@@ -27,6 +27,7 @@ import type { Product, Model, VideoHistoryItem } from '../../../stores/types'
 import type { VideoMode } from '../../../utils/models'
 import { createDefaultOneShotCardState } from '../cardState'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
+import { claimTask, releaseTask } from '../services/taskRegistry'
 import { buildReferencePreamble } from '../services/generateBroll'
 import { resolveOneShotTokens } from '../services/generateOneShot'
 import { applyStyleToPrompt } from '../services/generateContinuous'
@@ -259,6 +260,7 @@ export default function OneShotView({
       ],
     }))
 
+    let claimedTaskId: string | null = null
     try {
       const { taskId, videoEndpoint } = await startVideoTask({
         prompt: styledPrompt,
@@ -277,6 +279,10 @@ export default function OneShotView({
           e.id === inFlightId ? { ...e, taskId, endpoint: videoEndpoint } : e,
         ),
       }))
+
+      // Own this poll before the taskId is persisted — see taskRegistry.
+      if (!claimTask('video', taskId)) return
+      claimedTaskId = taskId
 
       const res = await finishVideoTask(taskId, oneShotModelId, videoEndpoint, durationSeconds, card.aspectRatio)
       const assetRef = `asset://${res.assetId}`
@@ -324,6 +330,8 @@ export default function OneShotView({
         ),
       }))
       useAppStore.getState().addToast(`Video generation failed: ${msg}`, 'error')
+    } finally {
+      if (claimedTaskId) releaseTask('video', claimedTaskId)
     }
   }
 
@@ -343,7 +351,6 @@ export default function OneShotView({
 
   // ── Refresh-resume (lean copy of ScenesView's video-queue walker) ──
   const INFLIGHT_TTL_MS = 30 * 60 * 1000
-  const resumingRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     const now = Date.now()
     setCardStates((prev) => {
@@ -366,9 +373,9 @@ export default function OneShotView({
     for (const [key, card] of Object.entries(cardStates)) {
       for (const entry of card.inFlightVideos) {
         if (!entry.taskId) continue
-        const resumeKey = `oneshot-video:${entry.taskId}`
-        if (resumingRef.current.has(resumeKey)) continue
-        resumingRef.current.add(resumeKey)
+        // Skip tasks a live generation promise still owns — a view unmounted by
+        // a History/mode switch keeps polling, so resuming here would duplicate.
+        if (!claimTask('video', entry.taskId)) continue
         const { id: inFlightId, taskId, modelId, endpoint, durationSeconds, aspectRatio, resolution, audio, prompt, mode } = entry
         ;(async () => {
           try {
@@ -400,7 +407,7 @@ export default function OneShotView({
             })
             useAppStore.getState().addToast(`Video resume failed: ${msg}`, 'error')
           } finally {
-            resumingRef.current.delete(resumeKey)
+            releaseTask('video', taskId)
           }
         })()
       }
@@ -509,12 +516,23 @@ export default function OneShotView({
       setDownloadingAll(false)
     }
   }
-  // Credits for the pending run — summed per clip at each card's settings.
+  // Credits for the pending run — summed per clip at each card's settings,
+  // put through the SAME fire-time clamp runSegmentVideo applies (duration
+  // snapped up onto the model's grid, unsupported resolutions swapped). A card
+  // planned on another model otherwise quotes a duration this model can't bill
+  // — exactly the stale-plan case the banner above warns about.
+  const confirmConstraints = getModel(oneShotModelId)?.videoConstraints
   const confirmCredits = confirmGen
     ? confirmGen.keys.reduce((sum, k) => {
         const card = cardStates[k]
         if (!card) return sum
-        return sum + (estimateCredits(oneShotModelId, { durationSeconds: card.durationSeconds, resolution: card.resolution, audio: card.audio }) ?? 0)
+        const durationSeconds = confirmConstraints
+          ? snapVideoDurationUp(card.durationSeconds, confirmConstraints.durations)
+          : card.durationSeconds
+        const resolution = confirmConstraints && !confirmConstraints.resolutions.includes(card.resolution)
+          ? confirmConstraints.default ?? confirmConstraints.resolutions[0]
+          : card.resolution
+        return sum + (estimateCredits(oneShotModelId, { durationSeconds, resolution, audio: card.audio }) ?? 0)
       }, 0)
     : 0
   const overBudget = balance !== null && confirmCredits > balance

@@ -22,6 +22,7 @@ import type { VideoHistoryItem, Product, Model, BRoll } from '../../../stores/ty
 import { enhanceVariationPrompt, generateNewVariation, startImageTask, finishImageTask } from '../services/generateBroll'
 import { applyStyleToPrompt } from '../services/generateContinuous'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
+import { claimTask, releaseTask } from '../services/taskRegistry'
 import { sendClipToPlayground } from '../services/sendClipToPlayground'
 import { isPollTimeout } from '../../../utils/kie'
 import { useBankStore } from '../../../stores/bankStore'
@@ -344,6 +345,9 @@ export default function VariationCard(props: VariationCardProps) {
       return
     }
 
+    // Own this poll before the taskId lands in persisted state, so a resume
+    // walker on a remounted view can't start a second poll for the same task.
+    if (!claimTask('image', taskId)) return
     try {
       const imageUrl = await finishImageTask(taskId, modelId, imageResolution)
       const newImage: GeneratedImage = { imageUrl, prompt: promptText, modelId, createdAt: Date.now() }
@@ -364,6 +368,8 @@ export default function VariationCard(props: VariationCardProps) {
         ),
       }))
       useAppStore.getState().addToast(`Image generation failed: ${msg}`, 'error')
+    } finally {
+      releaseTask('image', taskId)
     }
   }
 
@@ -545,6 +551,7 @@ export default function VariationCard(props: VariationCardProps) {
       ],
     }))
 
+    let claimedTaskId: string | null = null
     try {
       // Same fire-time restyle as image gen — STYLE block + realism-stack toggle
       // for a stylized pick; the persisted prompt/history stay unstyled.
@@ -575,6 +582,10 @@ export default function VariationCard(props: VariationCardProps) {
           e.id === inFlightId ? { ...e, taskId, endpoint: videoEndpoint } : e,
         ),
       }))
+
+      // Own this poll before the taskId is persisted — see taskRegistry.
+      if (!claimTask('video', taskId)) return
+      claimedTaskId = taskId
 
       const res = await finishVideoTask(
         taskId,
@@ -640,6 +651,8 @@ export default function VariationCard(props: VariationCardProps) {
         ),
       }))
       useAppStore.getState().addToast(`Video generation failed: ${msg}`, 'error')
+    } finally {
+      if (claimedTaskId) releaseTask('video', claimedTaskId)
     }
   }
 

@@ -47,6 +47,7 @@ import type { Product, Model, VideoHistoryItem, BRoll } from '../../../stores/ty
 import { createDefaultContinuousFrameState, createDefaultContinuousClipState } from '../cardState'
 import { startImageTask, finishImageTask } from '../services/generateBroll'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
+import { claimTask, releaseTask } from '../services/taskRegistry'
 import {
   buildContinuousPrompt,
   buildContinuousPreamble,
@@ -348,6 +349,8 @@ export default function ContinuousView({
       return false
     }
 
+    // Own this poll before the taskId is persisted — see taskRegistry.
+    if (!claimTask('image', taskId)) return false
     try {
       const imageUrl = await finishImageTask(taskId, modelId, resolution)
       const newImage: GeneratedImage = { imageUrl, prompt: promptText, modelId, createdAt: Date.now() }
@@ -372,6 +375,8 @@ export default function ContinuousView({
       }))
       useAppStore.getState().addToast(`Image generation failed: ${msg}`, 'error')
       return false
+    } finally {
+      releaseTask('image', taskId)
     }
   }
 
@@ -479,6 +484,7 @@ export default function ContinuousView({
       ],
     }))
 
+    let claimedTaskId: string | null = null
     try {
       const { taskId, videoEndpoint } = await startVideoTask({
         prompt: promptText,
@@ -495,6 +501,10 @@ export default function ContinuousView({
       updateClip(key, (prev) => ({
         inFlightVideos: prev.inFlightVideos.map((e) => (e.id === inFlightId ? { ...e, taskId, endpoint: videoEndpoint } : e)),
       }))
+
+      // Own this poll before the taskId is persisted — see taskRegistry.
+      if (!claimTask('video', taskId)) return
+      claimedTaskId = taskId
 
       const res = await finishVideoTask(taskId, continuousModelId, videoEndpoint, durationSeconds, '9:16')
       const assetRef = `asset://${res.assetId}`
@@ -536,6 +546,8 @@ export default function ContinuousView({
         inFlightVideos: prev.inFlightVideos.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)),
       }))
       useAppStore.getState().addToast(`Video generation failed: ${msg}`, 'error')
+    } finally {
+      if (claimedTaskId) releaseTask('video', claimedTaskId)
     }
   }
 
@@ -594,6 +606,7 @@ export default function ContinuousView({
       ],
     }))
 
+    let claimedTaskId: string | null = null
     try {
       const { taskId, videoEndpoint } = await startVideoTask({
         prompt: promptText,
@@ -610,6 +623,10 @@ export default function ContinuousView({
       updateFrame(frameKey, (prev) => ({
         inFlightVideos: prev.inFlightVideos.map((e) => (e.id === inFlightId ? { ...e, taskId, endpoint: videoEndpoint } : e)),
       }))
+
+      // Own this poll before the taskId is persisted — see taskRegistry.
+      if (!claimTask('video', taskId)) return
+      claimedTaskId = taskId
 
       const res = await finishVideoTask(taskId, continuousAnimateModelId, videoEndpoint, durationSeconds, '9:16')
       const assetRef = `asset://${res.assetId}`
@@ -634,13 +651,14 @@ export default function ContinuousView({
         inFlightVideos: prev.inFlightVideos.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)),
       }))
       useAppStore.getState().addToast(`Video generation failed: ${msg}`, 'error')
+    } finally {
+      if (claimedTaskId) releaseTask('video', claimedTaskId)
     }
   }
 
   // ── Refresh-resume (images + videos) ─────────────────────────
   const IMG_TTL_MS = 30 * 60 * 1000
   const VID_TTL_MS = 60 * 60 * 1000
-  const resumingRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     const now = Date.now()
     setFrameStates((prev) => {
@@ -679,9 +697,9 @@ export default function ContinuousView({
     for (const [key, cs] of Object.entries(frameStates)) {
       for (const entry of cs.inFlightImages) {
         if (!entry.taskId || !entry.modelId) continue
-        const resumeKey = `cont-image:${entry.taskId}`
-        if (resumingRef.current.has(resumeKey)) continue
-        resumingRef.current.add(resumeKey)
+        // Skip tasks a live generation promise still owns — a view unmounted by
+        // a History/mode switch keeps polling, so resuming here would duplicate.
+        if (!claimTask('image', entry.taskId)) continue
         const { id: inFlightId, taskId, modelId, prompt, resolution } = entry
         ;(async () => {
           try {
@@ -701,7 +719,7 @@ export default function ContinuousView({
               return { ...prev, [key]: { ...existing, inFlightImages: existing.inFlightImages.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)) } }
             })
           } finally {
-            resumingRef.current.delete(resumeKey)
+            releaseTask('image', taskId)
           }
         })()
       }
@@ -709,9 +727,7 @@ export default function ContinuousView({
     for (const [key, cs] of Object.entries(clipStates)) {
       for (const entry of cs.inFlightVideos) {
         if (!entry.taskId) continue
-        const resumeKey = `cont-video:${entry.taskId}`
-        if (resumingRef.current.has(resumeKey)) continue
-        resumingRef.current.add(resumeKey)
+        if (!claimTask('video', entry.taskId)) continue
         const { id: inFlightId, taskId, modelId, endpoint, durationSeconds, aspectRatio, resolution, audio, prompt, mode } = entry
         ;(async () => {
           try {
@@ -743,7 +759,7 @@ export default function ContinuousView({
             })
             useAppStore.getState().addToast(`Video resume failed: ${msg}`, 'error')
           } finally {
-            resumingRef.current.delete(resumeKey)
+            releaseTask('video', taskId)
           }
         })()
       }
@@ -752,9 +768,7 @@ export default function ContinuousView({
     for (const [key, cs] of Object.entries(frameStates)) {
       for (const entry of cs.inFlightVideos) {
         if (!entry.taskId) continue
-        const resumeKey = `cont-frame-video:${entry.taskId}`
-        if (resumingRef.current.has(resumeKey)) continue
-        resumingRef.current.add(resumeKey)
+        if (!claimTask('video', entry.taskId)) continue
         const { id: inFlightId, taskId, modelId, endpoint, durationSeconds, aspectRatio, resolution, audio, prompt, mode } = entry
         ;(async () => {
           try {
@@ -779,7 +793,7 @@ export default function ContinuousView({
               return { ...prev, [key]: { ...existing, inFlightVideos: existing.inFlightVideos.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)) } }
             })
           } finally {
-            resumingRef.current.delete(resumeKey)
+            releaseTask('video', taskId)
           }
         })()
       }
@@ -903,11 +917,22 @@ export default function ContinuousView({
     setIncludeExisting(false)
     setConfirmGen({ kind: 'frames', fresh, done })
   }
+  // Put each clip through the SAME fire-time clamp runClipVideo applies —
+  // duration snapped up onto the model's grid, unsupported resolutions swapped.
+  // Swapping the model inside this dialog otherwise costs every clip at its old
+  // settings while kie bills the clamped ones.
+  const confirmClipConstraints = getModel(continuousModelId)?.videoConstraints
   const confirmCredits = confirmGen?.kind === 'clips'
     ? confirmGen.sceneIndices.reduce((sum, i) => {
         const c = clipStates[clipKey(i)]
         if (!c) return sum
-        return sum + (estimateCredits(continuousModelId, { durationSeconds: c.durationSeconds, resolution: c.resolution, audio: c.audio }) ?? 0)
+        const durationSeconds = confirmClipConstraints
+          ? snapVideoDurationUp(c.durationSeconds, confirmClipConstraints.durations)
+          : c.durationSeconds
+        const resolution = confirmClipConstraints && !confirmClipConstraints.resolutions.includes(c.resolution)
+          ? confirmClipConstraints.default ?? confirmClipConstraints.resolutions[0]
+          : c.resolution
+        return sum + (estimateCredits(continuousModelId, { durationSeconds, resolution, audio: c.audio }) ?? 0)
       }, 0)
     : 0
   const overBudget = balance !== null && confirmGen?.kind === 'clips' && confirmCredits > balance
