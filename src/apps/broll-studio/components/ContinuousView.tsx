@@ -20,9 +20,15 @@ import {
   Copy,
   Bookmark,
   Film,
+  ChevronRight,
+  Star,
 } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import GeneratingBackdrop from '../../../components/GeneratingBackdrop'
+import ModelPicker from '../../../components/ModelPicker'
+import ModelSidePanel from '../../../components/ModelSidePanel'
+import ProviderLogo from '../../../components/ProviderLogo'
+import SavingsPill from '../../../components/SavingsPill'
 import { ContinuousFrameModal, ContinuousClipModal } from './ContinuousDetailModals'
 import type {
   ContinuousResult,
@@ -49,6 +55,7 @@ import {
   enhanceContinuousMotion,
   regenerateContinuousMotion,
   CONTINUOUS_DEFAULT_MODEL_ID,
+  CONTINUOUS_MODEL_IDS,
 } from '../services/generateContinuous'
 import { isPollTimeout } from '../../../utils/kie'
 import { useBankStore } from '../../../stores/bankStore'
@@ -58,7 +65,7 @@ import { useCreditsStore } from '../../../stores/creditsStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
-import { getModel, snapVideoDurationUp, estimateCredits, formatCredits, type VideoMode } from '../../../utils/models'
+import { getModel, snapVideoDurationUp, estimateCredits, formatCredits, officialSavingsPercent, type VideoMode } from '../../../utils/models'
 import { humanizeError } from '../../../utils/friendlyError'
 import { downloadImage } from '../../../utils/downloadImage'
 import { downloadAssetsZip } from '../../../utils/downloadZip'
@@ -137,6 +144,8 @@ export default function ContinuousView({
     | null
   >(null)
   const [downloadingAll, setDownloadingAll] = useState(false)
+  // Video-model slide-in panel opened from inside the batch-generate dialog.
+  const [confirmModelPanelOpen, setConfirmModelPanelOpen] = useState(false)
   const balance = useCreditsStore((s) => s.balance)
   useCloseOnAppSwitch(!!confirmGen, () => setConfirmGen(null))
 
@@ -891,16 +900,19 @@ export default function ContinuousView({
 
       {/* Top strip — storyboard meta + the two batch actions. */}
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">
-          {result.scenes.length} {result.scenes.length === 1 ? 'scene' : 'scenes'} · {style.label} · ~{totalSeconds}s · {framesPicked}/{result.frames.length} keyframes picked
-        </span>
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
+          <span>{result.scenes.length} {result.scenes.length === 1 ? 'scene' : 'scenes'}</span>
+          <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{style.label}</span>
+          <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">~{totalSeconds}s</span>
+          <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{framesPicked}/{result.frames.length} keyframes picked</span>
+        </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => requestFrames()}
             disabled={chainRunning || anyFrameInFlight}
             title="Generate a keyframe image for every frame that doesn't have one yet, chained in order for consistency"
-            className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {chainRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
             {chainRunning ? 'Chaining frames…' : 'Generate frames'}
@@ -913,7 +925,7 @@ export default function ContinuousView({
             className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <VideoIcon className="h-3.5 w-3.5" />
-            Generate all clips
+            Generate all videos
           </button>
           {allClipEntries.length > 0 && (
             <button
@@ -921,7 +933,7 @@ export default function ContinuousView({
               onClick={() => void downloadAll()}
               disabled={downloadingAll}
               title="Download every generated clip as a single zip"
-              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {downloadingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
               {downloadingAll ? 'Zipping…' : `Download all (${allClipEntries.length})`}
@@ -981,7 +993,7 @@ export default function ContinuousView({
           confirm so a 12-frame chain never fires on a stray click. */}
       {confirmGen && createPortal(
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
           onClick={() => setConfirmGen(null)}
         >
           <div
@@ -991,12 +1003,40 @@ export default function ContinuousView({
             {confirmGen.kind === 'clips' ? (
               <>
                 <h3 className="text-sm font-medium text-ink-100">
-                  Generate {confirmGen.sceneIndices.length} clip{confirmGen.sceneIndices.length === 1 ? '' : 's'}?
+                  Generate {confirmGen.sceneIndices.length} video{confirmGen.sceneIndices.length === 1 ? '' : 's'}?
                 </h3>
                 <p className="mt-1 text-xs text-ink-500">
                   {confirmGen.scope} · all render in parallel and survive a refresh.
                 </p>
-                <div className="mt-4 flex items-center justify-between rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5 text-xs">
+
+                {/* Model — the frames-to-video model every video in this batch
+                    uses. Swapping it here re-costs the run below. */}
+                <div className="mt-4 flex flex-col gap-2.5">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Model</span>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmModelPanelOpen(true)}
+                    className="flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
+                  >
+                    {getModel(continuousModelId) ? (
+                      <>
+                        <ProviderLogo provider={getModel(continuousModelId)?.provider ?? ''} />
+                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                          <span className="truncate text-[13px] font-medium text-ink-100">{getModel(continuousModelId)?.displayName}</span>
+                          {getModel(continuousModelId)?.tags.includes('recommended') && (
+                            <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
+                          )}
+                          {officialSavingsPercent(continuousModelId) != null && <SavingsPill pct={officialSavingsPercent(continuousModelId)!} />}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
+                    )}
+                    <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
+                  </button>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5 text-xs">
                   <span className="text-ink-400">Estimated cost</span>
                   <span className="flex items-center gap-1 font-medium text-ink-100">
                     <Coins className="h-3 w-3" strokeWidth={2} />
@@ -1017,6 +1057,12 @@ export default function ContinuousView({
                 <p className="mt-1 text-xs text-ink-500">
                   Frames generate one after another so each can reference the previous keyframe — the chain keeps the style locked.
                 </p>
+
+                {/* Model — the image model every keyframe in this batch uses. */}
+                <div className="mt-4 flex flex-col gap-2.5">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Model</span>
+                  <ModelPicker appId="broll-studio" task="image" mode="text-to-image" />
+                </div>
               </>
             )}
             <div className="mt-4 flex items-center justify-end gap-2">
@@ -1038,6 +1084,26 @@ export default function ContinuousView({
               </button>
             </div>
           </div>
+
+          {/* Video-model slide-in, opened from the batch dialog (clips only).
+              Portals to body, so it layers above this dialog cleanly. */}
+          {confirmGen.kind === 'clips' && (
+            <ModelSidePanel
+              appId="broll-studio"
+              task="video"
+              allowedModelIds={CONTINUOUS_MODEL_IDS}
+              value={continuousModelId}
+              onChange={(id) => useSettingsStore.getState().setAppModel('broll-studio:continuous:video', id)}
+              isOpen={confirmModelPanelOpen}
+              onClose={() => setConfirmModelPanelOpen(false)}
+              requireMode="frames-to-video"
+              requireModeNote="Continuous clips interpolate between two keyframes, so only frame-to-frame models are offered."
+              costParams={(() => {
+                const c = clipStates[clipKey(confirmGen.sceneIndices[0])]
+                return { durationSeconds: c?.durationSeconds ?? 5, resolution: c?.resolution ?? '720p', audio: c?.audio ?? true }
+              })()}
+            />
+          )}
         </div>,
         document.body,
       )}
@@ -1066,6 +1132,7 @@ export default function ContinuousView({
           }))}
           selectedImageIndex={openFrameSel?.conceptId === openConcept.id ? openFrameSel.imageIndex : null}
           onSelectImage={(i) => setSelections((prev) => ({ ...prev, [String(openFrame.index)]: { conceptId: openConcept.id, imageIndex: i } }))}
+          onSaveImage={saveKeyframeToBank}
           onClose={() => setOpenFrameKey(null)}
           onUpdate={(updater) => updateFrame(openFrameKey, updater)}
           onGenerate={() => void runFrameImage(openFrameKey)}

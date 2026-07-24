@@ -14,6 +14,7 @@ import {
   Package,
   Link2,
   Download,
+  Bookmark,
   Check,
   RefreshCw,
   Trash2,
@@ -140,6 +141,8 @@ interface ContinuousFrameModalProps {
   // Which image (if any) of THIS concept is the frame's chosen keyframe.
   selectedImageIndex: number | null
   onSelectImage: (index: number) => void
+  // Save a generated keyframe still to the B-Rolls bank (reusable start frame).
+  onSaveImage: (imageRef: string, prompt: string) => Promise<void>
   onClose: () => void
   onUpdate: (updater: (prev: ContinuousFrameCardState) => Partial<ContinuousFrameCardState>) => void
   onGenerate: () => void
@@ -175,6 +178,7 @@ export function ContinuousFrameModal({
   onRemoveExtraRef,
   selectedImageIndex,
   onSelectImage,
+  onSaveImage,
   onClose,
   onUpdate,
   onGenerate,
@@ -290,10 +294,6 @@ export function ContinuousFrameModal({
               <div className="-mx-5 -mt-1 border-b border-ink/5" />
 
               {frameTab === 'image' && (<>
-              {/* Image model — the same app-wide picker the Line-by-Line card
-                  uses, so a model swap applies across the whole storyboard. */}
-              <ModelPicker appId="broll-studio" task="image" mode="text-to-image" />
-
               <StyleNote style={style} />
 
               {/* Reference toggles — the chain ref (previous keyframe) is the
@@ -403,49 +403,9 @@ export function ContinuousFrameModal({
 
               {frameTab === 'animate' && (
                 <>
-                  {/* Video model — its own pick for the standalone animate. The
-                      still rides as a start frame or reference depending on what
-                      the picked model supports. */}
-                  <button
-                    type="button"
-                    onClick={() => setAnimateModelPanelOpen(true)}
-                    className="flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
-                  >
-                    {animateModel ? (
-                      <>
-                        <ProviderLogo provider={animateModel.provider ?? ''} />
-                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                          <span className="truncate text-[13px] font-medium text-ink-100">{animateModel.displayName}</span>
-                          {animateModel.tags.includes('recommended') && (
-                            <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
-                          )}
-                          {officialSavingsPercent(animateModelId) != null && <SavingsPill pct={officialSavingsPercent(animateModelId)!} />}
-                        </div>
-                      </>
-                    ) : (
-                      <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
-                    )}
-                    <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
-                  </button>
-                  <ModelSidePanel
-                    appId="broll-studio"
-                    task="video"
-                    allowedModelIds={CONTINUOUS_MODEL_IDS}
-                    requireAnyModes={['image-to-video', 'reference-to-video']}
-                    requireModeNote="Greyed-out models can't animate a single still — they take neither a start frame nor reference images."
-                    value={animateModelId}
-                    onChange={(id) => useSettingsStore.getState().setAppModel('broll-studio:continuous:animate', id)}
-                    isOpen={animateModelPanelOpen}
-                    onClose={() => setAnimateModelPanelOpen(false)}
-                    costParams={{ durationSeconds: cardState.videoDurationSeconds, resolution: cardState.videoResolution, audio: cardState.videoAudio }}
-                  />
-
                   {/* Start frame — the chosen still this animation begins on. */}
                   <div>
                     <span className="text-sm font-medium text-ink-200">Start frame</span>
-                    <p className="mt-1 text-[11px] leading-relaxed text-ink-500">
-                      This frame's chosen image animates on its own — a standalone clip, not chained into the next keyframe.
-                    </p>
                     <div className="mt-2">
                       {startImageUrl ? (
                         <div className="relative max-w-[120px] overflow-hidden rounded-xl border border-ink/10 bg-ink/[0.02]" style={{ aspectRatio: '9 / 16' }}>
@@ -477,7 +437,7 @@ export function ContinuousFrameModal({
                         ? 'The still is used as the start frame.'
                         : animateModel?.modes?.includes('reference-to-video')
                           ? 'The still is used as a reference image (this model has no start-frame mode).'
-                          : "This model can't animate a still — pick another above."}
+                          : "This model can't animate a still — pick another below."}
                     </p>
                   </div>
                 </>
@@ -490,6 +450,12 @@ export function ContinuousFrameModal({
           <div className="shrink-0 border-t border-ink/5 px-5 py-4">
             {frameTab === 'image' ? (
               <>
+                {/* Image model — the same app-wide picker the Line-by-Line card
+                    uses, so a model swap applies across the whole storyboard.
+                    Sits just above the output chips (opens upward). */}
+                <div className="mb-3">
+                  <ModelPicker appId="broll-studio" task="image" mode="text-to-image" />
+                </div>
                 <div className="mb-3 flex flex-wrap items-center gap-1.5">
                   {resolutions.length > 0 && (
                     <ConstraintChip
@@ -537,6 +503,44 @@ export function ContinuousFrameModal({
               </>
             ) : (
               <>
+                {/* Video model — its own pick for the standalone animate. The
+                    still rides as a start frame or reference depending on what
+                    the picked model supports. Sits just above the output chips. */}
+                <div className="mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setAnimateModelPanelOpen(true)}
+                    className="flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
+                  >
+                    {animateModel ? (
+                      <>
+                        <ProviderLogo provider={animateModel.provider ?? ''} />
+                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                          <span className="truncate text-[13px] font-medium text-ink-100">{animateModel.displayName}</span>
+                          {animateModel.tags.includes('recommended') && (
+                            <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
+                          )}
+                          {officialSavingsPercent(animateModelId) != null && <SavingsPill pct={officialSavingsPercent(animateModelId)!} />}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
+                    )}
+                    <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
+                  </button>
+                  <ModelSidePanel
+                    appId="broll-studio"
+                    task="video"
+                    allowedModelIds={CONTINUOUS_MODEL_IDS}
+                    requireAnyModes={['image-to-video', 'reference-to-video']}
+                    requireModeNote="Greyed-out models can't animate a single still — they take neither a start frame nor reference images."
+                    value={animateModelId}
+                    onChange={(id) => useSettingsStore.getState().setAppModel('broll-studio:continuous:animate', id)}
+                    isOpen={animateModelPanelOpen}
+                    onClose={() => setAnimateModelPanelOpen(false)}
+                    costParams={{ durationSeconds: cardState.videoDurationSeconds, resolution: cardState.videoResolution, audio: cardState.videoAudio }}
+                  />
+                </div>
                 <div className="mb-3 flex flex-wrap items-center gap-1.5">
                   {animateConstraints && (
                     <>
@@ -660,8 +664,10 @@ export function ContinuousFrameModal({
                       <FrameImageTile
                         key={`${image.imageUrl}-${i}`}
                         imageRef={image.imageUrl}
+                        prompt={image.prompt}
                         isKeyframe={selectedImageIndex === i}
                         onSelect={() => onSelectImage(i)}
+                        onSave={onSaveImage}
                       />
                     ))}
                   </div>
@@ -718,17 +724,35 @@ export function ContinuousFrameModal({
   )
 }
 
-function FrameImageTile({ imageRef, isKeyframe, onSelect }: {
+function FrameImageTile({ imageRef, prompt, isKeyframe, onSelect, onSave }: {
   imageRef: string
+  prompt: string
   isKeyframe: boolean
   onSelect: () => void
+  onSave: (imageRef: string, prompt: string) => Promise<void>
 }) {
   const url = useAssetUrl(imageRef)
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
   const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation()
     const resolved = await getUrl(imageRef)
     if (!resolved) { useAppStore.getState().addToast('Could not load the image.', 'error'); return }
     await downloadImage(resolved, 'continuous-keyframe', 'png')
+  }
+  const handleSave = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (saved || saving) return
+    setSaving(true)
+    try {
+      await onSave(imageRef, prompt)
+      setSaved(true)
+      useAppStore.getState().addToast('Saved to B-Rolls bank', 'success')
+    } catch (err) {
+      useAppStore.getState().addToast(humanizeError(err, 'Save failed'), 'error')
+    } finally {
+      setSaving(false)
+    }
   }
   return (
     <div
@@ -750,6 +774,16 @@ function FrameImageTile({ imageRef, isKeyframe, onSelect }: {
       )}
       <div className="pointer-events-none absolute right-1.5 top-1.5 flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
         <button type="button" title="Download" onClick={handleDownload} className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm hover:bg-black/80"><Download className="h-3.5 w-3.5" /></button>
+        <button
+          type="button"
+          title={saved ? 'Saved to B-Rolls bank' : saving ? 'Saving…' : 'Save to B-Rolls bank'}
+          onClick={handleSave}
+          className={`pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full backdrop-blur-sm transition-colors ${
+            saved ? 'bg-emerald-500/40 text-emerald-100' : 'bg-black/60 text-white hover:bg-black/80'
+          }`}
+        >
+          {saved ? <Check className="h-3.5 w-3.5" /> : saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bookmark className="h-3.5 w-3.5" />}
+        </button>
       </div>
     </div>
   )
