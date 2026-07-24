@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react'
-import { X, Plus, Mic, Film, UserRound, Loader2 } from 'lucide-react'
+import { X, Plus, Mic, Film, Loader2 } from 'lucide-react'
 import BankPicker from '../../../components/BankPicker'
 import SlotActionMenu from '../../../components/video/SlotActionMenu'
 import AnchoredPopover from '../../../components/video/AnchoredPopover'
-import { RefSlotPill, RefChip } from '../../../components/video/RefSlot'
+import { RefGroup, ImageTile, AddTile, MediaCard, MediaAddCard } from '../../../components/video/refInputParts'
 import { readMediaDuration } from '../../../utils/media'
 import { fileToDataUri } from '../../../utils/kie'
 import { isAssetRef, getAsBase64 } from '../../../utils/assetStore'
@@ -147,19 +147,31 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
     onChangeRefs(refs.filter((r) => r !== target))
   }
 
-  // Fragment, not a block: characters / voices / source clip flow into the
-  // parent's attachment row alongside the reference-image slot.
+  // Three labelled groups — characters, voices, source clip — each stacking in
+  // the parent's reference column below the image slots.
   return (
     <>
-      <RefSlotPill
-        triggerRef={characterTriggerRef}
-        icon={UserRound}
-        label="Characters"
-        count={characterRefs.length}
-        max={MAX_CHARACTERS}
-        disabled={characterRefs.length >= MAX_CHARACTERS}
-        onClick={() => setCharacterMenuOpen((v) => !v)}
-      />
+      <RefGroup label="Characters" count={characterRefs.length} max={MAX_CHARACTERS}>
+        <div className="flex flex-wrap gap-1.5">
+          {characterRefs.map((r) => (
+            <ImageTile
+              key={r.bankModelId ?? r.omniId}
+              src={r.url}
+              label={r.label}
+              accent
+              onRemove={() => removeRef(r)}
+            />
+          ))}
+          {uploadingCharacter && (
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-ink/10 bg-ink/[0.03] text-ink-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          )}
+          {characterRefs.length < MAX_CHARACTERS && (
+            <AddTile triggerRef={characterTriggerRef} onClick={() => setCharacterMenuOpen((v) => !v)} />
+          )}
+        </div>
+      </RefGroup>
       {characterRefs.length < MAX_CHARACTERS && (
         <SlotActionMenu
           anchorRef={characterTriggerRef}
@@ -169,21 +181,6 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
           onPickFromBank={() => setCharacterPickerOpen(true)}
         />
       )}
-      {characterRefs.map((r) => (
-        <RefChip
-          key={r.bankModelId ?? r.omniId}
-          thumbnail={r.url}
-          label={r.label}
-          accent
-          onRemove={() => removeRef(r)}
-        />
-      ))}
-      {uploadingCharacter && (
-        <div className="flex h-9 shrink-0 items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-3 text-[12px] text-ink-400">
-          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
-          Creating character…
-        </div>
-      )}
       <input
         ref={characterFileRef}
         type="file"
@@ -192,15 +189,76 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
         onChange={(e) => { void handleCharacterUpload(e.target.files?.[0] ?? null); e.target.value = '' }}
       />
 
-      <RefSlotPill
-        triggerRef={voiceTriggerRef}
-        icon={Mic}
-        label="Voices"
-        count={voiceRefs.length}
-        max={MAX_VOICES}
-        disabled={voiceRefs.length >= MAX_VOICES}
-        onClick={() => setVoiceMenuOpen((v) => !v)}
-      />
+      {/* Voices and Source clip share a row — both are compact, single-column
+          lists, so side by side saves the vertical space of two stacked groups. */}
+      <div className="grid grid-cols-2 items-start gap-2">
+        <RefGroup label="Voices" count={voiceRefs.length} max={MAX_VOICES}>
+          <div className="flex flex-col gap-1.5">
+            {voiceRefs.map((r) => (
+              <MediaCard key={r.omniId} icon={Mic} label={r.label} onRemove={() => removeRef(r)} />
+            ))}
+            {voiceRefs.length < MAX_VOICES && (
+              <MediaAddCard
+                icon={Mic}
+                label="Add voice"
+                triggerRef={voiceTriggerRef}
+                onClick={() => setVoiceMenuOpen((v) => !v)}
+              />
+            )}
+          </div>
+        </RefGroup>
+
+        <RefGroup label="Source clip">
+          {clipRef ? (
+            <div className="flex flex-col gap-1.5">
+              <MediaCard
+                icon={Film}
+                label={clipRef.label}
+                meta={clipRef.durationSeconds != null ? `${Math.round(clipRef.durationSeconds)}s clip` : undefined}
+                onRemove={() => removeRef(clipRef)}
+              />
+              {/* Trim window — which slice of the clip Omni actually sees. */}
+              <div className="flex items-center gap-1 self-start rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-1 text-[11px] text-ink-500">
+                <input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={clipRef.clipStart ?? 0}
+                  onChange={(e) => {
+                    const start = Math.max(0, Number(e.target.value) || 0)
+                    const ends = Math.min(clipRef.clipEnds ?? start + MAX_CLIP_WINDOW_S, start + MAX_CLIP_WINDOW_S)
+                    patchClip({ clipStart: start, clipEnds: Math.max(ends, start + 0.5) })
+                  }}
+                  className="w-7 bg-transparent text-center text-[12px] text-ink-200 outline-none"
+                />
+                <span>→</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  value={clipRef.clipEnds ?? MAX_CLIP_WINDOW_S}
+                  onChange={(e) => {
+                    const start = clipRef.clipStart ?? 0
+                    let ends = Number(e.target.value) || 0
+                    ends = Math.min(ends, start + MAX_CLIP_WINDOW_S)
+                    if (clipRef.durationSeconds) ends = Math.min(ends, clipRef.durationSeconds)
+                    patchClip({ clipEnds: Math.max(ends, start + 0.5) })
+                  }}
+                  className="w-7 bg-transparent text-center text-[12px] text-ink-200 outline-none"
+                />
+                <span>s</span>
+              </div>
+            </div>
+          ) : (
+            <MediaAddCard
+              icon={Film}
+              label="Upload clip"
+              helper={`≤ ${MAX_CLIP_WINDOW_S}s`}
+              onClick={() => clipInputRef.current?.click()}
+            />
+          )}
+        </RefGroup>
+      </div>
       {voiceRefs.length < MAX_VOICES && (
         <AnchoredPopover
           anchorRef={voiceTriggerRef}
@@ -240,58 +298,6 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
             <span>Design new voice…</span>
           </button>
         </AnchoredPopover>
-      )}
-      {voiceRefs.map((r) => (
-        <RefChip key={r.omniId} icon={Mic} label={r.label} onRemove={() => removeRef(r)} />
-      ))}
-
-      {clipRef ? (
-        <>
-          <RefChip
-            icon={Film}
-            label={clipRef.label}
-            meta={clipRef.durationSeconds != null ? `${Math.round(clipRef.durationSeconds)}s` : undefined}
-            onRemove={() => removeRef(clipRef)}
-          />
-          {/* Trim window — which slice of the clip Omni actually sees. */}
-          <div className="flex h-9 shrink-0 items-center gap-1 rounded-full border border-ink/10 bg-ink/[0.03] px-2.5 text-[11px] text-ink-500">
-            <input
-              type="number"
-              min={0}
-              step={0.5}
-              value={clipRef.clipStart ?? 0}
-              onChange={(e) => {
-                const start = Math.max(0, Number(e.target.value) || 0)
-                const ends = Math.min(clipRef.clipEnds ?? start + MAX_CLIP_WINDOW_S, start + MAX_CLIP_WINDOW_S)
-                patchClip({ clipStart: start, clipEnds: Math.max(ends, start + 0.5) })
-              }}
-              className="w-8 bg-transparent text-center text-[12px] text-ink-200 outline-none"
-            />
-            <span>→</span>
-            <input
-              type="number"
-              min={0}
-              step={0.5}
-              value={clipRef.clipEnds ?? MAX_CLIP_WINDOW_S}
-              onChange={(e) => {
-                const start = clipRef.clipStart ?? 0
-                let ends = Number(e.target.value) || 0
-                ends = Math.min(ends, start + MAX_CLIP_WINDOW_S)
-                if (clipRef.durationSeconds) ends = Math.min(ends, clipRef.durationSeconds)
-                patchClip({ clipEnds: Math.max(ends, start + 0.5) })
-              }}
-              className="w-8 bg-transparent text-center text-[12px] text-ink-200 outline-none"
-            />
-            <span>s</span>
-          </div>
-        </>
-      ) : (
-        <RefSlotPill
-          icon={Film}
-          label="Source Clip"
-          helper={`≤ ${MAX_CLIP_WINDOW_S}s`}
-          onClick={() => clipInputRef.current?.click()}
-        />
       )}
       <input
         ref={clipInputRef}

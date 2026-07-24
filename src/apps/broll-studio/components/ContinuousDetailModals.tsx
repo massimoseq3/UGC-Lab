@@ -898,47 +898,6 @@ export function ContinuousClipModal({
               </div>
               <div className="-mx-5 -mt-1 border-b border-ink/5" />
 
-              {/* Video model — picked HERE rather than in the left input panel:
-                  the model only matters once there are keyframes to animate.
-                  Frames-to-video capable models only. */}
-              <button
-                type="button"
-                onClick={() => setModelPanelOpen(true)}
-                className="flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
-              >
-                {model ? (
-                  <>
-                    <ProviderLogo provider={model.provider ?? ''} />
-                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                      <span className="truncate text-[13px] font-medium text-ink-100">{model.displayName}</span>
-                      {model.tags.includes('recommended') && (
-                        <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
-                      )}
-                      {officialSavingsPercent(modelId) != null && <SavingsPill pct={officialSavingsPercent(modelId)!} />}
-                    </div>
-                  </>
-                ) : (
-                  <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
-                )}
-                <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
-              </button>
-              <ModelSidePanel
-                appId="broll-studio"
-                task="video"
-                allowedModelIds={CONTINUOUS_MODEL_IDS}
-                value={modelId}
-                onChange={(id) => useSettingsStore.getState().setAppModel('broll-studio:continuous:video', id)}
-                isOpen={modelPanelOpen}
-                onClose={() => setModelPanelOpen(false)}
-                requireMode="frames-to-video"
-                requireModeNote="Continuous clips interpolate between two keyframes, so only frame-to-frame models are offered."
-                costParams={{
-                  durationSeconds: cardState.durationSeconds,
-                  resolution: cardState.resolution,
-                  audio: cardState.audio,
-                }}
-              />
-
               {/* Start → end keyframes this clip interpolates between. */}
               <div className="flex items-center gap-3">
                 <EndpointThumb label="Start frame" imageRef={startImageRef} />
@@ -1017,6 +976,45 @@ export function ContinuousClipModal({
           </div>
 
           <div className="shrink-0 border-t border-ink/5 px-5 py-4">
+            {/* Video model — sits directly above the output pills it configures
+                (frames-to-video capable models only). */}
+            <button
+              type="button"
+              onClick={() => setModelPanelOpen(true)}
+              className="mb-3 flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
+            >
+              {model ? (
+                <>
+                  <ProviderLogo provider={model.provider ?? ''} />
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className="truncate text-[13px] font-medium text-ink-100">{model.displayName}</span>
+                    {model.tags.includes('recommended') && (
+                      <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
+                    )}
+                    {officialSavingsPercent(modelId) != null && <SavingsPill pct={officialSavingsPercent(modelId)!} />}
+                  </div>
+                </>
+              ) : (
+                <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
+              )}
+              <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
+            </button>
+            <ModelSidePanel
+              appId="broll-studio"
+              task="video"
+              allowedModelIds={CONTINUOUS_MODEL_IDS}
+              value={modelId}
+              onChange={(id) => useSettingsStore.getState().setAppModel('broll-studio:continuous:video', id)}
+              isOpen={modelPanelOpen}
+              onClose={() => setModelPanelOpen(false)}
+              requireMode="frames-to-video"
+              requireModeNote="Continuous clips interpolate between two keyframes, so only frame-to-frame models are offered."
+              costParams={{
+                durationSeconds: cardState.durationSeconds,
+                resolution: cardState.resolution,
+                audio: cardState.audio,
+              }}
+            />
             <div className="mb-3 flex flex-wrap items-center gap-1.5">
               {constraints && (
                 <>

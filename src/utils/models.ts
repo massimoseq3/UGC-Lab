@@ -795,11 +795,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       default: '1080p',
       aspectRatios: ['16:9', '9:16'],
     },
-    // The video default for both video surfaces. Note Omni has no
-    // 'image-to-video' mode — it takes every image as a generic reference, not
-    // as frame one — so B-Roll's Animate tab greys it out and asks for Veo /
-    // Seedance instead. That's the one flow where the default isn't the answer.
-    defaultFor: ['broll-studio', 'playground'],
+    // Ref-capable, but no 'image-to-video' mode — it takes every image as a
+    // generic reference, not as frame one — so B-Roll's Animate tab greys it
+    // out and asks for Veo / Seedance instead. It's still the recommended Omni
+    // pick, but the *default* video model is Grok Imagine 1.5 (below), which
+    // does image-to-video and so works everywhere including Animate.
   },
   // Wan 2.7 — Alibaba Tongyi's video suite. kie exposes T2V and I2V as
   // separate slugs; we register one virtual id and resolve to the real slug
@@ -869,6 +869,10 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       aspectRatios: ['16:9', '9:16', '1:1', '3:2', '2:3'],
       supportsAudio: false,
     },
+    // Default video model for Playground and B-Roll (Line-by-Line): cheap, fast,
+    // does text/image/reference-to-video. One-Shot and Continuous keep their own
+    // Seedance 2.0 defaults.
+    defaultFor: ['broll-studio', 'playground'],
   },
 
   // ── Music generation (Suno via kie.ai) ────────────────────────

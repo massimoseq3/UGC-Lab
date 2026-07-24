@@ -39,7 +39,7 @@ export const CONTINUOUS_MODEL_IDS = [
   'gemini-omni-video',
 ]
 
-export const CONTINUOUS_DEFAULT_MODEL_ID = 'bytedance/seedance-2'
+export const CONTINUOUS_DEFAULT_MODEL_ID = 'bytedance/seedance-1.5-pro'
 
 // How many visual concepts each keyframe fans out into. More live in the
 // per-frame "Add concept" button.
