@@ -1039,6 +1039,15 @@ export default function VariationCard(props: VariationCardProps) {
               <VideoIcon className="h-3 w-3" />
               Video
             </button>
+            <button
+              type="button"
+              title="Open this card on the Animate tab"
+              onClick={(e) => { e.stopPropagation(); openDetail('animate') }}
+              className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/50 text-[10px] font-medium text-white backdrop-blur transition-colors hover:bg-black/70"
+            >
+              <Film className="h-3 w-3" />
+              Animate
+            </button>
           </div>
         </div>
 

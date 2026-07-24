@@ -555,9 +555,11 @@ export default function OneShotView({
 
       {/* Top strip — full-ad meta + Generate-all, mirroring ScenesView. */}
       <div className="mb-5 flex items-center justify-between gap-3">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">
-          {result.concepts.length} {result.concepts.length === 1 ? 'style' : 'styles'} · {result.delivery === 'dialogue' ? 'With Dialogue' : 'B-Roll'} · ~{result.estimatedSeconds}s
-        </span>
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
+          <span>{result.concepts.length} {result.concepts.length === 1 ? 'style' : 'styles'}</span>
+          <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{result.delivery === 'dialogue' ? 'With Dialogue' : 'B-Roll'}</span>
+          <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">~{result.estimatedSeconds}s</span>
+        </div>
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"

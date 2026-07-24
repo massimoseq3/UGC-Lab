@@ -419,93 +419,38 @@ export default function CardDetailModal(props: CardDetailModalProps) {
           {/* LEFT 50% — scrollable body (model + refs + prompt) over a pinned
               footer (output settings + Generate), mirroring the Playground panel. */}
           <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 md:border-b-0 md:border-r">
+            {/* Sticky header — the Image / Video / Animate toggle, pulled out of
+                the scroll area so it stays put while the body scrolls. Mirrors
+                the right panel's identity header (same px-5 pt-3, h-12 row, and
+                hairline) so the two line up across the modal. */}
+            <div className="flex flex-col gap-3 px-5 pt-3">
+              <div className="flex h-12 items-center">
+                <SegmentedToggle<Tab>
+                  className="h-10 !p-1"
+                  value={tab}
+                  onChange={setTab}
+                  options={[
+                    { value: 'image', label: 'Image', icon: ImageIcon },
+                    { value: 'video', label: 'Video', icon: VideoIcon },
+                    { value: 'animate', label: 'Animate', icon: Film },
+                  ]}
+                />
+              </div>
+              <div className="-mx-5 -mt-1 border-b border-ink/5" />
+            </div>
+
             {/* Scrollable body */}
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
               <div className="flex grow flex-col gap-3 px-5 pb-6 pt-3">
-                {/* Image / Video / Animate — slim segmented toggle (h-10 !p-1)
-                    to match the Playground mode toggle. Wrapped in an h-12 row so
-                    its baseline aligns with the stacked identity header opposite,
-                    keeping the two hairlines on one line across the modal. */}
-                <div className="flex h-12 items-center">
-                  <SegmentedToggle<Tab>
-                    className="h-10 !p-1"
-                    value={tab}
-                    onChange={setTab}
-                    options={[
-                      { value: 'image', label: 'Image', icon: ImageIcon },
-                      { value: 'video', label: 'Video', icon: VideoIcon },
-                      { value: 'animate', label: 'Animate', icon: Film },
-                    ]}
-                  />
-                </div>
-
-                {/* Full-width separator between the toggle and the controls
-                    below (breaks out of the px-5 column padding). */}
-                <div className="-mx-5 -mt-1 border-b border-ink/5" />
-
-                {/* Model picker — no heading (Playground style); constraint
-                    chips live in the pinned footer above Generate. */}
-                {tab === 'image' ? (
-                  <ModelPicker appId="broll-studio" task="image" mode="text-to-image" />
-                ) : (
-                  <>
-                    {/* Trigger button — opens the slide-in ModelSidePanel.
-                        Mirrors ModelPicker's trigger look (provider logo + name
-                        + star + "% off"), no heading (Playground style). */}
-                    <button
-                      type="button"
-                      onClick={() => setModelPanelOpen(true)}
-                      className="flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
-                    >
-                      {videoModelId ? (
-                        <>
-                          <ProviderLogo provider={getModel(videoModelId)?.provider ?? ''} />
-                          <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                            <span className="truncate text-[13px] font-medium text-ink-100">{videoModelName}</span>
-                            {getModel(videoModelId)?.tags.includes('recommended') && (
-                              <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
-                            )}
-                            {videoModelSavings != null && <SavingsPill pct={videoModelSavings} />}
-                          </div>
-                        </>
-                      ) : (
-                        <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
-                      )}
-                      {/* Chevron signals the slide-in panel; no credits badge
-                          here — costs show per-model in the panel. */}
-                      <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
-                    </button>
-                    <ModelSidePanel
-                      appId="broll-studio"
-                      task="video"
-                      isOpen={modelPanelOpen}
-                      onClose={() => setModelPanelOpen(false)}
-                      requireMode={tab === 'animate' ? undefined : (hasActiveRef ? 'reference-to-video' : undefined)}
-                      requireAnyModes={tab === 'animate' ? ['image-to-video', 'reference-to-video'] : undefined}
-                      requireModeNote={tab === 'animate'
-                        ? "Greyed-out models can't animate a still — they take neither a start frame nor reference images. Pick Seedance 2.0, Veo 3.1 Fast, Gemini Omni, or another still-capable model."
-                        : "Greyed-out models don't support reference image-to-video. To use these, generate still frames in the Image tab, then send them to Playground for start/end frames."}
-                      costParams={{
-                        durationSeconds: cardState.cardVideoDurationSeconds,
-                        resolution: cardState.cardVideoResolution,
-                        audio: cardState.cardVideoAudio,
-                      }}
-                    />
-                  </>
-                )}
-
                 {/* Animate tab → Start frame preview. Image/Video tabs →
                     the Influencer / Product reference slot cards + extra refs. */}
                 {tab === 'animate' ? (
                   <div>
                     <span className="text-sm font-medium text-ink-200">Start frame</span>
-                    <p className="mt-1 text-[11px] leading-relaxed text-ink-500">
-                      The still that gets animated. Click <span className="font-medium text-ink-400">Animate</span> on any image in the gallery to swap it.
-                    </p>
                     <div className="mt-2">
                       {effectiveAnimateFrame && animateFrameUrl ? (
                         <div
-                          className="relative max-w-[96px] overflow-hidden rounded-xl border border-ink/10 bg-ink/[0.02]"
+                          className="relative max-w-[72px] overflow-hidden rounded-xl border border-ink/10 bg-ink/[0.02]"
                           style={aspectStyle(cardState.cardVideoAspectRatio)}
                         >
                           <img src={animateFrameUrl} alt="" className="h-full w-full object-cover" />
@@ -568,28 +513,6 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         {videoModelName} doesn't support reference images — this will generate text-to-video only. Pick Veo 3.1 Fast or Seedance 2.0 to use your character/product.
                       </p>
                     )}
-                  </div>
-                )}
-
-                {/* Voice profile — one shared voice for every dialogue clip so
-                    the character sounds the same across scenes. Only on the
-                    Video / Animate tabs of a DIALOGUE card; edits update the
-                    value shared by all dialogue clips. */}
-                {isDialogue && onUpdateVoiceProfile && tab !== 'image' && (
-                  <div className="rounded-2xl border border-broll-500/20 bg-broll-500/[0.06] px-3 py-2.5">
-                    <div className="mb-1.5 flex items-center gap-1.5">
-                      <Volume2 className="h-3.5 w-3.5 text-broll-300 light:text-broll-600" />
-                      <span className="text-[12px] font-medium text-ink-100">Voice</span>
-                      <span className="text-[10px] text-ink-500">shared by every dialogue clip</span>
-                    </div>
-                    <textarea
-                      value={voiceDraft}
-                      onChange={(e) => setVoiceDraft(e.target.value)}
-                      onBlur={() => onUpdateVoiceProfile(voiceDraft)}
-                      rows={3}
-                      placeholder="How the character sounds — age, accent, pitch, pace, texture, energy. Written once, applied to every talking clip."
-                      className="w-full resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-[12px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
-                    />
                   </div>
                 )}
 
@@ -664,6 +587,28 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                     </div>
                   )}
                 </div>
+
+                {/* Voice profile — one shared voice for every dialogue clip so
+                    the character sounds the same across scenes. Sits below the
+                    prompt. Only on the Video / Animate tabs of a DIALOGUE card;
+                    edits update the value shared by all dialogue clips. */}
+                {isDialogue && onUpdateVoiceProfile && tab !== 'image' && (
+                  <div className="rounded-2xl border border-broll-500/20 bg-broll-500/[0.06] px-3 py-2.5">
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <Volume2 className="h-3.5 w-3.5 text-broll-300 light:text-broll-600" />
+                      <span className="text-[12px] font-medium text-ink-100">Voice</span>
+                      <span className="text-[10px] text-ink-500">shared by every dialogue clip</span>
+                    </div>
+                    <textarea
+                      value={voiceDraft}
+                      onChange={(e) => setVoiceDraft(e.target.value)}
+                      onBlur={() => onUpdateVoiceProfile(voiceDraft)}
+                      rows={3}
+                      placeholder="How the character sounds — age, accent, pitch, pace, texture, energy. Written once, applied to every talking clip."
+                      className="w-full resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-[12px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -671,6 +616,58 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                 / audio) just above the Generate button, separated by a hairline.
                 Matches the Playground panel's sticky footer; chips open upward. */}
             <div className="shrink-0 border-t border-ink/5 px-5 py-4">
+              {/* Model picker — sits directly above the output chips (Playground
+                  style); the picker's own dropdown/panel opens upward here. */}
+              <div className="mb-3">
+                {tab === 'image' ? (
+                  <ModelPicker appId="broll-studio" task="image" mode="text-to-image" />
+                ) : (
+                  <>
+                    {/* Trigger button — opens the slide-in ModelSidePanel.
+                        Mirrors ModelPicker's trigger look (provider logo + name
+                        + star + "% off"), no heading (Playground style). */}
+                    <button
+                      type="button"
+                      onClick={() => setModelPanelOpen(true)}
+                      className="flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
+                    >
+                      {videoModelId ? (
+                        <>
+                          <ProviderLogo provider={getModel(videoModelId)?.provider ?? ''} />
+                          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                            <span className="truncate text-[13px] font-medium text-ink-100">{videoModelName}</span>
+                            {getModel(videoModelId)?.tags.includes('recommended') && (
+                              <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
+                            )}
+                            {videoModelSavings != null && <SavingsPill pct={videoModelSavings} />}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
+                      )}
+                      {/* Chevron signals the slide-in panel; no credits badge
+                          here — costs show per-model in the panel. */}
+                      <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
+                    </button>
+                    <ModelSidePanel
+                      appId="broll-studio"
+                      task="video"
+                      isOpen={modelPanelOpen}
+                      onClose={() => setModelPanelOpen(false)}
+                      requireMode={tab === 'animate' ? undefined : (hasActiveRef ? 'reference-to-video' : undefined)}
+                      requireAnyModes={tab === 'animate' ? ['image-to-video', 'reference-to-video'] : undefined}
+                      requireModeNote={tab === 'animate'
+                        ? "Greyed-out models can't animate a still — they take neither a start frame nor reference images. Pick Seedance 2.0, Veo 3.1 Fast, Gemini Omni, or another still-capable model."
+                        : "Greyed-out models don't support reference image-to-video. To use these, generate still frames in the Image tab, then send them to Playground for start/end frames."}
+                      costParams={{
+                        durationSeconds: cardState.cardVideoDurationSeconds,
+                        resolution: cardState.cardVideoResolution,
+                        audio: cardState.cardVideoAudio,
+                      }}
+                    />
+                  </>
+                )}
+              </div>
               <div className="mb-3 flex flex-wrap items-center gap-1.5">
                 {tab === 'image'
                   ? imageConstraints && (
