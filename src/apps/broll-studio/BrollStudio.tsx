@@ -2,21 +2,23 @@ import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
-import type { Product, Model, Script, BrollHistoryItem } from '../../stores/types'
+import type { Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
 import type { BrollResult, PromptVariation, ReferenceImage, VariationTag, VariationRefs, CardState, BrollMode, OneShotDelivery, OneShotResult, OneShotCardState, ContinuousResult, ContinuousConcept, ContinuousSelection, ContinuousFrameCardState, ContinuousClipCardState } from './types'
 import { generateBroll } from './services/generateBroll'
 import { generateOneShot, generateOneShotVariation, buildDemoOneShotResult, ONE_SHOT_DEFAULT_MODEL_ID } from './services/generateOneShot'
-import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, CONTINUOUS_DEFAULT_MODEL_ID, CONTINUOUS_STYLES } from './services/generateContinuous'
+import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
 import InputPanel from './components/InputPanel'
 import RightPanel from './components/RightPanel'
+import { brollHistoryMode } from './components/BrollHistoryView'
 import { backfillCardState, backfillOneShotCardState, backfillContinuousFrameState, backfillContinuousClipState } from './cardState'
 import { useSettingsStore } from '../../stores/settingsStore'
 import BankPicker from '../../components/BankPicker'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 import { humanizeError } from '../../utils/friendlyError'
 import { fileToDataUri } from '../../utils/kie'
+import { getAsBase64, isAssetRef } from '../../utils/assetStore'
 
-type PickerMode = 'products' | 'models' | 'scripts' | null
+type PickerMode = 'products' | 'models' | 'scripts' | 'styleRefs' | null
 
 // Map old slash-form tag values onto the new single-word union. Variations
 // generated before iteration 3 carry strings like 'CHARACTER / SPEAKING';
@@ -175,7 +177,16 @@ export default function BrollStudio() {
     useSettingsStore((s) => s.perAppModel['broll-studio:oneshot:video']) ?? ONE_SHOT_DEFAULT_MODEL_ID
 
   // ── Continuous mode (keyframe chain) state ─────────────────────
-  const [continuousStyleId, setContinuousStyleId] = usePersistedState<string>(`${baseKey}:continuousStyle`, CONTINUOUS_STYLES[0].id)
+  // Until the user actively picks a style, the look falls back to a mode-
+  // specific default: UGC Realism for Line-by-Line / One-Shot, 3D Animated for
+  // Continuous. `styleChosen` (not the raw id) gates this so a legacy persisted
+  // id from the old app-wide default doesn't masquerade as an explicit pick.
+  const [continuousStyleId, setContinuousStyleId] = usePersistedState<string>(`${baseKey}:continuousStyle`, '')
+  const [styleChosen, setStyleChosen] = usePersistedState<boolean>(`${baseKey}:styleChosen`, false)
+  const resolvedStyleId = styleChosen && continuousStyleId
+    ? continuousStyleId
+    : (mode === 'continuous' ? 'zack-3d' : 'ugc')
+  const chooseStyle = (id: string) => { setContinuousStyleId(id); setStyleChosen(true) }
   // Style reference frames are memory-only (data: URIs blow the localStorage
   // quota); the distilled brief they produce IS persisted, so a refresh keeps
   // the locked style even though the thumbnails go.
@@ -430,7 +441,7 @@ export default function BrollStudio() {
         productContext,
         modelContext,
         additionalContext,
-        styleId: continuousStyleId,
+        styleId: resolvedStyleId,
         styleBrief: continuousStyleBrief ?? undefined,
       })
       // Same commit discipline as line mode: only rotate the session once we
@@ -473,7 +484,7 @@ export default function BrollStudio() {
           additionalContext,
           // Style is already fixed on oneShotResult; the new concept inherits it
           // at fire time. Passed only to satisfy the input shape.
-          styleId: continuousStyleId,
+          styleId: resolvedStyleId,
           styleBrief: continuousStyleBrief ?? undefined,
         },
         oneShotResult.concepts.length,
@@ -497,7 +508,7 @@ export default function BrollStudio() {
       setContinuousFrameStates({})
       setContinuousClipStates({})
       setContinuousSelections({})
-      setContinuousResult(buildDemoContinuousResult(continuousModelId, continuousStyleId))
+      setContinuousResult(buildDemoContinuousResult(continuousModelId, resolvedStyleId))
       useAppStore.getState().addToast('Showing a sample storyboard — add your kie.ai key to storyboard your own script', 'info')
       return
     }
@@ -506,7 +517,7 @@ export default function BrollStudio() {
     try {
       const res = await generateContinuous({
         scriptText,
-        styleId: continuousStyleId,
+        styleId: resolvedStyleId,
         styleBrief: continuousStyleBrief ?? undefined,
         modelId: continuousModelId,
         productContext,
@@ -537,6 +548,24 @@ export default function BrollStudio() {
     if (room <= 0) return
     const dataUris = await Promise.all(files.slice(0, room).map((f) => fileToDataUri(f)))
     setStyleRefs((prev) => [...prev, ...dataUris].slice(0, 4))
+  }
+
+  // Add saved B-Roll stills as style references — the vision pass reads data
+  // URIs, so resolve each bank asset ref to base64 before storing it.
+  const handleAddStyleRefsFromBank = async (items: BRoll[]) => {
+    const room = 4 - styleRefs.length
+    if (room <= 0) return
+    const refs = items.map((b) => b.imageUrl).filter(Boolean).slice(0, room)
+    const dataUris = (
+      await Promise.all(
+        refs.map(async (ref) => {
+          if (!isAssetRef(ref)) return ref
+          const asset = await getAsBase64(ref)
+          return asset ? `data:${asset.mimeType};base64,${asset.base64}` : null
+        }),
+      )
+    ).filter((u): u is string => !!u)
+    if (dataUris.length > 0) setStyleRefs((prev) => [...prev, ...dataUris].slice(0, 4))
   }
 
   const handleAnalyzeStyleRefs = async () => {
@@ -589,7 +618,7 @@ export default function BrollStudio() {
         productContext,
         modelContext,
         referenceImages,
-        styleId: continuousStyleId,
+        styleId: resolvedStyleId,
         styleBrief: continuousStyleBrief ?? undefined,
       })
       // Only now that we have scenes do we start a fresh session: rotating the
@@ -633,8 +662,10 @@ export default function BrollStudio() {
     }
     setCardStates(restored)
 
-    // One Shot snapshot (absent on legacy rows → line mode).
-    setMode(item.mode ?? 'line')
+    // Switch to the mode this row actually represents (derived from its content,
+    // not the unreliable last-active `mode`) so the toggle + right panel land on
+    // what the user clicked. Same helper drives the history badge, so they agree.
+    setMode(brollHistoryMode(item))
     setOneShotResult((item.oneShotResult as OneShotResult | undefined) ?? null)
     const restoredOneShot: Record<string, OneShotCardState> = {}
     for (const k in (item.oneShotCardStates ?? {}) as Record<string, unknown>) {
@@ -665,7 +696,7 @@ export default function BrollStudio() {
     }
     setContinuousClipStates(restoredClips)
     setContinuousSelections((item.continuousSelections as Record<string, ContinuousSelection> | undefined) ?? {})
-    if (item.continuousStyleId) setContinuousStyleId(item.continuousStyleId)
+    if (item.continuousStyleId) { setContinuousStyleId(item.continuousStyleId); setStyleChosen(true) }
     if (item.continuousModelId) {
       useSettingsStore.getState().setAppModel('broll-studio:continuous:video', item.continuousModelId)
     }
@@ -699,13 +730,14 @@ export default function BrollStudio() {
           onOneShotDeliveryChange={setOneShotDelivery}
           oneShotModelId={oneShotModelId}
           onOneShotModelChange={() => { /* persisted by the picker via persistKey */ }}
-          continuousStyleId={continuousStyleId}
-          onContinuousStyleChange={setContinuousStyleId}
+          continuousStyleId={resolvedStyleId}
+          onContinuousStyleChange={chooseStyle}
           styleRefs={styleRefs}
           onAddStyleRefs={(files) => { void handleAddStyleRefs(files) }}
           onRemoveStyleRef={(i) => setStyleRefs((prev) => prev.filter((_, idx) => idx !== i))}
           onClearStyleRefs={() => { setStyleRefs([]); setContinuousStyleBrief(null) }}
           onAnalyzeStyleRefs={() => { void handleAnalyzeStyleRefs() }}
+          onPickStyleRefsFromBank={() => setPickerMode('styleRefs')}
           isAnalyzingStyle={isAnalyzingStyle}
           continuousStyleBrief={continuousStyleBrief}
           onClearStyleBrief={() => setContinuousStyleBrief(null)}
@@ -772,6 +804,17 @@ export default function BrollStudio() {
         bankType="scripts"
         isOpen={pickerMode === 'scripts'}
         onSelect={handleSelectScript}
+        onClose={() => setPickerMode(null)}
+      />
+      {/* Style references from the bank — saved B-Roll stills (image only),
+          multi-select. Their look is what gets distilled, not their content. */}
+      <BankPicker
+        bankType="brolls"
+        isOpen={pickerMode === 'styleRefs'}
+        multiSelect
+        filter={(item) => !!(item as BRoll).imageUrl}
+        onSelect={() => { /* multi-select uses onSelectMany */ }}
+        onSelectMany={(items) => { void handleAddStyleRefsFromBank(items as BRoll[]) }}
         onClose={() => setPickerMode(null)}
       />
     </div>

@@ -207,6 +207,8 @@ export async function generateBroll(input: BrollInput): Promise<BrollResult> {
     scenes: parseScenes(responseText),
     style: styleBriefFor({ styleId: input.styleId, styleBrief: input.styleBrief }),
     realism: styleUsesRealism(input.styleId, !!input.styleBrief?.trim()),
+    styleId: input.styleId,
+    styleBrief: input.styleBrief?.trim() || undefined,
   }
 }
 
