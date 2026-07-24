@@ -41,7 +41,7 @@ Senior frontend engineer + product architect. Push back when something's flawed.
 - `hooks/useCloseOnEscape.ts` — every dismissible overlay takes it, alongside the existing backdrop click (and `useCloseOnAppSwitch` when body-portaled).
 - `components/ClearAllButton.tsx` — the panel-level reset at the top of each input column. Labelled **"New"**, because it clears inputs only; outputs and history always survive.
 - Panel headers are `h-[57px]` + `border-b border-ink/5` on **both** panes of a two-pane app, rendered even when a pane is empty, so the hairlines align.
-- Keyboard focus is one global `:focus-visible` outline in `index.css`. Don't add per-component focus rings.
+- No global focus ring, on purpose. A `:focus-visible` outline was tried and reverted: `:focus-visible` matches text inputs on a plain mouse click too, so every search field and textarea drew an outline around its own border. The `focus:outline-none` resets stand — see the note in `index.css`.
 
 **Theming (light default + dark mode).** Driven by `data-theme` on `<html>`: an inline script in `index.html` sets it pre-paint; `stores/themeStore.ts` owns the preference (`dark`/`light`/`system`, own localStorage key `ai-ugc-lab-theme`, deliberately per-browser — never cloud-synced, survives sign-out). New browsers default to `dark` — the store fallback and the index.html bootstrap must agree. Switchers: Settings → Appearance + the menu bar's top-right quick toggle. UI chrome must use the semantic tokens from `index.css`, never literal white/zinc/dark hexes:
 - `ink` — fg chrome (white in dark, near-black in light): `border-ink/10`, `bg-ink/5`, `text-ink`. `paper` is its inverse (`bg-ink text-paper` buttons).

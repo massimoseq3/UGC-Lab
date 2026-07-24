@@ -174,8 +174,8 @@ Dismiss via ✕, backdrop, Escape, or the "Let's get to work" button.
 - **"New", not "Clear"** — the `ClearAllButton` pill at the top of each input
   column resets **inputs only**. Generated outputs and history are never
   touched, which is why it isn't labelled "Clear".
-- **Keyboard focus** is a 2px ink outline on `:focus-visible` only, applied
-  globally from `index.css`. Don't add per-component focus rings.
+- **No focus ring**, deliberately — a global `:focus-visible` outline was tried
+  and reverted (it fires on click for text inputs, boxing every search field).
 
 ---
 
