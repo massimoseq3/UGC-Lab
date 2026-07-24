@@ -106,7 +106,6 @@ interface ContinuousViewProps {
   setSelections: React.Dispatch<React.SetStateAction<Record<string, ContinuousSelection>>>
   // Appends one fresh concept to a frame (BrollStudio owns the result state).
   onAddConcept: (frameIndex: number) => void
-  addingConceptFrame: number | null
 }
 
 // Right-panel view for Continuous mode: one row per scene (its keyframe's
@@ -132,7 +131,6 @@ export default function ContinuousView({
   selections,
   setSelections,
   onAddConcept,
-  addingConceptFrame,
 }: ContinuousViewProps) {
   // Open modal: a frame concept ("3:cont-xxx") or a clip ("c2").
   const [openFrameKey, setOpenFrameKey] = useState<string | null>(null)
@@ -1130,7 +1128,6 @@ export default function ContinuousView({
               setSelections((prev) => ({ ...prev, [String(scene.index)]: { conceptId, imageIndex: card.currentImageIndex } }))
             }}
             onAddConcept={() => onAddConcept(scene.index)}
-            addingConcept={addingConceptFrame === scene.index}
             onSaveImage={saveKeyframeToBank}
           />
         ))}
@@ -1150,7 +1147,6 @@ export default function ContinuousView({
             setSelections((prev) => ({ ...prev, [String(finalFrame.index)]: { conceptId, imageIndex: card.currentImageIndex } }))
           }}
           onAddConcept={() => onAddConcept(finalFrame.index)}
-          addingConcept={addingConceptFrame === finalFrame.index}
           onSaveImage={saveKeyframeToBank}
         />
       </div>
@@ -1450,7 +1446,6 @@ function SceneRow({
   onGenerateConcept,
   onSelectConcept,
   onAddConcept,
-  addingConcept,
   onSaveImage,
 }: {
   scene: ContinuousScene
@@ -1467,7 +1462,6 @@ function SceneRow({
   onGenerateConcept: (key: string) => void
   onSelectConcept: (conceptId: string) => void
   onAddConcept: () => void
-  addingConcept: boolean
   onSaveImage: (imageRef: string, prompt: string) => Promise<void>
 }) {
   return (
@@ -1528,7 +1522,7 @@ function SceneRow({
                 onSaveImage={onSaveImage}
               />
             ))}
-            <AddConceptCard onAdd={onAddConcept} adding={addingConcept} />
+            <AddConceptCard onAdd={onAddConcept} />
           </div>
         </div>
         {/* Clip column — top-aligned so it holds its place while concepts wrap
@@ -1559,7 +1553,6 @@ function FinalFrameRow({
   onGenerateConcept,
   onSelectConcept,
   onAddConcept,
-  addingConcept,
   onSaveImage,
 }: {
   frame: ContinuousFrame
@@ -1571,7 +1564,6 @@ function FinalFrameRow({
   onGenerateConcept: (key: string) => void
   onSelectConcept: (conceptId: string) => void
   onAddConcept: () => void
-  addingConcept: boolean
   onSaveImage: (imageRef: string, prompt: string) => Promise<void>
 }) {
   const framePicked = !!selection
@@ -1625,7 +1617,7 @@ function FinalFrameRow({
             onSaveImage={onSaveImage}
           />
         ))}
-        <AddConceptCard onAdd={onAddConcept} adding={addingConcept} />
+        <AddConceptCard onAdd={onAddConcept} />
       </div>
     </div>
   )
@@ -2036,22 +2028,19 @@ function ClipCard({
 
 // ── Add-concept card ───────────────────────────────────────────
 
-function AddConceptCard({ onAdd, adding }: { onAdd: () => void; adding: boolean }) {
+// Adding a concept drops a blank card synchronously (no LLM call), so there is
+// no pending state to show.
+function AddConceptCard({ onAdd }: { onAdd: () => void }) {
   return (
     <button
       type="button"
       onClick={onAdd}
-      disabled={adding}
       title="Add a blank concept — open it to write or generate a prompt"
-      className="group/add flex aspect-[9/16] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink/20 bg-ink/[0.03] transition-colors hover:border-broll-400/60 hover:bg-broll-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+      className="group/add flex aspect-[9/16] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink/20 bg-ink/[0.03] transition-colors hover:border-broll-400/60 hover:bg-broll-500/10"
     >
-      {adding ? (
-        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-broll-300" />
-      ) : (
-        <Plus className="h-4 w-4 shrink-0 text-ink-400 transition-colors group-hover/add:text-broll-300" />
-      )}
+      <Plus className="h-4 w-4 shrink-0 text-ink-400 transition-colors group-hover/add:text-broll-300" />
       <span className="px-3 text-center text-[11px] font-medium text-ink-400 transition-colors group-hover/add:text-broll-300">
-        {adding ? 'Adding…' : 'Add concept'}
+        Add concept
       </span>
     </button>
   )

@@ -384,13 +384,6 @@ export default function BrollStudio() {
     return () => clearTimeout(handle)
   }, [result, cardStates, lineDelivery, oneShotResult, oneShotCardStates, oneShotDelivery, oneShotModelId, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, sessionStyleId, sessionStyleBrief, continuousModelId, sessionMode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, upsertBrollHistory])
 
-  // "New": clear the inputs / references only. The generated scene cards stay
-  // on screen — they're the user's output, never wiped by starting a new
-  // session. Blanking the sessionId *detaches* the kept cards: the debounced
-  // History upsert early-returns while it's empty, so clearing the inputs
-  // can't overwrite the saved session's metadata. The prior session is already
-  // preserved as its own brollHistory row, and the next generation stamps a
-  // fresh sessionId + replaces the cards cleanly.
   const handleSelectProduct = (item: unknown) => {
     setSelectedProductId((item as Product).id)
     setPickerMode(null)
@@ -568,6 +561,7 @@ export default function BrollStudio() {
           styleId: resolvedStyleId,
           styleBrief: continuousStyleBrief ?? undefined,
         },
+        oneShotResult.concepts.map((c) => c.poolAngle).filter((a): a is string => !!a),
         oneShotResult.concepts.length,
       )
       setOneShotResult((prev) => (prev ? { ...prev, concepts: [...prev.concepts, concept] } : prev))
@@ -858,7 +852,6 @@ export default function BrollStudio() {
           oneShotDelivery={oneShotDelivery}
           onOneShotDeliveryChange={setOneShotDelivery}
           oneShotModelId={oneShotModelId}
-          onOneShotModelChange={() => { /* persisted by the picker via persistKey */ }}
           continuousStyleId={resolvedStyleId}
           onContinuousStyleChange={chooseStyle}
           styleRefs={styleRefs}
@@ -893,7 +886,6 @@ export default function BrollStudio() {
           continuousSelections={continuousSelections}
           setContinuousSelections={setContinuousSelections}
           onAddContinuousConcept={handleAddContinuousConcept}
-          addingConceptFrame={null}
           isGenerating={isGenerating}
           error={error}
           onAddVariation={handleAddVariation}

@@ -587,6 +587,7 @@ export default function OneShotDetailModal({
                         modelId={entry.modelId}
                         aspectRatio={entry.aspectRatio}
                         messages={['Sending request...', 'Rolling the clip...', 'Cutting the shots...', 'Finalizing the clip...']}
+                        onDismiss={() => onDismissInFlight(entry.id)}
                       />
                     ))}
                     {cardState.videos.map((video, i) => (

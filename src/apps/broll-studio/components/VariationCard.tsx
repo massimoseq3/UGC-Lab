@@ -738,15 +738,6 @@ export default function VariationCard(props: VariationCardProps) {
     }
   }
 
-  const handleResetVideo = () => {
-    onUpdateState({
-      videoStatus: 'idle',
-      videoError: null,
-      videoTaskId: null,
-      videoStartedAt: null,
-    })
-  }
-
   // ────────────────────────────────────────────────────────────────────────
   // Face
   // ────────────────────────────────────────────────────────────────────────
@@ -1117,7 +1108,6 @@ export default function VariationCard(props: VariationCardProps) {
           handleGenerateImage={handleGenerateImage}
           handleGenerateVideo={handleGenerateVideo}
           handleAnimate={handleAnimate}
-          handleResetVideo={handleResetVideo}
           handleRetryInFlight={handleRetryInFlight}
           handleDismissInFlight={handleDismissInFlight}
           voiceProfile={voiceProfile}

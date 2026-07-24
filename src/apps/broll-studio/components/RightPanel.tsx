@@ -27,7 +27,6 @@ interface RightPanelProps {
   continuousSelections: Record<string, ContinuousSelection>
   setContinuousSelections: React.Dispatch<React.SetStateAction<Record<string, ContinuousSelection>>>
   onAddContinuousConcept: (frameIndex: number) => void
-  addingConceptFrame: number | null
   isGenerating?: boolean
   error?: string | null
   onAddVariation: (sceneNumber: number, variation: PromptVariation) => void
@@ -74,7 +73,6 @@ export default function RightPanel(props: RightPanelProps) {
     continuousSelections,
     setContinuousSelections,
     onAddContinuousConcept,
-    addingConceptFrame,
     isGenerating,
     error,
     onAddVariation,
@@ -148,7 +146,6 @@ export default function RightPanel(props: RightPanelProps) {
             selections={continuousSelections}
             setSelections={setContinuousSelections}
             onAddConcept={onAddContinuousConcept}
-            addingConceptFrame={addingConceptFrame}
           />
         ) : tab === 'scenes' && isOneShot ? (
           <OneShotView

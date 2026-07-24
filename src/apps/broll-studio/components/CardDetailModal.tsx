@@ -68,7 +68,6 @@ interface CardDetailModalProps {
   // gets to Image or Video, instead of opening here and toggling. The modal is
   // conditionally mounted, so this seeds fresh on every open.
   initialTab?: Tab
-  onDelete?: () => void
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
   // Full bank entries — rendered as side-by-side slot cards in the modal.
@@ -91,11 +90,9 @@ interface CardDetailModalProps {
   handleEnhance: () => void
   handleRegeneratePrompt: () => void
   handleGenerateImage: () => void
-  handleSaveToBank?: () => void
   // Animate a still (image-to-video). startFrameRef is one of the card's images.
   handleAnimate: (startFrameRef: string | undefined, videoModelId: string | undefined) => void
   handleGenerateVideo: (videoModelId: string | undefined) => void
-  handleResetVideo: () => void
   // Re-fire / drop a failed in-flight gen surfaced in the gallery.
   handleRetryInFlight: (id: string, isVideo: boolean) => void
   handleDismissInFlight: (id: string, isVideo: boolean) => void

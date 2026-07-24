@@ -277,7 +277,7 @@ export type OneShotDelivery = 'dialogue' | 'silent'
 export interface OneShotSegment {
   index: number              // 1-based position within the concept
   scriptExcerpt: string      // the exact script slice this clip covers
-  prompt: string             // full master prompt (STYLE … TIMELINE)
+  prompt: string             // scene blueprint for this clip (+ VOICE PROFILE when dialogue)
   durationSeconds: number    // snapped UP onto the plan model's duration grid
 }
 
@@ -286,6 +286,11 @@ export interface OneShotConcept {
   angle: string              // short creative-angle title, e.g. "DEMO-FIRST"
   summary: string            // one-line concept description
   segments: OneShotSegment[]
+  // The ONE_SHOT_ANGLES pool entry this concept was generated from. `angle`
+  // above is the LLM's own slug and can't be matched back to the pool, so
+  // Add-variation reads this to pick a genuinely unused angle. Absent on rows
+  // generated before it existed.
+  poolAngle?: string
 }
 
 export interface OneShotResult {

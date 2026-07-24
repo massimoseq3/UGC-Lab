@@ -164,6 +164,9 @@ export default function OneShotView({
   // reads and video decoding, so a second click (or a Generate-all overlapping
   // a per-concept Generate) fired a duplicate paid generation of the same clip.
   const startingRef = useRef<Set<string>>(new Set())
+  // Last model we told the user takes no reference images — so the notice is
+  // per model choice rather than per clip.
+  const refWarnedModelRef = useRef<string | null>(null)
 
   // ── Video generation (adaptation of VariationCard.runVideoTask) ──
   const runSegmentVideo = async (key: string) => {
@@ -201,11 +204,15 @@ export default function OneShotView({
 
     let claimedTaskId: string | null = null
     try {
-      const refs: ReferenceImage[] = [
+      // Models without a reference mode (Kling) drop refs anyway — don't read
+      // them out of IDB, and skip the boundary-frame video decode below, only
+      // to throw the result away.
+      const modelTakesRefs = !!model.modes?.includes('reference-to-video')
+      const refs: ReferenceImage[] = modelTakesRefs ? [
         ...(card.refsCharacter && characterRef ? [characterRef] : []),
         ...(card.refsProduct && productRef ? [productRef] : []),
         ...(extraRefs[key] ?? []),
-      ]
+      ] : []
       const referenceDataUris: string[] = []
       for (const r of refs) {
         const uri = await toDataUri(r.dataUrl)
@@ -237,15 +244,19 @@ export default function OneShotView({
         }
       }
 
-      let mode: VideoMode = referenceDataUris.length > 0 ? 'reference-to-video' : 'text-to-video'
-      let effectiveRefs: string[] | undefined = referenceDataUris.length > 0 ? referenceDataUris : undefined
-      if (mode === 'reference-to-video' && !model.modes?.includes('reference-to-video')) {
+      const mode: VideoMode = referenceDataUris.length > 0 ? 'reference-to-video' : 'text-to-video'
+      const effectiveRefs: string[] | undefined = referenceDataUris.length > 0 ? referenceDataUris : undefined
+      // Prompt-only likeness on a ref-less model is expected and documented (the
+      // modal shows an amber note), so this is information, not an error — and
+      // it's said once per model, not once per clip. A Generate-all of 4
+      // concepts × 2 clips used to raise eight error toasts.
+      const wantedRefs = card.refsCharacter || card.refsProduct || (extraRefs[key]?.length ?? 0) > 0
+      if (!modelTakesRefs && wantedRefs && refWarnedModelRef.current !== oneShotModelId) {
+        refWarnedModelRef.current = oneShotModelId
         useAppStore.getState().addToast(
-          `${model.displayName} doesn't support reference images — generating text-to-video only.`,
-          'error',
+          `${model.displayName} doesn't take reference images — clips render from the prompt alone.`,
+          'info',
         )
-        mode = 'text-to-video'
-        effectiveRefs = undefined
       }
 
       // Fire-time re-validation against the CURRENT model.
@@ -831,6 +842,7 @@ function ConceptRow({
           <OSVariationCard
             key={segment.index}
             segment={segment}
+            conceptNumber={conceptNumber}
             cardState={cardStates[cardKey(concept.id, segment.index)]}
             onOpen={() => onOpenClip(cardKey(concept.id, segment.index))}
           />
@@ -847,10 +859,12 @@ function ConceptRow({
 
 function OSVariationCard({
   segment,
+  conceptNumber,
   cardState,
   onOpen,
 }: {
   segment: OneShotSegment
+  conceptNumber: number
   cardState?: OneShotCardState
   onOpen: () => void
 }) {
@@ -884,7 +898,9 @@ function OSVariationCard({
     if (!currentVideo) return
     const resolved = await getUrl(currentVideo.url)
     if (!resolved) { useAppStore.getState().addToast('Could not load the video.', 'error'); return }
-    await downloadImage(resolved, `oneshot-clip-${segment.index}`, 'mp4')
+    // Include the variation — every concept has a "Clip 1", so naming by clip
+    // alone made Variation 1 and Variation 3 download as the same file.
+    await downloadImage(resolved, `oneshot-variation${conceptNumber}-clip${segment.index}`, 'mp4')
   }
   const handleCopy = async () => {
     const text = (currentVideo?.prompt ?? '').trim()
