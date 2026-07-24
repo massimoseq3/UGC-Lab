@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Film, AlertCircle, Plus, Images, X, Palette } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
@@ -6,9 +6,10 @@ import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage } f
 import type { Product, Model } from '../../../stores/types'
 import { createDefaultCardState } from '../cardState'
 import type { VideoHistoryItem } from '../../../stores/types'
-import { finishImageTask } from '../services/generateBroll'
+import { finishImageTask, resolveImageModelId } from '../services/generateBroll'
 import { getContinuousStyle } from '../services/generateContinuous'
 import { finishVideoTask } from '../services/generateVideo'
+import { claimTask, releaseTask } from '../services/taskRegistry'
 import { isPollTimeout } from '../../../utils/kie'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
@@ -138,9 +139,6 @@ export default function ScenesView({
       : batchAspectOptions.includes('9:16')
         ? '9:16'
         : batchAspectOptions[0]
-  const batchPerImage = batchImageModelId
-    ? estimateCredits(batchImageModelId, { imageCount: 1, resolution: effectiveBatchRes })
-    : null
   // What this run will actually fire: the untouched cards, plus the already-
   // generated ones only when the user explicitly opts in.
   const batchTargets = batchConfirm
@@ -148,8 +146,25 @@ export default function ScenesView({
       ? [...batchConfirm.fresh, ...batchConfirm.done]
       : batchConfirm.fresh
     : []
-  const batchTotalCredits =
-    batchConfirm && batchPerImage != null ? batchPerImage * batchTargets.length : null
+  // A card with references attached doesn't fire on the picked text-to-image
+  // model — startImageTask swaps in the image-to-image sibling, which can be
+  // priced differently. Cost each card against the model that will really run,
+  // or the dialog quotes one price and kie bills another.
+  const batchTotalCredits = batchConfirm
+    ? batchTargets.reduce<number | null>((sum, key) => {
+        if (sum === null) return null
+        const card = cardStates[key]
+        const hasRefs = !!(
+          (characterRef && card?.refsCharacter !== false) ||
+          (productRef && card?.refsProduct !== false)
+        )
+        const modelId = resolveImageModelId(hasRefs) ?? batchImageModelId
+        const credits = modelId
+          ? estimateCredits(modelId, { imageCount: 1, resolution: effectiveBatchRes })
+          : null
+        return credits == null ? null : sum + credits
+      }, 0)
+    : null
   const batchOverBudget = batchTotalCredits != null && balance !== null && batchTotalCredits > balance
 
   const requestBatch = (keys: string[], scope: string) => {
@@ -212,7 +227,6 @@ export default function ScenesView({
   // taskId (refresh during createTask) — are evicted with an error chip so the
   // gallery doesn't stay stuck on a phantom spinner.
   const INFLIGHT_TTL_MS = 30 * 60 * 1000
-  const resumingRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     const now = Date.now()
     // First pass: evict stale entries that can't be resumed.
@@ -245,9 +259,9 @@ export default function ScenesView({
       // ── Image queue ────────────────────────────────────────────────
       for (const entry of card.inFlightImages) {
         if (!entry.taskId || !entry.modelId) continue
-        const resumeKey = `image:${entry.taskId}`
-        if (resumingRef.current.has(resumeKey)) continue
-        resumingRef.current.add(resumeKey)
+        // Skip tasks a live generation promise still owns — a view unmounted by
+        // a History/mode switch keeps polling, so resuming here would duplicate.
+        if (!claimTask('image', entry.taskId)) continue
         const inFlightId = entry.id
         const taskId = entry.taskId
         const modelId = entry.modelId
@@ -288,7 +302,7 @@ export default function ScenesView({
               }
             })
           } finally {
-            resumingRef.current.delete(resumeKey)
+            releaseTask('image', taskId)
           }
         })()
       }
@@ -296,9 +310,7 @@ export default function ScenesView({
       // ── Video queue ────────────────────────────────────────────────
       for (const entry of card.inFlightVideos) {
         if (!entry.taskId) continue
-        const resumeKey = `video:${entry.taskId}`
-        if (resumingRef.current.has(resumeKey)) continue
-        resumingRef.current.add(resumeKey)
+        if (!claimTask('video', entry.taskId)) continue
         const inFlightId = entry.id
         const taskId = entry.taskId
         const modelId = entry.modelId
@@ -380,7 +392,7 @@ export default function ScenesView({
             })
             useAppStore.getState().addToast(`Video resume failed: ${msg}`, 'error')
           } finally {
-            resumingRef.current.delete(resumeKey)
+            releaseTask('video', taskId)
           }
         })()
       }

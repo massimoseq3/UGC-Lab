@@ -455,6 +455,33 @@ function buildStaticReferencePreamble(refs: ReferenceImage[]): string {
 }
 
 /**
+ * Which image model a generation will actually run on. Honours the user's pick
+ * from the master ModelPicker (wired with mode='text-to-image'): when refs are
+ * present and the picked model also does image-to-image (e.g. nano-banana-2),
+ * it's used directly; when it doesn't (gpt-image-2-text-to-image is t2i-only),
+ * this resolves to its i2i sibling. Final fallback is the registry default.
+ *
+ * Exported because cost estimates must price the model that will really fire —
+ * quoting the t2i pick while an i2i sibling gets billed is how a confirm dialog
+ * lies about the price.
+ */
+export function resolveImageModelId(hasRefs: boolean): string | undefined {
+  const mode = hasRefs ? 'image-to-image' : 'text-to-image'
+  const pickedId = useSettingsStore.getState().getAppModel('broll-studio:image:text-to-image')
+  const picked = pickedId ? getModel(pickedId) : undefined
+
+  if (picked && picked.modes?.includes(mode)) return picked.id
+  if (picked && hasRefs) {
+    // Same-family i2i sibling (gpt-image-2-text-to-image → …-image-to-image).
+    const family = picked.id.replace(/-(text-to-image|image-to-image|image-edit).*$/, '')
+    const sibling = getModel(`${family}-image-to-image`)
+    return sibling?.id ?? getDefaultModel('broll-studio', 'image', 'image-to-image')?.id
+  }
+  return useSettingsStore.getState().getAppModel(`broll-studio:image:${mode}`)
+    ?? getDefaultModel('broll-studio', 'image', mode)?.id
+}
+
+/**
  * Phase 1 of B-Roll image generation: resolve model, host refs, POST createTask,
  * return the kie taskId. Caller persists the taskId before awaiting completion
  * so a tab refresh can resume the poll.
@@ -474,26 +501,7 @@ export async function startImageTask(
   const hasRefs = !!referenceImages?.length
   const mode = hasRefs ? 'image-to-image' : 'text-to-image'
 
-  // Honour the user's pick from the master ModelPicker (which is wired with
-  // mode='text-to-image'). When refs are present and the picked model also
-  // supports image-to-image (e.g. nano-banana-2), use it directly. If it
-  // doesn't (e.g. gpt-image-2-text-to-image is t2i-only), auto-resolve to its
-  // i2i sibling. Final fallback is the registry default.
-  const pickedId = useSettingsStore.getState().getAppModel('broll-studio:image:text-to-image')
-  const picked = pickedId ? getModel(pickedId) : undefined
-
-  let modelId: string | undefined
-  if (picked && picked.modes?.includes(mode)) {
-    modelId = picked.id
-  } else if (picked && hasRefs) {
-    // Try a same-family i2i sibling (e.g. gpt-image-2-text-to-image → gpt-image-2-image-to-image).
-    const family = picked.id.replace(/-(text-to-image|image-to-image|image-edit).*$/, '')
-    const sibling = getModel(`${family}-image-to-image`)
-    modelId = sibling?.id ?? getDefaultModel('broll-studio', 'image', 'image-to-image')?.id
-  } else {
-    modelId = useSettingsStore.getState().getAppModel(`broll-studio:image:${mode}`)
-      ?? getDefaultModel('broll-studio', 'image', mode)?.id
-  }
+  const modelId = resolveImageModelId(hasRefs)
   if (!modelId) throw new Error(`No image model configured for B-Roll (${mode}).`)
 
   // Convert each reference (asset ref or data URL) to a kie-hosted URL.
