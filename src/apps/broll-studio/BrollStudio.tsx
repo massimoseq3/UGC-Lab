@@ -316,7 +316,14 @@ export default function BrollStudio() {
     const handle = setTimeout(() => {
       const item: BrollHistoryItem = {
         id: sessionIdRef.current,
+        // Candidate creation time — only applied to a brand-new row; the store
+        // preserves the original `createdAt` on every subsequent save.
         createdAt: Date.now(),
+        // Row-level style snapshot for the history pill (works across all three
+        // modes, incl. One-Shot whose result carries no styleId). `resolvedStyleId`
+        // folds in the per-mode default (UGC for line/one-shot, 3D for continuous).
+        styleId: resolvedStyleId || undefined,
+        styleBrief: continuousStyleBrief ?? undefined,
         inputSummary: buildInputSummary(selectedProduct?.productName, scriptText),
         productId: selectedProductId ?? undefined,
         modelId: selectedModelId ?? undefined,
@@ -341,7 +348,7 @@ export default function BrollStudio() {
       upsertBrollHistory(item)
     }, 1000)
     return () => clearTimeout(handle)
-  }, [result, cardStates, lineDelivery, oneShotResult, oneShotCardStates, oneShotDelivery, oneShotModelId, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, continuousModelId, mode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, upsertBrollHistory])
+  }, [result, cardStates, lineDelivery, oneShotResult, oneShotCardStates, oneShotDelivery, oneShotModelId, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, continuousStyleBrief, resolvedStyleId, continuousModelId, mode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, upsertBrollHistory])
 
   // "New": clear the inputs / references only. The generated scene cards stay
   // on screen — they're the user's output, never wiped by starting a new

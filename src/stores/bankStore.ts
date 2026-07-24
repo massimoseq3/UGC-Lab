@@ -921,15 +921,26 @@ export const useBankStore = create<BankState>((set, get) => ({
   // capped at BROLL_HISTORY_CAP — drops the oldest entries past the cap.
   upsertBrollHistory: async (item) => {
     let evicted: BrollHistoryItem[] = []
+    // Preserve the original creation time and stamp a fresh `updatedAt`. Without
+    // this, every re-save (including simply reopening a session, which re-runs
+    // the debounced persist effect) rewrote `createdAt` to now — so old rows
+    // jumped to the top labelled "just now". `createdAt` is now write-once.
+    let merged = item
     set((state) => {
+      const existing = state.brollHistory.find((h) => h.id === item.id)
+      merged = {
+        ...item,
+        createdAt: existing?.createdAt ?? item.createdAt,
+        updatedAt: Date.now(),
+      }
       const filtered = state.brollHistory.filter((h) => h.id !== item.id)
-      const combined = [item, ...filtered]
+      const combined = [merged, ...filtered]
       evicted = combined.slice(BROLL_HISTORY_CAP)
       const next = { brollHistory: combined.slice(0, BROLL_HISTORY_CAP) }
       saveToStorage({ ...state, ...next })
       return next
     })
-    pushRow('brollHistory', item)
+    pushRow('brollHistory', merged)
     // Drop entries that fell off the cap from the cloud too, or hydrate (which
     // pulls every row) would resurrect them. Their asset blobs are reclaimed by
     // the orphan sweep once nothing else references them.

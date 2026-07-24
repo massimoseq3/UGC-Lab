@@ -242,7 +242,19 @@ export interface CharacterHistoryItem {
 // stays small.
 export interface BrollHistoryItem {
   id: string
+  // When the session was first generated — stable across re-saves so a row
+  // never jumps around when it's merely reopened or edited. `upsertBrollHistory`
+  // preserves the original value on every subsequent write.
   createdAt: number
+  // Last time the session was touched (edited, resumed, a new clip generated).
+  // Stamped fresh on every upsert. Absent on rows persisted before this field
+  // existed — sort/label code falls back to `createdAt`.
+  updatedAt?: number
+  // Snapshot of the visual style the session was generated with, for the
+  // history-row style pill. `styleBrief` (a look distilled from reference
+  // frames) wins over the preset `styleId` when set. Absent on legacy rows.
+  styleId?: string
+  styleBrief?: string
   inputSummary: string
   productId?: string
   modelId?: string
