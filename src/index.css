@@ -104,7 +104,9 @@
   --color-voice-500: #007AFF;
   --color-voice-600: color-mix(in oklab, #007AFF 85%, black);
 
-  /* B-Roll — purple #7165FF */
+  /* B-Roll — purple #7165FF. Per-mode retints live in the unlayered
+     [data-broll-mode] rules below (Tailwind bakes @theme var() refs to static
+     hex, so the live override has to sit outside @theme). */
   --color-broll-100: color-mix(in oklab, #7165FF 25%, white);
   --color-broll-200: color-mix(in oklab, #7165FF 40%, white);
   --color-broll-300: color-mix(in oklab, #7165FF 60%, white);
@@ -212,6 +214,35 @@
   --color-dashboard-300: color-mix(in oklab, #059669 70%, black);
   --color-dashboard-400: color-mix(in oklab, #059669 95%, black);
   --color-dashboard-600: color-mix(in oklab, #059669 85%, black);
+}
+
+/* ---- B-Roll per-mode accent ----
+   Each B-Roll mode gets its own shade of the app purple so the accent visibly
+   shifts when you switch toggles. The whole broll-* ramp is re-derived from a
+   per-mode --broll-base on the B-Roll wrapper ([data-broll-mode], set in
+   BrollStudio). This has to live OUTSIDE @theme: Tailwind resolves @theme var()
+   refs into static hex at build time, so an @theme ramp can't respond to a
+   runtime override. These unlayered rules stay live var() refs and, sitting on
+   a close ancestor, override the :root ramp for the whole B-Roll subtree.
+   Mirror the dark/light mix directions of the @theme ramp so both stay right. */
+[data-broll-mode="line"] { --broll-base: #7165FF; }       /* indigo */
+[data-broll-mode="continuous"] { --broll-base: #A24DF0; }  /* violet */
+[data-broll-mode="oneshot"] { --broll-base: #C94DE6; }     /* magenta-purple */
+
+[data-broll-mode] {
+  --color-broll-100: color-mix(in oklab, var(--broll-base) 25%, white);
+  --color-broll-200: color-mix(in oklab, var(--broll-base) 40%, white);
+  --color-broll-300: color-mix(in oklab, var(--broll-base) 60%, white);
+  --color-broll-400: color-mix(in oklab, var(--broll-base) 80%, white);
+  --color-broll-500: var(--broll-base);
+  --color-broll-600: color-mix(in oklab, var(--broll-base) 85%, black);
+}
+[data-theme="light"] [data-broll-mode] {
+  --color-broll-100: color-mix(in oklab, var(--broll-base) 35%, black);
+  --color-broll-200: color-mix(in oklab, var(--broll-base) 50%, black);
+  --color-broll-300: color-mix(in oklab, var(--broll-base) 70%, black);
+  --color-broll-400: color-mix(in oklab, var(--broll-base) 95%, black);
+  --color-broll-600: color-mix(in oklab, var(--broll-base) 85%, black);
 }
 
 html,

@@ -536,11 +536,11 @@ export default function InputPanel({
             />
           )}
 
-          {/* Visual style + reference frames — laid out half & half like the
-              Characters "preset | drop-to-autofill" row: the left half opens a
-              slide-in style picker; the right half is a dashed pick/upload zone
-              for reference frames. A locked custom style (distilled from those
-              frames) replaces the whole row. */}
+          {/* Visual style + reference frames — two separate pills, half & half:
+              the left opens the slide-in preset picker; the right opens the
+              pick/upload menu for your own style frames. Both carry a chevron
+              so they read as clickable. A locked custom style (distilled from
+              those frames) replaces the whole row. */}
           {continuousStyleBrief ? (
             <div className="order-first rounded-2xl border border-broll-500/25 bg-broll-500/10 px-3 py-2.5">
               <div className="flex items-start justify-between gap-2">
@@ -573,9 +573,8 @@ export default function InputPanel({
                 </button>
               </div>
 
-              {/* Reference frames — dashed zone (mirrors "Drop an image to
-                  autofill"); click asks bank or upload. The AI reads only the
-                  LOOK of these frames, never their content. */}
+              {/* Reference frames — click asks bank or upload. The AI reads
+                  only the LOOK of these frames, never their content. */}
               <div className="relative min-w-0 flex-1" ref={styleSourceRef}>
                 <button
                   type="button"
@@ -588,7 +587,7 @@ export default function InputPanel({
                   <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-100">
                     {styleRefs.length > 0
                       ? `${styleRefs.length} reference${styleRefs.length === 1 ? '' : 's'}`
-                      : 'Custom Style'}
+                      : 'Upload Style'}
                   </span>
                 </button>
                 {styleSourceOpen && (
