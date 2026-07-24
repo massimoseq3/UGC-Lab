@@ -77,6 +77,12 @@ export interface BrollResult {
   // iPhone-realism suffix on. Every stylized style bypasses it. Undefined on
   // legacy rows, which are treated as UGC (stack on, no STYLE appended).
   realism?: boolean
+  // The picked style — id (→ friendly label via getContinuousStyle) or, when
+  // the look was distilled from reference frames, `styleBrief` set instead.
+  // Drives the style pill in the Scenes header (parity with Continuous). Both
+  // optional so legacy rows fall back to the UGC Realism label.
+  styleId?: string
+  styleBrief?: string
 }
 
 export interface ReferenceImage {

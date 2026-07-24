@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Clapperboard, AlertTriangle, Rows3, Star, Box, ImagePlus, Sparkles, Coins } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Clapperboard, AlertTriangle, Rows3, Star, Box, ImagePlus, Sparkles, Coins, Palette, Pencil } from 'lucide-react'
 import type { Product, Model, Script } from '../../../stores/types'
 import type { BrollMode, OneShotDelivery } from '../types'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import ModelSidePanel from '../../../components/ModelSidePanel'
+import SlideOver from '../../../components/SlideOver'
 import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
 import { useSettingsStore } from '../../../stores/settingsStore'
@@ -51,6 +52,8 @@ interface InputPanelProps {
   onRemoveStyleRef: (index: number) => void
   onClearStyleRefs: () => void
   onAnalyzeStyleRefs: () => void
+  // Opens the bank picker (in the parent) to add saved stills as style refs.
+  onPickStyleRefsFromBank: () => void
   isAnalyzingStyle: boolean
   continuousStyleBrief: string | null
   onClearStyleBrief: () => void
@@ -205,6 +208,52 @@ function ScriptCard({ script }: { script: Script | null; scriptText: string }) {
   )
 }
 
+// Right slide-in listing the preset visual styles — same chrome as the Video
+// Model / Character-preset pickers so every "pick from a panel" reads alike.
+function StyleSlideOver({
+  open,
+  onClose,
+  value,
+  onPick,
+}: {
+  open: boolean
+  onClose: () => void
+  value: string
+  onPick: (id: string) => void
+}) {
+  return (
+    <SlideOver open={open} onClose={onClose} title="Choose a style" subtitle="The look every clip is rendered in">
+      <div className="flex flex-col gap-2 p-4">
+        {CONTINUOUS_STYLES.map((s) => {
+          const active = s.id === value
+          return (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => { onPick(s.id); onClose() }}
+              className={`flex items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
+                active
+                  ? 'border-broll-500/30 bg-broll-500/10'
+                  : 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'
+              }`}
+            >
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${active ? 'bg-broll-500/10 text-broll-400' : 'bg-ink/5 text-ink-500'}`}>
+                <Palette className="h-5 w-5" strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className={`text-[13px] font-medium tracking-tight ${active ? 'text-broll-300' : 'text-ink-200'}`}>
+                  {s.label}
+                </div>
+                <div className="line-clamp-2 text-[11px] leading-snug text-ink-500">{s.hint}</div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </SlideOver>
+  )
+}
+
 export default function InputPanel({
   selectedProduct,
   selectedModel,
@@ -235,6 +284,7 @@ export default function InputPanel({
   onRemoveStyleRef,
   onClearStyleRefs,
   onAnalyzeStyleRefs,
+  onPickStyleRefsFromBank,
   isAnalyzingStyle,
   continuousStyleBrief,
   onClearStyleBrief,
@@ -244,6 +294,11 @@ export default function InputPanel({
   const [scriptExpanded, setScriptExpanded] = useState(false)
   const [instructionsExpanded, setInstructionsExpanded] = useState(false)
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
+  // Popover that asks where to pull style-reference frames from (bank or upload).
+  const [styleSourceOpen, setStyleSourceOpen] = useState(false)
+  const styleSourceRef = useRef<HTMLDivElement>(null)
+  // Slide-in picker for the preset visual style (mirrors the Video Model picker).
+  const [stylePanelOpen, setStylePanelOpen] = useState(false)
   const isOneShot = mode === 'oneshot'
   const isContinuous = mode === 'continuous'
   const hasRefs = !!selectedProduct?.productImage || !!selectedModel?.characterImage
@@ -260,6 +315,20 @@ export default function InputPanel({
   const perClipSeconds = plan ? Math.min(plan.maxClipSeconds, Math.max(4, Math.ceil(estSeconds / plan.count))) : undefined
   const oneShotModel = getModel(oneShotModelId)
   const oneShotModelSupportsRefs = !!oneShotModel?.modes?.includes('reference-to-video')
+  // Preset style shown on the slide-in picker's trigger.
+  const currentStyle = CONTINUOUS_STYLES.find((s) => s.id === continuousStyleId) ?? CONTINUOUS_STYLES[0]
+
+  // Close the reference-source popover on an outside click or Escape.
+  useEffect(() => {
+    if (!styleSourceOpen) return
+    const onDown = (e: PointerEvent) => {
+      if (styleSourceRef.current && !styleSourceRef.current.contains(e.target as Node)) setStyleSourceOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setStyleSourceOpen(false) }
+    document.addEventListener('pointerdown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('pointerdown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [styleSourceOpen])
 
   return (
     <div className="flex flex-col md:h-full">
@@ -283,13 +352,8 @@ export default function InputPanel({
       </div>
 
       {/* Bank selections */}
-      <div className="flex flex-1 flex-col px-5 pb-5 pt-4 md:overflow-y-auto">
-        <div className="flex grow flex-col gap-3">
-          {/* References section. */}
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-ink-200">References</span>
-          </div>
-
+      <div className="flex flex-1 flex-col px-5 pb-4 pt-4 md:overflow-y-auto">
+        <div className="flex grow flex-col gap-2.5">
           {/* Product */}
           <BankCard
             icon={Package}
@@ -320,7 +384,7 @@ export default function InputPanel({
               merged into one rounded box so the two sources read as one input.
               In One-Shot the script box doesn't grow — there's a stack of
               controls below it (model, clip type) that should stay in view. */}
-          <div className={`flex min-h-0 flex-col overflow-hidden rounded-3xl border transition-colors ${isOneShot || isContinuous ? '' : 'flex-1'} ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
+          <div className={`flex min-h-0 flex-col overflow-hidden rounded-3xl border transition-colors ${isOneShot ? '' : 'flex-1'} ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
             <BankCard
               icon={FileText}
               label="Script / Hooks"
@@ -345,16 +409,42 @@ export default function InputPanel({
             </div>
           </div>
 
-          {/* Section separator */}
-          <div className="my-2 h-px bg-ink/5" />
+          {/* Additional instructions — a slim, fully-rounded dashed pill; a tap
+              opens a centered editor popup (ExpandTextModal) to write in. Shows
+              the note (or the placeholder + Optional) on its face. */}
+          <button
+            type="button"
+            onClick={() => setInstructionsExpanded(true)}
+            className="flex h-11 w-full items-center gap-2 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 text-left transition-colors hover:border-ink/20 hover:bg-ink/[0.05]"
+          >
+            <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={1.5} />
+            <span className={`min-w-0 flex-1 truncate text-[13px] ${additionalContext.trim() ? 'font-medium text-ink-100' : 'text-ink-400'}`}>
+              {additionalContext.trim() ? additionalContext.trim() : 'Additional Instructions'}
+            </span>
+            {!additionalContext.trim() && (
+              <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
+                Optional
+              </span>
+            )}
+          </button>
+
+        </div>
+      </div>
+
+      {/* Render-settings + Generate band — the video model, clip type, and visual
+          style are the controls that shape the output, so they dock together in
+          one tinted panel directly above the Generate button (the Characters tab
+          groups its model + chips + button the same way). Sticky on mobile,
+          static rounded-top card on desktop. */}
+      <div className="sticky bottom-0 z-30 border-t border-ink/5 bg-surface-0 px-5 py-3 md:static md:z-auto md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
+        <div className="mb-2.5 flex flex-col gap-2">
 
           {/* One Shot video model — picked BEFORE generation because the
               script split is planned against this model's max clip length
               (15s Seedance / Kling, 10s Gemini Omni). */}
           {isOneShot && (
             <div>
-              <span className="text-sm font-medium text-ink-200">Video Model</span>
-              <div className="mt-2">
+              <div>
                 {/* Slide-in side-panel picker (same as the detail modal). */}
                 <button
                   type="button"
@@ -393,13 +483,6 @@ export default function InputPanel({
                   costParams={perClipSeconds ? { durationSeconds: perClipSeconds } : undefined}
                 />
               </div>
-              {plan && (
-                <p className="mt-1.5 px-1 text-[11px] leading-relaxed text-ink-600">
-                  ≈ {estSeconds}s spoken → {plan.count === 1
-                    ? `1 clip of up to ${plan.maxClipSeconds}s`
-                    : `${plan.count} clips of up to ${plan.maxClipSeconds}s`}
-                </p>
-              )}
               {plan?.capped && (
                 <p className="mt-1 flex items-start gap-1.5 px-1 text-[11px] leading-relaxed text-amber-300 light:text-amber-700">
                   <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
@@ -420,96 +503,86 @@ export default function InputPanel({
               laid over in the edit ("B-Roll Clips")? Both carry diegetic audio,
               so neither is truly "silent". */}
           {isOneShot && (
-            <div>
-              <span className="text-sm font-medium text-ink-200">Clip Type</span>
-              <div className="mt-2">
-                <SegmentedToggle<OneShotDelivery>
-                  className="h-12 !p-1"
-                  value={oneShotDelivery}
-                  onChange={onOneShotDeliveryChange}
-                  accent="broll"
-                  options={[
-                    { value: 'dialogue', label: 'With Dialogue' },
-                    { value: 'silent', label: 'B-Roll Clips' },
-                  ]}
-                />
-              </div>
-              <p className="mt-1.5 px-1 text-[11px] leading-relaxed text-ink-600">
-                {oneShotDelivery === 'dialogue'
-                  ? 'The character speaks the script on camera — same voice across every clip.'
-                  : 'B-roll footage only — lay your own voiceover over the clips in the edit.'}
-              </p>
-            </div>
+            <SegmentedToggle<OneShotDelivery>
+              className="h-12 !p-1"
+              value={oneShotDelivery}
+              onChange={onOneShotDeliveryChange}
+              accent="broll"
+              options={[
+                { value: 'dialogue', label: 'With Dialogue' },
+                { value: 'silent', label: 'B-Roll Clips' },
+              ]}
+            />
           )}
 
-          {/* Visual style — shared by all three modes. A preset chip seeds the
-              look, or reference frames get reverse-engineered into a custom
-              style brief that outranks the presets. In every mode a stylized
-              pick restyles the render (STYLE block appended, iPhone-realism
-              stack off); UGC Realism is the default and leaves output untouched.
-              No video model picker here on purpose. */}
-          <div>
-              <span className="text-sm font-medium text-ink-200">Visual Style</span>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {CONTINUOUS_STYLES.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => onContinuousStyleChange(s.id)}
-                    title={s.hint}
-                    disabled={!!continuousStyleBrief}
-                    className={`rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-                      continuousStyleId === s.id && !continuousStyleBrief
-                        ? 'border-broll-500/40 bg-broll-500/15 text-broll-200 light:text-broll-700'
-                        : 'border-ink/10 bg-ink/[0.02] text-ink-400 hover:bg-ink/[0.05] hover:text-ink-200'
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
+          {/* Visual style + reference frames — laid out half & half like the
+              Characters "preset | drop-to-autofill" row: the left half opens a
+              slide-in style picker; the right half is a dashed pick/upload zone
+              for reference frames. A locked custom style (distilled from those
+              frames) replaces the whole row. */}
+          {continuousStyleBrief ? (
+            <div className="order-first rounded-2xl border border-broll-500/25 bg-broll-500/10 px-3 py-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-broll-300">Custom style locked</span>
+                <button
+                  type="button"
+                  onClick={onClearStyleBrief}
+                  title="Drop the custom style and go back to the presets"
+                  className="shrink-0 rounded-full p-0.5 text-ink-400 transition-colors hover:bg-ink/10 hover:text-ink-200"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+              <p className="mt-1 line-clamp-3 text-[11px] leading-relaxed text-ink-400">{continuousStyleBrief}</p>
+            </div>
+          ) : (
+            <div className="order-first flex items-center gap-2">
+              {/* Visual style — opens the slide-in style picker. */}
+              <div className="min-w-0 flex-1">
+                <button
+                  type="button"
+                  onClick={() => setStylePanelOpen(true)}
+                  className="flex h-12 w-full items-center gap-2.5 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-3.5 text-left transition-colors hover:border-ink/20 hover:bg-ink/[0.05]"
+                >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-broll-500/10 text-broll-400 light:text-broll-600">
+                    <Palette className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-100">{currentStyle.label}</span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
+                </button>
               </div>
 
-              {/* Style references — the AI reads the LOOK out of these frames
-                  (medium, palette, light, finish) and never their content. */}
-              <div className="mt-3 rounded-2xl border border-dashed border-ink/10 bg-ink/[0.02] p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-medium text-ink-300">Match a reference style</span>
-                    <span className="rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
-                      Optional
-                    </span>
-                  </div>
-                  {styleRefs.length > 0 && (
+              {/* Reference frames — dashed zone (mirrors "Drop an image to
+                  autofill"); click asks bank or upload. The AI reads only the
+                  LOOK of these frames, never their content. */}
+              <div className="relative min-w-0 flex-1" ref={styleSourceRef}>
+                <button
+                  type="button"
+                  onClick={() => setStyleSourceOpen((v) => !v)}
+                  className="flex h-12 w-full items-center gap-2.5 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-3.5 text-left transition-colors hover:border-ink/20 hover:bg-ink/[0.05]"
+                >
+                  <span className="shrink-0 rounded-full bg-ink/5 p-1.5">
+                    <ImagePlus className="h-4 w-4 text-ink-500" strokeWidth={1.5} />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-100">
+                    {styleRefs.length > 0
+                      ? `${styleRefs.length} reference${styleRefs.length === 1 ? '' : 's'}`
+                      : 'Match a style'}
+                  </span>
+                </button>
+                {styleSourceOpen && (
+                  <div className="absolute bottom-full left-0 right-0 z-40 mb-1 overflow-hidden rounded-2xl border border-ink/10 bg-surface-2/95 p-1 shadow-xl backdrop-blur-xl">
                     <button
                       type="button"
-                      onClick={onClearStyleRefs}
-                      className="rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-300"
+                      onClick={() => { setStyleSourceOpen(false); onPickStyleRefsFromBank() }}
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.06]"
                     >
-                      Clear
+                      <Package className="h-3.5 w-3.5 text-ink-400" strokeWidth={1.5} />
+                      Choose from Bank
                     </button>
-                  )}
-                </div>
-                <p className="mt-1 text-[11px] leading-relaxed text-ink-600">
-                  Drop in frames of an ad whose look you want.
-                </p>
-
-                <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                  {styleRefs.map((ref, i) => (
-                    <div key={i} className="group/ref relative h-14 w-14 overflow-hidden rounded-xl border border-ink/10">
-                      <img src={ref} alt={`Style reference ${i + 1}`} className="h-full w-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => onRemoveStyleRef(i)}
-                        title="Remove"
-                        className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover/ref:opacity-100"
-                      >
-                        <X className="h-3.5 w-3.5 text-white" />
-                      </button>
-                    </div>
-                  ))}
-                  {styleRefs.length < 4 && (
-                    <label className="flex h-14 w-14 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-ink/15 text-ink-500 transition-colors hover:border-broll-400/50 hover:text-broll-300">
-                      <ImagePlus className="h-4 w-4" strokeWidth={1.5} />
+                    <label className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.06]">
+                      <ImagePlus className="h-3.5 w-3.5 text-ink-400" strokeWidth={1.5} />
+                      Upload from device
                       <input
                         type="file"
                         accept="image/*"
@@ -519,72 +592,56 @@ export default function InputPanel({
                           const files = Array.from(e.target.files ?? [])
                           if (files.length > 0) onAddStyleRefs(files)
                           e.target.value = ''
+                          setStyleSourceOpen(false)
                         }}
                       />
                     </label>
-                  )}
-                </div>
-
-                {styleRefs.length > 0 && !continuousStyleBrief && (
-                  <button
-                    type="button"
-                    onClick={onAnalyzeStyleRefs}
-                    disabled={isAnalyzingStyle}
-                    className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-full border border-broll-500/30 bg-broll-500/10 px-3 py-2 text-[11px] font-medium text-broll-200 transition-colors hover:bg-broll-500/20 disabled:cursor-not-allowed disabled:opacity-50 light:text-broll-700"
-                  >
-                    {isAnalyzingStyle ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                    {isAnalyzingStyle ? 'Reading the style…' : `Analyze style from ${styleRefs.length} image${styleRefs.length === 1 ? '' : 's'}`}
-                  </button>
-                )}
-
-                {continuousStyleBrief && (
-                  <div className="mt-2.5 rounded-xl border border-broll-500/25 bg-broll-500/10 px-3 py-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-broll-300">Custom style locked</span>
-                      <button
-                        type="button"
-                        onClick={onClearStyleBrief}
-                        title="Drop the custom style and go back to the presets"
-                        className="shrink-0 rounded-full p-0.5 text-ink-400 transition-colors hover:bg-ink/10 hover:text-ink-200"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <p className="mt-1 line-clamp-3 text-[11px] leading-relaxed text-ink-400">{continuousStyleBrief}</p>
                   </div>
                 )}
               </div>
-
-              {/* Clip-per-line framing note is Continuous-specific. */}
-              {isContinuous && hasScript && (
-                <p className="mt-2 px-1 text-[11px] leading-relaxed text-ink-600">
-                  ≈ {estimateSpokenSeconds(scriptText)}s spoken · one clip per line, each ending on the next clip's first frame
-                </p>
-              )}
             </div>
+          )}
 
-          {/* Additional instructions */}
-          <div>
-            <span className="text-sm font-medium text-ink-200">Additional Instructions</span>
-            <div className="relative mt-2">
-              <textarea
-                value={additionalContext}
-                onChange={(e) => onAdditionalContextChange(e.target.value)}
-                rows={5}
-                placeholder="Optional notes for this generation (mood, style preferences, specific angles...)"
-                className="w-full rounded-xl border border-ink/10 bg-transparent px-3 py-2 text-sm text-ink-200 placeholder-ink-700 outline-none transition-colors focus:border-ink/20 resize-none"
-              />
-              <ExpandButton onClick={() => setInstructionsExpanded(true)} className="absolute bottom-2 right-2" />
+          {/* Selected reference frames + the analyze-to-lock action. */}
+          {styleRefs.length > 0 && !continuousStyleBrief && (
+            <div className="order-first flex flex-col gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {styleRefs.map((ref, i) => (
+                  <div key={i} className="group/ref relative h-14 w-14 overflow-hidden rounded-xl border border-ink/10">
+                    <img src={ref} alt={`Style reference ${i + 1}`} className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => onRemoveStyleRef(i)}
+                      title="Remove"
+                      className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover/ref:opacity-100"
+                    >
+                      <X className="h-3.5 w-3.5 text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClearStyleRefs}
+                  className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-300"
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={onAnalyzeStyleRefs}
+                  disabled={isAnalyzingStyle}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full border border-broll-500/30 bg-broll-500/10 px-3 py-2 text-[11px] font-medium text-broll-200 transition-colors hover:bg-broll-500/20 disabled:cursor-not-allowed disabled:opacity-50 light:text-broll-700"
+                >
+                  {isAnalyzingStyle ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {isAnalyzingStyle ? 'Reading the style…' : `Analyze style from ${styleRefs.length} image${styleRefs.length === 1 ? '' : 's'}`}
+                </button>
+              </div>
             </div>
-          </div>
-
+          )}
         </div>
-      </div>
 
-      {/* Generate button — pinned to the app window's bottom edge on mobile.
-          Opaque bg: backdrop-filter doesn't re-blur inside the already-blurred
-          window frame, so any alpha lets content underneath ghost through. */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-ink/5 bg-surface-0 p-4 md:static md:left-auto md:right-auto md:z-auto md:bg-transparent">
         <button
           onClick={onGenerate}
           disabled={!canGenerate || isGenerating}
@@ -643,6 +700,13 @@ export default function InputPanel({
         title="Additional Instructions"
         accent="broll"
         placeholder="Optional notes for this generation (mood, style preferences, specific angles...)"
+      />
+
+      <StyleSlideOver
+        open={stylePanelOpen}
+        onClose={() => setStylePanelOpen(false)}
+        value={continuousStyleId}
+        onPick={onContinuousStyleChange}
       />
     </div>
   )

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Search, Film, Trash2 } from 'lucide-react'
 import type { BrollHistoryItem } from '../../../stores/types'
-import type { BrollResult, CardState, OneShotResult } from '../types'
+import type { BrollResult, CardState, OneShotResult, BrollMode } from '../types'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useBankStore } from '../../../stores/bankStore'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
@@ -29,8 +29,21 @@ function sceneCount(result: BrollResult | null): number {
   return result?.scenes?.length ?? 0
 }
 
-// Mode filter pills — session rows carry `mode` ('line' | 'continuous' |
-// 'oneshot'); legacy rows with no mode read as Line-by-Line.
+// A session accumulates results across modes (state isn't cleared on a mode
+// switch), and the saved `mode` is only the last-active one — unreliable for
+// telling what a row *is*. So derive the row's mode from its richest content:
+// prefer the special modes' own results (continuous, then one-shot); a lingering
+// line result is the weakest signal. Both the badge/filter AND selecting the row
+// use this, so what you see always matches where a click takes you.
+export function brollHistoryMode(item: BrollHistoryItem): BrollMode {
+  if (item.continuousResult) return 'continuous'
+  if (item.oneShotResult) return 'oneshot'
+  const line = item.result as BrollResult | null
+  if (line?.scenes?.length) return 'line'
+  return item.mode ?? 'line'
+}
+
+// Mode filter pills.
 type ModeFilter = 'all' | 'line' | 'continuous' | 'oneshot'
 const MODE_FILTERS: { id: ModeFilter; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -39,7 +52,7 @@ const MODE_FILTERS: { id: ModeFilter; label: string }[] = [
   { id: 'oneshot', label: 'One-Shot' },
 ]
 function itemMode(it: BrollHistoryItem): Exclude<ModeFilter, 'all'> {
-  return it.mode ?? 'line'
+  return brollHistoryMode(it)
 }
 
 export default function BrollHistoryView({ items, activeId, onSelect, onDelete }: BrollHistoryViewProps) {
@@ -160,7 +173,7 @@ function HistoryRow({
   const result = item.result as BrollResult | null
   const thumbRef = firstImageRef(cardStates)
   const thumbUrl = useAssetUrl(thumbRef ?? '')
-  const mode = item.mode ?? 'line'
+  const mode = brollHistoryMode(item)
   const isOneShot = mode === 'oneshot'
   const isContinuous = mode === 'continuous'
   const oneShotResult = item.oneShotResult as OneShotResult | undefined

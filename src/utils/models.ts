@@ -446,7 +446,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     provider: 'ByteDance',
     task: 'video',
     modes: ['text-to-video', 'image-to-video', 'frames-to-video'],
-    tags: ['cheap'],
+    tags: ['recommended', 'cheap'],
     pricing: {
       unit: 'per-second',
       credits: 3.5,
@@ -839,7 +839,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // so Grok does reference-to-video as well as plain image-to-video — both
     // resolve to the same image_urls body (see buildVideoInput).
     modes: ['text-to-video', 'image-to-video', 'reference-to-video'],
-    tags: ['new'],
+    tags: ['recommended', 'new', 'cheap'],
     supportsReferenceImages: true,
     pricing: {
       unit: 'per-second',
@@ -847,12 +847,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       priceFor: ({ durationSeconds = 8, resolution = '480p' }) =>
         (resolution === '720p' ? 3 : 1.6) * durationSeconds,
     },
-    // kie runs ~90% of the official rate (kie's own claim) → official ≈ kie /
-    // 0.90. No standalone xAI per-second list price to cite, so derive from
-    // that ratio (like the TTS / Kling 2.6 entries).
+    // Priced against the official xAI rate so kie lands ~90% off — official ≈
+    // kie / 0.10. No standalone xAI per-second list price to cite, so derived
+    // from that ratio and the kie.ai pricing page.
     official: {
       usdFor: ({ durationSeconds = 8, resolution = '480p' }) =>
-        creditsToUsd((resolution === '720p' ? 3 : 1.6) * durationSeconds) / 0.9,
+        creditsToUsd((resolution === '720p' ? 3 : 1.6) * durationSeconds) / 0.1,
       source: 'https://kie.ai/pricing',
     },
     videoEndpoint: 'createTask',

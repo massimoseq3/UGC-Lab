@@ -1,12 +1,13 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Film, AlertCircle, Plus, Images, X } from 'lucide-react'
+import { Film, AlertCircle, Plus, Images, X, Palette } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage } from '../types'
 import type { Product, Model } from '../../../stores/types'
 import { createDefaultCardState } from '../cardState'
 import type { VideoHistoryItem } from '../../../stores/types'
 import { finishImageTask } from '../services/generateBroll'
+import { getContinuousStyle } from '../services/generateContinuous'
 import { finishVideoTask } from '../services/generateVideo'
 import { isPollTimeout } from '../../../utils/kie'
 import { useBankStore } from '../../../stores/bankStore'
@@ -426,9 +427,17 @@ export default function ScenesView({
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4">
       <div className="mb-5 flex items-center justify-between gap-3">
-        <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">
-          {result.scenes.length} scene{result.scenes.length === 1 ? '' : 's'}
-        </span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-ink-400">
+            {result.scenes.length} scene{result.scenes.length === 1 ? '' : 's'}
+          </span>
+          {/* Style pill — parity with Continuous/One-Shot, so the member can see
+              which look every b-roll clip is rendered in. */}
+          <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-broll-500/25 bg-broll-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-broll-300">
+            <Palette className="h-3 w-3 shrink-0" strokeWidth={2} />
+            <span className="truncate">{result.styleBrief ? 'Custom style' : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
+          </span>
+        </div>
         <button
           type="button"
           onClick={() => requestBatch(allKeys, 'All scenes')}
