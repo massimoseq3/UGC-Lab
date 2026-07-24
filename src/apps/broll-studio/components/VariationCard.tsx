@@ -22,6 +22,7 @@ import type { VideoHistoryItem, Product, Model, BRoll } from '../../../stores/ty
 import { enhanceVariationPrompt, generateNewVariation, startImageTask, finishImageTask } from '../services/generateBroll'
 import { applyStyleToPrompt } from '../services/generateContinuous'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
+import { claimTask, releaseTask } from '../services/taskRegistry'
 import { sendClipToPlayground } from '../services/sendClipToPlayground'
 import { isPollTimeout } from '../../../utils/kie'
 import { useBankStore } from '../../../stores/bankStore'
@@ -202,14 +203,19 @@ export default function VariationCard(props: VariationCardProps) {
   }
 
   // Push a new entry onto the prompt undo/redo stack, trimming any forward
-  // redo branch. Caller pre-pads CardState.editablePrompt with the new value.
+  // redo branch. Reads the card's LIVE history rather than this render's copy:
+  // the textarea stays editable during Enhance / Regenerate, so a snapshot
+  // captured at click time truncated away anything the user committed while the
+  // LLM was working, with no Undo path back to it.
   const pushPromptHistory = (newPrompt: string) => {
-    const truncated = cardState.promptHistory.slice(0, cardState.promptHistoryIndex + 1)
-    const nextHistory = [...truncated, newPrompt]
-    onUpdateState({
-      editablePrompt: newPrompt,
-      promptHistory: nextHistory,
-      promptHistoryIndex: nextHistory.length - 1,
+    onUpdateStateFn((prev) => {
+      const truncated = prev.promptHistory.slice(0, prev.promptHistoryIndex + 1)
+      const nextHistory = [...truncated, newPrompt]
+      return {
+        editablePrompt: newPrompt,
+        promptHistory: nextHistory,
+        promptHistoryIndex: nextHistory.length - 1,
+      }
     })
   }
 
@@ -344,6 +350,9 @@ export default function VariationCard(props: VariationCardProps) {
       return
     }
 
+    // Own this poll before the taskId lands in persisted state, so a resume
+    // walker on a remounted view can't start a second poll for the same task.
+    if (!claimTask('image', taskId)) return
     try {
       const imageUrl = await finishImageTask(taskId, modelId, imageResolution)
       const newImage: GeneratedImage = { imageUrl, prompt: promptText, modelId, createdAt: Date.now() }
@@ -364,6 +373,8 @@ export default function VariationCard(props: VariationCardProps) {
         ),
       }))
       useAppStore.getState().addToast(msg, 'error')
+    } finally {
+      releaseTask('image', taskId)
     }
   }
 
@@ -464,6 +475,9 @@ export default function VariationCard(props: VariationCardProps) {
     firstFrameDataUri: string | undefined,
     referenceDataUris: string[] | undefined,
     videoModelId: string | undefined,
+    // Asset ref behind firstFrameDataUri / a single-still reference, recorded
+    // on the in-flight entry so Retry can replay the same generation.
+    startFrameRef?: string,
   ) => {
     if (!videoModelId) {
       useAppStore.getState().addToast('No video model configured.', 'error')
@@ -541,10 +555,12 @@ export default function VariationCard(props: VariationCardProps) {
           resolution: videoResolution,
           audio: videoAudio,
           sourceBRollId,
+          startFrameRef,
         },
       ],
     }))
 
+    let claimedTaskId: string | null = null
     try {
       // Same fire-time restyle as image gen — STYLE block + realism-stack toggle
       // for a stylized pick; the persisted prompt/history stay unstyled.
@@ -575,6 +591,10 @@ export default function VariationCard(props: VariationCardProps) {
           e.id === inFlightId ? { ...e, taskId, endpoint: videoEndpoint } : e,
         ),
       }))
+
+      // Own this poll before the taskId is persisted — see taskRegistry.
+      if (!claimTask('video', taskId)) return
+      claimedTaskId = taskId
 
       const res = await finishVideoTask(
         taskId,
@@ -640,6 +660,8 @@ export default function VariationCard(props: VariationCardProps) {
         ),
       }))
       useAppStore.getState().addToast(msg, 'error')
+    } finally {
+      if (claimedTaskId) releaseTask('video', claimedTaskId)
     }
   }
 
@@ -661,9 +683,9 @@ export default function VariationCard(props: VariationCardProps) {
     // reference-to-video model. Either way the chosen still drives the clip.
     const modes = (videoModelId ? getModel(videoModelId)?.modes : undefined) ?? []
     if (modes.includes('image-to-video')) {
-      await runVideoTask('image-to-video', dataUri, undefined, videoModelId)
+      await runVideoTask('image-to-video', dataUri, undefined, videoModelId, startFrameRef)
     } else if (modes.includes('reference-to-video')) {
-      await runVideoTask('reference-to-video', undefined, [dataUri], videoModelId)
+      await runVideoTask('reference-to-video', undefined, [dataUri], videoModelId, startFrameRef)
     } else {
       useAppStore.getState().addToast("This model can't animate a still — pick one that takes a start frame or reference images.", 'error')
     }
@@ -684,15 +706,22 @@ export default function VariationCard(props: VariationCardProps) {
     )
   }
 
-  // Retry a failed in-flight gen: drop the errored entry, then re-fire. Images
-  // re-run their captured prompt/settings exactly; videos re-run via the
-  // standard handler (refs are rebuilt from the current toggles).
+  // Retry a failed in-flight gen: drop the errored entry, then re-fire the
+  // SAME generation. A clip that animated a still retries as that animation —
+  // routing it through handleGenerateVideo instead silently rebuilt it as a
+  // reference-/text-to-video from the current toggles, so the user paid again
+  // for a different clip than the one that failed. (The prompt is read live, so
+  // a retry after editing the prompt still picks up the edit.)
   const handleRetryInFlight = (id: string, isVideo: boolean) => {
     if (isVideo) {
       const failed = cardState.inFlightVideos.find((e) => e.id === id)
       if (!failed) return
       onUpdateStateFn((prev) => ({ inFlightVideos: prev.inFlightVideos.filter((e) => e.id !== id) }))
-      void handleGenerateVideo(failed.modelId)
+      if (failed.startFrameRef) {
+        void handleAnimate(failed.startFrameRef, failed.modelId)
+      } else {
+        void handleGenerateVideo(failed.modelId)
+      }
     } else {
       const failed = cardState.inFlightImages.find((e) => e.id === id)
       if (!failed) return
@@ -707,15 +736,6 @@ export default function VariationCard(props: VariationCardProps) {
     } else {
       onUpdateStateFn((prev) => ({ inFlightImages: prev.inFlightImages.filter((e) => e.id !== id) }))
     }
-  }
-
-  const handleResetVideo = () => {
-    onUpdateState({
-      videoStatus: 'idle',
-      videoError: null,
-      videoTaskId: null,
-      videoStartedAt: null,
-    })
   }
 
   // ────────────────────────────────────────────────────────────────────────
@@ -1053,7 +1073,6 @@ export default function VariationCard(props: VariationCardProps) {
           handleGenerateImage={handleGenerateImage}
           handleGenerateVideo={handleGenerateVideo}
           handleAnimate={handleAnimate}
-          handleResetVideo={handleResetVideo}
           handleRetryInFlight={handleRetryInFlight}
           handleDismissInFlight={handleDismissInFlight}
           voiceProfile={voiceProfile}

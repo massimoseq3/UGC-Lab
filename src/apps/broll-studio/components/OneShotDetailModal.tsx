@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   X,
@@ -44,7 +44,7 @@ import {
   estimateCredits,
   formatCredits,
   videoResolutionLabel,
-  snapVideoDuration,
+  snapVideoDurationUp,
   officialSavingsPercent,
 } from '../../../utils/models'
 import { downloadImage } from '../../../utils/downloadImage'
@@ -116,7 +116,14 @@ export default function OneShotDetailModal({
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
 
   useEffect(() => { setDraft(cardState.editablePrompt) }, [cardState.editablePrompt])
-  useCloseOnEscape(true, onClose)
+  // Esc closes like the backdrop does — but the backdrop path lets the textarea
+  // blur first, which commits the draft into history. Without the explicit
+  // commit here, text typed and then Esc'd away survived in `editablePrompt`
+  // but never entered `promptHistory`, so one Undo discarded it for good.
+  // `commitDraft` is declared further down, so it's reached through a ref.
+  const commitDraftRef = useRef<() => void>(() => {})
+  const closeWithCommit = useCallback(() => { commitDraftRef.current(); onClose() }, [onClose])
+  useCloseOnEscape(true, closeWithCommit)
   useCloseOnAppSwitch(true, onClose)
 
   // A text-selection drag that starts inside the content and releases over the
@@ -140,7 +147,11 @@ export default function OneShotDetailModal({
     if (constraints.aspectRatios.length > 0 && !constraints.aspectRatios.includes(cardState.aspectRatio)) {
       updates.aspectRatio = constraints.aspectRatios[0]
     }
-    const snapped = snapVideoDuration(cardState.durationSeconds, constraints.durations)
+    // Snap UP, matching fire time (runSegmentVideo) — rounding down would cut
+    // the clip short of the speech it was planned for. snapVideoDuration picks
+    // the nearest at-or-BELOW option, so merely opening this modal on a model
+    // with a coarser grid used to shorten the card behind the user's back.
+    const snapped = snapVideoDurationUp(cardState.durationSeconds, constraints.durations)
     if (snapped !== cardState.durationSeconds) updates.durationSeconds = snapped
     if (Object.keys(updates).length) onUpdate(() => updates)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,16 +171,24 @@ export default function OneShotDetailModal({
   const canUndo = historyIndex > 0
   const canRedo = historyIndex < history.length - 1
 
+  // Rebuilds from the card's LIVE history, not the render-time snapshot. The
+  // textarea stays editable during Enhance/Regenerate, so a snapshot captured
+  // at click time truncated away any edit the user committed while the LLM was
+  // working — the text vanished with no Undo path back to it.
   const pushHistory = (newPrompt: string) => {
-    const truncated = history.slice(0, historyIndex + 1)
-    const next = [...truncated, newPrompt]
-    onUpdate(() => ({ editablePrompt: newPrompt, promptHistory: next, promptHistoryIndex: next.length - 1 }))
+    onUpdate((prev) => {
+      const hist = prev.promptHistory.length > 0 ? prev.promptHistory : [prev.editablePrompt]
+      const idx = Math.max(0, Math.min(prev.promptHistoryIndex, hist.length - 1))
+      const next = [...hist.slice(0, idx + 1), newPrompt]
+      return { editablePrompt: newPrompt, promptHistory: next, promptHistoryIndex: next.length - 1 }
+    })
     setDraft(newPrompt)
   }
   const commitDraft = () => {
     if (draft === history[historyIndex]) { onUpdate(() => ({ editablePrompt: draft })); return }
     pushHistory(draft)
   }
+  commitDraftRef.current = commitDraft
   const handleUndo = () => {
     if (!canUndo) return
     const i = historyIndex - 1
@@ -565,6 +584,7 @@ export default function OneShotDetailModal({
                         modelId={entry.modelId}
                         aspectRatio={entry.aspectRatio}
                         messages={['Sending request...', 'Rolling the clip...', 'Cutting the shots...', 'Finalizing the clip...']}
+                        onDismiss={() => onDismissInFlight(entry.id)}
                       />
                     ))}
                     {cardState.videos.map((video, i) => (

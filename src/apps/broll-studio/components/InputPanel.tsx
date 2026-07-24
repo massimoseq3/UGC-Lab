@@ -46,7 +46,6 @@ interface InputPanelProps {
   oneShotDelivery: OneShotDelivery
   onOneShotDeliveryChange: (delivery: OneShotDelivery) => void
   oneShotModelId: string
-  onOneShotModelChange: (modelId: string) => void
   // Continuous mode (keyframe chain) — visual style only. The video model is
   // NOT picked here: it only matters once there are keyframes to animate, so
   // the picker lives in the clip modal.
@@ -200,7 +199,7 @@ function ModelCard({ model }: { model: Model }) {
   )
 }
 
-function ScriptCard({ script }: { script: Script | null; scriptText: string }) {
+function ScriptCard({ script }: { script: Script | null }) {
   const title = script?.title ?? 'Imported Script'
   return (
     <div className="flex items-center gap-3">
@@ -286,7 +285,6 @@ export default function InputPanel({
   oneShotDelivery,
   onOneShotDeliveryChange,
   oneShotModelId,
-  onOneShotModelChange,
   continuousStyleId,
   onContinuousStyleChange,
   styleRefs,
@@ -412,7 +410,7 @@ export default function InputPanel({
               onClear={selectedScript ? onClearScript : undefined}
               flat
             >
-              {selectedScript && <ScriptCard script={selectedScript} scriptText={scriptText} />}
+              {selectedScript && <ScriptCard script={selectedScript} />}
             </BankCard>
             <div className="relative flex min-h-0 flex-1 flex-col">
               <textarea
@@ -492,7 +490,7 @@ export default function InputPanel({
                   allowedModelIds={ONE_SHOT_MODEL_IDS}
                   enabledModelIds={ONE_SHOT_ENABLED_MODEL_IDS}
                   value={oneShotModelId}
-                  onChange={(id) => { useSettingsStore.getState().setAppModel('broll-studio:oneshot:video', id); onOneShotModelChange(id) }}
+                  onChange={(id) => useSettingsStore.getState().setAppModel('broll-studio:oneshot:video', id)}
                   isOpen={modelPanelOpen}
                   onClose={() => setModelPanelOpen(false)}
                   requireMode={hasRefs ? 'reference-to-video' : undefined}

@@ -27,6 +27,7 @@ import type { Product, Model, VideoHistoryItem } from '../../../stores/types'
 import type { VideoMode } from '../../../utils/models'
 import { createDefaultOneShotCardState } from '../cardState'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
+import { claimTask, releaseTask } from '../services/taskRegistry'
 import { buildReferencePreamble } from '../services/generateBroll'
 import { resolveOneShotTokens } from '../services/generateOneShot'
 import { applyStyleToPrompt } from '../services/generateContinuous'
@@ -118,7 +119,11 @@ export default function OneShotView({
   const [extraRefs, setExtraRefs] = useState<Record<string, ReferenceImage[]>>({})
   // Pending Generate-all / Generate request awaiting confirmation — video gens
   // are expensive, so a click opens a cost popup before firing.
-  const [confirmGen, setConfirmGen] = useState<{ keys: string[]; scope: string } | null>(null)
+  // `fresh` = clips with no rendered video yet; `done` = already generated.
+  // Kept apart so a second press never silently re-bills clips the user already
+  // paid for — video gens are the most expensive thing in the app.
+  const [confirmGen, setConfirmGen] = useState<{ fresh: string[]; done: string[]; scope: string } | null>(null)
+  const [includeExisting, setIncludeExisting] = useState(false)
   const [downloadingAll, setDownloadingAll] = useState(false)
   const balance = useCreditsStore((s) => s.balance)
   // Portals to body, so dismiss it on a dock switch.
@@ -156,93 +161,31 @@ export default function OneShotView({
     return `data:${asset.mimeType};base64,${asset.base64}`
   }
 
+  // Clips whose start is underway but whose in-flight entry hasn't landed in
+  // state yet. `isBusy`/`anyInFlight` read cardStates, which doesn't update
+  // until the entry is pushed — and the push used to sit behind seconds of IDB
+  // reads and video decoding, so a second click (or a Generate-all overlapping
+  // a per-concept Generate) fired a duplicate paid generation of the same clip.
+  const startingRef = useRef<Set<string>>(new Set())
+  // Last model we told the user takes no reference images — so the notice is
+  // per model choice rather than per clip.
+  const refWarnedModelRef = useRef<string | null>(null)
+
   // ── Video generation (adaptation of VariationCard.runVideoTask) ──
   const runSegmentVideo = async (key: string) => {
     const card = cardStates[key]
     if (!card) return
+    if (startingRef.current.has(key)) return
     const model = getModel(oneShotModelId)
     if (!model) {
       useAppStore.getState().addToast(`Unknown video model: ${oneShotModelId}`, 'error')
       return
     }
+    startingRef.current.add(key)
 
-    const refs: ReferenceImage[] = [
-      ...(card.refsCharacter && characterRef ? [characterRef] : []),
-      ...(card.refsProduct && productRef ? [productRef] : []),
-      ...(extraRefs[key] ?? []),
-    ]
-    const referenceDataUris: string[] = []
-    for (const r of refs) {
-      const uri = await toDataUri(r.dataUrl)
-      if (uri) referenceDataUris.push(uri)
-    }
-
-    // Clip-to-clip handoff: a follow-up clip (index > 1) carries the PREVIOUS
-    // clip's last frame as a reference so the setting + character position
-    // continue instead of the model re-inventing "the same kitchen" blind. Only
-    // when the toggle is on AND the previous clip has actually rendered (nothing
-    // to grab otherwise — a first parallel "Generate all" won't have it yet, so
-    // regenerating this clip after clip 1 lands is what picks it up).
-    let boundaryFrameAttached = false
-    const { conceptId, segmentIndex } = parseCardKey(key)
-    if (card.carryPrevFrame !== false && segmentIndex > 1) {
-      const prevCard = cardStates[cardKey(conceptId, segmentIndex - 1)]
-      const prevVideo = prevCard?.videos[prevCard.currentVideoIndex] ?? prevCard?.videos[prevCard.videos.length - 1]
-      if (prevVideo?.url) {
-        try {
-          const playable = await getUrl(prevVideo.url)
-          if (playable) {
-            const frame = await extractVideoFrame(playable, 'last')
-            referenceDataUris.unshift(await blobToDataUri(frame))
-            boundaryFrameAttached = true
-          }
-        } catch {
-          // Non-fatal — the clip still generates, just without the handoff anchor.
-        }
-      }
-    }
-
-    let mode: VideoMode = referenceDataUris.length > 0 ? 'reference-to-video' : 'text-to-video'
-    let effectiveRefs: string[] | undefined = referenceDataUris.length > 0 ? referenceDataUris : undefined
-    if (mode === 'reference-to-video' && !model.modes?.includes('reference-to-video')) {
-      useAppStore.getState().addToast(
-        `${model.displayName} doesn't support reference images — generating text-to-video only.`,
-        'error',
-      )
-      mode = 'text-to-video'
-      effectiveRefs = undefined
-    }
-
-    // Fire-time re-validation against the CURRENT model.
-    const constraints = model.videoConstraints
-    const durationSeconds = constraints
-      ? snapVideoDurationUp(card.durationSeconds, constraints.durations)
-      : card.durationSeconds
-    const resolution = constraints && !constraints.resolutions.includes(card.resolution)
-      ? constraints.default ?? constraints.resolutions[0]
-      : card.resolution
-
-    // Resolve [CHARACTER]/[PRODUCT] tokens to plain words the moment before
-    // sending — a video model reads brackets literally.
-    // When the previous clip's last frame rode along (and refs survived the
-    // model-capability check), tell the model the first reference is the handoff
-    // anchor so it continues that exact setting rather than re-inventing it.
-    const usingBoundaryFrame = boundaryFrameAttached && !!effectiveRefs
-    const continuityNote = usingBoundaryFrame
-      ? `\n\nCONTINUITY — The FIRST reference image is special: it is the FINAL FRAME of the previous clip, NOT an appearance reference. Unlike the identity references above (which you must not copy for framing or background), you SHOULD match this first image — its setting, props, framing, lighting, and the character's position and wardrobe — so this clip picks up moments later in the same place and the two cut together seamlessly. Then play out the action below.`
-      : ''
-    const rawPrompt = effectiveRefs
-      ? `${buildReferencePreamble(refs)}${continuityNote}\n\n${card.editablePrompt}`
-      : card.editablePrompt
-    const promptText = resolveOneShotTokens(rawPrompt, productName)
-    // Restyle at fire time: a stylized pick appends its STYLE block and drops the
-    // iPhone-realism stack; UGC / legacy pass through untouched. The persisted
-    // prompt + history stay unstyled — the style rides outside, like Continuous.
-    const { prompt: styledPrompt, noRealism } = applyStyleToPrompt(promptText, {
-      style: result?.style,
-      realism: result?.realism,
-    })
-
+    // Provisional entry, pushed BEFORE any await so the card shows pending and
+    // the busy flags close immediately. Its mode/duration/resolution/prompt are
+    // the card's own settings; the fire-time values are patched in below.
     const inFlightId = crypto.randomUUID()
     updateCard(key, (prev) => ({
       inFlightVideos: [
@@ -252,17 +195,111 @@ export default function OneShotView({
           taskId: null,
           modelId: oneShotModelId,
           startedAt: Date.now(),
-          prompt: promptText,
-          mode,
+          prompt: card.editablePrompt,
+          mode: 'text-to-video',
           aspectRatio: card.aspectRatio,
-          durationSeconds,
-          resolution,
+          durationSeconds: card.durationSeconds,
+          resolution: card.resolution,
           audio: card.audio,
         },
       ],
     }))
 
+    let claimedTaskId: string | null = null
     try {
+      // Models without a reference mode (Kling) drop refs anyway — don't read
+      // them out of IDB, and skip the boundary-frame video decode below, only
+      // to throw the result away.
+      const modelTakesRefs = !!model.modes?.includes('reference-to-video')
+      const refs: ReferenceImage[] = modelTakesRefs ? [
+        ...(card.refsCharacter && characterRef ? [characterRef] : []),
+        ...(card.refsProduct && productRef ? [productRef] : []),
+        ...(extraRefs[key] ?? []),
+      ] : []
+      const referenceDataUris: string[] = []
+      for (const r of refs) {
+        const uri = await toDataUri(r.dataUrl)
+        if (uri) referenceDataUris.push(uri)
+      }
+
+      // Clip-to-clip handoff: a follow-up clip (index > 1) carries the PREVIOUS
+      // clip's last frame as a reference so the setting + character position
+      // continue instead of the model re-inventing "the same kitchen" blind. Only
+      // when the toggle is on AND the previous clip has actually rendered (nothing
+      // to grab otherwise — a first parallel "Generate all" won't have it yet, so
+      // regenerating this clip after clip 1 lands is what picks it up).
+      let boundaryFrameAttached = false
+      const { conceptId, segmentIndex } = parseCardKey(key)
+      if (card.carryPrevFrame !== false && segmentIndex > 1) {
+        const prevCard = cardStates[cardKey(conceptId, segmentIndex - 1)]
+        const prevVideo = prevCard?.videos[prevCard.currentVideoIndex] ?? prevCard?.videos[prevCard.videos.length - 1]
+        if (prevVideo?.url) {
+          try {
+            const playable = await getUrl(prevVideo.url)
+            if (playable) {
+              const frame = await extractVideoFrame(playable, 'last')
+              referenceDataUris.unshift(await blobToDataUri(frame))
+              boundaryFrameAttached = true
+            }
+          } catch {
+            // Non-fatal — the clip still generates, just without the handoff anchor.
+          }
+        }
+      }
+
+      const mode: VideoMode = referenceDataUris.length > 0 ? 'reference-to-video' : 'text-to-video'
+      const effectiveRefs: string[] | undefined = referenceDataUris.length > 0 ? referenceDataUris : undefined
+      // Prompt-only likeness on a ref-less model is expected and documented (the
+      // modal shows an amber note), so this is information, not an error — and
+      // it's said once per model, not once per clip. A Generate-all of 4
+      // concepts × 2 clips used to raise eight error toasts.
+      const wantedRefs = card.refsCharacter || card.refsProduct || (extraRefs[key]?.length ?? 0) > 0
+      if (!modelTakesRefs && wantedRefs && refWarnedModelRef.current !== oneShotModelId) {
+        refWarnedModelRef.current = oneShotModelId
+        useAppStore.getState().addToast(
+          `${model.displayName} doesn't take reference images — clips render from the prompt alone.`,
+          'info',
+        )
+      }
+
+      // Fire-time re-validation against the CURRENT model.
+      const constraints = model.videoConstraints
+      const durationSeconds = constraints
+        ? snapVideoDurationUp(card.durationSeconds, constraints.durations)
+        : card.durationSeconds
+      const resolution = constraints && !constraints.resolutions.includes(card.resolution)
+        ? constraints.default ?? constraints.resolutions[0]
+        : card.resolution
+
+      // Resolve [CHARACTER]/[PRODUCT] tokens to plain words the moment before
+      // sending — a video model reads brackets literally.
+      // When the previous clip's last frame rode along (and refs survived the
+      // model-capability check), tell the model the first reference is the handoff
+      // anchor so it continues that exact setting rather than re-inventing it.
+      const usingBoundaryFrame = boundaryFrameAttached && !!effectiveRefs
+      const continuityNote = usingBoundaryFrame
+        ? `\n\nCONTINUITY — The FIRST reference image is special: it is the FINAL FRAME of the previous clip, NOT an appearance reference. Unlike the identity references above (which you must not copy for framing or background), you SHOULD match this first image — its setting, props, framing, lighting, and the character's position and wardrobe — so this clip picks up moments later in the same place and the two cut together seamlessly. Then play out the action below.`
+        : ''
+      const rawPrompt = effectiveRefs
+        ? `${buildReferencePreamble(refs)}${continuityNote}\n\n${card.editablePrompt}`
+        : card.editablePrompt
+      const promptText = resolveOneShotTokens(rawPrompt, productName)
+      // Restyle at fire time: a stylized pick appends its STYLE block and drops the
+      // iPhone-realism stack; UGC / legacy pass through untouched. The persisted
+      // prompt + history stay unstyled — the style rides outside, like Continuous.
+      const { prompt: styledPrompt, noRealism } = applyStyleToPrompt(promptText, {
+        style: result?.style,
+        realism: result?.realism,
+      })
+
+      // Fold the fire-time values onto the provisional entry so a refresh-resume
+      // polls with what was actually sent.
+      updateCard(key, (prev) => ({
+        inFlightVideos: prev.inFlightVideos.map((e) =>
+          e.id === inFlightId ? { ...e, prompt: promptText, mode, durationSeconds, resolution } : e,
+        ),
+      }))
+
       const { taskId, videoEndpoint } = await startVideoTask({
         prompt: styledPrompt,
         mode,
@@ -280,6 +317,10 @@ export default function OneShotView({
           e.id === inFlightId ? { ...e, taskId, endpoint: videoEndpoint } : e,
         ),
       }))
+
+      // Own this poll before the taskId is persisted — see taskRegistry.
+      if (!claimTask('video', taskId)) return
+      claimedTaskId = taskId
 
       const res = await finishVideoTask(taskId, oneShotModelId, videoEndpoint, durationSeconds, card.aspectRatio)
       const assetRef = `asset://${res.assetId}`
@@ -327,6 +368,9 @@ export default function OneShotView({
         ),
       }))
       useAppStore.getState().addToast(msg, 'error')
+    } finally {
+      if (claimedTaskId) releaseTask('video', claimedTaskId)
+      startingRef.current.delete(key)
     }
   }
 
@@ -346,7 +390,6 @@ export default function OneShotView({
 
   // ── Refresh-resume (lean copy of ScenesView's video-queue walker) ──
   const INFLIGHT_TTL_MS = 30 * 60 * 1000
-  const resumingRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     const now = Date.now()
     setCardStates((prev) => {
@@ -369,9 +412,9 @@ export default function OneShotView({
     for (const [key, card] of Object.entries(cardStates)) {
       for (const entry of card.inFlightVideos) {
         if (!entry.taskId) continue
-        const resumeKey = `oneshot-video:${entry.taskId}`
-        if (resumingRef.current.has(resumeKey)) continue
-        resumingRef.current.add(resumeKey)
+        // Skip tasks a live generation promise still owns — a view unmounted by
+        // a History/mode switch keeps polling, so resuming here would duplicate.
+        if (!claimTask('video', entry.taskId)) continue
         const { id: inFlightId, taskId, modelId, endpoint, durationSeconds, aspectRatio, resolution, audio, prompt, mode } = entry
         ;(async () => {
           try {
@@ -403,7 +446,7 @@ export default function OneShotView({
             })
             useAppStore.getState().addToast(msg, 'error')
           } finally {
-            resumingRef.current.delete(resumeKey)
+            releaseTask('video', taskId)
           }
         })()
       }
@@ -478,14 +521,31 @@ export default function OneShotView({
   // left with a Failed entry must not lock the buttons forever.
   const anyInFlight = Object.values(cardStates).some((c) => c.inFlightVideos.some((e) => !e.error))
   // Open the cost-confirm popup for a set of clips (never fire straight away).
+  // Clips with an empty blueprint are dropped here rather than firing a paid
+  // gen on an empty prompt — the modal's own Generate guards the same way.
   const requestGenerate = (keys: string[], scope: string) => {
-    const targets = keys.filter((k) => cardStates[k])
-    if (targets.length === 0) return
-    setConfirmGen({ keys: targets, scope })
+    const targets = keys.filter((k) => cardStates[k] && cardStates[k].editablePrompt.trim())
+    if (targets.length === 0) {
+      useAppStore.getState().addToast('No blueprints ready to generate.', 'error')
+      return
+    }
+    const fresh = targets.filter((k) => (cardStates[k]?.videos.length ?? 0) === 0)
+    const done = targets.filter((k) => (cardStates[k]?.videos.length ?? 0) > 0)
+    // Default to skipping what's already rendered. When everything is done the
+    // dialog still opens — the toggle is the only way forward, so "regenerate
+    // the lot" stays possible but never accidental.
+    setIncludeExisting(false)
+    setConfirmGen({ fresh, done, scope })
   }
+  // What this run will actually fire.
+  const confirmTargets = confirmGen
+    ? includeExisting
+      ? [...confirmGen.fresh, ...confirmGen.done]
+      : confirmGen.fresh
+    : []
   const confirmGenerate = () => {
-    if (!confirmGen) return
-    confirmGen.keys.forEach((k) => void runSegmentVideo(k))
+    if (!confirmGen || confirmTargets.length === 0) return
+    confirmTargets.forEach((k) => void runSegmentVideo(k))
     setConfirmGen(null)
   }
   const allKeys = result.concepts.flatMap((c) => c.segments.map((s) => cardKey(c.id, s.index)))
@@ -512,12 +572,23 @@ export default function OneShotView({
       setDownloadingAll(false)
     }
   }
-  // Credits for the pending run — summed per clip at each card's settings.
+  // Credits for the pending run — summed per clip at each card's settings,
+  // put through the SAME fire-time clamp runSegmentVideo applies (duration
+  // snapped up onto the model's grid, unsupported resolutions swapped). A card
+  // planned on another model otherwise quotes a duration this model can't bill
+  // — exactly the stale-plan case the banner above warns about.
+  const confirmConstraints = getModel(oneShotModelId)?.videoConstraints
   const confirmCredits = confirmGen
-    ? confirmGen.keys.reduce((sum, k) => {
+    ? confirmTargets.reduce((sum, k) => {
         const card = cardStates[k]
         if (!card) return sum
-        return sum + (estimateCredits(oneShotModelId, { durationSeconds: card.durationSeconds, resolution: card.resolution, audio: card.audio }) ?? 0)
+        const durationSeconds = confirmConstraints
+          ? snapVideoDurationUp(card.durationSeconds, confirmConstraints.durations)
+          : card.durationSeconds
+        const resolution = confirmConstraints && !confirmConstraints.resolutions.includes(card.resolution)
+          ? confirmConstraints.default ?? confirmConstraints.resolutions[0]
+          : card.resolution
+        return sum + (estimateCredits(oneShotModelId, { durationSeconds, resolution, audio: card.audio }) ?? 0)
       }, 0)
     : 0
   const overBudget = balance !== null && confirmCredits > balance
@@ -613,11 +684,30 @@ export default function OneShotView({
             className="w-full max-w-md rounded-2xl border border-ink/10 bg-ink-950/95 p-5 shadow-2xl"
           >
             <h3 className="text-sm font-medium text-ink-100">
-              Generate {confirmGen.keys.length} clip{confirmGen.keys.length === 1 ? '' : 's'}?
+              Generate {confirmTargets.length} clip{confirmTargets.length === 1 ? '' : 's'}?
             </h3>
             <p className="mt-1 text-xs text-ink-500">
               {confirmGen.scope} · all render in parallel and survive a refresh.
+              {confirmGen.done.length > 0 && !includeExisting && (
+                <> {confirmGen.done.length} clip{confirmGen.done.length === 1 ? '' : 's'} already
+                {confirmGen.done.length === 1 ? ' has' : ' have'} a video and will be skipped.</>
+              )}
             </p>
+
+            {confirmGen.done.length > 0 && (
+              <label className="mt-3 flex cursor-pointer items-center gap-2.5 rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={includeExisting}
+                  onChange={(e) => setIncludeExisting(e.target.checked)}
+                  className="h-3.5 w-3.5 shrink-0 accent-broll-500"
+                />
+                <span className="text-xs text-ink-300">
+                  Also regenerate the {confirmGen.done.length} clip
+                  {confirmGen.done.length === 1 ? '' : 's'} that already {confirmGen.done.length === 1 ? 'has' : 'have'} a video
+                </span>
+              </label>
+            )}
             <div className="mt-4 flex items-center justify-between rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5 text-xs">
               <span className="text-ink-400">Estimated cost</span>
               <span className="flex items-center gap-1 font-medium text-ink-100">
@@ -642,7 +732,8 @@ export default function OneShotView({
               <button
                 type="button"
                 onClick={confirmGenerate}
-                className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-4 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-broll-400"
+                disabled={confirmTargets.length === 0}
+                className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-4 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <VideoIcon className="h-3.5 w-3.5" />
                 Generate
@@ -754,6 +845,7 @@ function ConceptRow({
           <OSVariationCard
             key={segment.index}
             segment={segment}
+            conceptNumber={conceptNumber}
             cardState={cardStates[cardKey(concept.id, segment.index)]}
             onOpen={() => onOpenClip(cardKey(concept.id, segment.index))}
           />
@@ -770,10 +862,12 @@ function ConceptRow({
 
 function OSVariationCard({
   segment,
+  conceptNumber,
   cardState,
   onOpen,
 }: {
   segment: OneShotSegment
+  conceptNumber: number
   cardState?: OneShotCardState
   onOpen: () => void
 }) {
@@ -807,7 +901,9 @@ function OSVariationCard({
     if (!currentVideo) return
     const resolved = await getUrl(currentVideo.url)
     if (!resolved) { useAppStore.getState().addToast('Could not load the video.', 'error'); return }
-    await downloadImage(resolved, `oneshot-clip-${segment.index}`, 'mp4')
+    // Include the variation — every concept has a "Clip 1", so naming by clip
+    // alone made Variation 1 and Variation 3 download as the same file.
+    await downloadImage(resolved, `oneshot-variation${conceptNumber}-clip${segment.index}`, 'mp4')
   }
   const handleCopy = async () => {
     const text = (currentVideo?.prompt ?? '').trim()

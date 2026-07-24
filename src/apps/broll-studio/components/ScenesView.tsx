@@ -1,14 +1,15 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Film, AlertCircle, Plus, Images, X, Palette } from 'lucide-react'
+import { Film, AlertCircle, Plus, Images, X, Palette, Download, Loader2 } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage } from '../types'
 import type { Product, Model } from '../../../stores/types'
 import { createDefaultCardState } from '../cardState'
 import type { VideoHistoryItem } from '../../../stores/types'
-import { finishImageTask } from '../services/generateBroll'
+import { finishImageTask, resolveImageModelId } from '../services/generateBroll'
 import { getContinuousStyle } from '../services/generateContinuous'
 import { finishVideoTask } from '../services/generateVideo'
+import { claimTask, releaseTask } from '../services/taskRegistry'
 import { isPollTimeout } from '../../../utils/kie'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
@@ -20,6 +21,7 @@ import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
 import VariationCard from './VariationCard'
 import { humanizeError } from '../../../utils/friendlyError'
+import { downloadAssetsZip } from '../../../utils/downloadZip'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 
@@ -115,6 +117,7 @@ export default function ScenesView({
     { fresh: string[]; done: string[]; scope: string } | null
   >(null)
   const [includeExisting, setIncludeExisting] = useState(false)
+  const [downloadingAll, setDownloadingAll] = useState(false)
   // The confirm dialog portals to document.body, so it would outlive an app
   // switch — dismiss it when the user docks away.
   useCloseOnAppSwitch(!!batchConfirm, () => setBatchConfirm(null))
@@ -140,9 +143,6 @@ export default function ScenesView({
       : batchAspectOptions.includes('9:16')
         ? '9:16'
         : batchAspectOptions[0]
-  const batchPerImage = batchImageModelId
-    ? estimateCredits(batchImageModelId, { imageCount: 1, resolution: effectiveBatchRes })
-    : null
   // What this run will actually fire: the untouched cards, plus the already-
   // generated ones only when the user explicitly opts in.
   const batchTargets = batchConfirm
@@ -150,8 +150,25 @@ export default function ScenesView({
       ? [...batchConfirm.fresh, ...batchConfirm.done]
       : batchConfirm.fresh
     : []
-  const batchTotalCredits =
-    batchConfirm && batchPerImage != null ? batchPerImage * batchTargets.length : null
+  // A card with references attached doesn't fire on the picked text-to-image
+  // model — startImageTask swaps in the image-to-image sibling, which can be
+  // priced differently. Cost each card against the model that will really run,
+  // or the dialog quotes one price and kie bills another.
+  const batchTotalCredits = batchConfirm
+    ? batchTargets.reduce<number | null>((sum, key) => {
+        if (sum === null) return null
+        const card = cardStates[key]
+        const hasRefs = !!(
+          (characterRef && card?.refsCharacter !== false) ||
+          (productRef && card?.refsProduct !== false)
+        )
+        const modelId = resolveImageModelId(hasRefs) ?? batchImageModelId
+        const credits = modelId
+          ? estimateCredits(modelId, { imageCount: 1, resolution: effectiveBatchRes })
+          : null
+        return credits == null ? null : sum + credits
+      }, 0)
+    : null
   const batchOverBudget = batchTotalCredits != null && balance !== null && batchTotalCredits > balance
 
   const requestBatch = (keys: string[], scope: string) => {
@@ -214,7 +231,6 @@ export default function ScenesView({
   // taskId (refresh during createTask) — are evicted with an error chip so the
   // gallery doesn't stay stuck on a phantom spinner.
   const INFLIGHT_TTL_MS = 30 * 60 * 1000
-  const resumingRef = useRef<Set<string>>(new Set())
   useEffect(() => {
     const now = Date.now()
     // First pass: evict stale entries that can't be resumed.
@@ -247,9 +263,9 @@ export default function ScenesView({
       // ── Image queue ────────────────────────────────────────────────
       for (const entry of card.inFlightImages) {
         if (!entry.taskId || !entry.modelId) continue
-        const resumeKey = `image:${entry.taskId}`
-        if (resumingRef.current.has(resumeKey)) continue
-        resumingRef.current.add(resumeKey)
+        // Skip tasks a live generation promise still owns — a view unmounted by
+        // a History/mode switch keeps polling, so resuming here would duplicate.
+        if (!claimTask('image', entry.taskId)) continue
         const inFlightId = entry.id
         const taskId = entry.taskId
         const modelId = entry.modelId
@@ -290,7 +306,7 @@ export default function ScenesView({
               }
             })
           } finally {
-            resumingRef.current.delete(resumeKey)
+            releaseTask('image', taskId)
           }
         })()
       }
@@ -298,9 +314,7 @@ export default function ScenesView({
       // ── Video queue ────────────────────────────────────────────────
       for (const entry of card.inFlightVideos) {
         if (!entry.taskId) continue
-        const resumeKey = `video:${entry.taskId}`
-        if (resumingRef.current.has(resumeKey)) continue
-        resumingRef.current.add(resumeKey)
+        if (!claimTask('video', entry.taskId)) continue
         const inFlightId = entry.id
         const taskId = entry.taskId
         const modelId = entry.modelId
@@ -382,7 +396,7 @@ export default function ScenesView({
             })
             useAppStore.getState().addToast(msg, 'error')
           } finally {
-            resumingRef.current.delete(resumeKey)
+            releaseTask('video', taskId)
           }
         })()
       }
@@ -429,6 +443,33 @@ export default function ScenesView({
 
   const allKeys = result.scenes.flatMap((s) => s.variations.map((_, i) => `${s.number}-${i}`))
 
+  // Every rendered clip across every scene, for "Download all" — parity with
+  // Continuous and One-Shot. This is the mode that produces the most clips and
+  // where videos are download-only, so bulk export matters most here; without
+  // it the only way out was opening each card in turn.
+  const allClipEntries = result.scenes.flatMap((s) =>
+    s.variations.flatMap((_, i) => {
+      const vids = cardStates[`${s.number}-${i}`]?.videos ?? []
+      const scene = String(s.number).padStart(2, '0')
+      return vids.map((v, vi) => ({
+        ref: v.url,
+        name: `scene${scene}-option${i + 1}${vids.length > 1 ? `-take${vi + 1}` : ''}`,
+      }))
+    }),
+  )
+  const downloadAll = async () => {
+    if (downloadingAll || allClipEntries.length === 0) return
+    setDownloadingAll(true)
+    try {
+      const n = await downloadAssetsZip(allClipEntries, 'broll-clips')
+      useAppStore.getState().addToast(`Downloading ${n} clip${n === 1 ? '' : 's'} as a zip`, 'success')
+    } catch (err) {
+      useAppStore.getState().addToast(humanizeError(err, 'Could not download the clips.'), 'error')
+    } finally {
+      setDownloadingAll(false)
+    }
+  }
+
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4">
       <div className="mb-5 flex items-center justify-between gap-3">
@@ -443,15 +484,29 @@ export default function ScenesView({
             <span className="truncate">{result.styleBrief ? 'Custom style' : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => requestBatch(allKeys, 'All scenes')}
-          title="Generate images for every variation across all scenes"
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400"
-        >
-          <Images className="h-3.5 w-3.5" />
-          Generate all images
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {allClipEntries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void downloadAll()}
+              disabled={downloadingAll}
+              title="Download every generated clip as a single zip"
+              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {downloadingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              {downloadingAll ? 'Zipping…' : `Download all (${allClipEntries.length})`}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => requestBatch(allKeys, 'All scenes')}
+            title="Generate images for every variation across all scenes"
+            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400"
+          >
+            <Images className="h-3.5 w-3.5" />
+            Generate all images
+          </button>
+        </div>
       </div>
       <div className="flex flex-col gap-10">
         {result.scenes.map((scene) => (

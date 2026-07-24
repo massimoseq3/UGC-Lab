@@ -12,6 +12,7 @@ import RightPanel from './components/RightPanel'
 import { brollHistoryMode } from './components/BrollHistoryView'
 import { backfillCardState, backfillOneShotCardState, backfillContinuousFrameState, backfillContinuousClipState } from './cardState'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { getModel } from '../../utils/models'
 import BankPicker from '../../components/BankPicker'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 import { humanizeError } from '../../utils/friendlyError'
@@ -122,6 +123,11 @@ export default function BrollStudio() {
       },
     },
   )
+
+  // Latest result, readable from stable useCallback handlers that must not
+  // take `result` as a dep (that would re-render every memoized card row).
+  const resultRef = useRef(result)
+  useEffect(() => { resultRef.current = result }, [result])
 
   // Per-card state — lifted from RightPanel so BrollStudio can snapshot it
   // into the brollHistory bank whenever it changes. Sanitized on hydrate to
@@ -273,6 +279,29 @@ export default function BrollStudio() {
   const sessionIdRef = useRef(sessionId)
   useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
 
+  // Which mode the CURRENT session was generated in. The workspace can hold a
+  // result per mode at once, but a history row represents ONE generation, so
+  // the snapshot below is scoped to this. Without it a fresh row also carried
+  // the previous session's sibling result — misfiling the row's badge, cover
+  // and scene count (brollHistoryMode prioritises continuous > oneshot > line),
+  // restoring stale content on click, and re-copying that payload into every
+  // subsequent row. Sessions already in progress when this shipped have no
+  // stored value, so the default derives it from what the workspace holds —
+  // same precedence as the history badge — and their row keeps updating.
+  const [sessionMode, setSessionMode] = usePersistedState<BrollMode>(
+    `${baseKey}:sessionMode`,
+    continuousResult ? 'continuous' : oneShotResult ? 'oneshot' : 'line',
+  )
+
+  // The style the CURRENT session's content was actually generated with —
+  // stamped at Generate, restored from the row on history select. The history
+  // snapshot reads these, never the live panel: `resolvedStyleId` folds in a
+  // mode-dependent default, so snapshotting it let a bare mode-toggle rewrite
+  // the saved row's style, and the brief was clobbered to undefined whenever a
+  // custom-style row was opened without one loaded in the panel.
+  const [sessionStyleId, setSessionStyleId] = usePersistedState<string>(`${baseKey}:sessionStyleId`, '')
+  const [sessionStyleBrief, setSessionStyleBrief] = usePersistedState<string | null>(`${baseKey}:sessionStyleBrief`, null)
+
   // Active history row in the History tab — highlights the row that's
   // currently being edited / restored.
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(sessionId || null)
@@ -323,7 +352,12 @@ export default function BrollStudio() {
   // prompt) don't thrash localStorage. Only writes when there's actually a
   // result to snapshot.
   useEffect(() => {
-    if ((!result && !oneShotResult && !continuousResult) || !sessionIdRef.current) return
+    // Only this session's own mode counts — a leftover sibling result in the
+    // workspace must not keep an empty row alive or leak into the snapshot.
+    const sessionResult = sessionMode === 'line' ? result : null
+    const sessionOneShot = sessionMode === 'oneshot' ? oneShotResult : null
+    const sessionContinuous = sessionMode === 'continuous' ? continuousResult : null
+    if ((!sessionResult && !sessionOneShot && !sessionContinuous) || !sessionIdRef.current) return
     const handle = setTimeout(() => {
       const item: BrollHistoryItem = {
         id: sessionIdRef.current,
@@ -331,43 +365,36 @@ export default function BrollStudio() {
         // preserves the original `createdAt` on every subsequent save.
         createdAt: Date.now(),
         // Row-level style snapshot for the history pill (works across all three
-        // modes, incl. One-Shot whose result carries no styleId). `resolvedStyleId`
-        // folds in the per-mode default (UGC for line/one-shot, 3D for continuous).
-        styleId: resolvedStyleId || undefined,
-        styleBrief: continuousStyleBrief ?? undefined,
+        // modes, incl. One-Shot whose result carries no styleId), stamped at
+        // generation time so a later mode-toggle can't rewrite it.
+        styleId: sessionStyleId || undefined,
+        styleBrief: sessionStyleBrief ?? undefined,
         inputSummary: buildInputSummary(selectedProduct?.productName, scriptText),
         productId: selectedProductId ?? undefined,
         modelId: selectedModelId ?? undefined,
         scriptId: selectedScriptId ?? undefined,
         scriptText: scriptText || undefined,
         context: additionalContext || undefined,
-        result: result ?? { scenes: [] },
-        cardStates,
-        mode,
-        lineDelivery: result ? lineDelivery : undefined,
-        oneShotResult: oneShotResult ?? undefined,
-        oneShotCardStates: Object.keys(oneShotCardStates).length > 0 ? oneShotCardStates : undefined,
-        oneShotDelivery: oneShotResult ? oneShotDelivery : undefined,
-        oneShotModelId: oneShotResult ? oneShotModelId : undefined,
-        continuousResult: continuousResult ?? undefined,
-        continuousFrameStates: Object.keys(continuousFrameStates).length > 0 ? continuousFrameStates : undefined,
-        continuousClipStates: Object.keys(continuousClipStates).length > 0 ? continuousClipStates : undefined,
-        continuousSelections: Object.keys(continuousSelections).length > 0 ? continuousSelections : undefined,
-        continuousStyleId: continuousResult ? continuousStyleId : undefined,
-        continuousModelId: continuousResult ? continuousModelId : undefined,
+        result: sessionResult ?? { scenes: [] },
+        cardStates: sessionResult ? cardStates : {},
+        mode: sessionMode,
+        lineDelivery: sessionResult ? lineDelivery : undefined,
+        oneShotResult: sessionOneShot ?? undefined,
+        oneShotCardStates: sessionOneShot && Object.keys(oneShotCardStates).length > 0 ? oneShotCardStates : undefined,
+        oneShotDelivery: sessionOneShot ? oneShotDelivery : undefined,
+        oneShotModelId: sessionOneShot ? oneShotModelId : undefined,
+        continuousResult: sessionContinuous ?? undefined,
+        continuousFrameStates: sessionContinuous && Object.keys(continuousFrameStates).length > 0 ? continuousFrameStates : undefined,
+        continuousClipStates: sessionContinuous && Object.keys(continuousClipStates).length > 0 ? continuousClipStates : undefined,
+        continuousSelections: sessionContinuous && Object.keys(continuousSelections).length > 0 ? continuousSelections : undefined,
+        continuousStyleId: sessionContinuous ? continuousStyleId : undefined,
+        continuousModelId: sessionContinuous ? continuousModelId : undefined,
       }
       upsertBrollHistory(item)
     }, 1000)
     return () => clearTimeout(handle)
-  }, [result, cardStates, lineDelivery, oneShotResult, oneShotCardStates, oneShotDelivery, oneShotModelId, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, continuousStyleBrief, resolvedStyleId, continuousModelId, mode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, upsertBrollHistory])
+  }, [result, cardStates, lineDelivery, oneShotResult, oneShotCardStates, oneShotDelivery, oneShotModelId, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, sessionStyleId, sessionStyleBrief, continuousModelId, sessionMode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, upsertBrollHistory])
 
-  // "New": clear the inputs / references only. The generated scene cards stay
-  // on screen — they're the user's output, never wiped by starting a new
-  // session. Blanking the sessionId *detaches* the kept cards: the debounced
-  // History upsert early-returns while it's empty, so clearing the inputs
-  // can't overwrite the saved session's metadata. The prior session is already
-  // preserved as its own brollHistory row, and the next generation stamps a
-  // fresh sessionId + replaces the cards cleanly.
   const handleSelectProduct = (item: unknown) => {
     setSelectedProductId((item as Product).id)
     setPickerMode(null)
@@ -402,6 +429,10 @@ export default function BrollStudio() {
   }, [setResult])
 
   const handleDeleteVariation = useCallback((sceneNumber: number, variationId: string) => {
+    const scene = resultRef.current?.scenes.find((s) => s.number === sceneNumber)
+    const removedIndex = scene?.variations.findIndex((v) => v.id === variationId) ?? -1
+    if (removedIndex === -1) return
+
     setResult((prev) => {
       if (!prev) return prev
       return {
@@ -413,7 +444,27 @@ export default function BrollStudio() {
         ),
       }
     })
-  }, [setResult])
+    // Card state is keyed positionally (`${sceneNumber}-${index}`), so deleting
+    // a card shifts every later one down a slot. Without re-keying, each of
+    // those cards would inherit its old neighbour's state, fail the rebuild
+    // effect's prompt match, and reset to blank — losing already-paid images
+    // and videos (and orphaning their in-flight tasks).
+    setCardStates((prev) => {
+      const next: Record<string, CardState> = {}
+      for (const [key, card] of Object.entries(prev)) {
+        const dash = key.lastIndexOf('-')
+        const keyScene = Number(key.slice(0, dash))
+        const index = Number(key.slice(dash + 1))
+        if (keyScene !== sceneNumber || index < removedIndex) {
+          next[key] = card
+          continue
+        }
+        if (index === removedIndex) continue
+        next[`${sceneNumber}-${index - 1}`] = card
+      }
+      return next
+    })
+  }, [setResult, setCardStates])
 
   // Edit the ad's shared dialogue voice profile (from a dialogue card's modal).
   // One value on the result, applied to every DIALOGUE clip at fire time.
@@ -454,6 +505,9 @@ export default function BrollStudio() {
     // still needs a real key (the Generate Video button surfaces that).
     if (!useSettingsStore.getState().kieApiKey) {
       setSessionId(newSessionId())
+      setSessionMode('oneshot')
+      setSessionStyleId(resolvedStyleId)
+      setSessionStyleBrief(continuousStyleBrief)
       setOneShotCardStates({})
       setOneShotResult(buildDemoOneShotResult(oneShotModelId, oneShotDelivery))
       useAppStore.getState().addToast('Showing sample concepts — add your kie.ai key to generate from your own script', 'info')
@@ -475,6 +529,9 @@ export default function BrollStudio() {
       // Same commit discipline as line mode: only rotate the session once we
       // actually have concepts, so a failed call leaves the old ones intact.
       setSessionId(newSessionId())
+      setSessionMode('oneshot')
+      setSessionStyleId(resolvedStyleId)
+      setSessionStyleBrief(continuousStyleBrief)
       setOneShotCardStates({})
       setOneShotResult(res)
       if (res.concepts.length < 4) {
@@ -515,6 +572,7 @@ export default function BrollStudio() {
           styleId: resolvedStyleId,
           styleBrief: continuousStyleBrief ?? undefined,
         },
+        oneShotResult.concepts.map((c) => c.poolAngle).filter((a): a is string => !!a),
         oneShotResult.concepts.length,
       )
       setOneShotResult((prev) => (prev ? { ...prev, concepts: [...prev.concepts, concept] } : prev))
@@ -533,6 +591,9 @@ export default function BrollStudio() {
     // Continuous mode produces before wiring billing.
     if (!useSettingsStore.getState().kieApiKey) {
       setSessionId(newSessionId())
+      setSessionMode('continuous')
+      setSessionStyleId(resolvedStyleId)
+      setSessionStyleBrief(continuousStyleBrief)
       setContinuousFrameStates({})
       setContinuousClipStates({})
       setContinuousSelections({})
@@ -555,6 +616,9 @@ export default function BrollStudio() {
       // Same commit discipline as the other modes: only rotate the session
       // once a storyboard actually landed.
       setSessionId(newSessionId())
+      setSessionMode('continuous')
+      setSessionStyleId(resolvedStyleId)
+      setSessionStyleBrief(continuousStyleBrief)
       setContinuousFrameStates({})
       setContinuousClipStates({})
       setContinuousSelections({})
@@ -656,6 +720,9 @@ export default function BrollStudio() {
       // holding the old result with no card states). Batched into one commit,
       // so the rebuild effect sees the new result against empty cards.
       setSessionId(newSessionId())
+      setSessionMode('line')
+      setSessionStyleId(resolvedStyleId)
+      setSessionStyleBrief(continuousStyleBrief)
       setCardStates({})
       setResult(res)
       useAppStore.getState().addToast('B-roll image generated', 'success')
@@ -666,6 +733,19 @@ export default function BrollStudio() {
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  // Adopt a restored row's video model. These keys are the user's persistent
+  // per-app picks, so a change outlives the session being opened — announce it
+  // instead of letting a history click quietly redefine their default.
+  const restoreAppModel = (key: string, modelId: string) => {
+    const settings = useSettingsStore.getState()
+    if (settings.perAppModel[key] === modelId) return
+    settings.setAppModel(key, modelId)
+    useAppStore.getState().addToast(
+      `Video model set to ${getModel(modelId)?.displayName ?? modelId} to match this session`,
+      'info',
+    )
   }
 
   // Restore a B-Roll session from history. Loads all inputs + result +
@@ -696,7 +776,10 @@ export default function BrollStudio() {
     // Switch to the mode this row actually represents (derived from its content,
     // not the unreliable last-active `mode`) so the toggle + right panel land on
     // what the user clicked. Same helper drives the history badge, so they agree.
-    setMode(brollHistoryMode(item))
+    const rowMode = brollHistoryMode(item)
+    setMode(rowMode)
+    // Further edits keep updating this row as the mode it actually is.
+    setSessionMode(rowMode)
     setOneShotResult((item.oneShotResult as OneShotResult | undefined) ?? null)
     const restoredOneShot: Record<string, OneShotCardState> = {}
     for (const k in (item.oneShotCardStates ?? {}) as Record<string, unknown>) {
@@ -706,8 +789,11 @@ export default function BrollStudio() {
     }
     setOneShotCardStates(restoredOneShot)
     if (item.oneShotDelivery) setOneShotDelivery(item.oneShotDelivery)
-    if (item.oneShotModelId) {
-      useSettingsStore.getState().setAppModel('broll-studio:oneshot:video', item.oneShotModelId)
+    // Only the mode being restored adopts the row's model — a One-Shot row has
+    // no business rewriting the Continuous pick, and vice versa. Even then it's
+    // a persistent setting, so say so rather than changing it behind the user.
+    if (rowMode === 'oneshot' && item.oneShotModelId) {
+      restoreAppModel('broll-studio:oneshot:video', item.oneShotModelId)
     }
 
     // Continuous snapshot (absent on older rows).
@@ -727,9 +813,24 @@ export default function BrollStudio() {
     }
     setContinuousClipStates(restoredClips)
     setContinuousSelections((item.continuousSelections as Record<string, ContinuousSelection> | undefined) ?? {})
-    if (item.continuousStyleId) { setContinuousStyleId(item.continuousStyleId); setStyleChosen(true) }
-    if (item.continuousModelId) {
-      useSettingsStore.getState().setAppModel('broll-studio:continuous:video', item.continuousModelId)
+
+    // Restore the row's style snapshot into BOTH the session stamp (what the
+    // next upsert writes back) and the live panel. Skipping this let the
+    // debounced upsert overwrite the row ~1s after opening it with whatever
+    // the panel happened to hold — permanently losing a custom style brief.
+    const rowStyleId = item.continuousStyleId ?? item.styleId ?? ''
+    setSessionStyleId(rowStyleId)
+    setSessionStyleBrief(item.styleBrief ?? null)
+    setContinuousStyleBrief(item.styleBrief ?? null)
+    if (rowStyleId) {
+      setContinuousStyleId(rowStyleId)
+      setStyleChosen(true)
+    } else {
+      setContinuousStyleId('')
+      setStyleChosen(false)
+    }
+    if (rowMode === 'continuous' && item.continuousModelId) {
+      restoreAppModel('broll-studio:continuous:video', item.continuousModelId)
     }
     setActiveHistoryId(item.id)
   }
@@ -763,7 +864,6 @@ export default function BrollStudio() {
           oneShotDelivery={oneShotDelivery}
           onOneShotDeliveryChange={setOneShotDelivery}
           oneShotModelId={oneShotModelId}
-          onOneShotModelChange={() => { /* persisted by the picker via persistKey */ }}
           continuousStyleId={resolvedStyleId}
           onContinuousStyleChange={chooseStyle}
           styleRefs={styleRefs}
@@ -798,7 +898,6 @@ export default function BrollStudio() {
           continuousSelections={continuousSelections}
           setContinuousSelections={setContinuousSelections}
           onAddContinuousConcept={handleAddContinuousConcept}
-          addingConceptFrame={null}
           isGenerating={isGenerating}
           error={error}
           onAddVariation={handleAddVariation}

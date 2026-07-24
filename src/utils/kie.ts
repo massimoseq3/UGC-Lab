@@ -825,13 +825,55 @@ export async function kieUploadBase64(
   return json.data
 }
 
+// Uploads of identical bytes, memoised for the tab's lifetime. The same
+// character / product / keyframe image is attached to many generations — a
+// Line-by-Line "Generate all" over 5 scenes × 4 cards used to upload the same
+// two references 20 times each, and a Continuous run re-uploaded every keyframe
+// for the chain and again for each clip. The value is the in-flight PROMISE, so
+// a parallel batch that all misses at once still performs one upload.
+//
+// Entries expire well inside kie's ~3-day file lifetime, and the map is capped
+// so a long session can't grow it without bound.
+const HOSTED_TTL_MS = 6 * 60 * 60 * 1000
+const HOSTED_CACHE_MAX = 64
+const hostedUrlCache = new Map<string, { url: Promise<string>; at: number }>()
+
+async function hashSource(source: string): Promise<string | null> {
+  try {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source))
+    return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('')
+  } catch {
+    // No SubtleCrypto (non-secure context) — upload uncached rather than fail.
+    return null
+  }
+}
+
 // Convert any image source (data URI, http(s) URL) to a kie-hosted public URL.
 // Pure http(s) URLs pass through; data URIs get uploaded.
 export async function ensureHostedUrl(apiKey: string, source: string): Promise<string> {
   if (source.startsWith('http://') || source.startsWith('https://')) return source
   if (source.startsWith('data:')) {
-    const uploaded = await kieUploadBase64(apiKey, source)
-    return uploaded.downloadUrl
+    const key = await hashSource(source)
+    if (!key) return (await kieUploadBase64(apiKey, source)).downloadUrl
+
+    const hit = hostedUrlCache.get(key)
+    if (hit && Date.now() - hit.at < HOSTED_TTL_MS) return hit.url
+
+    const pending = kieUploadBase64(apiKey, source).then((u) => u.downloadUrl)
+    // A failed upload must not be cached — drop it so the next attempt retries.
+    pending.catch(() => {
+      if (hostedUrlCache.get(key)?.url === pending) hostedUrlCache.delete(key)
+    })
+    if (hostedUrlCache.size >= HOSTED_CACHE_MAX) {
+      let oldestKey: string | undefined
+      let oldestAt = Infinity
+      for (const [k, v] of hostedUrlCache) {
+        if (v.at < oldestAt) { oldestAt = v.at; oldestKey = k }
+      }
+      if (oldestKey) hostedUrlCache.delete(oldestKey)
+    }
+    hostedUrlCache.set(key, { url: pending, at: Date.now() })
+    return pending
   }
   throw new Error(`Cannot host image source — unsupported format: ${source.slice(0, 64)}`)
 }

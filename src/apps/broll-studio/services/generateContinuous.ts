@@ -21,9 +21,10 @@ import { getChatEndpointPath, getModel, snapVideoDurationUp } from '../../../uti
 // panel greys the rest via requireMode='frames-to-video' so the user can see
 // (and understand) why they're unavailable. Image-only (Kling Turbo) and
 // frame-less (Gemini Omni, Grok) models are listed but land greyed.
-// Seedance 2.0 is the default — cheap, first/last-frame native, and it generates
-// the transitional SFX this style leans on. The picker lives in the CLIP modal,
-// not the left panel: the model only matters once there are keyframes.
+// Seedance 1.5 Pro is the default — first/last-frame native and materially
+// cheaper per clip than the 2.0 family, at a quality that holds up for this
+// style. The picker lives in the CLIP modal, not the left panel: the model
+// only matters once there are keyframes to animate.
 export const CONTINUOUS_MODEL_IDS = [
   'bytedance/seedance-2',
   'bytedance/seedance-2-fast',
@@ -491,7 +492,18 @@ export interface FrameContext {
 export function frameContextFor(
   result: ContinuousResult,
   frameIndex: number,
-  ctx: { productContext?: string; modelContext?: string; conceptLabel?: string },
+  ctx: {
+    productContext?: string
+    modelContext?: string
+    conceptLabel?: string
+    // The motions actually in play on the clips either side of this frame —
+    // the picked concept's motion, or whatever the user hand-edited. Pass them
+    // whenever they're known: `scene.motionPrompt` is only ever the FIRST
+    // concept's motion, so grounding a rewrite in it describes a chain the
+    // storyboard isn't using once the user picks concept 2 or 3.
+    inboundMotion?: string
+    outboundMotion?: string
+  },
 ): FrameContext {
   const frame = result.frames.find((f) => f.index === frameIndex)
   const inbound = result.scenes.find((s) => s.index === frameIndex - 1)
@@ -500,8 +512,8 @@ export function frameContextFor(
     style: result.style,
     conceptLabel: ctx.conceptLabel,
     scriptLine: outbound?.scriptLine ?? '',
-    inboundMotion: inbound?.motionPrompt,
-    outboundMotion: outbound?.motionPrompt,
+    inboundMotion: ctx.inboundMotion?.trim() || inbound?.motionPrompt,
+    outboundMotion: ctx.outboundMotion?.trim() || outbound?.motionPrompt,
     isFinal: !outbound,
     isOpening: frameIndex === 1,
     existingLabels: frame?.concepts.map((c) => c.label) ?? [],
