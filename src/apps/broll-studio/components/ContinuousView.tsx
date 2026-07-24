@@ -29,6 +29,8 @@ import ModelPicker from '../../../components/ModelPicker'
 import ModelSidePanel from '../../../components/ModelSidePanel'
 import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
+import ConstraintChip from '../../../components/ConstraintChip'
+import AspectIcon from '../../../components/AspectIcon'
 import { ContinuousFrameModal, ContinuousClipModal } from './ContinuousDetailModals'
 import type {
   ContinuousResult,
@@ -65,7 +67,7 @@ import { useCreditsStore } from '../../../stores/creditsStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
-import { getModel, snapVideoDurationUp, estimateCredits, formatCredits, officialSavingsPercent, type VideoMode } from '../../../utils/models'
+import { getModel, getDefaultModel, snapVideoDurationUp, estimateCredits, formatCredits, officialSavingsPercent, type VideoMode, type ImageResolution } from '../../../utils/models'
 import { humanizeError } from '../../../utils/friendlyError'
 import { downloadImage } from '../../../utils/downloadImage'
 import { downloadAssetsZip } from '../../../utils/downloadZip'
@@ -140,14 +142,26 @@ export default function ContinuousView({
   // Pending generate request awaiting cost confirmation.
   const [confirmGen, setConfirmGen] = useState<
     | { kind: 'clips'; sceneIndices: number[]; scope: string }
-    | { kind: 'frames'; frameIndices: number[] }
+    | { kind: 'frames'; fresh: number[]; done: number[] }
     | null
   >(null)
+  // Frames branch only: opt into regenerating frames that already have a picked
+  // keyframe (mirrors Line-by-Line's "also regenerate" toggle).
+  const [includeExisting, setIncludeExisting] = useState(false)
   const [downloadingAll, setDownloadingAll] = useState(false)
   // Video-model slide-in panel opened from inside the batch-generate dialog.
   const [confirmModelPanelOpen, setConfirmModelPanelOpen] = useState(false)
   const balance = useCreditsStore((s) => s.balance)
   useCloseOnAppSwitch(!!confirmGen, () => setConfirmGen(null))
+
+  // Keyframes are images, so the frame-batch confirm dialog mirrors Line-by-
+  // Line's "Generate images" dialog: the shared B-Roll image model plus a
+  // resolution + aspect chosen for the whole run, priced against the balance.
+  const frameImageModelId =
+    useSettingsStore((s) => s.perAppModel['broll-studio:image:text-to-image']) ??
+    getDefaultModel('broll-studio', 'image', 'text-to-image')?.id
+  const [framesResolution, setFramesResolution] = useState<ImageResolution | undefined>(undefined)
+  const [framesAspect, setFramesAspect] = useState<string | undefined>(undefined)
 
   // Standalone-Animate video model — its own pick (separate from the clip's
   // frames-to-video model, since animating a single still is image-to-video or
@@ -269,11 +283,19 @@ export default function ContinuousView({
 
   // ── Keyframe image generation (chained) ──────────────────────
   // Returns true on success so the sequential "Generate frames" walk can chain.
-  const runFrameImage = async (key: string): Promise<boolean> => {
+  const runFrameImage = async (
+    key: string,
+    override?: { aspectRatio: string; resolution: ImageResolution },
+    repick = false,
+  ): Promise<boolean> => {
     if (!result || guardDemo()) return false
     const card = frameStatesRef.current[key]
     if (!card || !card.editablePrompt.trim()) return false
     const frameIndex = Number(key.split(':')[0])
+    // Batch runs choose one resolution/aspect for the whole chain; a single-card
+    // generate (from the modal) passes no override and keeps the card's own.
+    const aspectRatio = override?.aspectRatio ?? card.aspectRatio
+    const resolution = override?.resolution ?? card.resolution
 
     // Chain reference: the previous frame's chosen keyframe. First in the ref
     // list so the preamble's "FIRST attached image" clause holds.
@@ -299,7 +321,7 @@ export default function ContinuousView({
     updateFrame(key, (prev) => ({
       inFlightImages: [
         ...prev.inFlightImages,
-        { id: inFlightId, taskId: null, modelId: null, startedAt: Date.now(), prompt: promptText, aspectRatio: card.aspectRatio, resolution: card.resolution },
+        { id: inFlightId, taskId: null, modelId: null, startedAt: Date.now(), prompt: promptText, aspectRatio, resolution },
       ],
     }))
 
@@ -308,7 +330,7 @@ export default function ContinuousView({
     try {
       // noRealism unless the storyboard is the UGC Realism style — that's the
       // one look that wants the app's iPhone-realism stack kept on.
-      const started = await startImageTask(promptText, refs.length > 0 ? refs : undefined, card.aspectRatio, card.resolution, {
+      const started = await startImageTask(promptText, refs.length > 0 ? refs : undefined, aspectRatio, resolution, {
         noRealism: !result.realism,
         preambleOverride: preamble,
       })
@@ -327,7 +349,7 @@ export default function ContinuousView({
     }
 
     try {
-      const imageUrl = await finishImageTask(taskId, modelId, card.resolution)
+      const imageUrl = await finishImageTask(taskId, modelId, resolution)
       const newImage: GeneratedImage = { imageUrl, prompt: promptText, modelId, createdAt: Date.now() }
       let newIndex = 0
       updateFrame(key, (prev) => {
@@ -336,9 +358,10 @@ export default function ContinuousView({
         return { images: newImages, currentImageIndex: newIndex, inFlightImages: prev.inFlightImages.filter((e) => e.id !== inFlightId) }
       })
       // Auto-pick the first image a frame produces as its keyframe — the user
-      // can always click a different one.
+      // can always click a different one. `repick` (a regenerate of an already-
+      // picked frame) moves the keyframe onto the freshly generated image.
       setSelections((prev) => {
-        if (prev[String(frameIndex)]) return prev
+        if (!repick && prev[String(frameIndex)]) return prev
         return { ...prev, [String(frameIndex)]: { conceptId: key.slice(key.indexOf(':') + 1), imageIndex: newIndex } }
       })
       return true
@@ -355,14 +378,33 @@ export default function ContinuousView({
   // Sequential chain-generate: walk the frames in order so each generation can
   // reference the previous keyframe. Skips frames that already have one.
   const [chainRunning, setChainRunning] = useState(false)
-  const runAllFrames = async (frameIndices: number[]) => {
+  const runAllFrames = async (
+    frameIndices: number[],
+    override?: { aspectRatio: string; resolution: ImageResolution },
+    includeExisting = false,
+  ) => {
     if (!result || chainRunning) return
     setChainRunning(true)
     try {
-      for (const frameIndex of frameIndices) {
-        if (selectionsRef.current[String(frameIndex)]) continue
+      // Always walk in index order so each frame can chain off the previous
+      // frame's (possibly just-regenerated) keyframe.
+      const ordered = [...frameIndices].sort((a, b) => a - b)
+      for (const frameIndex of ordered) {
         const frame = result.frames.find((f) => f.index === frameIndex)
         if (!frame || frame.concepts.length === 0) continue
+        const picked = selectionsRef.current[String(frameIndex)]
+        if (picked) {
+          // Already has a keyframe. Skip unless the user opted to regenerate —
+          // then re-run the picked concept and move the keyframe onto the new image.
+          if (!includeExisting) continue
+          const ok = await runFrameImage(frameKey(frameIndex, picked.conceptId), override, true)
+          if (!ok) {
+            useAppStore.getState().addToast(`Stopped at Frame ${frameIndex} — fix it and run again.`, 'error')
+            break
+          }
+          await new Promise((r) => setTimeout(r, 0))
+          continue
+        }
         // Prefer a concept that already has an image (just needs selecting).
         const withImage = frame.concepts.find((c) => (frameStatesRef.current[frameKey(frameIndex, c.id)]?.images.length ?? 0) > 0)
         if (withImage) {
@@ -372,7 +414,7 @@ export default function ContinuousView({
           await new Promise((r) => setTimeout(r, 0))
           continue
         }
-        const ok = await runFrameImage(frameKey(frameIndex, frame.concepts[0].id))
+        const ok = await runFrameImage(frameKey(frameIndex, frame.concepts[0].id), override)
         if (!ok) {
           useAppStore.getState().addToast(`Stopped at Frame ${frameIndex} — fix it and run again.`, 'error')
           break
@@ -849,15 +891,17 @@ export default function ContinuousView({
   // per-row "Generate frame" button, matching Line-by-Line's per-row generate.
   const requestFrames = (frameIndices?: number[]) => {
     const pool = frameIndices ?? result.frames.map((f) => f.index)
-    const missing = pool.filter((i) => !selections[String(i)])
-    if (missing.length === 0) {
-      useAppStore.getState().addToast(
-        frameIndices ? 'This frame already has a keyframe picked.' : 'Every frame already has a keyframe picked.',
-        'info',
-      )
-      return
-    }
-    setConfirmGen({ kind: 'frames', frameIndices: missing })
+    // `fresh` = no keyframe picked yet; `done` = already picked. Kept apart so a
+    // stray press never silently re-bills frames the user already chose — the
+    // regenerate toggle is the only way to include them.
+    const fresh = pool.filter((i) => !selections[String(i)])
+    const done = pool.filter((i) => selections[String(i)])
+    if (fresh.length === 0 && done.length === 0) return
+    // When everything's already picked the dialog still opens — with the toggle
+    // as the only path forward, so "regenerate the lot" stays possible but never
+    // accidental.
+    setIncludeExisting(false)
+    setConfirmGen({ kind: 'frames', fresh, done })
   }
   const confirmCredits = confirmGen?.kind === 'clips'
     ? confirmGen.sceneIndices.reduce((sum, i) => {
@@ -867,12 +911,46 @@ export default function ContinuousView({
       }, 0)
     : 0
   const overBudget = balance !== null && confirmGen?.kind === 'clips' && confirmCredits > balance
+
+  // Frame-batch (keyframe images) cost + valid resolutions/aspects, clamped to
+  // whatever the current image model supports so switching it never strands an
+  // invalid pick. Defaults match the frame card (1K / 9:16).
+  const frameImgConstraints = frameImageModelId ? getModel(frameImageModelId)?.imageConstraints : undefined
+  const frameResOptions = (frameImgConstraints?.resolutions ?? []) as ImageResolution[]
+  const frameAspectOptions = frameImgConstraints?.aspectRatios ?? []
+  const effectiveFramesRes: ImageResolution | undefined =
+    framesResolution && frameResOptions.includes(framesResolution)
+      ? framesResolution
+      : frameResOptions.includes('1K' as ImageResolution)
+        ? ('1K' as ImageResolution)
+        : frameResOptions[0]
+  const effectiveFramesAspect =
+    framesAspect && frameAspectOptions.includes(framesAspect)
+      ? framesAspect
+      : frameAspectOptions.includes('9:16')
+        ? '9:16'
+        : frameAspectOptions[0]
+  // What the frames run will actually fire: the un-picked frames, plus the
+  // already-picked ones only when the user opts in.
+  const frameTargets = confirmGen?.kind === 'frames'
+    ? (includeExisting ? [...confirmGen.fresh, ...confirmGen.done] : confirmGen.fresh)
+    : []
+  const framesPerImage = frameImageModelId
+    ? estimateCredits(frameImageModelId, { imageCount: 1, resolution: effectiveFramesRes })
+    : null
+  const framesCredits = framesPerImage != null ? framesPerImage * frameTargets.length : null
+  const framesOverBudget = framesCredits != null && balance !== null && framesCredits > balance
+
   const confirmGenerate = () => {
     if (!confirmGen) return
     if (confirmGen.kind === 'clips') {
       confirmGen.sceneIndices.forEach((i) => void runClipVideo(i))
     } else {
-      void runAllFrames(confirmGen.frameIndices)
+      if (frameTargets.length === 0) return
+      void runAllFrames(frameTargets, {
+        aspectRatio: effectiveFramesAspect ?? '9:16',
+        resolution: effectiveFramesRes ?? ('1K' as ImageResolution),
+      }, includeExisting)
     }
     setConfirmGen(null)
   }
@@ -1052,17 +1130,89 @@ export default function ContinuousView({
             ) : (
               <>
                 <h3 className="text-sm font-medium text-ink-100">
-                  Generate {confirmGen.frameIndices.length} keyframe{confirmGen.frameIndices.length === 1 ? '' : 's'}?
+                  {frameTargets.length === 0
+                    ? 'Nothing to generate'
+                    : `Generate ${frameTargets.length} keyframe${frameTargets.length === 1 ? '' : 's'}?`}
                 </h3>
                 <p className="mt-1 text-xs text-ink-500">
                   Frames generate one after another so each can reference the previous keyframe — the chain keeps the style locked.
+                  {confirmGen.done.length > 0 && !includeExisting && (
+                    <> {confirmGen.done.length} frame{confirmGen.done.length === 1 ? '' : 's'} already
+                    {confirmGen.done.length === 1 ? ' has' : ' have'} a keyframe and will be skipped.</>
+                  )}
                 </p>
 
-                {/* Model — the image model every keyframe in this batch uses. */}
+                {confirmGen.done.length > 0 && (
+                  <label className="mt-3 flex cursor-pointer items-center gap-2.5 rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5">
+                    <input
+                      type="checkbox"
+                      checked={includeExisting}
+                      onChange={(e) => setIncludeExisting(e.target.checked)}
+                      className="h-3.5 w-3.5 shrink-0 accent-broll-500"
+                    />
+                    <span className="text-xs text-ink-300">
+                      Also regenerate the {confirmGen.done.length} frame
+                      {confirmGen.done.length === 1 ? '' : 's'} that already {confirmGen.done.length === 1 ? 'has' : 'have'} a keyframe
+                    </span>
+                  </label>
+                )}
+
+                {/* Model + run settings — the image model, resolution and aspect
+                    every keyframe in this batch uses. Mirrors Line-by-Line. */}
                 <div className="mt-4 flex flex-col gap-2.5">
                   <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Model</span>
                   <ModelPicker appId="broll-studio" task="image" mode="text-to-image" />
+                  {(frameAspectOptions.length > 0 || frameResOptions.length > 0) && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {frameAspectOptions.length > 0 && (
+                        <ConstraintChip
+                          grow
+                          openDirection="up"
+                          options={frameAspectOptions}
+                          value={effectiveFramesAspect ?? frameAspectOptions[0]}
+                          onChange={(v) => setFramesAspect(v)}
+                          render={(v) => (
+                            <span className="flex items-center gap-1.5">
+                              <AspectIcon ratio={v} />
+                              <span>{v}</span>
+                            </span>
+                          )}
+                        />
+                      )}
+                      {frameResOptions.length > 0 && (
+                        <ConstraintChip
+                          grow
+                          openDirection="up"
+                          options={frameResOptions as string[]}
+                          value={(effectiveFramesRes ?? frameResOptions[0]) as string}
+                          onChange={(v) => setFramesResolution(v as ImageResolution)}
+                          renderOption={(v) => {
+                            const credits = formatCredits(estimateCredits(frameImageModelId, { imageCount: 1, resolution: v as ImageResolution }))
+                            return (
+                              <span className="flex w-full items-center justify-between gap-6">
+                                <span>{v}</span>
+                                {credits && <span className="text-ink-500">{credits}</span>}
+                              </span>
+                            )
+                          }}
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                <div className="mt-3 flex items-center justify-between rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5 text-xs">
+                  <span className="text-ink-400">Estimated cost</span>
+                  <span className="flex items-center gap-1 font-medium text-ink-100">
+                    <Coins className="h-3 w-3" strokeWidth={2} />
+                    {framesCredits != null ? (formatCredits(framesCredits) ?? '— credits') : '— credits'}
+                  </span>
+                </div>
+                {balance !== null && (
+                  <p className={`mt-1.5 text-[11px] ${framesOverBudget ? 'text-red-400 light:text-red-600' : 'text-ink-500'}`}>
+                    Your balance: {balance.toLocaleString()} credits{framesOverBudget ? ' — not enough' : ''}
+                  </p>
+                )}
               </>
             )}
             <div className="mt-4 flex items-center justify-end gap-2">
@@ -1077,7 +1227,8 @@ export default function ContinuousView({
               <button
                 type="button"
                 onClick={confirmGenerate}
-                className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-4 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-broll-400"
+                disabled={confirmGen.kind === 'frames' && frameTargets.length === 0}
+                className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-4 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-broll-500"
               >
                 {confirmGen.kind === 'clips' ? <VideoIcon className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
                 Generate
@@ -1558,18 +1709,23 @@ function FrameConceptCard({
           </div>
         )}
 
-        {/* Hover action row — generate, and select once an image exists. */}
+        {/* Hover action row. Before any image → Generate. Once an image exists →
+            "Use as keyframe" (select) only; the regenerate button was removed
+            here because a stray click over an existing keyframe wiped it —
+            regenerating now lives inside the card's detail modal, one deliberate
+            step away. The chosen keyframe shows nothing (its badge marks it). */}
         <div className="absolute inset-x-2 bottom-2 z-10 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onGenerate() }}
-            title="Generate an image for this concept"
-            className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/50 text-[10px] font-medium text-white backdrop-blur transition-colors hover:bg-black/70"
-          >
-            <ImageIcon className="h-3 w-3" />
-            {hasImage ? 'Again' : 'Generate'}
-          </button>
-          {hasImage && !isKeyframe && (
+          {!hasImage ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onGenerate() }}
+              title="Generate an image for this concept"
+              className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/50 text-[10px] font-medium text-white backdrop-blur transition-colors hover:bg-black/70"
+            >
+              <ImageIcon className="h-3 w-3" />
+              Generate
+            </button>
+          ) : !isKeyframe ? (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onSelect() }}
@@ -1577,9 +1733,9 @@ function FrameConceptCard({
               className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-broll-500/80 text-[10px] font-medium text-white backdrop-blur transition-colors hover:bg-broll-500"
             >
               <Check className="h-3 w-3" />
-              Use
+              Use as keyframe
             </button>
-          )}
+          ) : null}
         </div>
       </div>
 
