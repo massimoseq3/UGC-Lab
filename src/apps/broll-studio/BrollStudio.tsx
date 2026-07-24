@@ -20,12 +20,6 @@ import { getAsBase64, isAssetRef } from '../../utils/assetStore'
 
 type PickerMode = 'products' | 'models' | 'scripts' | 'styleRefs' | null
 
-// Each mode gets its own shade of the B-Roll purple so the accent shifts when
-// you switch toggles — a visual cue for which mode you're in. The wrapper's
-// data-broll-mode attribute drives the retint; the shades + ramp live in
-// index.css ([data-broll-mode]), light- and dark-correct, so no per-component
-// colours change here.
-
 // Map old slash-form tag values onto the new single-word union. Variations
 // generated before iteration 3 carry strings like 'CHARACTER / SPEAKING';
 // after migration they become 'DIALOGUE'. Keys are typed as `string` to
@@ -730,10 +724,7 @@ export default function BrollStudio() {
   }
 
   return (
-    <div
-      className="flex flex-col pb-28 md:flex-row md:h-full md:pb-0"
-      data-broll-mode={mode}
-    >
+    <div className="flex flex-col pb-28 md:flex-row md:h-full md:pb-0">
       {/* Left panel — inputs */}
       <div className="flex w-full md:w-[30%] shrink-0 flex-col border-b md:border-b-0 md:border-r border-ink/5">
         <InputPanel
