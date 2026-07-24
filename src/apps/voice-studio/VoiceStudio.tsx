@@ -119,7 +119,7 @@ export default function VoiceStudio() {
     } catch (err) {
       const msg = humanizeError(err, 'Audio generation failed. Check your API key and try again.')
       setError(msg)
-      useAppStore.getState().addToast(`Voiceover generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     } finally {
       setIsGenerating(false)
       setInFlightVoice(null)
@@ -158,7 +158,7 @@ export default function VoiceStudio() {
     } catch (err) {
       const msg = humanizeError(err, 'Audio generation failed. Check your API key and try again.')
       setError(msg)
-      useAppStore.getState().addToast(`Voiceover generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
       setIsGenerating(false)
       return
     }
@@ -223,6 +223,7 @@ export default function VoiceStudio() {
             onSelectScript={() => setScriptPickerOpen(true)}
             selectedScript={selectedScript}
             onClearScript={() => setSelectedScript(null)}
+            onClearInputs={() => { setSelectedScript(null); setScriptText('') }}
             onGenerate={handleGenerate}
             isGenerating={isGenerating}
             canGenerate={scriptText.trim().length > 0}

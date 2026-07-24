@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { Search, FileText, Trash2, PenLine, Clapperboard, FishingHook } from 'lucide-react'
+import { Search, FileText, PenLine, Clapperboard, FishingHook } from 'lucide-react'
 import type { ScriptHistoryItem } from '../../../stores/types'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
 import { WRITE_STYLE_META, HOOK_CATEGORY_META, isHookCategoryChoice, parseHooks } from '../types'
+import { TileDeleteButton } from '../../../components/tileActions'
 
 const isHooksItem = (item: ScriptHistoryItem) => item.mode === 'write' && item.writeFormat === 'hooks'
 
@@ -29,33 +30,10 @@ interface HistoryViewProps {
   onDelete: (id: string) => void
 }
 
-// Two-click confirm delete — same pattern as the B-Roll / Ad Analyzer
-// history rows so destructive actions behave identically everywhere.
+// Two-click confirm delete — the shared control, so destructive actions behave
+// identically in every history list.
 function DeleteRowButton({ onDelete, alwaysVisible }: { onDelete: () => void; alwaysVisible: boolean }) {
-  const [confirming, setConfirming] = useState(false)
-  return (
-    <button
-      onClick={(e) => {
-        e.stopPropagation()
-        if (!confirming) {
-          setConfirming(true)
-          setTimeout(() => setConfirming(false), 3000)
-          return
-        }
-        onDelete()
-      }}
-      // Idle is a fixed 7×7 circle; only "Confirm" grows into a pill.
-      className={`flex h-7 shrink-0 items-center justify-center rounded-full transition-all ${
-        confirming
-          ? 'gap-1 px-2 bg-red-500/30 text-red-100 light:text-red-900 opacity-100 ring-1 ring-red-400/60'
-          : `w-7 text-ink-500 hover:bg-red-500/10 hover:text-red-400 light:hover:text-red-600 ${alwaysVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`
-      }`}
-      title={confirming ? 'Click again to delete' : 'Delete'}
-    >
-      <Trash2 className="h-3.5 w-3.5" />
-      {confirming && <span className="text-[10px] font-medium">Confirm</span>}
-    </button>
-  )
+  return <TileDeleteButton variant="chrome" size="sm" alwaysVisible={alwaysVisible} onDelete={onDelete} />
 }
 
 export default function HistoryView({ items, activeId, onSelect, onDelete }: HistoryViewProps) {

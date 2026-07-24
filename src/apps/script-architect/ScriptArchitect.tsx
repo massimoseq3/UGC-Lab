@@ -61,6 +61,17 @@ export default function ScriptArchitect() {
   // handoff as the @INFLUENCER reference image.
   const [selectedInfluencerId, setSelectedInfluencerId] = usePersistedState<string | null>(`${baseKey}:influencerId`, null)
   const [additionalContext, setAdditionalContext] = usePersistedState(`${baseKey}:context`, '')
+
+  // Panel-level "New" — wipes the input column back to a blank slate. Inputs
+  // ONLY: generated variations stay in the Output pane and in the script
+  // history bank, because outputs are the user's work.
+  const handleClearInputs = () => {
+    setSource('')
+    setBrief('')
+    setSelectedProductId(null)
+    setSelectedInfluencerId(null)
+    setAdditionalContext('')
+  }
   const [variations, setVariations] = usePersistedState<string[]>(`${baseKey}:variations`, [])
   // Snapshot of the mode + style that produced the *currently shown*
   // variations. The output panel labels off these (not the live left-panel
@@ -219,7 +230,7 @@ export default function ScriptArchitect() {
     } catch (err) {
       const msg = humanizeError(err, 'Script generation failed. Check your API key and try again.')
       setError(msg)
-      useAppStore.getState().addToast(`Script generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     } finally {
       setIsGenerating(false)
     }
@@ -279,6 +290,7 @@ export default function ScriptArchitect() {
         <InputPanel
           mode={mode}
           onModeChange={setMode}
+          onClearInputs={handleClearInputs}
           source={source}
           onSourceChange={setSource}
           isBlueprint={isBlueprint}

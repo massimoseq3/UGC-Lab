@@ -70,9 +70,9 @@ system · library · create · tools`, order from `APP_REGISTRY`, `constants.ts`
 - **System:** Dashboard (green; also the default landing page — fresh visits
   redirect to `/dashboard`).
 - **Library:** Bank.
-- **Create:** Ad Analyzer · Characters · Scripts · Voiceovers · B-Roll ·
-  Playground · Edit (analyzer leads the group — no divider between it and
-  Characters; Edit closes it).
+- **Create:** Characters · Scripts · Voiceovers · B-Roll · Edit (Edit closes the
+  group — cut what you produced).
+- **Tools:** Ad Analyzer · Playground.
 - divider → a **Settings** tile (opens the Settings modal). The theme quick
   toggle lives in the menu bar's top-right corner, not here.
 
@@ -153,6 +153,29 @@ Dismiss via ✕, backdrop, Escape, or the "Let's get to work" button.
 - **Generate button** — every Create/Tool app's primary action is a full-width
   pill at the **bottom of the left control column**, accent-filled in the app's
   family color, with the credit cost in the label.
+- **Panel header band** — every two-pane app puts a `h-[57px]` bar with a
+  `border-b border-ink/5` at the top of **both** columns, so the two hairlines
+  land on the same pixel. It holds the app's mode toggle / tab strip, and it
+  renders even when a pane is empty.
+- **Media tile hover actions** (`src/components/tileActions.tsx`) — every
+  generated image/video tile in the app gets the same vertical top-right column:
+  32px circles on a `bg-black/55` scrim (no backdrop-blur — it stutters while
+  the stack fades in), in the order **[Star] → Download → Save → Copy →
+  [context extras] → Delete**. `TileActionStack` positions it,
+  `TileActionButton` is one action, `TileStarButton` is the bank-only star (it
+  stays visible once set), and `TileDeleteButton` is the delete.
+- **Destructive actions are two-click, never a modal** — `TileDeleteButton`
+  arms on the first click into a red "Confirm" pill and reverts after 3s. Its
+  `variant` switches skin only (`media` over artwork, `chrome` on panel
+  surfaces like history rows); the interaction is identical everywhere.
+- **Escape closes every dismissible overlay** (`hooks/useCloseOnEscape.ts`),
+  and every one also closes on a backdrop click. Body-portaled overlays
+  additionally call `useCloseOnAppSwitch`.
+- **"New", not "Clear"** — the `ClearAllButton` pill at the top of each input
+  column resets **inputs only**. Generated outputs and history are never
+  touched, which is why it isn't labelled "Clear".
+- **No focus ring**, deliberately — a global `:focus-visible` outline was tried
+  and reverted (it fires on click for text inputs, boxing every search field).
 
 ---
 
@@ -308,10 +331,12 @@ playing.
 
 ### Center editor (`components/EditorArea.tsx`), top→bottom
 
-Script bank selector (pill / dashed "Click to select from bank") → "or paste
-script manually" divider → large textarea → "Clear All" link → progress bar →
-**footer row**: character counter (leading) · download icon + **Generate
-Voiceover** button (trailing).
+A `h-[57px]` header band holding the **New** reset pill (`ClearAllButton` —
+clears the picked script + pasted text; every generated voiceover stays in
+History), aligned with the right panel's Settings/History strip. Then: script
+bank selector (pill / dashed "Click to select from bank") → "or paste script
+manually" divider → large textarea → progress bar → **footer row**: character
+counter (leading) · model chip + **Generate Voiceover** button (trailing).
 
 ### Right panel (`components/RightPanel.tsx`)
 
@@ -319,10 +344,15 @@ Top tabs: **Settings / History**. Settings (`SettingsView.tsx`), top→bottom:
 
 1. **Voice** selector (avatar + name + description; opens the voice picker
    slide-over).
-2. **Model** row (read-only "Eleven Multilingual v2").
-3. Sliders **in this exact order**: **Speed → Stability → Similarity → Style
-   Exaggeration** (`SettingsView.tsx:54`–`101`).
-4. **Reset values** link.
+2. **Style** dropdown (Vocal Smile / Newscaster / Whisper / Empathetic /
+   Promo·Hype / Deadpan).
+3. **Pace** + **Accent** dropdowns, side by side.
+4. **Expressiveness** slider (the `temperature` param, Focused → Creative).
+5. Collapsible **Scene** / **Tone / context** textareas, both optional.
+6. **Reset values** link.
+
+The engine is **Gemini 3.1 Flash TTS**, not ElevenLabs — the model name shows on
+the generate row's chip, and there is no model picker.
 
 **Voice picker** (`VoicePickerView.tsx`): slide-over with a "Select a voice"
 header (back arrow), search box + category chips, then a scrolling list of rows
@@ -379,11 +409,15 @@ gallery). Both batch buttons confirm first (clips show summed credits + balance)
 
 ### Left input (`components/InputPanel.tsx`), top→bottom
 
-"References" header + Clear All → **Product** ref card → **Character** ref card →
-**Script** ref card (each: dashed "Click to select from bank" when empty, filled
-pill when set) → "or paste script manually" divider + script textarea → divider →
-**Additional Instructions** textarea → **Generate B-Roll Prompts** button (pinned
-bottom).
+The `h-[57px]` header band holds the three-way **mode toggle** (§6 above), not a
+title — it already fills that row in this narrow 25% pane. Below it, inside the
+scroll area: a **REFERENCES** label + the **New** reset pill (`ClearAllButton` —
+clears the three ref slots, the script text and the instructions; every
+generated scene, clip and history row stays) → **Product** ref card →
+**Character** ref card → **Script** ref card (each: dashed "Click to select from
+bank" when empty, filled pill when set) → "or paste script manually" divider +
+script textarea → divider → **Additional Instructions** textarea → **Generate
+B-Roll Prompts** button (pinned bottom).
 
 ### Right scenes (`components/RightPanel.tsx` → `ScenesView.tsx`)
 
@@ -399,13 +433,15 @@ Top tabs: **Scenes / History**. Scenes view: a control bar with the scene count
   vertical (`writing-mode: vertical-rl`) text; below `xl` it wraps as a normal card.
   The strip is pinned to `xl:col-start-6 xl:row-start-1` so added cards wrap past it
   onto row 2 at full card width instead of landing in the narrow track.
-  Nine variation tags (`variationTags.ts`): **Dialogue · Static · Action · Emotional ·
-  Product shot · POV · Environment · Transition · Proof** — a colored chip top-left of
-  each card (cyan / emerald / lime / pink / amber / violet / teal / sky / orange). The
-  bottom-center caption reads **A-Roll** (Dialogue, Static) or **B-Roll** (others).
-  - **Static leads the row**, then Dialogue, then the LLM's per-line role picks in
-    generation order, then any manually added cards. `displayOrder` (ScenesView) sorts
-    the render only — Static stays last in the underlying array.
+  Seven selectable variation tags (`ALL_TAGS` in `services/generateBroll.ts`):
+  **Action · Emotional · Product shot · POV · Environment · Transition · Proof** — a
+  colored chip top-left of each card (lime / pink / amber / violet / teal / sky /
+  orange). `Dialogue` and `Static` survive in the `VariationTag` union so older
+  persisted sessions still render, but they are **not** in `ALL_TAGS`, are never
+  offered to the model, and the parser no longer synthesizes them. The bottom-center
+  caption reads **A-Roll** (the two legacy tags) or **B-Roll** (everything else).
+  - Cards render in the LLM's per-line generation order, then any manually added
+    cards. `displayOrder` (ScenesView) sorts the render only.
 
 Each card (`VariationCard.tsx`, portrait `9/16`): tag chip top-left (or a neutral
 **Custom** chip on a manually added card); status badges top-right, replaced on hover
@@ -538,28 +574,32 @@ dock (green) and the **default landing page** (`DEFAULT_SLUG = 'dashboard'`).
 Hero text (greeting + big stat values) is Instrument Serif italic; every card,
 pill, and tile carries a subtle drop shadow. Top→bottom:
 
-- **Greeting header:** date line, "Good morning, `<first name>`" (time-of-day
-  phrase; name from `profile.first_name`, omitted in local-only mode), one-line
-  sub. Top-right: **Get Credits** (kie.ai/billing) and **Community** (Skool)
-  pill links.
+- **Greeting header:** "Good morning, `<first name>`" (time-of-day phrase; name
+  from `profile.display_name` then `first_name`, omitted in local-only mode) +
+  a one-line sub. **No quick links** — the menu bar already carries Get Credits
+  and Community on every screen, so duplicating them here was the same two
+  links twice.
 - **Bento grid** (12-col on `md:`). While no kie.ai key is saved, a slim
   full-width **red to-do row** (`ConnectKeyCard.tsx` — unchecked circle +
   "Connect your kie.ai API key to get started") sits ABOVE the metric cards;
   clicking opens the same 4-step `ApiKeyGuide` popup as the menu bar's red
-  alert (→ Open Settings), and the row removes itself once a key lands. Cards:
-  - **Time saved** card (5 cols): serif hero ("286 hrs"), a green
-    "+N hrs this week" delta (rolling 7 days, hidden at zero), workdays
-    sub-line ("…of production and tool-hopping…"). No hover tooltip —
-    assumptions live in `utils/usage.ts` (`MINUTES_SAVED_PER_GEN` +
-    `TASK_SWITCH_MINUTES_PER_GEN`).
-  - **Money saved** card (4 cols): serif hero USD, green "+$N this week"
-    delta, sub "vs official APIs & creator platforms · N credits used".
-  - **Streaks** card (3 cols): three icon rows — current streak (flame, green),
+  alert (→ Open Settings), and the row removes itself once a key lands. Every
+  card in the first two rows is `md:h-[200px]` so the rows align. Cards:
+  - **Time saved** (6 cols): serif hero ("286 hrs"), a green "+N hrs this week"
+    delta (rolling 7 days, hidden at zero), workdays sub-line ("…of production
+    and tool-hopping…"). No hover tooltip — assumptions live in
+    `utils/usage.ts` (`MINUTES_SAVED_PER_GEN` + `TASK_SWITCH_MINUTES_PER_GEN`).
+  - **Money saved** (6 cols): serif hero USD, green "+$N this week" delta, sub
+    "vs official APIs & creator platforms · N credits used".
+  - **Streaks** (3 cols): three icon rows — current streak (flame, green),
     longest streak (trophy), active days since first activity (calendar).
-  - **Activity** card (full width): 26-week GitHub-style heatmap
+  - **Activity** (6 cols): 26-week GitHub-style heatmap
     (`ActivityHeatmap.tsx`) — Monday-first columns, month labels above, green
-    intensity ramp, Less→More legend bottom-right, native `title` tooltip per
-    cell; "`<n>` generations · last 6 months" top-right.
+    intensity ramp, native `title` tooltip per cell. Top-right caption reads
+    "`<n>` generations · last 6 months", or "Every generation lights up a day"
+    before there's any activity.
+  - **AI UGC Academy** (3 cols): an external link tile (graduation-cap glyph,
+    `ArrowUpRight` top-right) opening the community classroom.
   - **Crew shortcut row** (8 tiles, dock order): crab sprite on an accent-tinted
     chip, app name, "Name · Role" in the app accent (truncated), `ArrowUpRight`
     top-right; clicking opens that app. No footer below the grid.

@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
-import { Loader2, Trash2, Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2 } from 'lucide-react'
+import { Loader2, Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2 } from 'lucide-react'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState } from '../../../hooks/useAssetUrl'
 import { getUrl } from '../../../utils/assetStore'
@@ -11,6 +11,7 @@ import type { CharacterHistoryItem } from '../../../stores/types'
 import type { InFlightCharacterGen, LaunchGenOptions } from '../types'
 import { getModel } from '../../../utils/models'
 import SegmentedToggle from '../../../components/SegmentedToggle'
+import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import InfluencerEditModal from './InfluencerEditModal'
 import GeneratingTile from './GeneratingTile'
 import { buildJsonPrompt, buildImagePrompt } from '../services/generateCharacter'
@@ -79,19 +80,13 @@ export default function GalleryPanel({
 
   return (
     <div className="flex h-full min-w-0 flex-col">
-      {isEmpty ? (
-        <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-          <UserRound className="h-9 w-9 text-ink-800" strokeWidth={1.5} />
-          <p className="text-sm text-ink-500">No generations yet</p>
-          <p className="max-w-[300px] text-xs leading-relaxed text-ink-600">
-            Configure parameters on the left and hit Generate.
-            Every character you make lands here, sorted by day.
-          </p>
-        </div>
-      ) : (
-        <>
-          {/* Header — card-size slider (list view only) + view switch (Grid / List). */}
-          <div className="flex h-[57px] shrink-0 items-center justify-end gap-3 border-b border-ink/5 px-4">
+      {/* Header — card-size slider (list view only) + view switch (Grid / List).
+          Renders even when the gallery is empty: every other app keeps a
+          h-[57px] bar on BOTH panes, so hiding it here left the two columns'
+          divider lines out of alignment on a fresh visit. */}
+      <div className="flex h-[57px] shrink-0 items-center justify-end gap-3 border-b border-ink/5 px-4">
+        {!isEmpty && (
+          <>
             {viewMode === 'list' && (
               <div className="flex items-center gap-2.5" title="Card size">
                 <Maximize2 className="h-3.5 w-3.5 text-ink-500" />
@@ -112,8 +107,21 @@ export default function GalleryPanel({
               </div>
             )}
             <ViewToggle value={viewMode} onChange={setViewMode} />
-          </div>
+          </>
+        )}
+      </div>
 
+      {isEmpty ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+          <UserRound className="h-9 w-9 text-ink-800" strokeWidth={1.5} />
+          <p className="text-sm text-ink-500">No generations yet</p>
+          <p className="max-w-[300px] text-xs leading-relaxed text-ink-600">
+            Configure parameters on the left and hit Generate.
+            Every character you make lands here, sorted by day.
+          </p>
+        </div>
+      ) : (
+        <>
           {/* Scrollable gallery */}
           <div className="min-w-0 flex-1 overflow-y-auto px-4 py-3">
             {inFlight.length > 0 && (
@@ -319,19 +327,15 @@ function useHistoryTileActions(item: CharacterHistoryItem, onDelete: () => void 
     }
   }
 
-  async function handleDelete() {
+  // Arming/confirming lives in TileDeleteButton — this just performs the
+  // delete and tracks the in-flight state so the button can show a spinner.
+  async function confirmDelete() {
     if (deleting) return
-    if (!confirmingDelete) {
-      setConfirmingDelete(true)
-      setTimeout(() => setConfirmingDelete(false), 3000)
-      return
-    }
     setDeleting(true)
     try {
       await onDelete()
     } catch {
       setDeleting(false)
-      setConfirmingDelete(false)
     }
   }
 
@@ -345,7 +349,7 @@ function useHistoryTileActions(item: CharacterHistoryItem, onDelete: () => void 
     url, status,
     isSheet, savedAsModel, modelLabel,
     savingToBank, nameDraft, setNameDraft, commitSave, openNameInput, toggleSave,
-    deleting, confirmingDelete, handleDelete,
+    deleting, confirmingDelete, setConfirmingDelete, confirmDelete,
     handleDownload,
   }
 }
@@ -453,51 +457,35 @@ function HistoryTile({
 
       <SourceBadge isSheet={a.isSheet} savedAsModel={a.savedAsModel} />
 
-      {/* Hover actions — a single vertical column in the top-right, top to
-          bottom: Download · Save · Copy · Make Sheet (portraits only) · Delete.
-          This order is the app-wide standard for hover action stacks. The column
-          stays visible while a delete is being confirmed. The inline name input
-          takes over the bottom edge while a save is being named. */}
+      {/* Hover actions — the shared tile stack (components/tileActions). Order
+          is the app-wide standard: Download · Save · Copy · extras · Delete.
+          The inline name input takes over the bottom edge while a save is
+          being named, so the stack steps aside for it. */}
       {a.nameDraft === null && (
-        <div className={`absolute right-1.5 top-1.5 flex flex-col items-end gap-1 transition-opacity ${a.deleting || a.confirmingDelete ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-          <TileIconButton title="Download image" onClick={(e) => { e.stopPropagation(); a.handleDownload() }}>
+        <TileActionStack forceVisible={a.deleting || a.confirmingDelete}>
+          <TileActionButton title="Download image" onClick={() => a.handleDownload()}>
             <Download className="h-4 w-4" />
-          </TileIconButton>
-          <TileIconButton
+          </TileActionButton>
+          <TileActionButton
             title={a.savedAsModel ? 'Saved — click to remove from Bank' : a.savingToBank ? 'Saving…' : 'Save to Bank'}
             tone={a.savedAsModel ? 'saved' : 'default'}
-            onClick={(e) => { e.stopPropagation(); a.toggleSave() }}
+            onClick={() => a.toggleSave()}
           >
             {a.savingToBank ? <Loader2 className="h-4 w-4 animate-spin" /> : a.savedAsModel ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-          </TileIconButton>
-          <TileIconButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
+          </TileActionButton>
+          <TileActionButton title="Copy prompt" onClick={() => onCopyPrompt()}>
             <Copy className="h-4 w-4" />
-          </TileIconButton>
+          </TileActionButton>
           {!a.isSheet && (
-            <TileIconButton
+            <TileActionButton
               title="Make a character sheet from this portrait"
-              onClick={(e) => { e.stopPropagation(); onMakeSheet() }}
+              onClick={() => onMakeSheet()}
             >
               <LayoutGrid className="h-4 w-4" />
-            </TileIconButton>
+            </TileActionButton>
           )}
-          <button
-            type="button"
-            title={a.deleting ? 'Deleting…' : a.confirmingDelete ? 'Click again to delete' : 'Delete'}
-            onClick={(e) => { e.stopPropagation(); a.handleDelete() }}
-            disabled={a.deleting}
-            // Idle state is a fixed 8×8 circle, matching TileIconButton above
-            // it; only the "Confirm" state grows into a pill for its label.
-            className={`flex h-8 items-center justify-center rounded-full border transition-colors disabled:cursor-wait ${
-              a.confirmingDelete
-                ? 'gap-1 px-2 border-red-400/60 bg-red-500/55 text-red-50'
-                : 'w-8 border-white/20 bg-black/55 text-white hover:bg-red-500/45 hover:text-red-100 hover:border-red-400/40 disabled:hover:bg-black/55 disabled:hover:text-white'
-            }`}
-          >
-            {a.deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            {a.confirmingDelete && !a.deleting && <span className="text-[9px] font-medium uppercase tracking-wider">Confirm</span>}
-          </button>
-        </div>
+          <TileDeleteButton onDelete={a.confirmDelete} busy={a.deleting} onArmedChange={a.setConfirmingDelete} />
+        </TileActionStack>
       )}
 
       {/* Inline name input — takes over the bottom edge while a save is being
@@ -661,7 +649,7 @@ function HistoryListRow({
                 <LayoutGrid className="h-3.5 w-3.5" />
               </ListRowButton>
             )}
-            <ListRowDeleteButton confirming={a.confirmingDelete} deleting={a.deleting} onClick={a.handleDelete} />
+            <TileDeleteButton variant="chrome" onDelete={a.confirmDelete} busy={a.deleting} />
           </div>
         )}
         </div>
@@ -693,35 +681,6 @@ function InFlightRow({ gen, mediaAspect, onCancel }: { gen: InFlightCharacterGen
 
 // Round 32px hover icon button — mirrors the B-Roll tile cluster so gallery
 // tiles read the same across apps.
-function TileIconButton({
-  children,
-  onClick,
-  title,
-  tone = 'default',
-}: {
-  children: React.ReactNode
-  onClick: (e: React.MouseEvent) => void
-  title: string
-  tone?: 'default' | 'saved'
-}) {
-  // Solid (no backdrop-blur): the cluster fades its opacity in on hover, and
-  // animating opacity over a backdrop-filter makes Chrome recompute the blur
-  // every frame — visibly choppy. A more opaque scrim reads cleanly instead.
-  const toneClass = tone === 'saved'
-    ? 'border-emerald-400/50 bg-emerald-500/45 text-emerald-100'
-    : 'border-white/20 bg-black/55 text-white hover:bg-black/70'
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${toneClass}`}
-    >
-      {children}
-    </button>
-  )
-}
-
 // Round icon button for list rows — tuned for the lighter list surface (no media
 // backdrop to sit over). Mirrors the Playground list row buttons.
 function ListRowButton({
@@ -736,7 +695,7 @@ function ListRowButton({
   tone?: 'default' | 'saved'
 }) {
   const toneClass = tone === 'saved'
-    ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300'
+    ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300 light:text-emerald-700'
     : 'border-ink/10 bg-ink/[0.03] text-ink-300 hover:bg-ink/[0.08] hover:text-ink-100'
   return (
     <button
@@ -746,36 +705,6 @@ function ListRowButton({
       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors ${toneClass}`}
     >
       {children}
-    </button>
-  )
-}
-
-// Two-click delete for list rows — styled for the list surface. Confirm state is
-// owned by the shared hook so it matches the grid tile's behaviour.
-function ListRowDeleteButton({
-  confirming,
-  deleting,
-  onClick,
-}: {
-  confirming: boolean
-  deleting: boolean
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      title={deleting ? 'Deleting…' : confirming ? 'Click again to delete' : 'Delete'}
-      onClick={(e) => { e.stopPropagation(); onClick() }}
-      disabled={deleting}
-      // Idle state is a fixed 6×6 circle; only "Confirm" grows into a pill.
-      className={`flex h-6 shrink-0 items-center justify-center rounded-full border transition-colors disabled:cursor-wait ${
-        confirming
-          ? 'gap-1 px-1.5 border-red-400/50 bg-red-500/20 text-red-300 light:text-red-700'
-          : 'w-6 border-ink/10 bg-ink/[0.03] text-ink-300 hover:border-red-400/40 hover:bg-red-500/15 hover:text-red-300'
-      }`}
-    >
-      {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-      {confirming && !deleting && <span className="text-[9px] font-medium uppercase tracking-wider">Confirm</span>}
     </button>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   X,
@@ -50,6 +50,7 @@ import {
 import { downloadImage } from '../../../utils/downloadImage'
 import { copyToClipboard } from '../../../utils/clipboard'
 import { humanizeError } from '../../../utils/friendlyError'
+import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 
 interface OneShotDetailModalProps {
   segment: OneShotSegment
@@ -119,14 +120,10 @@ export default function OneShotDetailModal({
   // blur first, which commits the draft into history. Without the explicit
   // commit here, text typed and then Esc'd away survived in `editablePrompt`
   // but never entered `promptHistory`, so one Undo discarded it for good.
-  const closeRef = useRef<() => void>(() => {})
-  closeRef.current = () => { commitDraftRef.current(); onClose() }
+  // `commitDraft` is declared further down, so it's reached through a ref.
   const commitDraftRef = useRef<() => void>(() => {})
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') closeRef.current() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [])
+  const closeWithCommit = useCallback(() => { commitDraftRef.current(); onClose() }, [onClose])
+  useCloseOnEscape(true, closeWithCommit)
   useCloseOnAppSwitch(true, onClose)
 
   // A text-selection drag that starts inside the content and releases over the

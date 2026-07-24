@@ -4,6 +4,7 @@ import { useAppStore } from '../stores/appStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useThemeStore, type ThemePref } from '../stores/themeStore'
 import SegmentedToggle from './SegmentedToggle'
+import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useAuthStore } from '../stores/authStore'
 import { isCloudEnabled } from '../lib/supabase'
 import { kieTestConnection } from '../utils/kie'
@@ -32,6 +33,7 @@ type StorageState =
   | { phase: 'error'; message: string }
 
 export default function SettingsModal({ open, onClose }: SettingsModalProps) {
+  useCloseOnEscape(open, onClose)
   const storedKieKey = useSettingsStore((s) => s.kieApiKey)
   const setKieApiKey = useSettingsStore((s) => s.setKieApiKey)
   const openApp = useAppStore((s) => s.openApp)
@@ -210,17 +212,21 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
         className="w-full max-w-md mx-4 lg:mx-0 max-h-[90vh] overflow-y-auto rounded-3xl border border-ink/10 bg-surface-1 p-5 lg:p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight text-ink-100">Settings</h2>
+            <h2 id="settings-title" className="text-lg font-semibold tracking-tight text-ink-100">Settings</h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
+            aria-label="Close settings"
+            className="rounded-full p-1.5 text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
           >
             <X className="h-4 w-4" />
           </button>
@@ -281,8 +287,8 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
             <div
               className={`flex items-start gap-2 rounded-md border px-2.5 py-1.5 text-[11px] ${
                 testResult.ok
-                  ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300'
-                  : 'border-red-500/20 bg-red-500/10 text-red-300'
+                  ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300 light:text-emerald-700'
+                  : 'border-red-500/20 bg-red-500/10 text-red-300 light:text-red-700'
               }`}
             >
               {testResult.ok ? (
@@ -308,7 +314,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
               disabled={disabled}
               className={`mt-4 flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-sm font-medium transition-colors ${
                 saved
-                  ? 'bg-emerald-500/15 text-emerald-300'
+                  ? 'bg-emerald-500/15 text-emerald-300 light:text-emerald-700'
                   : primary
                     ? 'bg-ink text-ink-900 hover:bg-ink-200'
                     : 'bg-ink/10 text-ink-400 disabled:cursor-not-allowed disabled:opacity-60'
@@ -372,7 +378,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                   disabled={nameSaving || nameSaved || nameDraft.trim() === storedName.trim()}
                   className={`flex shrink-0 items-center justify-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-medium transition-colors ${
                     nameSaved
-                      ? 'bg-emerald-500/15 text-emerald-300'
+                      ? 'bg-emerald-500/15 text-emerald-300 light:text-emerald-700'
                       : nameDraft.trim() !== storedName.trim() && !nameSaving
                         ? 'bg-ink text-ink-900 hover:bg-ink-200'
                         : 'bg-ink/10 text-ink-400 disabled:cursor-not-allowed disabled:opacity-60'
@@ -388,7 +394,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                 </button>
               </div>
               {nameError && (
-                <div className="mt-2 flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300">
+                <div className="mt-2 flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300 light:text-red-700">
                   <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
                   <span>{nameError}</span>
                 </div>
@@ -430,7 +436,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                   Checking usage…
                 </div>
               ) : usageError ? (
-                <div className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300">
+                <div className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300 light:text-red-700">
                   <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
                   <span>{usageError}</span>
                 </div>
@@ -449,7 +455,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                     <div className={`h-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
                   </div>
                   {pct >= 90 && (
-                    <p className="text-[10px] text-red-300">
+                    <p className="text-[10px] text-red-300 light:text-red-700">
                       You're near the {formatBytes(STORAGE_CAP_BYTES)} cap. Free up space below or delete unused items in your banks.
                     </p>
                   )}
@@ -475,14 +481,14 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
 
               {storage.phase === 'confirming' && (
                 <div className="mt-2 space-y-2 rounded-md border border-amber-500/20 bg-amber-500/[0.06] p-2.5">
-                  <div className="flex items-start gap-2 text-[11px] text-amber-200">
+                  <div className="flex items-start gap-2 text-[11px] text-amber-200 light:text-amber-800">
                     <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
                     <div className="space-y-1.5 leading-relaxed">
-                      <p className="font-medium text-amber-100">Are you sure you want to do this?</p>
-                      <p className="text-amber-200/90">
+                      <p className="font-medium text-amber-100 light:text-amber-900">Are you sure you want to do this?</p>
+                      <p className="text-amber-200 light:text-amber-800/90">
                         This permanently deletes every file in your cloud storage that no item in your banks or history references. Anything you generated but never saved (or whose history entry you've since cleared) will be removed and cannot be recovered.
                       </p>
-                      <p className="text-amber-200/90">
+                      <p className="text-amber-200 light:text-amber-800/90">
                         Before continuing, make sure anything you want to keep — Playground generations, B-Roll variations, characters, voiceovers, music — has been saved to its bank.
                       </p>
                     </div>
@@ -491,7 +497,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                     <button
                       type="button"
                       onClick={handleScanOrphans}
-                      className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-red-500/15 py-1.5 text-[11px] font-medium text-red-200 transition-colors hover:bg-red-500/25"
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-red-500/15 py-1.5 text-[11px] font-medium text-red-200 light:text-red-800 transition-colors hover:bg-red-500/25"
                     >
                       <Trash2 className="h-3 w-3" />
                       Continue
@@ -522,7 +528,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                 <div className="mt-2 space-y-2">
                   <div className="rounded-md bg-ink/[0.03] px-2.5 py-1.5 text-[11px] text-ink-300">
                     {storage.orphans.length === 0 ? (
-                      <span className="flex items-center gap-1.5 text-emerald-400">
+                      <span className="flex items-center gap-1.5 text-emerald-400 light:text-emerald-600">
                         <Check className="h-3 w-3" />
                         Clean — no orphans found.
                       </span>
@@ -555,7 +561,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                         <button
                           type="button"
                           onClick={handlePurgeOrphans}
-                          className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-red-500/15 py-1.5 text-[11px] font-medium text-red-200 transition-colors hover:bg-red-500/25"
+                          className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-red-500/15 py-1.5 text-[11px] font-medium text-red-200 light:text-red-800 transition-colors hover:bg-red-500/25"
                         >
                           <Trash2 className="h-3 w-3" />
                           Free {formatBytes(storage.totalBytes)}
@@ -600,7 +606,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
 
               {storage.phase === 'done' && (
                 <div className="mt-2 space-y-1.5">
-                  <div className="flex items-start gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] text-emerald-300">
+                  <div className="flex items-start gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1.5 text-[11px] text-emerald-300 light:text-emerald-700">
                     <Check className="mt-0.5 h-3 w-3 shrink-0" />
                     <span>Cleaned {storage.cleaned} — freed {formatBytes(storage.bytes)}.{storage.failed > 0 ? ` ${storage.failed} failed.` : ''}</span>
                   </div>
@@ -616,7 +622,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
 
               {storage.phase === 'error' && (
                 <div className="mt-2 space-y-1.5">
-                  <div className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300">
+                  <div className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300 light:text-red-700">
                     <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
                     <span>{storage.message}</span>
                   </div>

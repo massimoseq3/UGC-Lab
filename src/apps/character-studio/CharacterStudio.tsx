@@ -217,7 +217,7 @@ export default function CharacterStudio() {
       if (!controller.signal.aborted) {
         const msg = humanizeError(err, 'Image generation failed. Check your API key and try again.')
         setError(msg)
-        useAppStore.getState().addToast(`Character generation failed: ${msg}`, 'error')
+        useAppStore.getState().addToast(msg, 'error')
       }
     } finally {
       abortersRef.current.delete(gen.id)
@@ -275,7 +275,7 @@ export default function CharacterStudio() {
       if (!controller.signal.aborted) {
         const msg = humanizeError(err, 'Image generation failed. Check your API key and try again.')
         setError(msg)
-        useAppStore.getState().addToast(`Character generation failed: ${msg}`, 'error')
+        useAppStore.getState().addToast(msg, 'error')
       }
       return
     }

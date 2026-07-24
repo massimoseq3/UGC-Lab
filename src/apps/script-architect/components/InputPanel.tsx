@@ -9,6 +9,7 @@ const PROMPT_LENGTHS: WriteLength[] = [10, 15, 30]
 import { useBankStore } from '../../../stores/bankStore'
 import BankPicker from '../../../components/BankPicker'
 import SegmentedToggle from '../../../components/SegmentedToggle'
+import ClearAllButton from '../../../components/ClearAllButton'
 import SlideOver from '../../../components/SlideOver'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import { useAppStore } from '../../../stores/appStore'
@@ -35,6 +36,9 @@ function createEditableContext(product: Product): EditableProductContext {
 interface InputPanelProps {
   mode: ScriptUiMode
   onModeChange: (mode: ScriptUiMode) => void
+  // Resets the input column to a blank slate. Inputs only — generated scripts
+  // stay in the Output pane and in History.
+  onClearInputs: () => void
   // The merged Remix source — a plain winning transcript OR an Ad Analyzer
   // scene blueprint; the format is auto-detected (see detectSceneBlueprint).
   source: string
@@ -67,6 +71,7 @@ interface InputPanelProps {
 export default function InputPanel({
   mode,
   onModeChange,
+  onClearInputs,
   source,
   onSourceChange,
   isBlueprint,
@@ -513,7 +518,7 @@ export default function InputPanel({
           Mirrored under the right column's Output/History toggle (same h-14 band
           + dense pill) so the line runs cleanly across both columns and lines up
           with the sidebar header divider. */}
-      <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
+      <div className="flex h-[57px] shrink-0 items-center gap-2 border-b border-ink/5 px-5">
         <SegmentedToggle<ScriptUiMode>
           className="h-10 !p-1"
           value={mode}
@@ -523,6 +528,7 @@ export default function InputPanel({
             { value: 'remix', label: 'Remix', icon: Shuffle },
           ]}
         />
+        <ClearAllButton onClear={onClearInputs} label="New" className="shrink-0" />
       </div>
 
       {/* Scrollable inputs — a flex column so step 1's textarea can absorb

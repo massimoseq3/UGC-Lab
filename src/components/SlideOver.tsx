@@ -1,7 +1,7 @@
-import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
+import useCloseOnEscape from '../hooks/useCloseOnEscape'
 
 interface SlideOverProps {
   open: boolean
@@ -19,14 +19,7 @@ interface SlideOverProps {
 export default function SlideOver({ open, onClose, title, subtitle, children, footer }: SlideOverProps) {
   useCloseOnAppSwitch(open, onClose)
 
-  useEffect(() => {
-    if (!open) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [open, onClose])
+  useCloseOnEscape(open, onClose)
 
   const portalTarget = typeof document !== 'undefined' ? document.body : null
   if (!portalTarget) return null

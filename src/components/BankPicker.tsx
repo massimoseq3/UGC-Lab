@@ -11,6 +11,7 @@ import SegmentedToggle from './SegmentedToggle'
 import { useIsDesktop } from '../hooks/useBreakpoint'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import { sortByOrder, starredFirst, SORT_OPTIONS_WITH_NAME, SORT_OPTIONS_DATE_ONLY, type SortOrder } from '../apps/finder/bankSort'
+import useCloseOnEscape from '../hooks/useCloseOnEscape'
 
 type BankItem = Product | Model | Script | VoicePreset | BRoll
 
@@ -159,15 +160,7 @@ export default function BankPicker({
 
   useCloseOnAppSwitch(isOpen, onClose)
 
-  // Close on Escape
-  useEffect(() => {
-    if (!isOpen) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [isOpen, onClose])
+  useCloseOnEscape(isOpen, onClose)
 
   const handleSelect = (item: BankItem) => {
     if (multiSelect) {

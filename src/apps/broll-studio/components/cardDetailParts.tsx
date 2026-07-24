@@ -4,10 +4,11 @@
 // modal's orchestration (state + handlers). These all communicate via props.
 import { useState, useEffect, useRef } from 'react'
 import {
-  ImageIcon, Video as VideoIcon, Film, Loader2, Check, Download, Trash2, Bookmark, Volume2, VolumeX, Play, Pause, Copy, Circle, AlertCircle, RefreshCw, X, ImagePlus,
+  ImageIcon, Video as VideoIcon, Film, Loader2, Check, Download, Bookmark, Volume2, VolumeX, Play, Pause, Copy, Circle, AlertCircle, RefreshCw, X, ImagePlus,
 } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import GeneratingBackdrop from '../../../components/GeneratingBackdrop'
+import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import BankPicker from '../../../components/BankPicker'
 import SlotActionMenu from '../../../components/video/SlotActionMenu'
 import type { CardState, ReferenceImage } from '../types'
@@ -297,8 +298,8 @@ function ImageTile({
       {/* Hover action stack — top-right vertical column, app-wide standard
           order: download · save · copy · delete. The Animate bar keeps the
           bottom edge. */}
-      <div className="absolute right-1.5 top-1.5 flex flex-col items-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        <TileIconButton
+      <TileActionStack>
+        <TileActionButton
           title="Download"
           onClick={async (e) => {
             e.stopPropagation()
@@ -307,19 +308,19 @@ function ImageTile({
           }}
         >
           <Download className="h-4 w-4" />
-        </TileIconButton>
-        <TileIconButton
+        </TileActionButton>
+        <TileActionButton
           title={saved ? 'Saved to bank' : saving ? 'Saving…' : 'Save to bank'}
           tone={saved ? 'saved' : 'default'}
           onClick={(e) => { e.stopPropagation(); if (!saved && !saving) onSave() }}
         >
           {saved ? <Check className="h-4 w-4" /> : saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bookmark className="h-4 w-4" />}
-        </TileIconButton>
-        <TileIconButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
+        </TileActionButton>
+        <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
           <Copy className="h-4 w-4" />
-        </TileIconButton>
+        </TileActionButton>
         <TileDeleteButton onDelete={onDelete} />
-      </div>
+      </TileActionStack>
     </div>
   )
 }
@@ -450,8 +451,8 @@ function VideoTile({
       {/* Hover action stack — top-right vertical column, app-wide standard
           order: download · copy · send-to-Playground · delete (video has no
           save-to-bank). */}
-      <div className="absolute right-1.5 top-1.5 flex flex-col items-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        <TileIconButton
+      <TileActionStack>
+        <TileActionButton
           title="Download"
           onClick={async (e) => {
             e.stopPropagation()
@@ -460,18 +461,18 @@ function VideoTile({
           }}
         >
           <Download className="h-4 w-4" />
-        </TileIconButton>
-        <TileIconButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
+        </TileActionButton>
+        <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
           <Copy className="h-4 w-4" />
-        </TileIconButton>
-        <TileIconButton
+        </TileActionButton>
+        <TileActionButton
           title="Use in Playground as Gemini Omni source clip"
           onClick={(e) => { e.stopPropagation(); onSendToPlayground() }}
         >
           <Film className="h-4 w-4" />
-        </TileIconButton>
+        </TileActionButton>
         <TileDeleteButton onDelete={onDelete} />
-      </div>
+      </TileActionStack>
     </div>
   )
 }
@@ -716,64 +717,6 @@ function DayPill({ label }: { label: string }) {
     <div className="my-2 flex items-center justify-center">
       <span className="rounded-full bg-ink/[0.06] px-3 py-1 text-[11px] font-medium text-ink-300">{label}</span>
     </div>
-  )
-}
-
-function TileIconButton({
-  children,
-  onClick,
-  title,
-  tone = 'default',
-}: {
-  children: React.ReactNode
-  onClick: (e: React.MouseEvent) => void
-  title: string
-  tone?: 'default' | 'danger' | 'saved'
-}) {
-  const toneClass = tone === 'danger'
-    ? 'border-white/20 bg-black/35 text-white hover:bg-red-500/30 hover:text-red-100 hover:border-red-400/40'
-    : tone === 'saved'
-    ? 'border-emerald-400/50 bg-emerald-500/30 text-emerald-100'
-    : 'border-white/20 bg-black/35 text-white hover:bg-black/50'
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur transition-colors ${toneClass}`}
-    >
-      {children}
-    </button>
-  )
-}
-
-// Two-click delete inside the modal's tile gallery. First click flips to a
-// red "Confirm?" state for 3 s; second click within the window deletes.
-function TileDeleteButton({ onDelete }: { onDelete: () => void }) {
-  const [confirming, setConfirming] = useState(false)
-  return (
-    <button
-      type="button"
-      title={confirming ? 'Click again to delete' : 'Delete'}
-      onClick={(e) => {
-        e.stopPropagation()
-        if (!confirming) {
-          setConfirming(true)
-          setTimeout(() => setConfirming(false), 3000)
-          return
-        }
-        onDelete()
-      }}
-      // Idle is a fixed 8×8 circle; only the "Confirm" state grows into a pill.
-      className={`flex h-8 items-center justify-center rounded-full border backdrop-blur transition-colors ${
-        confirming
-          ? 'gap-1 px-2 border-red-400/60 bg-red-500/45 text-red-50'
-          : 'w-8 border-white/20 bg-black/35 text-white hover:bg-red-500/30 hover:text-red-100 hover:border-red-400/40'
-      }`}
-    >
-      <Trash2 className="h-4 w-4" />
-      {confirming && <span className="text-[10px] font-medium uppercase tracking-wider">Confirm</span>}
-    </button>
   )
 }
 

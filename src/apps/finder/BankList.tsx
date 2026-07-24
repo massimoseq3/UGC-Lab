@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { Trash2, Package, UserRound, FileText, Mic, Film, Plus, Video, Download, Loader2, ChevronDown, Sparkles, Check, LayoutGrid, Copy, Bookmark, Star } from 'lucide-react'
+import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, Loader2, ChevronDown, Sparkles, Check, LayoutGrid, Copy, Bookmark, Star } from 'lucide-react'
 import type { Product, Model, Script, VoicePreset, BRoll } from '../../stores/types'
 import type { BankType } from '../../utils/constants'
 import type { ModelFilter } from './Finder'
@@ -10,6 +10,7 @@ import { getAsBase64, isAssetRef } from '../../utils/assetStore'
 import { downloadImage } from '../../utils/downloadImage'
 import { copyToClipboard } from '../../utils/clipboard'
 import GeneratingBackdrop from '../../components/GeneratingBackdrop'
+import { TileActionStack, TileActionButton, TileStarButton, TileDeleteButton } from '../../components/tileActions'
 import { sortByOrder, type SortOrder } from './bankSort'
 import { groupByDay, sectionLabel } from '../../utils/history'
 
@@ -79,54 +80,6 @@ interface BankListProps {
   onBulkProductFiles?: (files: File[]) => void
 }
 
-// Local busy state stops a slow async delete from being clicked twice
-// (which would call the cloud delete twice and toast twice).
-function ConfirmDelete({ onConfirm, onCancel }: { onConfirm: () => Promise<void> | void; onCancel: () => void }) {
-  const [busy, setBusy] = useState(false)
-  const handleConfirm = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (busy) return
-    setBusy(true)
-    try { await onConfirm() } finally { setBusy(false) }
-  }
-  return (
-    <div className="flex items-center gap-2">
-      <button
-        onClick={handleConfirm}
-        disabled={busy}
-        className="flex items-center gap-1 rounded-full bg-red-500/20 px-2.5 py-0.5 text-[11px] font-medium text-red-400 light:text-red-600 transition-colors hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {busy && <Loader2 className="h-3 w-3 animate-spin" />}
-        {busy ? 'Deleting…' : 'Delete'}
-      </button>
-      <button
-        onClick={(e) => { e.stopPropagation(); if (!busy) onCancel() }}
-        disabled={busy}
-        className="text-[11px] text-ink-500 hover:text-ink-300 disabled:opacity-40"
-      >
-        Cancel
-      </button>
-    </div>
-  )
-}
-
-// Star toggle for the hover action stack (image cards). Hover-revealed like
-// its neighbours, but stays visible once starred so the pin reads at a glance.
-// Starred items surface first in the bank pickers.
-function StarButton({ starred, onToggle }: { starred: boolean; onToggle: () => void }) {
-  return (
-    <button
-      onClick={onToggle}
-      title={starred ? 'Unstar' : 'Star — starred items show first when picking from banks'}
-      className={`flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 backdrop-blur transition-all hover:bg-black/50 group-hover:opacity-100 ${
-        starred ? 'text-amber-300 opacity-100' : 'text-white opacity-0'
-      }`}
-    >
-      <Star className={`h-3.5 w-3.5 ${starred ? 'fill-current' : ''}`} />
-    </button>
-  )
-}
-
 // undefined → legacy product (predates the draft system, no dot).
 // false → draft awaiting user review (orange dot).
 // true → confirmed via Save in the form (green dot).
@@ -179,25 +132,16 @@ function ProductCard({ item, onEdit, onDelete, inFlight }: { item: Product; onEd
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent px-3 pb-2.5 pt-10 text-center">
         <span className="block line-clamp-2 text-[13px] font-semibold leading-tight tracking-tight text-zinc-100">{item.productName}</span>
       </div>
-      {/* Hover action stack — top-right vertical column: star · download · delete.
-          Star leads so a starred item's persistent badge sits flush in the corner. */}
-      <div className="absolute right-2 top-2 flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
-        {confirm ? (
-          <ConfirmDelete onConfirm={onDelete} onCancel={() => setConfirm(false)} />
-        ) : (
-          <>
-            <StarButton starred={!!item.starred} onToggle={() => toggleStar('products', item.id)} />
-            {resolvedImage && (
-              <button onClick={handleDownload} title="Download image" className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white opacity-0 backdrop-blur transition-all hover:bg-black/50 group-hover:opacity-100">
-                <Download className="h-3.5 w-3.5" />
-              </button>
-            )}
-            <button onClick={() => setConfirm(true)} title="Delete" className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white opacity-0 backdrop-blur transition-all hover:bg-red-500/30 hover:text-red-100 hover:border-red-400/40 group-hover:opacity-100">
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </>
+      {/* Hover action stack — star · download · delete. */}
+      <TileActionStack forceVisible={confirm}>
+        <TileStarButton starred={!!item.starred} onToggle={() => toggleStar('products', item.id)} />
+        {resolvedImage && (
+          <TileActionButton title="Download image" onClick={handleDownload}>
+            <Download className="h-4 w-4" />
+          </TileActionButton>
         )}
-      </div>
+        <TileDeleteButton onDelete={onDelete} onArmedChange={setConfirm} />
+      </TileActionStack>
     </div>
   )
 }
@@ -282,34 +226,21 @@ function ModelCard({ item, onEdit, onDelete }: { item: Model; onEdit: () => void
       <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent p-3 pt-10">
         <span className="block truncate text-center text-sm font-semibold tracking-tight text-zinc-100">{item.name}</span>
       </div>
-      {/* Hover action stack — top-right vertical column: star · download · copy · delete.
-          Star leads so a starred item's persistent badge sits flush in the corner. */}
-      <div className="absolute right-2 top-2 flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
-        {confirm ? (
-          <ConfirmDelete onConfirm={onDelete} onCancel={() => setConfirm(false)} />
-        ) : (
-          <>
-            <StarButton starred={!!item.starred} onToggle={() => toggleStar('models', item.id)} />
-            {resolvedImage && (
-              <button onClick={handleDownload} title="Download image" className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white opacity-0 backdrop-blur transition-all hover:bg-black/50 group-hover:opacity-100">
-                <Download className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {item.jsonProfile && (
-              <button
-                onClick={handleCopy}
-                title={copied ? 'Copied!' : 'Copy character prompt (JSON)'}
-                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white opacity-0 backdrop-blur transition-all hover:bg-black/50 group-hover:opacity-100"
-              >
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
-              </button>
-            )}
-            <button onClick={() => setConfirm(true)} title="Delete" className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white opacity-0 backdrop-blur transition-all hover:bg-red-500/30 hover:text-red-100 hover:border-red-400/40 group-hover:opacity-100">
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </>
+      {/* Hover action stack — star · download · copy · delete. */}
+      <TileActionStack forceVisible={confirm}>
+        <TileStarButton starred={!!item.starred} onToggle={() => toggleStar('models', item.id)} />
+        {resolvedImage && (
+          <TileActionButton title="Download image" onClick={handleDownload}>
+            <Download className="h-4 w-4" />
+          </TileActionButton>
         )}
-      </div>
+        {item.jsonProfile && (
+          <TileActionButton title={copied ? 'Copied!' : 'Copy character prompt (JSON)'} onClick={handleCopy}>
+            {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+          </TileActionButton>
+        )}
+        <TileDeleteButton onDelete={onDelete} onArmedChange={setConfirm} />
+      </TileActionStack>
     </div>
   )
 }
@@ -349,26 +280,20 @@ function ScriptCard({ item, onEdit, onDelete }: { item: Script; onEdit: () => vo
       </div>
       {/* Hover action stack — star · delete. Text-card styling (ink chrome, not
           the image cards' white-on-black pills); star stays visible once set. */}
-      <div className="absolute right-2 top-2 flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
-        {confirm ? (
-          <ConfirmDelete onConfirm={onDelete} onCancel={() => setConfirm(false)} />
-        ) : (
-          <>
-            <button
-              onClick={() => toggleStar('scripts', item.id)}
-              title={item.starred ? 'Unstar' : 'Star — starred items show first when picking from banks'}
-              className={`rounded-full bg-ink/5 p-1.5 backdrop-blur-sm transition-all group-hover:opacity-100 ${
-                item.starred ? 'text-amber-400 opacity-100' : 'text-ink-700 opacity-0 hover:text-amber-400'
-              }`}
-            >
-              <Star className={`h-3.5 w-3.5 ${item.starred ? 'fill-current' : ''}`} />
-            </button>
-            <button onClick={() => setConfirm(true)} className="rounded-full bg-ink/5 p-1.5 text-ink-700 opacity-0 backdrop-blur-sm transition-all hover:text-red-400 group-hover:opacity-100">
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </>
-        )}
-      </div>
+      <TileActionStack forceVisible={confirm}>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); toggleStar('scripts', item.id) }}
+          title={item.starred ? 'Unstar' : 'Star — starred items show first when picking from banks'}
+          aria-pressed={item.starred}
+          className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-ink/5 ${
+            item.starred ? 'text-amber-400' : 'text-ink-700 hover:text-amber-400'
+          }`}
+        >
+          <Star className={`h-4 w-4 ${item.starred ? 'fill-current' : ''}`} />
+        </button>
+        <TileDeleteButton variant="chrome" onDelete={onDelete} onArmedChange={setConfirm} />
+      </TileActionStack>
     </div>
   )
 }
@@ -394,6 +319,16 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
     const target = resolvedImage ?? resolvedVideo
     if (!target) return
     downloadImage(target, `broll-${item.id.slice(0, 8)}`, resolvedImage ? 'png' : 'mp4')
+  }
+
+  // Copies the FULL prompt, not the truncated card preview.
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!item.prompt) return
+    await copyToClipboard(item.prompt)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
   }
 
   // Send the still to Playground in video mode as the start frame.
@@ -446,23 +381,19 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
             {videoCount} {videoCount === 1 ? 'video' : 'videos'}
           </span>
         )}
-        {/* Hover action stack — top-right vertical column: star · download · delete.
-            Star leads so a starred item's persistent badge sits flush in the corner. */}
-        <div className="absolute right-2 top-2 flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
-          {confirm ? (
-            <ConfirmDelete onConfirm={onDelete} onCancel={() => setConfirm(false)} />
-          ) : (
-            <>
-              <StarButton starred={!!item.starred} onToggle={() => toggleStar('brolls', item.id)} />
-              <button onClick={handleDownload} title="Download image" className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white opacity-0 backdrop-blur transition-all hover:bg-black/50 group-hover:opacity-100">
-                <Download className="h-3.5 w-3.5" />
-              </button>
-              <button onClick={() => setConfirm(true)} title="Delete" className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white opacity-0 backdrop-blur transition-all hover:bg-red-500/30 hover:text-red-100 hover:border-red-400/40 group-hover:opacity-100">
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </>
+        {/* Hover action stack — star · download · copy · delete. */}
+        <TileActionStack forceVisible={confirm}>
+          <TileStarButton starred={!!item.starred} onToggle={() => toggleStar('brolls', item.id)} />
+          <TileActionButton title="Download image" onClick={handleDownload}>
+            <Download className="h-4 w-4" />
+          </TileActionButton>
+          {promptPreview && (
+            <TileActionButton title={copied ? 'Prompt copied' : 'Copy prompt'} onClick={handleCopy}>
+              {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+            </TileActionButton>
           )}
-        </div>
+          <TileDeleteButton onDelete={onDelete} onArmedChange={setConfirm} />
+        </TileActionStack>
         {/* Animate in Playground — rounded pill (matching the Send-to buttons),
             floats over the card bottom on hover, image cards only. */}
         {hasImage && (
@@ -487,7 +418,6 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
 }
 
 function VoiceCard({ item, onEdit, onDelete }: { item: VoicePreset; onEdit: () => void; onDelete: () => void }) {
-  const [confirm, setConfirm] = useState(false)
   return (
     <div onClick={onEdit} className="group flex cursor-pointer items-center gap-3 rounded-full border border-ink/5 bg-ink/[0.03] p-3 transition-colors hover:border-ink/10 hover:bg-ink/[0.05] card-soft-shadow">
       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-ink/5">
@@ -500,14 +430,11 @@ function VoiceCard({ item, onEdit, onDelete }: { item: VoicePreset; onEdit: () =
           {item.style} · {item.pace} · {item.accent}
         </span>
       </div>
-      <div className="shrink-0 self-center" onClick={(e) => e.stopPropagation()}>
-        {confirm ? (
-          <ConfirmDelete onConfirm={onDelete} onCancel={() => setConfirm(false)} />
-        ) : (
-          <button onClick={() => setConfirm(true)} className="rounded p-1 text-ink-700 opacity-0 transition-all hover:text-red-400 group-hover:opacity-100">
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        )}
+      <div
+        className="shrink-0 self-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <TileDeleteButton variant="chrome" onDelete={onDelete} />
       </div>
     </div>
   )

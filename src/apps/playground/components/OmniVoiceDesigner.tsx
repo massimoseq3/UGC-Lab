@@ -6,6 +6,7 @@ import { useSettingsStore } from '../../../stores/settingsStore'
 import { useOmniVoiceStore, type OmniVoice } from '../../../stores/omniVoiceStore'
 import { humanizeError } from '../../../utils/friendlyError'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
+import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { OMNI_BASE_VOICES, omniVoicePreviewUrl } from '../omniVoices'
 
 interface OmniVoiceDesignerProps {
@@ -20,6 +21,7 @@ interface OmniVoiceDesignerProps {
 // free-text description on top, and kie mints a reusable kieAudioId. The
 // result is stored browser-locally (omniVoiceStore) next to the kie API key.
 export default function OmniVoiceDesigner({ open, onClose, onCreated }: OmniVoiceDesignerProps) {
+  useCloseOnEscape(open, onClose)
   const addVoice = useOmniVoiceStore((s) => s.addVoice)
   const [name, setName] = useState('')
   const [baseVoiceId, setBaseVoiceId] = useState(OMNI_BASE_VOICES[0].id)

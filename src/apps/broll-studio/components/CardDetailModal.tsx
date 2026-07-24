@@ -38,6 +38,7 @@ import { tagChipStyle, tagLabel } from './variationTags'
 import { humanizeError } from '../../../utils/friendlyError'
 import ModelWaitNotice from '../../../components/ModelWaitNotice'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
+import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import {
   ModalGallery,
   ReferenceSlotCard,
@@ -182,13 +183,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     setDraft(cardState.editablePrompt)
   }, [cardState.editablePrompt])
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  useCloseOnEscape(true, onClose)
 
   // Mounted only while open, so `enabled` is simply true.
   useCloseOnAppSwitch(true, onClose)

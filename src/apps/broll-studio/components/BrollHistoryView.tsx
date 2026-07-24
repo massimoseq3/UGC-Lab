@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Film, Trash2, ArrowDownUp, Check, ChevronDown } from 'lucide-react'
+import { Search, Film, ArrowDownUp, Check, ChevronDown } from 'lucide-react'
 import type { BrollHistoryItem } from '../../../stores/types'
 import type {
   BrollResult,
@@ -16,6 +16,7 @@ import { useBankStore } from '../../../stores/bankStore'
 import { usePersistedState } from '../../../hooks/usePersistedState'
 import { getContinuousStyle } from '../services/generateContinuous'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
+import { TileDeleteButton } from '../../../components/tileActions'
 
 interface BrollHistoryViewProps {
   items: BrollHistoryItem[]
@@ -353,7 +354,6 @@ function HistoryRow({
     ? `concept${count === 1 ? '' : 's'}`
     : `scene${count === 1 ? '' : 's'}`
   const styleLabel = historyStyleLabel(item, mode)
-  const [confirming, setConfirming] = useState(false)
 
   return (
     <div
@@ -401,27 +401,7 @@ function HistoryRow({
         </div>
       </div>
 
-      <button
-        onClick={(e) => {
-          e.stopPropagation()
-          if (!confirming) {
-            setConfirming(true)
-            setTimeout(() => setConfirming(false), 3000)
-            return
-          }
-          onDelete()
-        }}
-        // Idle is a fixed 7×7 circle; only "Confirm" grows into a pill.
-        className={`flex h-7 shrink-0 items-center justify-center rounded-full transition-all ${
-          confirming
-            ? 'gap-1 px-2 bg-red-500/30 text-red-100 light:text-red-900 opacity-100 ring-1 ring-red-400/60'
-            : `w-7 text-ink-500 hover:bg-red-500/10 hover:text-red-400 light:hover:text-red-600 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`
-        }`}
-        title={confirming ? 'Click again to delete' : 'Delete'}
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-        {confirming && <span className="text-[10px] font-medium">Confirm</span>}
-      </button>
+      <TileDeleteButton variant="chrome" size="sm" alwaysVisible={isActive} onDelete={onDelete} />
     </div>
   )
 }

@@ -58,7 +58,7 @@ function CopyPromptButton({ text, label, title }: { text: string; label: string;
       title={title}
       className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.02] px-2.5 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:border-ink/20 hover:bg-ink/[0.05] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-40"
     >
-      {copied ? <Check className="h-3 w-3 text-emerald-400" /> : <Copy className="h-3 w-3" />}
+      {copied ? <Check className="h-3 w-3 text-emerald-400 light:text-emerald-600" /> : <Copy className="h-3 w-3" />}
       {copied ? 'Copied' : label}
     </button>
   )
@@ -195,10 +195,12 @@ export default function ControlsPanel({
 
   return (
     <div className="flex min-w-0 flex-col md:h-full">
-      {/* Rounded segmented toggle — filled so all tabs share the column
-          with no horizontal scroll. Sits at the top of the column in a fixed
-          h-14 band so its divider lines up with the sidebar header divider. */}
-      <div className="flex h-14 items-center px-2">
+      {/* Rounded segmented toggle — filled so all tabs share the column with no
+          horizontal scroll. The h-[57px] band + bottom hairline is the app-wide
+          panel-header spec (Scripts, B-Roll, Bank, Playground, Ad Analyzer and
+          Voiceovers all use it), so the left and right columns' divider lines
+          land on the same pixel. */}
+      <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-2">
         <SegmentedToggle<TabId>
           className="h-10 !p-1"
           value={activeTab}
@@ -211,13 +213,16 @@ export default function ControlsPanel({
         />
       </div>
 
-      {/* Divider between the toggle and the parameter inputs — full width. */}
-      <div className="border-t border-ink/5" />
-
       {/* Scrollable parameter fields (only scrolls internally on desktop). Every
           tab's groups render on one page — each group sits in its own card, and
-          the top toggle scroll-jumps between tab blocks (Ad Analyzer pattern). */}
-      <div ref={scrollRef} className="min-w-0 flex-1 px-4 pb-4 md:overflow-y-auto">
+          the top toggle scroll-jumps between tab blocks (Ad Analyzer pattern).
+          The bottom edge feathers out under the Generate bar, mirroring the
+          sticky preset row's fade at the top — without it the fields cut off
+          mid-row against the bar and read as a render glitch. */}
+      <div
+        ref={scrollRef}
+        className="min-w-0 flex-1 px-4 pb-4 md:overflow-y-auto [mask-image:linear-gradient(to_bottom,black_calc(100%-1.5rem),transparent_100%)]"
+      >
         <div className="flex flex-col gap-4">
           {/* Preset loader + reference-photo autofill — pinned just under the
               Physical / Scene & Pose toggle (sticky over the scroll), with an
@@ -251,9 +256,12 @@ export default function ControlsPanel({
               {/* Tab divider — a centered preset button on a full-width line
                   (mirrors the History date pills), marking each tab's block. The
                   centered button doubles as the scoped preset picker; Clear sits
-                  on the left and the scoped Copy on the right of every divider. */}
+                  on the left and the scoped Copy on the right of every divider.
+                  The left pill reads "New", not "Clear": it resets the input
+                  fields only — every generated character stays in the gallery
+                  and in history. */}
               <TabDivider
-                left={<ClearAllButton onClear={onClear} label="Clear" className="!py-1 !text-[11px]" />}
+                left={<ClearAllButton onClear={onClear} label="New" className="!py-1 !text-[11px]" />}
                 center={
                   tabIndex === 0 ? (
                     <PresetPillButton

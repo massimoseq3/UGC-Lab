@@ -9,7 +9,8 @@ export interface TeamMember {
   role: string
   blurb: string
   // Role labels use the app accent; apps whose accent is too dark to read on
-  // a dark surface (Playground's teal) override with a brighter tint here.
+  // a dark surface (Playground's teal, Scripts' navy) override with a brighter
+  // tint here. Anything under ~4:1 against surface-1 needs one.
   roleColor?: string
 }
 
@@ -31,6 +32,10 @@ export const TEAM: TeamMember[] = [
     name: 'Pinchy',
     role: 'Copywriter',
     blurb: 'Writes and remixes the words that sell, in any length or style.',
+    // Scripts' navy (#24365A) measures ~1.65:1 against the dark surface — the
+    // label was effectively invisible. This is the same steel blue as the
+    // `--color-scripts-text` token, which exists for exactly this reason.
+    roleColor: '#8FA6CE',
   },
   {
     appId: 'voice-studio',

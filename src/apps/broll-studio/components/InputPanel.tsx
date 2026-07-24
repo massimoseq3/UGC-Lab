@@ -5,6 +5,7 @@ import type { BrollMode, OneShotDelivery } from '../types'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import SegmentedToggle from '../../../components/SegmentedToggle'
+import ClearAllButton from '../../../components/ClearAllButton'
 import ModelSidePanel from '../../../components/ModelSidePanel'
 import SlideOver from '../../../components/SlideOver'
 import ProviderLogo from '../../../components/ProviderLogo'
@@ -29,6 +30,9 @@ interface InputPanelProps {
   onClearScript: () => void
   onScriptTextChange: (value: string) => void
   onAdditionalContextChange: (value: string) => void
+  // Resets the input column to a blank slate. Inputs only — every generated
+  // scene, clip and history row stays exactly where it is.
+  onClearInputs: () => void
   onGenerate: () => void
   isGenerating: boolean
   highlightField?: string | null
@@ -270,6 +274,7 @@ export default function InputPanel({
   onClearScript,
   onScriptTextChange,
   onAdditionalContextChange,
+  onClearInputs,
   onGenerate,
   isGenerating,
   highlightField,
@@ -355,7 +360,14 @@ export default function InputPanel({
       </div>
 
       {/* Bank selections */}
-      <div className="flex flex-1 flex-col px-5 pb-4 pt-4 md:overflow-y-auto">
+      <div className="flex flex-1 flex-col px-5 pb-4 pt-3 md:overflow-y-auto">
+        {/* "References" label + the panel-level New reset. It sits here rather
+            than in the header band because the three-way mode toggle already
+            fills that row in this narrow (25%) pane. */}
+        <div className="mb-2.5 flex items-center justify-between gap-2">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-ink-600">References</span>
+          <ClearAllButton onClear={onClearInputs} label="New" className="shrink-0" />
+        </div>
         <div className="flex grow flex-col gap-2.5">
           {/* Product */}
           <BankCard

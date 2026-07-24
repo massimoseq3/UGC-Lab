@@ -257,6 +257,12 @@ textarea,
   touch-action: manipulation;
 }
 
+/* NOTE: deliberately no global focus ring. A `:focus-visible` outline was tried
+   and reverted — `:focus-visible` matches text inputs on a plain mouse click
+   too (the browser assumes you're about to type), so every search field and
+   textarea picked up an outline around its own border on click. The app's
+   `focus:outline-none` resets stand. */
+
 /* Native scrollbars are kept INVISIBLE but still reserve their 11px track, so
    layout stays stable (and the prompt editors' reserved scrollbar gutter is
    preserved). The visible, smoothly-fading thumb is drawn as an overlay element

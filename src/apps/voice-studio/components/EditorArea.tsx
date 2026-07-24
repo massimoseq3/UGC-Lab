@@ -1,6 +1,7 @@
 import { FileText, Loader2, Mic, AlertCircle, RefreshCw, X, ChevronRight, Coins, Sparkles } from 'lucide-react'
 import type { Script } from '../../../stores/types'
 import GenerationProgress from '../../../components/GenerationProgress'
+import ClearAllButton from '../../../components/ClearAllButton'
 import { estimateCredits, formatCredits, getModel } from '../../../utils/models'
 import { TTS_MODEL_ID } from '../services/generateVoice'
 
@@ -14,6 +15,9 @@ interface EditorAreaProps {
   onSelectScript: () => void
   selectedScript: Script | null
   onClearScript: () => void
+  // Resets the editor to a blank slate — the picked script and the pasted
+  // text. Every generated voiceover stays in History.
+  onClearInputs: () => void
   onGenerate: () => void
   isGenerating: boolean
   canGenerate: boolean
@@ -29,6 +33,7 @@ export default function EditorArea({
   onSelectScript,
   selectedScript,
   onClearScript,
+  onClearInputs,
   onGenerate,
   isGenerating,
   canGenerate,
@@ -46,8 +51,14 @@ export default function EditorArea({
 
   return (
     <div className="flex flex-col md:h-full md:overflow-hidden">
+      {/* Header band — matches the right panel's Settings/History strip (and
+          every other app's 57px panel header) so the two columns' rules line
+          up. Holds the panel-level "New" reset. */}
+      <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-8">
+        <ClearAllButton onClear={onClearInputs} label="New" />
+      </div>
       {/* Body */}
-      <div className="flex flex-1 flex-col px-8 pt-8 md:overflow-hidden">
+      <div className="flex flex-1 flex-col px-8 pt-6 md:overflow-hidden">
         {/* Pull from Script bank — dashed "click to select" when empty; a
             filled pill with a hover refresh icon / X-clear once a bank script
             is loaded. Editing the textarea below reverts it to the empty state. */}

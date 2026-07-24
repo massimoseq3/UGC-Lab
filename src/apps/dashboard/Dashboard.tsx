@@ -8,7 +8,7 @@ import { useBankStore, backfillUsageLedger } from '../../stores/bankStore'
 import { isCloudEnabled } from '../../lib/supabase'
 import { creditsToUsd } from '../../utils/models'
 import { computeUsageMetrics, usageDayStart } from '../../utils/usage'
-import { getAppConfig, SKOOL_COMMUNITY_URL, AI_UGC_ACADEMY_URL } from '../../utils/constants'
+import { getAppConfig, AI_UGC_ACADEMY_URL } from '../../utils/constants'
 import { TEAM } from '../../utils/team'
 import CrabSprite from '../../components/CrabSprite'
 import ActivityHeatmap from './ActivityHeatmap'
@@ -89,11 +89,10 @@ export default function Dashboard() {
               : 'Generate your first asset and your savings start counting.'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <QuickLink href="https://kie.ai/billing" label="Get Credits" />
-          <QuickLink href={SKOOL_COMMUNITY_URL} label="Community" />
-        </div>
       </header>
+      {/* No Get Credits / Community pills here: the menu bar carries both on
+          every screen, ~40px above this row, so on the landing page they were
+          just the same two links twice. */}
 
       {/* Bento grid — until a kie.ai key is saved, a slim neutral to-do row
           sits above the metrics (nothing can generate without it). Top row is
@@ -172,11 +171,13 @@ export default function Dashboard() {
         <BentoCard className="col-span-2 md:col-span-6 md:h-[200px]" pad="p-5">
           <div className="flex items-baseline justify-between gap-3">
             <CardLabel icon={CalendarCheck} label="Activity" />
-            {hasActivity && (
-              <p className="text-[12px] text-ink-500">
-                {metrics.totalGenerations.toLocaleString()} generations · last 6 months
-              </p>
-            )}
+            {/* The empty grid is 26 weeks of blank cells; without a caption
+                it reads as a broken widget rather than a waiting one. */}
+            <p className="text-[12px] text-ink-500">
+              {hasActivity
+                ? `${metrics.totalGenerations.toLocaleString()} generations · last 6 months`
+                : 'Every generation lights up a day'}
+            </p>
           </div>
           <div className="mt-3">
             <ActivityHeatmap days={usageDays} />
@@ -273,20 +274,6 @@ function CardLabel({ icon: Icon, label }: { icon: ElementType; label: string }) 
       <Icon className="h-4 w-4 text-dashboard-400" strokeWidth={1.75} />
       <span className="text-[12px] font-semibold uppercase tracking-wide text-ink-400">{label}</span>
     </div>
-  )
-}
-
-function QuickLink({ href, label }: { href: string; label: string }) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`flex h-9 items-center gap-1 rounded-full border border-ink/10 bg-surface-1/60 px-4 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/[0.05] ${CARD_SHADOW}`}
-    >
-      {label}
-      <ArrowUpRight className="h-3.5 w-3.5 text-ink-500" strokeWidth={2} />
-    </a>
   )
 }
 

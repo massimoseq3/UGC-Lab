@@ -107,6 +107,12 @@ const GENERIC_FALLBACK =
  * Turn any thrown value into one friendly, plain-English sentence for end users.
  * Pass an optional `fallback` to override the generic message for unrecognized
  * errors (e.g. "Couldn't save to your bank. Try again.").
+ *
+ * The return value is ALWAYS a complete sentence — never prefix it at the call
+ * site. `addToast(\`Video generation failed: ${humanizeError(err, 'Video
+ * generation failed.')}\`)` renders the operation name twice. Name the
+ * operation in the `fallback` instead and toast the result verbatim:
+ * `addToast(humanizeError(err, 'Video generation failed.'), 'error')`.
  */
 export function humanizeError(err: unknown, fallback: string = GENERIC_FALLBACK): string {
   const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : ''
