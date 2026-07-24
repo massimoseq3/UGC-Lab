@@ -100,7 +100,7 @@ Lens rules:
 
 You decide per variation:
 - LABEL — a short slug naming the actual idea (e.g. "CARDBOARD BITE", "BAR HITS THE BIN", "DRAWER OF REJECTS"). Two-to-four words.
-- REFS — which reference images to attach: character / product / both / none. Attach character whenever the character (or their hands, for POV) is in frame; attach product only when the product is actually on screen. When VISIBILITY is no, REFS cannot include product.
+- REFS — which reference images to attach: character / product / both / none. ERR ON THE SIDE OF ATTACHING — a reference the model doesn't strictly need is harmless, but a missing one loses the character's face or the product's exact look. Attach the character reference whenever a person (or even just their hands, for POV) could appear, OR whenever holding the character's look consistent might help — when unsure, attach it. Attach the product reference whenever the product could appear or its exact packaging/shape could inform the frame — when unsure, attach it. Prefer "both" whenever both could plausibly help. Reserve "none" only for shots that clearly show neither a person nor the product (a bare environment, an abstract insert). The ONE hard exclusion: when VISIBILITY is no, REFS must NOT include product — the product cannot appear at all in that shot.
 
 # PROMPT FORMAT (EVERY PROMPT, EVERY VARIATION)
 
@@ -222,7 +222,7 @@ export async function generateBroll(input: BrollInput): Promise<BrollResult> {
     ? `For EACH scene emit four variations: VAR_1 is a DIALOGUE shot where the character speaks the exact line to camera (<TAG>DIALOGUE</TAG>, <REFS>character</REFS>), and VAR_2–VAR_4 are three genuinely DIFFERENT silent b-roll ideas for showing what the line SAYS. Pick three distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF) for VAR_2–VAR_4, declared in each <TAG> field.`
     : `For EACH scene emit four variations: four genuinely DIFFERENT ideas for showing what that line SAYS — make metaphors literal, show the act, the feeling, the proof. Pick four distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF), declared in each <TAG> field. Every shot is silent — no one speaks (a voiceover is added later).`
 
-  let prompt = `Break this script into B-Roll scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph (usually 40-80 words, longer when the idea needs it). Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation honouring the VISIBILITY rule.\n\nScript:\n${input.scriptText}`
+  let prompt = `Break this script into B-Roll scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph (usually 40-80 words, longer when the idea needs it). Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation, erring toward attaching references whenever they could plausibly help — only the VISIBILITY=no product exclusion is a hard rule.\n\nScript:\n${input.scriptText}`
 
   if (input.productContext) {
     prompt += `\n\n${input.productContext}`
@@ -400,23 +400,19 @@ function parseRefs(raw: string | undefined): VariationRefs | undefined {
 }
 
 // Sensible default when the LLM emits a variation without a <REFS> tag.
-// Hook / reframe lines with VISIBILITY=no force product off regardless.
+// Bias toward attaching — an unused reference is harmless, a missing one loses
+// likeness — so this errs ON. The only hard exclusion is the product when the
+// voiceover forbids it appearing (VISIBILITY=no), a deliberate creative rule.
 function defaultRefsFor(tag: VariationTag, productVisible: boolean | undefined): VariationRefs {
   // A talking DIALOGUE card and a legacy STATIC anchor are sourced entirely from
   // the character reference — the product never belongs in them, whatever
   // VISIBILITY says.
   if (tag === 'STATIC' || tag === 'DIALOGUE') return 'character'
-  if (productVisible === false) {
-    if (tag === 'PRODUCT') return 'none'
-    if (tag === 'ENVIRONMENT') return 'none'
-    return 'character'
-  }
-  switch (tag) {
-    case 'PRODUCT': return 'product'
-    case 'ENVIRONMENT': return 'none'
-    case 'PROOF': return 'product'
-    default: return 'both'
-  }
+  // Product must not appear when VISIBILITY is no — keep the character ref on so
+  // any person/hands stay consistent, drop only the product.
+  if (productVisible === false) return 'character'
+  // Otherwise attach both by default — when unsure, on is the safe side.
+  return 'both'
 }
 
 function defaultLabelFor(tag: VariationTag): string {

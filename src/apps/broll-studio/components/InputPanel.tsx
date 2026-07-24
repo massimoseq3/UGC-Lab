@@ -588,7 +588,7 @@ export default function InputPanel({
                   <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-100">
                     {styleRefs.length > 0
                       ? `${styleRefs.length} reference${styleRefs.length === 1 ? '' : 's'}`
-                      : 'Match a style'}
+                      : 'Custom Style'}
                   </span>
                 </button>
                 {styleSourceOpen && (
@@ -603,7 +603,7 @@ export default function InputPanel({
                     </button>
                     <label className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.06]">
                       <ImagePlus className="h-3.5 w-3.5 text-ink-400" strokeWidth={1.5} />
-                      Upload from device
+                      Upload images
                       <input
                         type="file"
                         accept="image/*"
