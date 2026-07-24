@@ -106,7 +106,6 @@ interface ContinuousViewProps {
   setSelections: React.Dispatch<React.SetStateAction<Record<string, ContinuousSelection>>>
   // Appends one fresh concept to a frame (BrollStudio owns the result state).
   onAddConcept: (frameIndex: number) => void
-  addingConceptFrame: number | null
 }
 
 // Right-panel view for Continuous mode: one row per scene (its keyframe's
@@ -132,7 +131,6 @@ export default function ContinuousView({
   selections,
   setSelections,
   onAddConcept,
-  addingConceptFrame,
 }: ContinuousViewProps) {
   // Open modal: a frame concept ("3:cont-xxx") or a clip ("c2").
   const [openFrameKey, setOpenFrameKey] = useState<string | null>(null)
@@ -166,7 +164,9 @@ export default function ContinuousView({
 
   // Standalone-Animate video model — its own pick (separate from the clip's
   // frames-to-video model, since animating a single still is image-to-video or
-  // reference-to-video). Default Seedance 2.0, which can do both.
+  // reference-to-video). Defaults to the clip model, Seedance 1.5 Pro: it does
+  // image-to-video (not reference-to-video), which is the branch runFrameAnimate
+  // prefers anyway, so one still animates from the chosen keyframe directly.
   const continuousAnimateModelId = useSettingsStore((s) => s.perAppModel['broll-studio:continuous:animate']) ?? CONTINUOUS_DEFAULT_MODEL_ID
 
   // Fresh reads inside async chains (the sequential frame walk sets a
@@ -267,12 +267,39 @@ export default function ContinuousView({
     return false
   }
 
-  // The chosen keyframe image ref for a frame slot, or undefined.
-  const keyframeRef = (frameIndex: number): string | undefined => {
-    const sel = selectionsRef.current[String(frameIndex)]
+  const lookupKeyframe = (
+    frameIndex: number,
+    sels: Record<string, ContinuousSelection>,
+    states: Record<string, ContinuousFrameCardState>,
+  ): string | undefined => {
+    const sel = sels[String(frameIndex)]
     if (!sel) return undefined
-    const card = frameStatesRef.current[frameKey(frameIndex, sel.conceptId)]
-    return card?.images[sel.imageIndex]?.imageUrl
+    return states[frameKey(frameIndex, sel.conceptId)]?.images[sel.imageIndex]?.imageUrl
+  }
+
+  // The chosen keyframe image ref for a frame slot, read through the refs.
+  // ONLY for async chains — the sequential frame walk sets a selection and the
+  // next iteration must see it before React has re-rendered.
+  const keyframeRef = (frameIndex: number): string | undefined =>
+    lookupKeyframe(frameIndex, selectionsRef.current, frameStatesRef.current)
+
+  // Render-time version. The refs above are synced in effects, so during the
+  // render that a pick triggers they still hold the PREVIOUS values — reading
+  // them here left "Generate all videos" one pick behind (picking the final
+  // frame last would leave the last clip out of the batch, or the button
+  // disabled while the clip card beside it already read "Keyframes ready").
+  const keyframeRefLive = (frameIndex: number): string | undefined =>
+    lookupKeyframe(frameIndex, selections, frameStates)
+
+  // The aspect a frame's keyframe images were actually generated at. Clips must
+  // follow it: the frame modal offers the image model's full aspect list, so a
+  // storyboard shot 16:9 used to be animated into a hardcoded 9:16 canvas, and
+  // the fixed first/last frames arrived cropped or letterboxed — discovered
+  // only after the video credits were spent.
+  const keyframeAspect = (frameIndex: number): string => {
+    const sel = selectionsRef.current[String(frameIndex)]
+    if (!sel) return '9:16'
+    return frameStatesRef.current[frameKey(frameIndex, sel.conceptId)]?.aspectRatio ?? '9:16'
   }
 
   const toDataUri = async (ref: string): Promise<string | null> => {
@@ -301,6 +328,16 @@ export default function ContinuousView({
     // Chain reference: the previous frame's chosen keyframe. First in the ref
     // list so the preamble's "FIRST attached image" clause holds.
     const chainRefUrl = card.chainLink && frameIndex > 1 ? keyframeRef(frameIndex - 1) : undefined
+    // Generating a middle frame before the one it chains from is allowed (the
+    // per-row button only disables once THIS frame is picked), but it silently
+    // loses the character/style lock — say so, since the drift only becomes
+    // visible once the image lands.
+    if (card.chainLink && frameIndex > 1 && !chainRefUrl) {
+      useAppStore.getState().addToast(
+        `No keyframe picked for Frame ${frameIndex - 1} yet — generating Frame ${frameIndex} without the continuity reference.`,
+        'info',
+      )
+    }
     const cardExtras = extraRefs[key] ?? []
     const refs: ReferenceImage[] = [
       ...(chainRefUrl ? [{ dataUrl: chainRefUrl, label: 'style' }] : []),
@@ -462,6 +499,13 @@ export default function ContinuousView({
     const resolution = constraints && !constraints.resolutions.includes(clipCard.resolution)
       ? constraints.default ?? constraints.resolutions[0]
       : clipCard.resolution
+    // Match the canvas the endpoints were drawn on, clamped to what this model
+    // offers. The frames are fixed inputs, so a mismatch crops or letterboxes.
+    const startAspect = keyframeAspect(sceneIndex)
+    const aspectRatio = constraints && constraints.aspectRatios.length > 0
+      && !constraints.aspectRatios.includes(startAspect)
+      ? constraints.aspectRatios[0]
+      : startAspect
 
     const promptText = buildContinuousPrompt(`${clipCard.editablePrompt.trim()}\n\n${CLIP_AUDIO_RULE}`, result.style)
 
@@ -476,7 +520,7 @@ export default function ContinuousView({
           startedAt: Date.now(),
           prompt: promptText,
           mode: 'frames-to-video',
-          aspectRatio: '9:16',
+          aspectRatio,
           durationSeconds,
           resolution,
           audio: clipCard.audio,
@@ -491,7 +535,7 @@ export default function ContinuousView({
         mode: 'frames-to-video',
         firstFrameDataUri,
         lastFrameDataUri,
-        aspectRatio: '9:16',
+        aspectRatio,
         durationSeconds,
         resolution,
         audio: clipCard.audio,
@@ -506,7 +550,7 @@ export default function ContinuousView({
       if (!claimTask('video', taskId)) return
       claimedTaskId = taskId
 
-      const res = await finishVideoTask(taskId, continuousModelId, videoEndpoint, durationSeconds, '9:16')
+      const res = await finishVideoTask(taskId, continuousModelId, videoEndpoint, durationSeconds, aspectRatio)
       const assetRef = `asset://${res.assetId}`
       const newVideo: GeneratedVideo = {
         url: assetRef,
@@ -596,13 +640,18 @@ export default function ContinuousView({
     const resolution = constraints && !constraints.resolutions.includes(frameCard.videoResolution)
       ? constraints.default ?? constraints.resolutions[0]
       : frameCard.videoResolution
+    // Animate on the canvas this frame was drawn at, clamped to the model's list.
+    const aspectRatio = constraints && constraints.aspectRatios.length > 0
+      && !constraints.aspectRatios.includes(frameCard.aspectRatio)
+      ? constraints.aspectRatios[0]
+      : frameCard.aspectRatio
     const promptText = buildContinuousPrompt(`${motion}\n\n${CLIP_AUDIO_RULE}`, result.style)
 
     const inFlightId = crypto.randomUUID()
     updateFrame(frameKey, (prev) => ({
       inFlightVideos: [
         ...prev.inFlightVideos,
-        { id: inFlightId, taskId: null, modelId: continuousAnimateModelId, startedAt: Date.now(), prompt: promptText, mode: animateMode, aspectRatio: '9:16', durationSeconds, resolution, audio: frameCard.videoAudio },
+        { id: inFlightId, taskId: null, modelId: continuousAnimateModelId, startedAt: Date.now(), prompt: promptText, mode: animateMode, aspectRatio, durationSeconds, resolution, audio: frameCard.videoAudio },
       ],
     }))
 
@@ -613,7 +662,7 @@ export default function ContinuousView({
         mode: animateMode,
         firstFrameDataUri: animateMode === 'image-to-video' ? frameDataUri : undefined,
         referenceDataUris: animateMode === 'reference-to-video' ? [frameDataUri] : undefined,
-        aspectRatio: '9:16',
+        aspectRatio,
         durationSeconds,
         resolution,
         audio: frameCard.videoAudio,
@@ -628,7 +677,7 @@ export default function ContinuousView({
       if (!claimTask('video', taskId)) return
       claimedTaskId = taskId
 
-      const res = await finishVideoTask(taskId, continuousAnimateModelId, videoEndpoint, durationSeconds, '9:16')
+      const res = await finishVideoTask(taskId, continuousAnimateModelId, videoEndpoint, durationSeconds, aspectRatio)
       const assetRef = `asset://${res.assetId}`
       const newVideo: GeneratedVideo = {
         url: assetRef, modelId: continuousAnimateModelId, prompt: promptText, aspectRatio: res.aspectRatio,
@@ -854,7 +903,19 @@ export default function ContinuousView({
 
   const readyClipIndices = result.scenes
     .map((s) => s.index)
-    .filter((i) => keyframeRef(i) && keyframeRef(i + 1))
+    .filter((i) => keyframeRefLive(i) && keyframeRefLive(i + 1))
+
+  // Rewrite context for the open frame, grounded in the motions actually on the
+  // clips either side (the picked concept's, or the user's hand-edit) rather
+  // than the storyboard's first-concept fallback.
+  const openFrameContext = (frameIndex: number, conceptLabel: string) =>
+    frameContextFor(result, frameIndex, {
+      productContext,
+      modelContext,
+      conceptLabel,
+      inboundMotion: clipStates[clipKey(frameIndex - 1)]?.editablePrompt,
+      outboundMotion: clipStates[clipKey(frameIndex)]?.editablePrompt,
+    })
 
   // Every generated clip across all rows, in scene order, for "Download all".
   const allClipEntries = result.scenes.flatMap((s) => {
@@ -1067,7 +1128,6 @@ export default function ContinuousView({
               setSelections((prev) => ({ ...prev, [String(scene.index)]: { conceptId, imageIndex: card.currentImageIndex } }))
             }}
             onAddConcept={() => onAddConcept(scene.index)}
-            addingConcept={addingConceptFrame === scene.index}
             onSaveImage={saveKeyframeToBank}
           />
         ))}
@@ -1087,7 +1147,6 @@ export default function ContinuousView({
             setSelections((prev) => ({ ...prev, [String(finalFrame.index)]: { conceptId, imageIndex: card.currentImageIndex } }))
           }}
           onAddConcept={() => onAddConcept(finalFrame.index)}
-          addingConcept={addingConceptFrame === finalFrame.index}
           onSaveImage={saveKeyframeToBank}
         />
       </div>
@@ -1314,11 +1373,11 @@ export default function ContinuousView({
           onGenerate={() => void runFrameImage(openFrameKey)}
           onEnhancePrompt={() => enhanceContinuousFrame(
             frameStates[openFrameKey]?.editablePrompt ?? '',
-            frameContextFor(result, openFrame.index, { productContext, modelContext, conceptLabel: openConcept.label }),
+            openFrameContext(openFrame.index, openConcept.label),
             openFrame.index,
           )}
           onRegeneratePrompt={() => regenerateContinuousFrame(
-            frameContextFor(result, openFrame.index, { productContext, modelContext, conceptLabel: openConcept.label }),
+            openFrameContext(openFrame.index, openConcept.label),
             openFrame.index,
           )}
           onRetryInFlight={(id) => {
@@ -1387,7 +1446,6 @@ function SceneRow({
   onGenerateConcept,
   onSelectConcept,
   onAddConcept,
-  addingConcept,
   onSaveImage,
 }: {
   scene: ContinuousScene
@@ -1404,7 +1462,6 @@ function SceneRow({
   onGenerateConcept: (key: string) => void
   onSelectConcept: (conceptId: string) => void
   onAddConcept: () => void
-  addingConcept: boolean
   onSaveImage: (imageRef: string, prompt: string) => Promise<void>
 }) {
   return (
@@ -1465,7 +1522,7 @@ function SceneRow({
                 onSaveImage={onSaveImage}
               />
             ))}
-            <AddConceptCard onAdd={onAddConcept} adding={addingConcept} />
+            <AddConceptCard onAdd={onAddConcept} />
           </div>
         </div>
         {/* Clip column — top-aligned so it holds its place while concepts wrap
@@ -1496,7 +1553,6 @@ function FinalFrameRow({
   onGenerateConcept,
   onSelectConcept,
   onAddConcept,
-  addingConcept,
   onSaveImage,
 }: {
   frame: ContinuousFrame
@@ -1508,7 +1564,6 @@ function FinalFrameRow({
   onGenerateConcept: (key: string) => void
   onSelectConcept: (conceptId: string) => void
   onAddConcept: () => void
-  addingConcept: boolean
   onSaveImage: (imageRef: string, prompt: string) => Promise<void>
 }) {
   const framePicked = !!selection
@@ -1562,7 +1617,7 @@ function FinalFrameRow({
             onSaveImage={onSaveImage}
           />
         ))}
-        <AddConceptCard onAdd={onAddConcept} adding={addingConcept} />
+        <AddConceptCard onAdd={onAddConcept} />
       </div>
     </div>
   )
@@ -1973,22 +2028,19 @@ function ClipCard({
 
 // ── Add-concept card ───────────────────────────────────────────
 
-function AddConceptCard({ onAdd, adding }: { onAdd: () => void; adding: boolean }) {
+// Adding a concept drops a blank card synchronously (no LLM call), so there is
+// no pending state to show.
+function AddConceptCard({ onAdd }: { onAdd: () => void }) {
   return (
     <button
       type="button"
       onClick={onAdd}
-      disabled={adding}
       title="Add a blank concept — open it to write or generate a prompt"
-      className="group/add flex aspect-[9/16] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink/20 bg-ink/[0.03] transition-colors hover:border-broll-400/60 hover:bg-broll-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+      className="group/add flex aspect-[9/16] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink/20 bg-ink/[0.03] transition-colors hover:border-broll-400/60 hover:bg-broll-500/10"
     >
-      {adding ? (
-        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-broll-300" />
-      ) : (
-        <Plus className="h-4 w-4 shrink-0 text-ink-400 transition-colors group-hover/add:text-broll-300" />
-      )}
+      <Plus className="h-4 w-4 shrink-0 text-ink-400 transition-colors group-hover/add:text-broll-300" />
       <span className="px-3 text-center text-[11px] font-medium text-ink-400 transition-colors group-hover/add:text-broll-300">
-        {adding ? 'Adding…' : 'Add concept'}
+        Add concept
       </span>
     </button>
   )

@@ -920,23 +920,41 @@ export const useBankStore = create<BankState>((set, get) => ({
   // so an in-flight session sits at the top even as cardStates mutate. FIFO
   // capped at BROLL_HISTORY_CAP — drops the oldest entries past the cap.
   upsertBrollHistory: async (item) => {
+    // Preserve the original creation time. Without this, every re-save
+    // (including simply reopening a session, which re-runs the debounced
+    // persist effect) rewrote `createdAt` to now — so old rows jumped to the
+    // top labelled "just now". `createdAt` is now write-once.
+    const prior = get().brollHistory.find((h) => h.id === item.id)
+    const createdAt = prior?.createdAt ?? item.createdAt
+
+    // Restoring a session re-runs the persist effect with content identical to
+    // what's already stored. Treat that as a no-op: writing it would stamp a
+    // fresh `updatedAt`, so merely *viewing* a row bumped it to the top under
+    // "Recently updated" — and re-pushed the whole row to the cloud for nothing.
+    if (prior) {
+      const a = { ...prior, createdAt, updatedAt: 0 }
+      const b = { ...item, createdAt, updatedAt: 0 }
+      if (JSON.stringify(a) === JSON.stringify(b)) return
+    }
+
+    const merged: BrollHistoryItem = { ...item, createdAt, updatedAt: Date.now() }
     let evicted: BrollHistoryItem[] = []
-    // Preserve the original creation time and stamp a fresh `updatedAt`. Without
-    // this, every re-save (including simply reopening a session, which re-runs
-    // the debounced persist effect) rewrote `createdAt` to now — so old rows
-    // jumped to the top labelled "just now". `createdAt` is now write-once.
-    let merged = item
     set((state) => {
-      const existing = state.brollHistory.find((h) => h.id === item.id)
-      merged = {
-        ...item,
-        createdAt: existing?.createdAt ?? item.createdAt,
-        updatedAt: Date.now(),
-      }
-      const filtered = state.brollHistory.filter((h) => h.id !== item.id)
-      const combined = [merged, ...filtered]
-      evicted = combined.slice(BROLL_HISTORY_CAP)
-      const next = { brollHistory: combined.slice(0, BROLL_HISTORY_CAP) }
+      // Update in place; only a genuinely new row goes to the head. Rebuilding
+      // the array as [merged, ...rest] made position track last-touched, so the
+      // cap below evicted the least-recently-*edited* row rather than the
+      // oldest — and not the row sitting at the bottom of "Newest first".
+      const idx = state.brollHistory.findIndex((h) => h.id === item.id)
+      const combined = idx === -1
+        ? [merged, ...state.brollHistory]
+        : state.brollHistory.map((h) => (h.id === item.id ? merged : h))
+      // Evict by age, not by array position.
+      const keep = [...combined]
+        .sort((x, y) => y.createdAt - x.createdAt)
+        .slice(0, BROLL_HISTORY_CAP)
+      const keepIds = new Set(keep.map((h) => h.id))
+      evicted = combined.filter((h) => !keepIds.has(h.id))
+      const next = { brollHistory: combined.filter((h) => keepIds.has(h.id)) }
       saveToStorage({ ...state, ...next })
       return next
     })

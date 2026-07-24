@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Film, AlertCircle, Plus, Images, X, Palette } from 'lucide-react'
+import { Film, AlertCircle, Plus, Images, X, Palette, Download, Loader2 } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage } from '../types'
 import type { Product, Model } from '../../../stores/types'
@@ -21,6 +21,7 @@ import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
 import VariationCard from './VariationCard'
 import { humanizeError } from '../../../utils/friendlyError'
+import { downloadAssetsZip } from '../../../utils/downloadZip'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 
 interface ScenesViewProps {
@@ -115,6 +116,7 @@ export default function ScenesView({
     { fresh: string[]; done: string[]; scope: string } | null
   >(null)
   const [includeExisting, setIncludeExisting] = useState(false)
+  const [downloadingAll, setDownloadingAll] = useState(false)
   // The confirm dialog portals to document.body, so it would outlive an app
   // switch — dismiss it when the user docks away.
   useCloseOnAppSwitch(!!batchConfirm, () => setBatchConfirm(null))
@@ -439,6 +441,33 @@ export default function ScenesView({
 
   const allKeys = result.scenes.flatMap((s) => s.variations.map((_, i) => `${s.number}-${i}`))
 
+  // Every rendered clip across every scene, for "Download all" — parity with
+  // Continuous and One-Shot. This is the mode that produces the most clips and
+  // where videos are download-only, so bulk export matters most here; without
+  // it the only way out was opening each card in turn.
+  const allClipEntries = result.scenes.flatMap((s) =>
+    s.variations.flatMap((_, i) => {
+      const vids = cardStates[`${s.number}-${i}`]?.videos ?? []
+      const scene = String(s.number).padStart(2, '0')
+      return vids.map((v, vi) => ({
+        ref: v.url,
+        name: `scene${scene}-option${i + 1}${vids.length > 1 ? `-take${vi + 1}` : ''}`,
+      }))
+    }),
+  )
+  const downloadAll = async () => {
+    if (downloadingAll || allClipEntries.length === 0) return
+    setDownloadingAll(true)
+    try {
+      const n = await downloadAssetsZip(allClipEntries, 'broll-clips')
+      useAppStore.getState().addToast(`Downloading ${n} clip${n === 1 ? '' : 's'} as a zip`, 'success')
+    } catch (err) {
+      useAppStore.getState().addToast(humanizeError(err, 'Could not download the clips.'), 'error')
+    } finally {
+      setDownloadingAll(false)
+    }
+  }
+
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4">
       <div className="mb-5 flex items-center justify-between gap-3">
@@ -453,15 +482,29 @@ export default function ScenesView({
             <span className="truncate">{result.styleBrief ? 'Custom style' : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => requestBatch(allKeys, 'All scenes')}
-          title="Generate images for every variation across all scenes"
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400"
-        >
-          <Images className="h-3.5 w-3.5" />
-          Generate all images
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {allClipEntries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void downloadAll()}
+              disabled={downloadingAll}
+              title="Download every generated clip as a single zip"
+              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {downloadingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              {downloadingAll ? 'Zipping…' : `Download all (${allClipEntries.length})`}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => requestBatch(allKeys, 'All scenes')}
+            title="Generate images for every variation across all scenes"
+            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400"
+          >
+            <Images className="h-3.5 w-3.5" />
+            Generate all images
+          </button>
+        </div>
       </div>
       <div className="flex flex-col gap-10">
         {result.scenes.map((scene) => (

@@ -152,21 +152,52 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
   const presentModes = useMemo(() => new Set(items.map(itemMode)), [items])
   const showModeFilters = presentModes.size > 1
 
+  // Deleting the last row of the filtered mode hides the pills (they only show
+  // for >1 mode), which would strand every remaining row behind "No matches"
+  // with no visible control to clear the filter. Fall back to 'all' rather than
+  // leaving a filter the user can't see or undo.
+  const activeModeFilter: ModeFilter =
+    modeFilter !== 'all' && !presentModes.has(modeFilter) ? 'all' : modeFilter
+
+  // Row titles come from the linked bank items. Built once here rather than in
+  // each row: 50 rows each subscribing to three banks re-rendered the whole
+  // list on any bank write, and search could only see `inputSummary` — so
+  // typing the influencer or script name a row visibly displays found nothing.
+  const products = useBankStore((s) => s.products)
+  const models = useBankStore((s) => s.models)
+  const scripts = useBankStore((s) => s.scripts)
+  const titles = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const it of items) {
+      const parts = [
+        it.productId ? products.find((p) => p.id === it.productId)?.productName : undefined,
+        it.modelId ? models.find((m) => m.id === it.modelId)?.name : undefined,
+        it.scriptId ? scripts.find((s) => s.id === it.scriptId)?.title : undefined,
+      ].map((s) => s?.trim()).filter(Boolean)
+      map.set(it.id, parts.length > 0
+        ? parts.join(' · ')
+        : (it.inputSummary?.split(' — ')[0]?.trim() || 'B-Roll session'))
+    }
+    return map
+  }, [items, products, models, scripts])
+
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
     const filtered = items
       .filter((it) => {
-        if (modeFilter !== 'all' && itemMode(it) !== modeFilter) return false
+        if (activeModeFilter !== 'all' && itemMode(it) !== activeModeFilter) return false
         if (!q) return true
         return it.inputSummary.toLowerCase().includes(q)
+          || (titles.get(it.id) ?? '').toLowerCase().includes(q)
       })
       .slice()
       .sort((a, b) => (sort === 'oldest'
         ? sortTs(a, sort) - sortTs(b, sort)
         : sortTs(b, sort) - sortTs(a, sort)))
 
-    return groupByDay(filtered, (it) => sortTs(it, sort))
-  }, [items, query, modeFilter, sort])
+    // Day sections must run the same direction as the rows inside them.
+    return groupByDay(filtered, (it) => sortTs(it, sort), sort === 'oldest' ? 'asc' : 'desc')
+  }, [items, query, activeModeFilter, sort, titles])
 
   if (items.length === 0) {
     return (
@@ -199,7 +230,7 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
           <div className="flex flex-wrap gap-1.5">
             {showModeFilters &&
               MODE_FILTERS.map((f) => {
-                const active = modeFilter === f.id
+                const active = activeModeFilter === f.id
                 return (
                   <button
                     key={f.id}
@@ -272,6 +303,7 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
                     key={item.id}
                     item={item}
                     displayTs={sortTs(item, sort)}
+                    title={titles.get(item.id) ?? 'B-Roll session'}
                     isActive={activeId === item.id}
                     onSelect={() => onSelect(item)}
                     onDelete={() => onDelete(item.id)}
@@ -289,12 +321,17 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
 function HistoryRow({
   item,
   displayTs,
+  title,
   isActive,
   onSelect,
   onDelete,
 }: {
   item: BrollHistoryItem
   displayTs: number
+  // "Product · Influencer · Script" from the linked bank items, resolved by the
+  // parent (one lookup pass for the whole list, and the same string search
+  // matches against).
+  title: string
   isActive: boolean
   onSelect: () => void
   onDelete: () => void
@@ -317,20 +354,6 @@ function HistoryRow({
     : `scene${count === 1 ? '' : 's'}`
   const styleLabel = historyStyleLabel(item, mode)
   const [confirming, setConfirming] = useState(false)
-
-  // A clean title built from the linked references: "Product · Influencer ·
-  // Script" (only the ones that were set). Falls back to the saved summary's
-  // product slice if the references were since deleted from the banks.
-  const products = useBankStore((s) => s.products)
-  const models = useBankStore((s) => s.models)
-  const scripts = useBankStore((s) => s.scripts)
-  const productName = item.productId ? products.find((p) => p.id === item.productId)?.productName : undefined
-  const influencerName = item.modelId ? models.find((m) => m.id === item.modelId)?.name : undefined
-  const scriptName = item.scriptId ? scripts.find((s) => s.id === item.scriptId)?.title : undefined
-  const parts = [productName, influencerName, scriptName].map((s) => s?.trim()).filter(Boolean)
-  const title = parts.length > 0
-    ? parts.join(' · ')
-    : (item.inputSummary?.split(' — ')[0]?.trim() || 'B-Roll session')
 
   return (
     <div

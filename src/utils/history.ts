@@ -31,11 +31,20 @@ export function sectionLabel(dayTs: number): string {
 }
 
 /**
- * Bucket items by local day, newest day first. Within a day, items keep their
- * input order (so callers that pre-sort newest-first stay newest-first).
+ * Bucket items by local day. Within a day, items keep their input order (so
+ * callers that pre-sort newest-first stay newest-first).
+ *
+ * `order` must match how the caller sorted the items: pass 'asc' for an
+ * oldest-first list, or the day sections run newest-first while the rows
+ * inside each one run oldest-first — a list that is neither order.
+ *
  * Returns `[dayStartTs, items][]`.
  */
-export function groupByDay<T>(items: T[], getTs: (item: T) => number): [number, T[]][] {
+export function groupByDay<T>(
+  items: T[],
+  getTs: (item: T) => number,
+  order: 'asc' | 'desc' = 'desc',
+): [number, T[]][] {
   const map = new Map<number, T[]>()
   for (const item of items) {
     const day = startOfDay(getTs(item))
@@ -43,5 +52,5 @@ export function groupByDay<T>(items: T[], getTs: (item: T) => number): [number, 
     arr.push(item)
     map.set(day, arr)
   }
-  return Array.from(map.entries()).sort(([a], [b]) => b - a)
+  return Array.from(map.entries()).sort(([a], [b]) => (order === 'asc' ? a - b : b - a))
 }

@@ -118,7 +118,7 @@ const DIALOGUE_RULES = {
   voiceBlock: `\n\nAfter the last scene of the clip, add a blank line, then this block EXACTLY — repeat it word-for-word identical in every clip of this concept so all clips share one on-camera voice:
 === VOICE PROFILE (same voice in every clip) ===
 VOICE — describe, in rich and reproducible detail, HOW the character sounds: perceived age and gender of the voice, accent / region, pitch, pace, texture (warm, raspy, breathy, smooth), energy, and 1-2 signature quirks (uptalk, slight vocal fry, a laugh living in the voice). One dense paragraph you could hand to a TTS engine and get the same person every time. Describe ONLY the sound, never appearance.`,
-  deliveryNote: `DELIVERY — WITH DIALOGUE. This is an on-camera ad: [CHARACTER] speaks the script out loud. Every scene where a line is spoken carries it in the DIALOGUE field, verbatim from the script, spread naturally across the scenes so nothing is dropped. Cutaway scenes (hands, product, environment) can set DIALOGUE to none while the voice carries over. Scene 1's DIALOGUE is the opening hook.`,
+  deliveryNote: `DELIVERY — WITH DIALOGUE. This is an on-camera ad: [CHARACTER] speaks the script out loud. Each scene's paragraph states the line spoken in it, verbatim from the script, spread naturally across the scenes so nothing is dropped. Cutaway scenes (hands, product, environment) carry no spoken line of their own while the voice continues over them. Scene 1 opens on the hook line.`,
 }
 
 const SILENT_RULES = {
@@ -354,7 +354,11 @@ async function generateConceptForAngle(
     { role: 'user', content: [{ type: 'text', text: buildUserPrompt(input, plan, angle) }] },
   ]
   const response = await kieChatCompletions(apiKey, endpoint, messages)
-  return parseOneShotConcept(response, input)
+  const concept = parseOneShotConcept(response, input)
+  // Stamp which pool angle produced this concept. `concept.angle` is the LLM's
+  // own 2-4 word slug (it's what the row label shows), so it can't be matched
+  // back against the pool — Add-variation needs this to know what's taken.
+  return concept ? { ...concept, poolAngle: angle } : null
 }
 
 // Four parallel calls, one per creative angle — mirrors the cinematic
@@ -406,13 +410,26 @@ export async function generateOneShot(input: OneShotInput): Promise<OneShotResul
 // matches the other variations and they stay comparable.
 export async function generateOneShotVariation(
   input: OneShotInput,
+  // The pool angles already on screen. Indexing by COUNT instead meant a
+  // partial fan-out (one of the initial four failing) left a gap, and the next
+  // add landed on an angle the user could already see.
+  usedAngles: string[],
+  // Concepts on screen, including any predating `poolAngle`. Only used to place
+  // legacy rows, where the pool angles aren't recorded.
   existingCount: number,
 ): Promise<OneShotConcept> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const endpoint = getChatEndpointPath()
   const plan = planSegments(estimateSpokenSeconds(input.scriptText), input.modelId)
   const system = oneShotSystem(input.delivery)
-  const angle = ONE_SHOT_ANGLES[existingCount % ONE_SHOT_ANGLES.length]
+  // A row generated before poolAngle existed reports nothing used — assume the
+  // fan-out's own order (the first N of the pool), which is how it ran.
+  const used = new Set(
+    usedAngles.length > 0 ? usedAngles : ONE_SHOT_ANGLES.slice(0, existingCount),
+  )
+  const angle = ONE_SHOT_ANGLES.find((a) => !used.has(a))
+    // Pool exhausted — wrap, which is the only way to keep adding.
+    ?? ONE_SHOT_ANGLES[existingCount % ONE_SHOT_ANGLES.length]
   const concept = await generateConceptForAngle(apiKey, endpoint, system, input, plan, angle)
   if (!concept) throw new Error('Could not generate another variation')
   return concept

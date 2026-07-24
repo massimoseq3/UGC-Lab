@@ -526,12 +526,18 @@ export function PendingMediaTile({
   modelId,
   aspectRatio = '9:16',
   messages,
+  onDismiss,
 }: {
   kind: 'image' | 'video'
   prompt?: string
   modelId?: string | null
   aspectRatio?: string
   messages?: string[]
+  // Give up on this entry. A generation that died before kie returned a task id
+  // (a refresh mid-createTask, say) has nothing to resume, and the in-flight
+  // entry blocks every Generate button until a 30-minute sweep clears it — with
+  // no way out, since only errored entries get a Retry/Dismiss row.
+  onDismiss?: () => void
 }) {
   const isVideo = kind === 'video'
   const Icon = isVideo ? VideoIcon : ImageIcon
@@ -565,8 +571,20 @@ export function PendingMediaTile({
           <p className="line-clamp-2 text-[10px] text-zinc-300">{prompt}</p>
         </div>
       )}
-      <div className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-black/40 px-2 py-0.5 text-[9px] font-medium text-broll-100 backdrop-blur-sm">
-        Survives refresh
+      <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5">
+        <span className="pointer-events-none rounded-full bg-black/40 px-2 py-0.5 text-[9px] font-medium text-broll-100 backdrop-blur-sm">
+          Survives refresh
+        </span>
+        {onDismiss && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDismiss() }}
+            title="Stop tracking this generation"
+            className="flex h-5 w-5 items-center justify-center rounded-full bg-black/40 text-broll-100 backdrop-blur-sm transition-colors hover:bg-black/60 hover:text-white"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        )}
       </div>
     </div>
   )
