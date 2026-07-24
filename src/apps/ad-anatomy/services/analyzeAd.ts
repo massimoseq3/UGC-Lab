@@ -334,7 +334,10 @@ async function pollChatTaskText(taskId: string): Promise<string> {
 
 async function streamChatText(messages: ChatMessage[]): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  // Pin the fallback to the same model the perception pass uses (Gemini 3) — the
+  // app-wide chat default is now 3.6, but this pass can carry video, which only
+  // the Gemini 3 jobs/streaming path is proven to handle.
+  const endpoint = getChatEndpointPath(CHAT_MODEL_ID)
   return kieChatCompletions(apiKey, endpoint, messages, {
     timeoutMs: STREAM_TIMEOUT_MS,
     reasoningEffort: 'high',

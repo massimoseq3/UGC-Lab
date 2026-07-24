@@ -176,19 +176,42 @@ function geminiTtsCredits(charCount: number): number {
 export const MODEL_REGISTRY: ModelEntry[] = [
   // ── Chat / Vision ─────────────────────────────────────────────
 
-  // Chat: Gemini 3 Flash is hard-coded for every text/vision call across the app.
-  // No model picker is exposed for chat — it adds friction without enough upside.
+  // Chat: Gemini 3.6 Flash is the app-wide text + vision model — hard-coded for
+  // every chat-completions call (getChatEndpointPath defaults to it). No picker
+  // is exposed for chat; it adds friction without enough upside. 3.6 is Google's
+  // newer Flash: better reasoning at ~2.6× the price of Gemini 3 (see pricing).
+  {
+    id: 'gemini-3-6-flash',
+    displayName: 'Gemini 3.6 Flash',
+    provider: 'Google',
+    task: 'chat',
+    tags: ['recommended', 'new'],
+    // Source: https://kie.ai/gemini-3-6-flash. Input $0.45/M tokens (90 cr/M =
+    // 0.090 cr/1k), output $2.25/M tokens (450 cr/M = 0.450 cr/1k). Blended 0.26
+    // using the same input/output weighting as the Gemini 3 entry below (it was
+    // 0.10 for 30/180 cr; the same blend on 90/450 lands at ~0.26).
+    pricing: { unit: 'per-1k-tokens', credits: 0.26 },
+    defaultFor: ['script-architect', 'character-studio', 'broll-studio'],
+    // OpenAI-compatible variant slug on kie.ai (native 3.6 uses Google's own
+    // generateContent shape; our transport speaks OpenAI chat/completions).
+    chatEndpoint: '/gemini-3-6-flash-openai/v1/chat/completions',
+  },
+
+  // Gemini 3 Flash — retained for the Ad Analyzer's video-perception pass, which
+  // runs through kie's async jobs API (createTask). Video isn't supported on the
+  // streaming chat endpoint, and 3.6's availability on the jobs API is unproven,
+  // so that one vision surface stays on the proven Gemini 3 path.
   {
     id: 'gemini-3-flash',
     displayName: 'Gemini 3 Flash',
     provider: 'Google',
     task: 'chat',
-    tags: ['recommended', 'fast', 'cheap'],
+    tags: ['fast', 'cheap'],
     // Source: https://kie.ai/gemini-3-flash. Input $0.15/M tokens (30 cr/M =
     // 0.030 cr/1k), output $0.90/M tokens (180 cr/M = 0.180 cr/1k). We use a
     // blended 0.10 since most chat calls in this app skew toward output.
     pricing: { unit: 'per-1k-tokens', credits: 0.1 },
-    defaultFor: ['ad-anatomy', 'script-architect', 'character-studio', 'broll-studio'],
+    defaultFor: ['ad-anatomy'],
     chatEndpoint: '/gemini-3-flash/v1/chat/completions',
   },
 
@@ -959,7 +982,7 @@ export function getDefaultModel(appId: string, task: Task, mode?: Mode): ModelEn
 
 // Convenience for chat-using services. Returns the registered chat endpoint
 // path for the configured chat model, throwing if misconfigured.
-export function getChatEndpointPath(modelId: string = 'gemini-3-flash'): string {
+export function getChatEndpointPath(modelId: string = 'gemini-3-6-flash'): string {
   const m = getModel(modelId)
   if (!m?.chatEndpoint) {
     throw new Error(`Chat model ${modelId} is missing a chatEndpoint. Check src/utils/models.ts.`)
