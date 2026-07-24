@@ -32,6 +32,7 @@ interface RightPanelProps {
   error?: string | null
   onAddVariation: (sceneNumber: number, variation: PromptVariation) => void
   onDeleteVariation: (sceneNumber: number, variationId: string) => void
+  onUpdateVoiceProfile?: (text: string) => void
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
   selectedProduct?: Product | null
@@ -78,6 +79,7 @@ export default function RightPanel(props: RightPanelProps) {
     error,
     onAddVariation,
     onDeleteVariation,
+    onUpdateVoiceProfile,
     characterRef,
     productRef,
     selectedProduct,
@@ -173,6 +175,7 @@ export default function RightPanel(props: RightPanelProps) {
             error={error}
             onAddVariation={onAddVariation}
             onDeleteVariation={onDeleteVariation}
+            onUpdateVoiceProfile={onUpdateVoiceProfile}
             characterRef={characterRef}
             productRef={productRef}
             selectedProduct={selectedProduct}

@@ -37,6 +37,7 @@ import { useCreditsStore } from '../../../stores/creditsStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
+import { extractVideoFrame } from '../../../utils/videoFrames'
 import { getModel, snapVideoDurationUp, estimateCredits, formatCredits } from '../../../utils/models'
 import { humanizeError } from '../../../utils/friendlyError'
 import { downloadImage } from '../../../utils/downloadImage'
@@ -68,6 +69,22 @@ interface OneShotViewProps {
 
 function cardKey(conceptId: string, segmentIndex: number): string {
   return `${conceptId}:${segmentIndex}`
+}
+
+// Split a card key back into its concept id + 1-based segment index. Concept
+// ids never contain ':' (see nextConceptId), so the last ':' is the divider.
+function parseCardKey(key: string): { conceptId: string; segmentIndex: number } {
+  const i = key.lastIndexOf(':')
+  return { conceptId: key.slice(0, i), segmentIndex: Number(key.slice(i + 1)) }
+}
+
+function blobToDataUri(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
 }
 
 // Right-panel view for One Shot mode: concept cards, each holding one clickable
@@ -157,6 +174,31 @@ export default function OneShotView({
       if (uri) referenceDataUris.push(uri)
     }
 
+    // Clip-to-clip handoff: a follow-up clip (index > 1) carries the PREVIOUS
+    // clip's last frame as a reference so the setting + character position
+    // continue instead of the model re-inventing "the same kitchen" blind. Only
+    // when the toggle is on AND the previous clip has actually rendered (nothing
+    // to grab otherwise — a first parallel "Generate all" won't have it yet, so
+    // regenerating this clip after clip 1 lands is what picks it up).
+    let boundaryFrameAttached = false
+    const { conceptId, segmentIndex } = parseCardKey(key)
+    if (card.carryPrevFrame !== false && segmentIndex > 1) {
+      const prevCard = cardStates[cardKey(conceptId, segmentIndex - 1)]
+      const prevVideo = prevCard?.videos[prevCard.currentVideoIndex] ?? prevCard?.videos[prevCard.videos.length - 1]
+      if (prevVideo?.url) {
+        try {
+          const playable = await getUrl(prevVideo.url)
+          if (playable) {
+            const frame = await extractVideoFrame(playable, 'last')
+            referenceDataUris.unshift(await blobToDataUri(frame))
+            boundaryFrameAttached = true
+          }
+        } catch {
+          // Non-fatal — the clip still generates, just without the handoff anchor.
+        }
+      }
+    }
+
     let mode: VideoMode = referenceDataUris.length > 0 ? 'reference-to-video' : 'text-to-video'
     let effectiveRefs: string[] | undefined = referenceDataUris.length > 0 ? referenceDataUris : undefined
     if (mode === 'reference-to-video' && !model.modes?.includes('reference-to-video')) {
@@ -179,8 +221,15 @@ export default function OneShotView({
 
     // Resolve [CHARACTER]/[PRODUCT] tokens to plain words the moment before
     // sending — a video model reads brackets literally.
+    // When the previous clip's last frame rode along (and refs survived the
+    // model-capability check), tell the model the first reference is the handoff
+    // anchor so it continues that exact setting rather than re-inventing it.
+    const usingBoundaryFrame = boundaryFrameAttached && !!effectiveRefs
+    const continuityNote = usingBoundaryFrame
+      ? `\n\nCONTINUITY — The FIRST reference image is special: it is the FINAL FRAME of the previous clip, NOT an appearance reference. Unlike the identity references above (which you must not copy for framing or background), you SHOULD match this first image — its setting, props, framing, lighting, and the character's position and wardrobe — so this clip picks up moments later in the same place and the two cut together seamlessly. Then play out the action below.`
+      : ''
     const rawPrompt = effectiveRefs
-      ? `${buildReferencePreamble(refs)}\n\n${card.editablePrompt}`
+      ? `${buildReferencePreamble(refs)}${continuityNote}\n\n${card.editablePrompt}`
       : card.editablePrompt
     const promptText = resolveOneShotTokens(rawPrompt, productName)
     // Restyle at fire time: a stylized pick appends its STYLE block and drops the
@@ -411,6 +460,11 @@ export default function OneShotView({
   const openConcept = openKey ? result.concepts.find((c) => c.segments.some((s) => cardKey(c.id, s.index) === openKey)) : undefined
   const openSegment = openConcept?.segments.find((s) => cardKey(openConcept.id, s.index) === openKey)
   const openCard = openKey ? cardStates[openKey] : undefined
+  // Has the clip immediately before the open one actually rendered? Gates the
+  // "continue from previous clip" toggle (nothing to grab until it has).
+  const openPrevClipReady = !!openConcept && !!openSegment && openSegment.index > 1
+    ? (cardStates[cardKey(openConcept.id, openSegment.index - 1)]?.videos.length ?? 0) > 0
+    : false
 
   // One row = one CONCEPT (a distinct creative style); the concept's clips are
   // the cards within that row. A short ad is one clip = one card; a longer one
@@ -602,6 +656,7 @@ export default function OneShotView({
           clipLabel={openConcept.segments.length > 1 ? `Clip ${openSegment.index}` : ''}
           delivery={result.delivery}
           cardState={openCard}
+          prevClipReady={openPrevClipReady}
           oneShotModelId={oneShotModelId}
           characterRef={characterRef}
           productRef={productRef}

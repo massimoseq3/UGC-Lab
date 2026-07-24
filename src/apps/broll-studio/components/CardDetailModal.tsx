@@ -99,6 +99,10 @@ interface CardDetailModalProps {
   // Re-fire / drop a failed in-flight gen surfaced in the gallery.
   handleRetryInFlight: (id: string, isVideo: boolean) => void
   handleDismissInFlight: (id: string, isVideo: boolean) => void
+  // Shared voice profile for the ad's dialogue clips (Video/Animate tab, DIALOGUE
+  // cards only). Editing it updates the value shared by every dialogue clip.
+  voiceProfile?: string
+  onUpdateVoiceProfile?: (text: string) => void
 }
 
 // Playground-faithful per-variation workspace.
@@ -142,6 +146,8 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     handleAnimate,
     handleRetryInFlight,
     handleDismissInFlight,
+    voiceProfile,
+    onUpdateVoiceProfile,
   } = props
 
   const [tab, setTab] = useState<Tab>(initialTab ?? 'image')
@@ -160,6 +166,11 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   const effectiveAnimateFrame = animateFrameRef ?? selectedImageRef ?? latestImageRef
   const animateFrameUrl = useAssetUrl(effectiveAnimateFrame)
   const [draft, setDraft] = useState(cardState.editablePrompt)
+  // Local draft for the shared voice profile (DIALOGUE cards) — committed to the
+  // shared value on blur so keystrokes don't churn the whole result.
+  const [voiceDraft, setVoiceDraft] = useState(voiceProfile ?? '')
+  useEffect(() => { setVoiceDraft(voiceProfile ?? '') }, [voiceProfile])
+  const isDialogue = variation.tag === 'DIALOGUE'
   // Expand-the-prompt-into-a-modal toggle (parity with Playground / Scripts).
   const [promptExpanded, setPromptExpanded] = useState(false)
   // Per-tile saved/saving sets so the Bookmark button can show a check.
@@ -184,6 +195,12 @@ export default function CardDetailModal(props: CardDetailModalProps) {
 
   // Mounted only while open, so `enabled` is simply true.
   useCloseOnAppSwitch(true, onClose)
+
+  // Backdrop-click closes the modal — but a text-selection drag that STARTS
+  // inside the content and releases over the backdrop fires a `click` on their
+  // common ancestor (the backdrop), which would wrongly close it. Guard by
+  // remembering whether the press began on the backdrop itself.
+  const pointerDownOnBackdrop = useRef(false)
 
   const persistedImageModel = useSettingsStore((s) => s.getAppModel('broll-studio:image:text-to-image'))
   const imageModelId = persistedImageModel ?? getDefaultModel('broll-studio', 'image', 'text-to-image')?.id
@@ -379,7 +396,8 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   return createPortal((
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm sm:px-6"
-      onClick={onClose}
+      onMouseDown={(e) => { pointerDownOnBackdrop.current = e.target === e.currentTarget }}
+      onClick={(e) => { if (e.target === e.currentTarget && pointerDownOnBackdrop.current) onClose() }}
     >
       <button
         type="button"
@@ -462,9 +480,10 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                       task="video"
                       isOpen={modelPanelOpen}
                       onClose={() => setModelPanelOpen(false)}
-                      requireMode={tab === 'animate' ? 'image-to-video' : (hasActiveRef ? 'reference-to-video' : undefined)}
+                      requireMode={tab === 'animate' ? undefined : (hasActiveRef ? 'reference-to-video' : undefined)}
+                      requireAnyModes={tab === 'animate' ? ['image-to-video', 'reference-to-video'] : undefined}
                       requireModeNote={tab === 'animate'
-                        ? "Greyed-out models can't animate a still — they have no image-to-video mode. Pick Veo 3.1 Fast, Seedance 2.0, or another image-to-video model."
+                        ? "Greyed-out models can't animate a still — they take neither a start frame nor reference images. Pick Seedance 2.0, Veo 3.1 Fast, Gemini Omni, or another still-capable model."
                         : "Greyed-out models don't support reference image-to-video. To use these, generate still frames in the Image tab, then send them to Playground for start/end frames."}
                       costParams={{
                         durationSeconds: cardState.cardVideoDurationSeconds,
@@ -549,6 +568,28 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         {videoModelName} doesn't support reference images — this will generate text-to-video only. Pick Veo 3.1 Fast or Seedance 2.0 to use your character/product.
                       </p>
                     )}
+                  </div>
+                )}
+
+                {/* Voice profile — one shared voice for every dialogue clip so
+                    the character sounds the same across scenes. Only on the
+                    Video / Animate tabs of a DIALOGUE card; edits update the
+                    value shared by all dialogue clips. */}
+                {isDialogue && onUpdateVoiceProfile && tab !== 'image' && (
+                  <div className="rounded-2xl border border-broll-500/20 bg-broll-500/[0.06] px-3 py-2.5">
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <Volume2 className="h-3.5 w-3.5 text-broll-300 light:text-broll-600" />
+                      <span className="text-[12px] font-medium text-ink-100">Voice</span>
+                      <span className="text-[10px] text-ink-500">shared by every dialogue clip</span>
+                    </div>
+                    <textarea
+                      value={voiceDraft}
+                      onChange={(e) => setVoiceDraft(e.target.value)}
+                      onBlur={() => onUpdateVoiceProfile(voiceDraft)}
+                      rows={3}
+                      placeholder="How the character sounds — age, accent, pitch, pace, texture, energy. Written once, applied to every talking clip."
+                      className="w-full resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-[12px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
+                    />
                   </div>
                 )}
 

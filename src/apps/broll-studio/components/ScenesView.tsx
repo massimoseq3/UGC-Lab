@@ -28,6 +28,8 @@ interface ScenesViewProps {
   error?: string | null
   onAddVariation: (sceneNumber: number, variation: PromptVariation) => void
   onDeleteVariation: (sceneNumber: number, variationId: string) => void
+  // Edit the ad's shared dialogue voice profile (from a dialogue card's modal).
+  onUpdateVoiceProfile?: (text: string) => void
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
   selectedProduct?: Product | null
@@ -53,6 +55,7 @@ export default function ScenesView({
   error,
   onAddVariation,
   onDeleteVariation,
+  onUpdateVoiceProfile,
   characterRef,
   productRef,
   selectedProduct,
@@ -479,6 +482,8 @@ export default function ScenesView({
             }
             resultStyle={result.style}
             resultRealism={result.realism}
+            resultVoiceProfile={result.voiceProfile}
+            onUpdateVoiceProfile={onUpdateVoiceProfile}
           />
         ))}
       </div>
@@ -638,6 +643,8 @@ const VariationCardRow = memo(function VariationCardRow({
   batchImageOverride,
   resultStyle,
   resultRealism,
+  resultVoiceProfile,
+  onUpdateVoiceProfile,
 }: {
   cardKey: string
   sceneNumber: number
@@ -662,6 +669,8 @@ const VariationCardRow = memo(function VariationCardRow({
   batchImageOverride?: { aspectRatio: string; resolution?: ImageResolution } | null
   resultStyle?: string
   resultRealism?: boolean
+  resultVoiceProfile?: string
+  onUpdateVoiceProfile?: (text: string) => void
 }) {
   const variationId = variation.id
   const onUpdateState = useCallback(
@@ -700,6 +709,8 @@ const VariationCardRow = memo(function VariationCardRow({
       batchImageOverride={batchImageOverride}
       resultStyle={resultStyle}
       resultRealism={resultRealism}
+      voiceProfile={resultVoiceProfile}
+      onUpdateVoiceProfile={onUpdateVoiceProfile}
     />
   )
 })
@@ -727,6 +738,8 @@ function SceneSection({
   onGenerateScene,
   resultStyle,
   resultRealism,
+  resultVoiceProfile,
+  onUpdateVoiceProfile,
 }: {
   scene: Scene
   cardStates: Record<string, CardState>
@@ -750,6 +763,8 @@ function SceneSection({
   onGenerateScene: () => void
   resultStyle?: string
   resultRealism?: boolean
+  resultVoiceProfile?: string
+  onUpdateVoiceProfile?: (text: string) => void
 }) {
   return (
     // `content-visibility: auto` brings paint containment, which clips the
@@ -823,6 +838,8 @@ function SceneSection({
               batchImageOverride={batchImageOverride}
               resultStyle={resultStyle}
               resultRealism={resultRealism}
+              resultVoiceProfile={resultVoiceProfile}
+              onUpdateVoiceProfile={onUpdateVoiceProfile}
             />
           )
         })}

@@ -72,6 +72,10 @@ interface ModelSidePanelProps {
   // Hint mode: models whose `modes` don't include this are dimmed but still
   // selectable (same semantics as ModelPicker's requireMode).
   requireMode?: Mode
+  // Like requireMode, but satisfied by ANY of these modes — a model is dimmed
+  // only when it supports none of them. Used by the Animate tabs, where a still
+  // can drive either an image-to-video OR a reference-to-video model.
+  requireAnyModes?: Mode[]
   // One-line note shown in the footer when requireMode dims at least one model.
   requireModeNote?: string
   // Cost params for the per-row credit estimate (e.g. duration/resolution/audio).
@@ -98,6 +102,7 @@ export default function ModelSidePanel({
   isOpen,
   onClose,
   requireMode,
+  requireAnyModes,
   requireModeNote,
   costParams = {},
   allowedModelIds,
@@ -130,7 +135,8 @@ export default function ModelSidePanel({
   // the model can't do that mode.
   const isMuted = (m: ModelEntry): boolean =>
     (!!enabledModelIds && !enabledModelIds.includes(m.id)) ||
-    (!!requireMode && !m.modes?.includes(requireMode))
+    (!!requireMode && !m.modes?.includes(requireMode)) ||
+    (!!requireAnyModes && requireAnyModes.length > 0 && !requireAnyModes.some((mode) => m.modes?.includes(mode)))
 
   // Capability pills — only render ones some listed model actually supports.
   const availableFilters = task === 'video'
@@ -186,6 +192,7 @@ export default function ModelSidePanel({
   const showRequireNote =
     !!requireModeNote &&
     ((!!requireMode && models.some((m) => !m.modes?.includes(requireMode))) ||
+      (!!requireAnyModes && requireAnyModes.length > 0 && models.some((m) => !requireAnyModes.some((mode) => m.modes?.includes(mode)))) ||
       (!!enabledModelIds && models.some((m) => !enabledModelIds.includes(m.id))))
 
   // Render through a portal so the panel parents at document root, not inside

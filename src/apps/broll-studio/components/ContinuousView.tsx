@@ -48,15 +48,17 @@ import {
   regenerateContinuousFrame,
   enhanceContinuousMotion,
   regenerateContinuousMotion,
+  CONTINUOUS_DEFAULT_MODEL_ID,
 } from '../services/generateContinuous'
 import { isPollTimeout } from '../../../utils/kie'
 import { useBankStore } from '../../../stores/bankStore'
+import { useSettingsStore } from '../../../stores/settingsStore'
 import { useAppStore } from '../../../stores/appStore'
 import { useCreditsStore } from '../../../stores/creditsStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
-import { getModel, snapVideoDurationUp, estimateCredits, formatCredits } from '../../../utils/models'
+import { getModel, snapVideoDurationUp, estimateCredits, formatCredits, type VideoMode } from '../../../utils/models'
 import { humanizeError } from '../../../utils/friendlyError'
 import { downloadImage } from '../../../utils/downloadImage'
 import { downloadAssetsZip } from '../../../utils/downloadZip'
@@ -137,6 +139,11 @@ export default function ContinuousView({
   const [downloadingAll, setDownloadingAll] = useState(false)
   const balance = useCreditsStore((s) => s.balance)
   useCloseOnAppSwitch(!!confirmGen, () => setConfirmGen(null))
+
+  // Standalone-Animate video model — its own pick (separate from the clip's
+  // frames-to-video model, since animating a single still is image-to-video or
+  // reference-to-video). Default Seedance 2.0, which can do both.
+  const continuousAnimateModelId = useSettingsStore((s) => s.perAppModel['broll-studio:continuous:animate']) ?? CONTINUOUS_DEFAULT_MODEL_ID
 
   // Fresh reads inside async chains (the sequential frame walk sets a
   // selection, then the next iteration must see it).
@@ -481,6 +488,104 @@ export default function ContinuousView({
     }
   }
 
+  // Standalone Animate: image-to-video THIS frame's chosen still on its own
+  // (not chained into the keyframe sequence). Mirrors runClipVideo but with a
+  // single start frame + the frame's own motion, and writes to the frame card.
+  const runFrameAnimate = async (frameKey: string) => {
+    if (!result || guardDemo()) return
+    const frameCard = frameStates[frameKey]
+    if (!frameCard) return
+    const frameIndex = Number(frameKey.slice(0, frameKey.indexOf(':')))
+    const startImageRef = frameCard.images[frameCard.currentImageIndex]?.imageUrl
+    if (!startImageRef) {
+      useAppStore.getState().addToast('Generate an image for this frame first, then animate it.', 'error')
+      return
+    }
+    const model = getModel(continuousAnimateModelId)
+    if (!model) {
+      useAppStore.getState().addToast(`Unknown video model: ${continuousAnimateModelId}`, 'error')
+      return
+    }
+    // Use the still however the picked model can: a true start frame for an
+    // image-to-video model, otherwise a reference image for a reference-to-video
+    // model. Either way the chosen keyframe drives the clip.
+    const modes = model.modes ?? []
+    const animateMode: VideoMode | null = modes.includes('image-to-video')
+      ? 'image-to-video'
+      : modes.includes('reference-to-video')
+        ? 'reference-to-video'
+        : null
+    if (!animateMode) {
+      useAppStore.getState().addToast(`${model.displayName} can't animate a single still — pick a model that takes a start frame or reference images.`, 'error')
+      return
+    }
+    const frameDataUri = await toDataUri(startImageRef)
+    if (!frameDataUri) {
+      useAppStore.getState().addToast('Could not load the frame image.', 'error')
+      return
+    }
+
+    // Motion: the frame's own editable animate motion, falling back to the clip
+    // that starts on this frame (same departure motion), then nothing.
+    const motion = frameCard.animateMotion?.trim() || clipStates[clipKey(frameIndex)]?.editablePrompt?.trim() || ''
+    const constraints = model.videoConstraints
+    const durationSeconds = constraints ? snapVideoDurationUp(frameCard.videoDurationSeconds, constraints.durations) : frameCard.videoDurationSeconds
+    const resolution = constraints && !constraints.resolutions.includes(frameCard.videoResolution)
+      ? constraints.default ?? constraints.resolutions[0]
+      : frameCard.videoResolution
+    const promptText = buildContinuousPrompt(`${motion}\n\n${CLIP_AUDIO_RULE}`, result.style)
+
+    const inFlightId = crypto.randomUUID()
+    updateFrame(frameKey, (prev) => ({
+      inFlightVideos: [
+        ...prev.inFlightVideos,
+        { id: inFlightId, taskId: null, modelId: continuousAnimateModelId, startedAt: Date.now(), prompt: promptText, mode: animateMode, aspectRatio: '9:16', durationSeconds, resolution, audio: frameCard.videoAudio },
+      ],
+    }))
+
+    try {
+      const { taskId, videoEndpoint } = await startVideoTask({
+        prompt: promptText,
+        mode: animateMode,
+        firstFrameDataUri: animateMode === 'image-to-video' ? frameDataUri : undefined,
+        referenceDataUris: animateMode === 'reference-to-video' ? [frameDataUri] : undefined,
+        aspectRatio: '9:16',
+        durationSeconds,
+        resolution,
+        audio: frameCard.videoAudio,
+        modelId: continuousAnimateModelId,
+        noRealism: !result.realism,
+      })
+      updateFrame(frameKey, (prev) => ({
+        inFlightVideos: prev.inFlightVideos.map((e) => (e.id === inFlightId ? { ...e, taskId, endpoint: videoEndpoint } : e)),
+      }))
+
+      const res = await finishVideoTask(taskId, continuousAnimateModelId, videoEndpoint, durationSeconds, '9:16')
+      const assetRef = `asset://${res.assetId}`
+      const newVideo: GeneratedVideo = {
+        url: assetRef, modelId: continuousAnimateModelId, prompt: promptText, aspectRatio: res.aspectRatio,
+        durationSeconds: res.durationSeconds, resolution, audio: frameCard.videoAudio, mode: animateMode, createdAt: Date.now(),
+      }
+      updateFrame(frameKey, (prev) => {
+        const newVideos = [...prev.videos, newVideo]
+        return { videos: newVideos, currentVideoIndex: newVideos.length - 1, inFlightVideos: prev.inFlightVideos.filter((e) => e.id !== inFlightId) }
+      })
+      const historyEntry: VideoHistoryItem = {
+        id: crypto.randomUUID(), modelId: continuousAnimateModelId, prompt: promptText, mode: animateMode, aspectRatio: res.aspectRatio,
+        durationSeconds: res.durationSeconds, resolution, audio: frameCard.videoAudio, videoUrl: assetRef, sourceApp: 'broll-studio', createdAt: Date.now(),
+      }
+      await useBankStore.getState().addVideoHistory(historyEntry)
+      useAppStore.getState().addToast('Animation ready', 'success')
+    } catch (err) {
+      if (isPollTimeout(err)) return
+      const msg = humanizeError(err, 'Video generation failed.')
+      updateFrame(frameKey, (prev) => ({
+        inFlightVideos: prev.inFlightVideos.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)),
+      }))
+      useAppStore.getState().addToast(`Video generation failed: ${msg}`, 'error')
+    }
+  }
+
   // ── Refresh-resume (images + videos) ─────────────────────────
   const IMG_TTL_MS = 30 * 60 * 1000
   const VID_TTL_MS = 60 * 60 * 1000
@@ -586,6 +691,42 @@ export default function ContinuousView({
               return { ...prev, [key]: { ...existing, inFlightVideos: existing.inFlightVideos.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)) } }
             })
             useAppStore.getState().addToast(`Video resume failed: ${msg}`, 'error')
+          } finally {
+            resumingRef.current.delete(resumeKey)
+          }
+        })()
+      }
+    }
+    // Standalone-animate videos live on the frame cards — resume them too.
+    for (const [key, cs] of Object.entries(frameStates)) {
+      for (const entry of cs.inFlightVideos) {
+        if (!entry.taskId) continue
+        const resumeKey = `cont-frame-video:${entry.taskId}`
+        if (resumingRef.current.has(resumeKey)) continue
+        resumingRef.current.add(resumeKey)
+        const { id: inFlightId, taskId, modelId, endpoint, durationSeconds, aspectRatio, resolution, audio, prompt, mode } = entry
+        ;(async () => {
+          try {
+            const res = await finishVideoTask(taskId, modelId, endpoint, durationSeconds, aspectRatio)
+            const assetRef = `asset://${res.assetId}`
+            const newVideo: GeneratedVideo = {
+              url: assetRef, modelId, prompt, aspectRatio: res.aspectRatio,
+              durationSeconds: res.durationSeconds, resolution, audio, mode, createdAt: Date.now(),
+            }
+            setFrameStates((prev) => {
+              const existing = prev[key]
+              if (!existing) return prev
+              const newVideos = [...existing.videos, newVideo]
+              return { ...prev, [key]: { ...existing, videos: newVideos, currentVideoIndex: newVideos.length - 1, inFlightVideos: existing.inFlightVideos.filter((e) => e.id !== inFlightId) } }
+            })
+          } catch (err) {
+            if (isPollTimeout(err)) return
+            const msg = humanizeError(err, 'Video resume failed.')
+            setFrameStates((prev) => {
+              const existing = prev[key]
+              if (!existing) return prev
+              return { ...prev, [key]: { ...existing, inFlightVideos: existing.inFlightVideos.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)) } }
+            })
           } finally {
             resumingRef.current.delete(resumeKey)
           }
@@ -942,6 +1083,14 @@ export default function ContinuousView({
             void runFrameImage(openFrameKey)
           }}
           onDismissInFlight={(id) => updateFrame(openFrameKey, (prev) => ({ inFlightImages: prev.inFlightImages.filter((e) => e.id !== id) }))}
+          animateModelId={continuousAnimateModelId}
+          onAnimate={() => void runFrameAnimate(openFrameKey)}
+          onDeleteVideo={(i) => updateFrame(openFrameKey, (prev) => ({ videos: prev.videos.filter((_, idx) => idx !== i), currentVideoIndex: Math.max(0, Math.min(prev.currentVideoIndex, prev.videos.length - 2)) }))}
+          onRetryVideoInFlight={(id) => {
+            updateFrame(openFrameKey, (prev) => ({ inFlightVideos: prev.inFlightVideos.filter((e) => e.id !== id) }))
+            void runFrameAnimate(openFrameKey)
+          }}
+          onDismissVideoInFlight={(id) => updateFrame(openFrameKey, (prev) => ({ inFlightVideos: prev.inFlightVideos.filter((e) => e.id !== id) }))}
         />
       )}
 

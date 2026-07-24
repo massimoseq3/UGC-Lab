@@ -156,6 +156,9 @@ export default function BrollStudio() {
     sanitize: (raw) => ((raw as string) === 'animated' ? 'continuous' : raw),
   })
   const [oneShotDelivery, setOneShotDelivery] = usePersistedState<OneShotDelivery>(`${baseKey}:oneShotDelivery`, 'dialogue')
+  // Line-by-Line delivery: 'silent' (all cards silent b-roll — today's default)
+  // or 'dialogue' (one talking card per scene + three silent b-roll cards).
+  const [lineDelivery, setLineDelivery] = usePersistedState<OneShotDelivery>(`${baseKey}:lineDelivery`, 'silent')
   const [oneShotResult, setOneShotResult] = usePersistedState<OneShotResult | null>(`${baseKey}:oneShotResult`, null)
   const [oneShotCardStates, setOneShotCardStates] = usePersistedState<Record<string, OneShotCardState>>(
     `${baseKey}:oneShotCardStates`,
@@ -323,6 +326,7 @@ export default function BrollStudio() {
         result: result ?? { scenes: [] },
         cardStates,
         mode,
+        lineDelivery: result ? lineDelivery : undefined,
         oneShotResult: oneShotResult ?? undefined,
         oneShotCardStates: Object.keys(oneShotCardStates).length > 0 ? oneShotCardStates : undefined,
         oneShotDelivery: oneShotResult ? oneShotDelivery : undefined,
@@ -337,7 +341,7 @@ export default function BrollStudio() {
       upsertBrollHistory(item)
     }, 1000)
     return () => clearTimeout(handle)
-  }, [result, cardStates, oneShotResult, oneShotCardStates, oneShotDelivery, oneShotModelId, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, continuousModelId, mode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, upsertBrollHistory])
+  }, [result, cardStates, lineDelivery, oneShotResult, oneShotCardStates, oneShotDelivery, oneShotModelId, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, continuousModelId, mode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, upsertBrollHistory])
 
   // "New": clear the inputs / references only. The generated scene cards stay
   // on screen — they're the user's output, never wiped by starting a new
@@ -391,6 +395,12 @@ export default function BrollStudio() {
         ),
       }
     })
+  }, [setResult])
+
+  // Edit the ad's shared dialogue voice profile (from a dialogue card's modal).
+  // One value on the result, applied to every DIALOGUE clip at fire time.
+  const handleUpdateVoiceProfile = useCallback((text: string) => {
+    setResult((prev) => (prev ? { ...prev, voiceProfile: text } : prev))
   }, [setResult])
 
   const handleOpenCharacterPicker = useCallback(() => setPickerMode('models'), [])
@@ -620,6 +630,7 @@ export default function BrollStudio() {
         referenceImages,
         styleId: resolvedStyleId,
         styleBrief: continuousStyleBrief ?? undefined,
+        delivery: lineDelivery,
       })
       // Only now that we have scenes do we start a fresh session: rotating the
       // id and clearing cardStates up-front meant a failed call left the old
@@ -661,6 +672,8 @@ export default function BrollStudio() {
       )
     }
     setCardStates(restored)
+    // Restore the Line-by-Line delivery toggle (legacy rows => silent).
+    setLineDelivery(item.lineDelivery ?? 'silent')
 
     // Switch to the mode this row actually represents (derived from its content,
     // not the unreliable last-active `mode`) so the toggle + right panel land on
@@ -726,6 +739,8 @@ export default function BrollStudio() {
           highlightField={highlightField}
           mode={mode}
           onModeChange={setMode}
+          lineDelivery={lineDelivery}
+          onLineDeliveryChange={setLineDelivery}
           oneShotDelivery={oneShotDelivery}
           onOneShotDeliveryChange={setOneShotDelivery}
           oneShotModelId={oneShotModelId}
@@ -769,6 +784,7 @@ export default function BrollStudio() {
           error={error}
           onAddVariation={handleAddVariation}
           onDeleteVariation={handleDeleteVariation}
+          onUpdateVoiceProfile={handleUpdateVoiceProfile}
           characterRef={characterRef}
           productRef={productRef}
           selectedProduct={selectedProduct}

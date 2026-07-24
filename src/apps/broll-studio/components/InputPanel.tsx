@@ -36,6 +36,9 @@ interface InputPanelProps {
   // cards and reveals the delivery toggle + video-model picker below.
   mode: BrollMode
   onModeChange: (mode: BrollMode) => void
+  // Line-by-Line delivery toggle. 'dialogue' adds one talking card per scene.
+  lineDelivery: OneShotDelivery
+  onLineDeliveryChange: (delivery: OneShotDelivery) => void
   oneShotDelivery: OneShotDelivery
   onOneShotDeliveryChange: (delivery: OneShotDelivery) => void
   oneShotModelId: string
@@ -273,6 +276,8 @@ export default function InputPanel({
   highlightField,
   mode,
   onModeChange,
+  lineDelivery,
+  onLineDeliveryChange,
   oneShotDelivery,
   onOneShotDeliveryChange,
   oneShotModelId,
@@ -507,6 +512,22 @@ export default function InputPanel({
               className="h-12 !p-1"
               value={oneShotDelivery}
               onChange={onOneShotDeliveryChange}
+              accent="broll"
+              options={[
+                { value: 'dialogue', label: 'With Dialogue' },
+                { value: 'silent', label: 'B-Roll Clips' },
+              ]}
+            />
+          )}
+
+          {/* Line-by-Line delivery — "With Dialogue" adds one talking-to-camera
+              card per scene (the character speaks the line) alongside three
+              silent b-roll cards; "B-Roll Clips" keeps every card silent. */}
+          {mode === 'line' && (
+            <SegmentedToggle<OneShotDelivery>
+              className="h-12 !p-1"
+              value={lineDelivery}
+              onChange={onLineDeliveryChange}
               accent="broll"
               options={[
                 { value: 'dialogue', label: 'With Dialogue' },

@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   X,
   Image as ImageIcon,
   Video as VideoIcon,
+  Film,
   Loader2,
   AlertCircle,
   Coins,
@@ -67,10 +68,16 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
   }, [onClose])
   useCloseOnAppSwitch(true, onClose)
 
+  // A text-selection drag that starts inside the content and releases over the
+  // backdrop fires a `click` on the backdrop — guard so only a real backdrop
+  // press-and-release closes the modal.
+  const pointerDownOnBackdrop = useRef(false)
+
   return createPortal((
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm sm:px-6"
-      onClick={onClose}
+      onMouseDown={(e) => { pointerDownOnBackdrop.current = e.target === e.currentTarget }}
+      onClick={(e) => { if (e.target === e.currentTarget && pointerDownOnBackdrop.current) onClose() }}
     >
       <button
         type="button"
@@ -142,6 +149,13 @@ interface ContinuousFrameModalProps {
   onRegeneratePrompt: () => Promise<string>
   onRetryInFlight: (id: string) => void
   onDismissInFlight: (id: string) => void
+  // ── Standalone Animate tab ── image-to-video this frame's chosen still on its
+  // own (not chained). The view owns the gen; the modal drives the UI.
+  animateModelId: string
+  onAnimate: () => void
+  onDeleteVideo: (index: number) => void
+  onRetryVideoInFlight: (id: string) => void
+  onDismissVideoInFlight: (id: string) => void
 }
 
 export function ContinuousFrameModal({
@@ -168,6 +182,11 @@ export function ContinuousFrameModal({
   onRegeneratePrompt,
   onRetryInFlight,
   onDismissInFlight,
+  animateModelId,
+  onAnimate,
+  onDeleteVideo,
+  onRetryVideoInFlight,
+  onDismissVideoInFlight,
 }: ContinuousFrameModalProps) {
   const [draft, setDraft] = useState(cardState.editablePrompt)
   const [promptExpanded, setPromptExpanded] = useState(false)
@@ -181,6 +200,19 @@ export function ContinuousFrameModal({
   }
 
   const isBusy = cardState.inFlightImages.some((e) => !e.error)
+
+  // Image vs standalone-Animate tab. Animate image-to-video's this frame's
+  // current still on its own using the storyboard's continuous video model.
+  const [frameTab, setFrameTab] = useState<'image' | 'animate'>('image')
+  const [animateModelPanelOpen, setAnimateModelPanelOpen] = useState(false)
+  const animateModel = getModel(animateModelId)
+  const animateConstraints = animateModel?.videoConstraints
+  const startImageUrl = useAssetUrl(cardState.images[cardState.currentImageIndex]?.imageUrl)
+  const animateCredits = animateModel
+    ? formatCredits(estimateCredits(animateModelId, { durationSeconds: cardState.videoDurationSeconds, resolution: cardState.videoResolution, audio: cardState.videoAudio }))
+    : null
+  const animateBusy = cardState.inFlightVideos.some((e) => !e.error)
+  const animateCapable = (animateModel?.modes ?? []).some((m) => m === 'image-to-video' || m === 'reference-to-video')
 
   // Image model is the app-wide B-Roll pick (same ModelPicker as the
   // Line-by-Line card), so its constraints drive the footer chips.
@@ -241,21 +273,23 @@ export function ContinuousFrameModal({
         <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 md:border-b-0 md:border-r">
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <div className="flex grow flex-col gap-3 px-5 pb-6 pt-3">
-              {/* Output-type tab — keyframes are images, so this workspace only
-                  makes images (no Video / Animate tabs, unlike Line-by-Line).
-                  Styled as the Line-by-Line segmented toggle, single option. The
-                  h-12 container + separator mirror the right header so the
-                  hairline runs straight across the modal. */}
+              {/* Output-type tab — Image builds the keyframe; Animate image-to-
+                  video's the chosen still on its own (a standalone clip, not
+                  chained into the keyframe sequence). */}
               <div className="flex h-12 items-center">
-                <SegmentedToggle
+                <SegmentedToggle<'image' | 'animate'>
                   className="h-10 !p-1"
-                  value="image"
-                  onChange={() => {}}
-                  options={[{ value: 'image', label: 'Image', icon: ImageIcon }]}
+                  value={frameTab}
+                  onChange={setFrameTab}
+                  options={[
+                    { value: 'image', label: 'Image', icon: ImageIcon },
+                    { value: 'animate', label: 'Animate', icon: Film },
+                  ]}
                 />
               </div>
               <div className="-mx-5 -mt-1 border-b border-ink/5" />
 
+              {frameTab === 'image' && (<>
               {/* Image model — the same app-wide picker the Line-by-Line card
                   uses, so a model swap applies across the whole storyboard. */}
               <ModelPicker appId="broll-studio" task="image" mode="text-to-image" />
@@ -365,56 +399,203 @@ export function ContinuousFrameModal({
                   </div>
                 </div>
               </div>
+              </>)}
+
+              {frameTab === 'animate' && (
+                <>
+                  {/* Video model — its own pick for the standalone animate. The
+                      still rides as a start frame or reference depending on what
+                      the picked model supports. */}
+                  <button
+                    type="button"
+                    onClick={() => setAnimateModelPanelOpen(true)}
+                    className="flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
+                  >
+                    {animateModel ? (
+                      <>
+                        <ProviderLogo provider={animateModel.provider ?? ''} />
+                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                          <span className="truncate text-[13px] font-medium text-ink-100">{animateModel.displayName}</span>
+                          {animateModel.tags.includes('recommended') && (
+                            <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
+                          )}
+                          {officialSavingsPercent(animateModelId) != null && <SavingsPill pct={officialSavingsPercent(animateModelId)!} />}
+                        </div>
+                      </>
+                    ) : (
+                      <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
+                    )}
+                    <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
+                  </button>
+                  <ModelSidePanel
+                    appId="broll-studio"
+                    task="video"
+                    allowedModelIds={CONTINUOUS_MODEL_IDS}
+                    requireAnyModes={['image-to-video', 'reference-to-video']}
+                    requireModeNote="Greyed-out models can't animate a single still — they take neither a start frame nor reference images."
+                    value={animateModelId}
+                    onChange={(id) => useSettingsStore.getState().setAppModel('broll-studio:continuous:animate', id)}
+                    isOpen={animateModelPanelOpen}
+                    onClose={() => setAnimateModelPanelOpen(false)}
+                    costParams={{ durationSeconds: cardState.videoDurationSeconds, resolution: cardState.videoResolution, audio: cardState.videoAudio }}
+                  />
+
+                  {/* Start frame — the chosen still this animation begins on. */}
+                  <div>
+                    <span className="text-sm font-medium text-ink-200">Start frame</span>
+                    <p className="mt-1 text-[11px] leading-relaxed text-ink-500">
+                      This frame's chosen image animates on its own — a standalone clip, not chained into the next keyframe.
+                    </p>
+                    <div className="mt-2">
+                      {startImageUrl ? (
+                        <div className="relative max-w-[120px] overflow-hidden rounded-xl border border-ink/10 bg-ink/[0.02]" style={{ aspectRatio: '9 / 16' }}>
+                          <img src={startImageUrl} alt="" className="h-full w-full object-cover" />
+                        </div>
+                      ) : (
+                        <div className="flex h-40 w-full flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-ink/10 bg-ink/[0.02] px-4 text-center">
+                          <ImageIcon className="h-6 w-6 text-ink-700" strokeWidth={1.5} />
+                          <p className="text-[11px] leading-relaxed text-ink-500">Generate an image on the Image tab first, then animate it.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Motion — how the still animates (seeded from this frame's
+                      departure motion; edit freely). */}
+                  <div className="flex grow flex-col">
+                    <div className="relative flex grow flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
+                      <textarea
+                        value={cardState.animateMotion}
+                        onChange={(e) => onUpdate(() => ({ animateMotion: e.target.value }))}
+                        rows={6}
+                        placeholder="How the shot moves — the camera move, the character's motion, what changes across the clip."
+                        className="relative min-h-[140px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
+                      />
+                    </div>
+                    <p className="mt-1.5 px-1 text-[10px] text-ink-600">
+                      {animateModel?.modes?.includes('image-to-video')
+                        ? 'The still is used as the start frame.'
+                        : animateModel?.modes?.includes('reference-to-video')
+                          ? 'The still is used as a reference image (this model has no start-frame mode).'
+                          : "This model can't animate a still — pick another above."}
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
           {/* Pinned footer — output settings + Generate, matching the
               Line-by-Line card modal. */}
           <div className="shrink-0 border-t border-ink/5 px-5 py-4">
-            <div className="mb-3 flex flex-wrap items-center gap-1.5">
-              {resolutions.length > 0 && (
-                <ConstraintChip
-                  grow
-                  openDirection="up"
-                  options={resolutions as string[]}
-                  value={cardState.resolution}
-                  onChange={(v) => onUpdate(() => ({ resolution: v as ImageResolution }))}
-                  render={(v) => {
-                    const c = imageModelId ? formatCredits(estimateCredits(imageModelId, { imageCount: 1, resolution: v as ImageResolution })) : null
-                    return <span>{v}{c ? ` · ${c}` : ''}</span>
-                  }}
-                />
-              )}
-              {aspects.length > 0 && (
-                <ConstraintChip
-                  grow
-                  openDirection="up"
-                  options={aspects}
-                  value={cardState.aspectRatio}
-                  onChange={(v) => onUpdate(() => ({ aspectRatio: v }))}
-                  render={(v) => (
-                    <span className="flex items-center gap-1.5">
-                      <AspectIcon ratio={v} />
-                      <span>{v}</span>
+            {frameTab === 'image' ? (
+              <>
+                <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                  {resolutions.length > 0 && (
+                    <ConstraintChip
+                      grow
+                      openDirection="up"
+                      options={resolutions as string[]}
+                      value={cardState.resolution}
+                      onChange={(v) => onUpdate(() => ({ resolution: v as ImageResolution }))}
+                      render={(v) => {
+                        const c = imageModelId ? formatCredits(estimateCredits(imageModelId, { imageCount: 1, resolution: v as ImageResolution })) : null
+                        return <span>{v}{c ? ` · ${c}` : ''}</span>
+                      }}
+                    />
+                  )}
+                  {aspects.length > 0 && (
+                    <ConstraintChip
+                      grow
+                      openDirection="up"
+                      options={aspects}
+                      value={cardState.aspectRatio}
+                      onChange={(v) => onUpdate(() => ({ aspectRatio: v }))}
+                      render={(v) => (
+                        <span className="flex items-center gap-1.5">
+                          <AspectIcon ratio={v} />
+                          <span>{v}</span>
+                        </span>
+                      )}
+                    />
+                  )}
+                </div>
+                <button
+                  onClick={onGenerate}
+                  disabled={!cardState.editablePrompt.trim()}
+                  className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                  Generate Image
+                  {credits && !isBusy && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
+                      <Coins className="h-3 w-3" strokeWidth={2} />
+                      {credits}
                     </span>
                   )}
-                />
-              )}
-            </div>
-            <button
-              onClick={onGenerate}
-              disabled={!cardState.editablePrompt.trim()}
-              className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
-              Generate Image
-              {credits && !isBusy && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
-                  <Coins className="h-3 w-3" strokeWidth={2} />
-                  {credits}
-                </span>
-              )}
-            </button>
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="mb-3 flex flex-wrap items-center gap-1.5">
+                  {animateConstraints && (
+                    <>
+                      <ConstraintChip
+                        grow
+                        openDirection="up"
+                        options={animateConstraints.resolutions}
+                        value={cardState.videoResolution}
+                        onChange={(v) => onUpdate(() => ({ videoResolution: v }))}
+                        render={videoResolutionLabel}
+                      />
+                      {animateConstraints.durations.length > 0 && (
+                        <ConstraintChip
+                          grow
+                          openDirection="up"
+                          options={animateConstraints.durations.map(String)}
+                          value={String(cardState.videoDurationSeconds)}
+                          onChange={(v) => onUpdate(() => ({ videoDurationSeconds: Number(v) }))}
+                          render={(v) => <span>{v}s</span>}
+                        />
+                      )}
+                      {animateConstraints.supportsAudio && (
+                        <ConstraintChip
+                          grow
+                          openDirection="up"
+                          options={['Audio', 'Mute']}
+                          value={cardState.videoAudio ? 'Audio' : 'Mute'}
+                          onChange={(v) => onUpdate(() => ({ videoAudio: v === 'Audio' }))}
+                          triggerClassName={cardState.videoAudio
+                            ? 'border-broll-500/40 bg-broll-500/15 text-broll-200'
+                            : 'border-ink/10 bg-ink/[0.02] text-ink-400 group-hover:bg-ink/[0.05]'}
+                          render={(v) => (
+                            <span className="flex items-center gap-1.5">
+                              {v === 'Audio' ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+                              <span>{v}</span>
+                            </span>
+                          )}
+                        />
+                      )}
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={onAnimate}
+                  disabled={!startImageUrl || animateBusy || !animateCapable}
+                  title={!startImageUrl ? 'Generate an image first, then animate it' : !animateCapable ? 'This model can’t animate a single still — pick another' : undefined}
+                  className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {animateBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Film className="h-4 w-4" />}
+                  Animate
+                  {animateCredits && !animateBusy && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
+                      <Coins className="h-3 w-3" strokeWidth={2} />
+                      {animateCredits}
+                    </span>
+                  )}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -448,42 +629,77 @@ export function ContinuousFrameModal({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            {cardState.images.length === 0 && cardState.inFlightImages.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-                <ImageIcon className="h-9 w-9 text-ink-800" strokeWidth={1.5} />
-                <p className="text-xs text-ink-600">No images yet — hit Generate, then click one to make it the keyframe.</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {cardState.inFlightImages.filter((e) => e.error).map((entry) => (
-                  <div key={entry.id} className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2">
-                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400 light:text-red-600" />
-                    <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-red-300 light:text-red-700">{entry.error}</p>
-                    <button type="button" title="Retry" onClick={() => onRetryInFlight(entry.id)} className="shrink-0 rounded-full p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200"><RefreshCw className="h-3.5 w-3.5" /></button>
-                    <button type="button" title="Dismiss" onClick={() => onDismissInFlight(entry.id)} className="shrink-0 rounded-full p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200"><X className="h-3.5 w-3.5" /></button>
-                  </div>
-                ))}
-                <div className="grid grid-cols-2 gap-3">
-                  {cardState.inFlightImages.filter((e) => !e.error).map((entry) => (
-                    <PendingMediaTile
-                      key={entry.id}
-                      kind="image"
-                      prompt={entry.prompt}
-                      modelId={entry.modelId}
-                      aspectRatio={entry.aspectRatio}
-                      messages={['Sending request...', 'Painting the keyframe...', 'Locking the style...', 'Almost there...']}
-                    />
-                  ))}
-                  {cardState.images.map((image, i) => (
-                    <FrameImageTile
-                      key={`${image.imageUrl}-${i}`}
-                      imageRef={image.imageUrl}
-                      isKeyframe={selectedImageIndex === i}
-                      onSelect={() => onSelectImage(i)}
-                    />
-                  ))}
+            {frameTab === 'image' ? (
+              cardState.images.length === 0 && cardState.inFlightImages.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                  <ImageIcon className="h-9 w-9 text-ink-800" strokeWidth={1.5} />
+                  <p className="text-xs text-ink-600">No images yet — hit Generate, then click one to make it the keyframe.</p>
                 </div>
-              </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {cardState.inFlightImages.filter((e) => e.error).map((entry) => (
+                    <div key={entry.id} className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2">
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400 light:text-red-600" />
+                      <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-red-300 light:text-red-700">{entry.error}</p>
+                      <button type="button" title="Retry" onClick={() => onRetryInFlight(entry.id)} className="shrink-0 rounded-full p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200"><RefreshCw className="h-3.5 w-3.5" /></button>
+                      <button type="button" title="Dismiss" onClick={() => onDismissInFlight(entry.id)} className="shrink-0 rounded-full p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200"><X className="h-3.5 w-3.5" /></button>
+                    </div>
+                  ))}
+                  <div className="grid grid-cols-2 gap-3">
+                    {cardState.inFlightImages.filter((e) => !e.error).map((entry) => (
+                      <PendingMediaTile
+                        key={entry.id}
+                        kind="image"
+                        prompt={entry.prompt}
+                        modelId={entry.modelId}
+                        aspectRatio={entry.aspectRatio}
+                        messages={['Sending request...', 'Painting the keyframe...', 'Locking the style...', 'Almost there...']}
+                      />
+                    ))}
+                    {cardState.images.map((image, i) => (
+                      <FrameImageTile
+                        key={`${image.imageUrl}-${i}`}
+                        imageRef={image.imageUrl}
+                        isKeyframe={selectedImageIndex === i}
+                        onSelect={() => onSelectImage(i)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            ) : (
+              cardState.videos.length === 0 && cardState.inFlightVideos.length === 0 ? (
+                <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
+                  <VideoIcon className="h-9 w-9 text-ink-800" strokeWidth={1.5} />
+                  <p className="text-xs text-ink-600">No animations yet — pick a still on the Image tab, then hit Animate.</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {cardState.inFlightVideos.filter((e) => e.error).map((entry) => (
+                    <div key={entry.id} className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2">
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400 light:text-red-600" />
+                      <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-red-300 light:text-red-700">{entry.error}</p>
+                      <button type="button" title="Retry" onClick={() => onRetryVideoInFlight(entry.id)} className="shrink-0 rounded-full p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200"><RefreshCw className="h-3.5 w-3.5" /></button>
+                      <button type="button" title="Dismiss" onClick={() => onDismissVideoInFlight(entry.id)} className="shrink-0 rounded-full p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200"><X className="h-3.5 w-3.5" /></button>
+                    </div>
+                  ))}
+                  <div className="grid grid-cols-2 gap-3">
+                    {cardState.inFlightVideos.filter((e) => !e.error).map((entry) => (
+                      <PendingMediaTile
+                        key={entry.id}
+                        kind="video"
+                        prompt={entry.prompt}
+                        modelId={entry.modelId}
+                        aspectRatio={entry.aspectRatio}
+                        messages={['Sending request...', 'Animating the still...', 'Rendering motion...', 'Almost there...']}
+                      />
+                    ))}
+                    {cardState.videos.map((video, i) => (
+                      <ClipVideoTile key={`${video.url}-${i}`} video={video} onDelete={() => onDeleteVideo(i)} />
+                    ))}
+                  </div>
+                </div>
+              )
             )}
           </div>
         </div>

@@ -256,6 +256,8 @@ export interface BrollHistoryItem {
   // One Shot mode snapshot. Absent on legacy rows (=> 'line'). All modes'
   // payloads can coexist on one row — the session holds them all.
   mode?: 'line' | 'oneshot' | 'continuous'
+  // Line-by-Line delivery. Absent on legacy rows (=> 'silent', all-silent b-roll).
+  lineDelivery?: 'dialogue' | 'silent'
   oneShotResult?: unknown
   oneShotCardStates?: Record<string, unknown>
   oneShotDelivery?: 'dialogue' | 'silent'

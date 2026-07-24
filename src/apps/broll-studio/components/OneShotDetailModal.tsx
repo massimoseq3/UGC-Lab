@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   X,
@@ -21,6 +21,7 @@ import {
   Redo2,
   ChevronRight,
   Star,
+  Link2,
 } from 'lucide-react'
 import ModelSidePanel from '../../../components/ModelSidePanel'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -57,6 +58,9 @@ interface OneShotDetailModalProps {
   clipLabel: string // "Clip 2" for multi-clip concepts, else ""
   delivery: 'dialogue' | 'silent'
   cardState: OneShotCardState
+  // True once the immediately-previous clip has a rendered video — enables the
+  // "continue from previous clip" handoff toggle (only meaningful for Clip 2+).
+  prevClipReady: boolean
   oneShotModelId: string
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
@@ -87,6 +91,7 @@ export default function OneShotDetailModal({
   clipLabel,
   delivery,
   cardState,
+  prevClipReady,
   oneShotModelId,
   characterRef,
   productRef,
@@ -116,6 +121,11 @@ export default function OneShotDetailModal({
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
   useCloseOnAppSwitch(true, onClose)
+
+  // A text-selection drag that starts inside the content and releases over the
+  // backdrop fires a `click` on the backdrop — guard so only a real backdrop
+  // press-and-release closes the modal.
+  const pointerDownOnBackdrop = useRef(false)
 
   const model = getModel(oneShotModelId)
   const constraints = model?.videoConstraints
@@ -202,7 +212,8 @@ export default function OneShotDetailModal({
   return createPortal((
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm sm:px-6"
-      onClick={onClose}
+      onMouseDown={(e) => { pointerDownOnBackdrop.current = e.target === e.currentTarget }}
+      onClick={(e) => { if (e.target === e.currentTarget && pointerDownOnBackdrop.current) onClose() }}
     >
       <button
         type="button"
@@ -327,6 +338,45 @@ export default function OneShotDetailModal({
                   onRemove={onRemoveExtraRef}
                   dimmed={!modelSupportsRefs}
                 />
+
+                {/* Clip-to-clip handoff — a follow-up clip (Clip 2+) carries the
+                    previous clip's last frame as a reference so the setting +
+                    character position continue. On by default; needs the previous
+                    clip rendered (nothing to grab otherwise). */}
+                {segment.index > 1 && (
+                  <button
+                    type="button"
+                    disabled={!prevClipReady}
+                    onClick={() => onUpdate((p) => ({ carryPrevFrame: p.carryPrevFrame === false }))}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-ink/10 bg-ink/[0.02] px-3 py-2.5 text-left transition-colors hover:bg-ink/[0.05] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-broll-500/15 text-broll-400 light:text-broll-600">
+                      <Link2 className="h-4 w-4" strokeWidth={1.5} />
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="text-[13px] font-medium text-ink-100">Continue from previous clip</span>
+                      <span className="text-[11px] leading-snug text-ink-500">
+                        {prevClipReady
+                          ? "Uses the previous clip's last frame as a reference so the setting and character carry over."
+                          : 'Generate the previous clip first, then this clip can continue from it.'}
+                      </span>
+                    </span>
+                    {/* Switch — mirrors the reference-slot tick affordance. */}
+                    <span
+                      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                        prevClipReady && cardState.carryPrevFrame !== false
+                          ? 'bg-broll-500'
+                          : 'bg-ink/15'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                          prevClipReady && cardState.carryPrevFrame !== false ? 'translate-x-4' : 'translate-x-0.5'
+                        }`}
+                      />
+                    </span>
+                  </button>
+                )}
 
                 {/* Prompt — the scene blueprint, bare like CardDetailModal. */}
                 <div className="flex grow flex-col">
