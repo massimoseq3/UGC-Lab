@@ -8,7 +8,6 @@ import {
   Pause,
   Volume2,
   VolumeX,
-  Trash2,
   Bookmark,
   Check,
   Copy,
@@ -16,6 +15,7 @@ import {
   Film,
 } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
+import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import GeneratingBackdrop from '../../../components/GeneratingBackdrop'
 import type { PromptVariation, CardState, GeneratedImage, ReferenceImage } from '../types'
 import type { VideoHistoryItem, Product, Model, BRoll } from '../../../stores/types'
@@ -258,7 +258,7 @@ export default function VariationCard(props: VariationCardProps) {
     } catch (err) {
       const msg = humanizeError(err, 'Enhance failed.')
       onUpdateState({ isPromptWorking: false, promptError: msg })
-      useAppStore.getState().addToast(`Enhance failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     }
   }
 
@@ -279,7 +279,7 @@ export default function VariationCard(props: VariationCardProps) {
     } catch (err) {
       const msg = humanizeError(err, 'Regenerate failed.')
       onUpdateState({ isPromptWorking: false, promptError: msg })
-      useAppStore.getState().addToast(`Regenerate failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     }
   }
 
@@ -340,7 +340,7 @@ export default function VariationCard(props: VariationCardProps) {
           e.id === inFlightId ? { ...e, error: msg } : e,
         ),
       }))
-      useAppStore.getState().addToast(`Image generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
       return
     }
 
@@ -363,7 +363,7 @@ export default function VariationCard(props: VariationCardProps) {
           e.id === inFlightId ? { ...e, error: msg } : e,
         ),
       }))
-      useAppStore.getState().addToast(`Image generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     }
   }
 
@@ -639,7 +639,7 @@ export default function VariationCard(props: VariationCardProps) {
           e.id === inFlightId ? { ...e, error: msg } : e,
         ),
       }))
-      useAppStore.getState().addToast(`Video generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     }
   }
 
@@ -922,82 +922,47 @@ export default function VariationCard(props: VariationCardProps) {
             </span>
           )}
 
-          {/* Hover-reveal action stack — top-right vertical column, app-wide
+          {/* Hover-reveal action stack (components/tileActions) — app-wide
               standard order: download · save (stills only) · copy · send-to-
-              Playground (videos only) · delete.
-              First delete click flips to a labelled "Confirm" state and keeps
-              the column visible. The card body stays clickable to open the
-              detail modal. */}
-          <div className={`absolute right-2 top-2 z-10 flex flex-col items-end gap-1 transition-opacity ${confirmingDelete ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+              Playground (videos only) · delete. The card body stays clickable
+              to open the detail modal. */}
+          <TileActionStack forceVisible={confirmingDelete}>
             {coverKind && (
               <>
-                <button
-                  type="button"
+                <TileActionButton
                   title={coverKind === 'image' ? 'Download image' : 'Download video'}
-                  onClick={(e) => { e.stopPropagation(); void handleDownloadCover() }}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/50"
+                  onClick={() => { void handleDownloadCover() }}
                 >
-                  <Download className="h-3.5 w-3.5" />
-                </button>
+                  <Download className="h-4 w-4" />
+                </TileActionButton>
                 {/* Save-to-bank is stills-only — videos are download-only. */}
                 {coverKind === 'image' && (
-                  <button
-                    type="button"
+                  <TileActionButton
                     title={savedCover ? 'Saved to B-Rolls bank' : savingCover ? 'Saving…' : 'Save to B-Rolls bank'}
-                    onClick={(e) => { e.stopPropagation(); void handleSaveCover() }}
-                    className={`flex h-7 w-7 items-center justify-center rounded-full border backdrop-blur transition-colors ${
-                      savedCover
-                        ? 'border-emerald-400/50 bg-emerald-500/30 text-emerald-100'
-                        : 'border-white/20 bg-black/35 text-white hover:bg-black/50'
-                    }`}
+                    tone={savedCover ? 'saved' : 'default'}
+                    onClick={() => { void handleSaveCover() }}
                   >
-                    {savedCover ? <Check className="h-3.5 w-3.5" /> : savingCover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bookmark className="h-3.5 w-3.5" />}
-                  </button>
+                    {savedCover ? <Check className="h-4 w-4" /> : savingCover ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bookmark className="h-4 w-4" />}
+                  </TileActionButton>
                 )}
-                <button
-                  type="button"
+                <TileActionButton
                   title={copiedPrompt ? 'Prompt copied' : 'Copy prompt'}
-                  onClick={(e) => { e.stopPropagation(); void handleCopyPrompt() }}
-                  className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/50"
+                  onClick={() => { void handleCopyPrompt() }}
                 >
-                  {copiedPrompt ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
-                </button>
+                  {copiedPrompt ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+                </TileActionButton>
                 {coverKind === 'video' && coverVideo && (
-                  <button
-                    type="button"
+                  <TileActionButton
                     title="Use in Playground as Gemini Omni source clip"
-                    onClick={(e) => { e.stopPropagation(); void sendClipToPlayground(coverVideo) }}
-                    className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/50"
+                    onClick={() => { void sendClipToPlayground(coverVideo) }}
                   >
-                    <Film className="h-3.5 w-3.5" />
-                  </button>
+                    <Film className="h-4 w-4" />
+                  </TileActionButton>
                 )}
               </>
             )}
-            <button
-              type="button"
-              title={confirmingDelete ? 'Click again to delete' : 'Delete variation'}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (!confirmingDelete) {
-                  setConfirmingDelete(true)
-                  setTimeout(() => setConfirmingDelete(false), 3000)
-                  return
-                }
-                onDelete()
-              }}
-              // Idle state is a fixed 7×7 circle (matching its siblings in the
-              // stack); only the "Confirm" state grows into a pill.
-              className={`flex h-7 items-center justify-center rounded-full border backdrop-blur transition-colors ${
-                confirmingDelete
-                  ? 'gap-1 px-2 border-red-400/60 bg-red-500/45 text-red-50 hover:bg-red-500/55'
-                  : 'w-7 border-white/20 bg-black/35 text-white hover:bg-red-500/30 hover:text-red-100 hover:border-red-400/40'
-              }`}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              {confirmingDelete && <span className="text-[10px] font-medium uppercase tracking-wider">Confirm</span>}
-            </button>
-          </div>
+            <TileDeleteButton title="Delete variation" onDelete={onDelete} onArmedChange={setConfirmingDelete} />
+          </TileActionStack>
 
           {showImageError && (
             <div className="absolute inset-x-2 bottom-2 flex items-start gap-1.5 rounded-lg border border-red-500/30 bg-red-500/15 px-2 py-1.5 backdrop-blur">

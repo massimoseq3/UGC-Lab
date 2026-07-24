@@ -21,6 +21,7 @@ import AspectIcon from '../../../components/AspectIcon'
 import VariationCard from './VariationCard'
 import { humanizeError } from '../../../utils/friendlyError'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
+import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 
 interface ScenesViewProps {
   result: BrollResult | null
@@ -117,6 +118,7 @@ export default function ScenesView({
   // The confirm dialog portals to document.body, so it would outlive an app
   // switch — dismiss it when the user docks away.
   useCloseOnAppSwitch(!!batchConfirm, () => setBatchConfirm(null))
+  useCloseOnEscape(!!batchConfirm, () => setBatchConfirm(null))
   // Resolution + aspect chosen for the run (model lives in the global setting).
   const [batchResolution, setBatchResolution] = useState<ImageResolution | undefined>(undefined)
   const [batchAspect, setBatchAspect] = useState<string | undefined>(undefined)
@@ -378,7 +380,7 @@ export default function ScenesView({
                 },
               }
             })
-            useAppStore.getState().addToast(`Video resume failed: ${msg}`, 'error')
+            useAppStore.getState().addToast(msg, 'error')
           } finally {
             resumingRef.current.delete(resumeKey)
           }

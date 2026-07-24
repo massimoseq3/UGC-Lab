@@ -257,6 +257,23 @@ textarea,
   touch-action: manipulation;
 }
 
+/* Keyboard focus ring. The app resets outlines in ~60 places (`focus:outline-none`
+   on inputs, so a click doesn't leave a box) and never restored a keyboard
+   affordance, which left tab navigation with no visible position at all. One
+   unlayered rule fixes every surface at once:
+   - `:focus-visible` only, so pointer users still never see a ring.
+   - `outline` rather than a box-shadow ring, because outlines follow each
+     element's own border-radius — pills stay pills, cards stay cards, and no
+     component needs a per-instance class.
+   - Unlayered, so it wins over Tailwind's layered `outline-none` utility
+     (same trick the light-mode block above relies on).
+   - Wrapped in `:where()` so specificity stays 0 and any component that wants
+     a bespoke focus treatment can override it with a single class. */
+:where(a, button, input, select, textarea, summary, [role='button'], [tabindex]):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-ink) 55%, transparent);
+  outline-offset: 2px;
+}
+
 /* Native scrollbars are kept INVISIBLE but still reserve their 11px track, so
    layout stays stable (and the prompt editors' reserved scrollbar gutter is
    preserved). The visible, smoothly-fading thumb is drawn as an overlay element

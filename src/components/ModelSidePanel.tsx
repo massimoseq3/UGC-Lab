@@ -20,6 +20,7 @@ import { useIsDesktop } from '../hooks/useBreakpoint'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import ProviderLogo from './ProviderLogo'
 import SavingsPill from './SavingsPill'
+import useCloseOnEscape from '../hooks/useCloseOnEscape'
 
 // Slide-in side-panel model picker (mirrors BankPicker's mechanics). Used by
 // B-Roll in place of the inline ModelPicker dropdown. Selection is persisted
@@ -173,15 +174,7 @@ export default function ModelSidePanel({
 
   useCloseOnAppSwitch(isOpen, onClose)
 
-  // Close on Escape.
-  useEffect(() => {
-    if (!isOpen) return
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [isOpen, onClose])
+  useCloseOnEscape(isOpen, onClose)
 
   function pick(modelId: string) {
     if (onChange) onChange(modelId)

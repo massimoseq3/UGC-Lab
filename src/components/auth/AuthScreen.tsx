@@ -223,7 +223,7 @@ function MembersOnlyModal({ onClose }: { onClose: () => void }) {
       <div className="relative w-full max-w-sm rounded-2xl border border-ink/10 bg-surface-2 p-6 text-center shadow-2xl">
         <button
           onClick={onClose}
-          className="absolute right-3 top-3 rounded-md p-1 text-ink-500 transition-colors hover:bg-ink/[0.05] hover:text-ink-200"
+          className="absolute right-3 top-3 rounded-full p-1 text-ink-500 transition-colors hover:bg-ink/[0.05] hover:text-ink-200"
           aria-label="Close"
         >
           <X className="h-4 w-4" />

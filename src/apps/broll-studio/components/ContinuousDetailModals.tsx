@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   X,
@@ -58,15 +58,12 @@ import {
 import { downloadImage } from '../../../utils/downloadImage'
 import { copyToClipboard } from '../../../utils/clipboard'
 import { humanizeError } from '../../../utils/friendlyError'
+import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 
 // ── Shared modal shell ─────────────────────────────────────────
 
 function ModalShell({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  useCloseOnEscape(true, onClose)
   useCloseOnAppSwitch(true, onClose)
 
   // A text-selection drag that starts inside the content and releases over the

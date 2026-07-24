@@ -12,9 +12,32 @@ interface GenerationProgressProps {
   // Override the rotating status line's type size (defaults to text-xs). The
   // Playground in-flight tile passes a size that matches its model label.
   messageClassName?: string
+  // Optional named phase for multi-stage jobs, e.g. {step: 1, of: 2, label:
+  // 'logging every cut'} → "Pass 1 of 2 — logging every cut". Borrowed from the
+  // Ad Analyzer's analysing pane: on a job with real stages, knowing WHICH
+  // stage you're in is far more reassuring than a rotating status line alone.
+  // Omit it for single-stage generations.
+  phase?: { step: number; of: number; label?: string; noun?: string }
 }
 
 const DEFAULT_MESSAGES = ['Preparing...', 'Sending request...', 'Processing...', 'Almost done...']
+
+// The phase line is tinted with the app accent to match the bar, so callers
+// don't have to pass the same accent twice. Spelled out as literals rather than
+// built from `color` — Tailwind only emits classes it can find as whole strings
+// in the source, so `text-${...}` would compile to nothing.
+const PHASE_TEXT: Record<string, string> = {
+  'bg-broll-500': 'text-broll-300',
+  'bg-influencers-500': 'text-influencers-300',
+  'bg-playground-500': 'text-playground-300',
+  'bg-scripts-500': 'text-scripts-text',
+  'bg-voice-500': 'text-voice-300',
+  'bg-green-500': 'text-green-400',
+}
+
+function accentTextClass(color: string): string {
+  return PHASE_TEXT[color] ?? 'text-ink-400'
+}
 const ROTATE_MS = 4000
 
 // Indeterminate generation indicator. No percentage, no elapsed counter —
@@ -28,6 +51,7 @@ export default function GenerationProgress({
   className = '',
   showHelper = true,
   messageClassName = 'text-xs',
+  phase,
 }: GenerationProgressProps) {
   const msgs = messages && messages.length > 0 ? messages : DEFAULT_MESSAGES
   const [index, setIndex] = useState(0)
@@ -56,7 +80,13 @@ export default function GenerationProgress({
       <div className="relative h-1 w-full overflow-hidden rounded-full bg-ink/10">
         <div className={`shimmer-band absolute inset-y-0 left-0 w-1/2 ${color} animate-shimmer-sweep`} />
       </div>
-      <div className={`${showHelper ? 'mt-2' : 'mt-1.5'} space-y-0.5`}>
+      {phase && (
+        <p className={`mt-2 text-[11px] font-medium uppercase tracking-widest ${accentTextClass(color)}`}>
+          {phase.noun ?? 'Step'} {phase.step} of {phase.of}
+          {phase.label ? ` — ${phase.label}` : ''}
+        </p>
+      )}
+      <div className={`${phase ? 'mt-1' : showHelper ? 'mt-2' : 'mt-1.5'} space-y-0.5`}>
         {/* When the helper line is shown, reserve 2 lines for the rotating
             message so the layout doesn't jump on long-message wraps. When
             it's hidden (Scripts / B-Roll prompt-gen), tighten to 1 line so

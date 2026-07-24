@@ -251,7 +251,8 @@ export function ApiKeyGuide({ onClose, onOpenSettings }: { onClose: () => void; 
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
+            aria-label="Close"
+            className="rounded-full p-1.5 text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
           >
             <X className="h-4 w-4" />
           </button>

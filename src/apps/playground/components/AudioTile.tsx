@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { Download, Trash2, Copy, Music as MusicIcon } from 'lucide-react'
+import { Download, Copy, Music as MusicIcon } from 'lucide-react'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import type { MusicHistoryItem } from '../../../stores/types'
 import { getModel } from '../../../utils/models'
+import { TileDeleteButton } from '../../../components/tileActions'
 
 interface AudioTileProps {
   item: MusicHistoryItem
@@ -18,7 +18,6 @@ export default function AudioTile({ item, onDownload, onDelete, onCopyPrompt }: 
   const audioUrl = useAssetUrl(item.audioRef)
   const coverUrl = useAssetUrl(item.coverImageRef)
   const modelLabel = getModel(item.modelId)?.displayName ?? item.modelId
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   return (
     <div className="overflow-hidden rounded-lg border border-ink/10 bg-ink/[0.02]">
@@ -48,44 +47,26 @@ export default function AudioTile({ item, onDownload, onDelete, onCopyPrompt }: 
           <audio src={audioUrl} controls className="mt-2 h-8 w-full" preload="metadata" />
         )}
 
+        {/* Horizontal variant of the standard action order: download · copy ·
+            delete (no save — music doesn't go to a bank). */}
         <div className="mt-1.5 flex items-center justify-end gap-1">
-          <button
-            type="button"
-            title="Copy prompt"
-            onClick={onCopyPrompt}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-ink/[0.05] hover:text-ink-200"
-          >
-            <Copy className="h-3 w-3" />
-          </button>
           <button
             type="button"
             title="Download"
             onClick={onDownload}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-ink-400 transition-colors hover:bg-ink/[0.05] hover:text-ink-200"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.05] hover:text-ink-200"
           >
-            <Download className="h-3 w-3" />
+            <Download className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
-            title={confirmingDelete ? 'Click again to delete' : 'Delete'}
-            onClick={(e) => {
-              e.stopPropagation()
-              if (!confirmingDelete) {
-                setConfirmingDelete(true)
-                setTimeout(() => setConfirmingDelete(false), 3000)
-                return
-              }
-              onDelete()
-            }}
-            className={`flex h-6 items-center justify-center gap-1 rounded-md px-1.5 transition-colors ${
-              confirmingDelete
-                ? 'bg-red-500/30 text-red-100 light:text-red-900 ring-1 ring-red-400/60'
-                : 'text-ink-400 hover:bg-red-500/15 hover:text-red-300 light:hover:text-red-700'
-            }`}
+            title="Copy prompt"
+            onClick={onCopyPrompt}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.05] hover:text-ink-200"
           >
-            <Trash2 className="h-3 w-3" />
-            {confirmingDelete && <span className="text-[9px] font-medium uppercase tracking-wider">Confirm</span>}
+            <Copy className="h-3.5 w-3.5" />
           </button>
+          <TileDeleteButton variant="chrome" size="sm" alwaysVisible onDelete={onDelete} />
         </div>
       </div>
     </div>

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { Search, Eye, Trash2, Plus, AlertCircle } from 'lucide-react'
+import { Search, Eye, Plus, AlertCircle } from 'lucide-react'
 import type { AdAnatomyHistoryItem } from '../../../stores/types'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
+import { TileDeleteButton } from '../../../components/tileActions'
 
 interface HistoryRailProps {
   items: AdAnatomyHistoryItem[]
@@ -35,16 +36,20 @@ export default function HistoryRail({ items, selectedId, onSelect, onDelete, onN
     // Phones: full-width strip on top of the app (New + search in one row,
     // history capped to a short scrollable list). md+: the 280px left rail.
     <div className="flex w-full shrink-0 flex-col border-b border-ink/5 md:h-full md:w-[280px] md:border-b-0 md:border-r">
-      {/* New analysis lives at the top of the rail, above the search field. */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-ink/5 p-3 md:flex-col md:items-stretch md:gap-2.5">
+      {/* New analysis leads the rail, above the search field.
+          On md+ the button sits in its own h-[57px] band so the rail's first
+          hairline lines up with the results column's sticky header (the
+          app-wide panel-header spec); the search drops to a second row below.
+          On phones the whole thing is one compact row and the band collapses. */}
+      <div className="flex shrink-0 items-center gap-2 p-3 md:h-[57px] md:border-b md:border-ink/5 md:px-3 md:py-0">
         <button
           onClick={onNew}
-          className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/15 bg-[#FF5257] px-4 py-2.5 text-[13px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-colors hover:bg-[#FF5257]/90 md:w-full"
+          className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/15 bg-[#FF5257] px-4 py-2.5 text-[13px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-colors hover:bg-[#FF5257]/90 md:w-full md:py-2"
         >
           <Plus className="h-4 w-4" strokeWidth={2.5} />
           New Analysis
         </button>
-        <div className="relative min-w-0 flex-1 md:w-full md:flex-none">
+        <div className="relative min-w-0 flex-1 md:hidden">
           <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
           <input
             value={query}
@@ -53,6 +58,15 @@ export default function HistoryRail({ items, selectedId, onSelect, onDelete, onN
             className="w-full rounded-full border border-ink/10 bg-transparent py-1.5 pl-9 pr-3 text-[12px] text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-[#FF5257]/40"
           />
         </div>
+      </div>
+      <div className="relative hidden shrink-0 border-b border-ink/5 px-3 py-2.5 md:block">
+        <Search className="absolute left-6 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search analyses..."
+          className="w-full rounded-full border border-ink/10 bg-transparent py-1.5 pl-9 pr-3 text-[12px] text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-[#FF5257]/40"
+        />
       </div>
 
       <div className="max-h-44 overflow-y-auto md:max-h-none md:flex-1">
@@ -107,7 +121,6 @@ function HistoryRow({
   onDelete: () => void
 }) {
   const thumbUrl = useAssetUrl(item.thumbnailRef ?? '')
-  const [confirming, setConfirming] = useState(false)
   const titleText = item.adTitle?.trim() || item.fileName || 'Untitled analysis'
 
   return (
@@ -145,26 +158,7 @@ function HistoryRow({
           </div>
         </div>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            if (!confirming) {
-              setConfirming(true)
-              setTimeout(() => setConfirming(false), 3000)
-              return
-            }
-            onDelete()
-          }}
-          className={`flex h-6 shrink-0 items-center justify-center gap-1 rounded-full px-1.5 transition-all ${
-            confirming
-              ? 'bg-red-500/30 text-red-100 light:text-red-900 opacity-100 ring-1 ring-red-400/60'
-              : `text-ink-500 hover:bg-red-500/10 hover:text-red-400 light:hover:text-red-600 ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`
-          }`}
-          title={confirming ? 'Click again to delete' : 'Delete'}
-        >
-          <Trash2 className="h-3 w-3" />
-          {confirming && <span className="text-[9px] font-medium">Confirm</span>}
-        </button>
+        <TileDeleteButton variant="chrome" size="sm" alwaysVisible={isActive} onDelete={onDelete} />
       </div>
     </div>
   )

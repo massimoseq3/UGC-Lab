@@ -36,6 +36,8 @@ import { useAppStore } from '../../../stores/appStore'
 import { useCreditsStore } from '../../../stores/creditsStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
+import { TileActionStack, TileActionButton } from '../../../components/tileActions'
+import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
 import { extractVideoFrame } from '../../../utils/videoFrames'
 import { getModel, snapVideoDurationUp, estimateCredits, formatCredits } from '../../../utils/models'
@@ -121,6 +123,7 @@ export default function OneShotView({
   const balance = useCreditsStore((s) => s.balance)
   // Portals to body, so dismiss it on a dock switch.
   useCloseOnAppSwitch(!!confirmGen, () => setConfirmGen(null))
+  useCloseOnEscape(!!confirmGen, () => setConfirmGen(null))
 
   // Seed a card state for every segment when a result lands (history restore
   // included). Existing entries win — they hold the user's edits and videos.
@@ -323,7 +326,7 @@ export default function OneShotView({
           e.id === inFlightId ? { ...e, error: msg } : e,
         ),
       }))
-      useAppStore.getState().addToast(`Video generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     }
   }
 
@@ -398,7 +401,7 @@ export default function OneShotView({
               if (!existing) return prev
               return { ...prev, [key]: { ...existing, inFlightVideos: existing.inFlightVideos.map((e) => e.id === inFlightId ? { ...e, error: msg } : e) } }
             })
-            useAppStore.getState().addToast(`Video resume failed: ${msg}`, 'error')
+            useAppStore.getState().addToast(msg, 'error')
           } finally {
             resumingRef.current.delete(resumeKey)
           }
@@ -908,32 +911,26 @@ function OSVariationCard({
         {/* Hover action stack — top-right, app-wide order: download · copy ·
             send-to-Playground. No save (video) and no trash (structural card). */}
         {currentVideo && (
-          <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            <button
-              type="button"
+          <TileActionStack>
+            <TileActionButton
               title="Download video"
-              onClick={(e) => { e.stopPropagation(); void handleDownload() }}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/50"
+              onClick={() => { void handleDownload() }}
             >
-              <Download className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
+              <Download className="h-4 w-4" />
+            </TileActionButton>
+            <TileActionButton
               title={copied ? 'Prompt copied' : 'Copy prompt'}
-              onClick={(e) => { e.stopPropagation(); void handleCopy() }}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/50"
+              onClick={() => { void handleCopy() }}
             >
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
-            <button
-              type="button"
+              {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+            </TileActionButton>
+            <TileActionButton
               title="Use in Playground as Gemini Omni source clip"
-              onClick={(e) => { e.stopPropagation(); void sendClipToPlayground(currentVideo) }}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/50"
+              onClick={() => { void sendClipToPlayground(currentVideo) }}
             >
-              <Film className="h-3.5 w-3.5" />
-            </button>
-          </div>
+              <Film className="h-4 w-4" />
+            </TileActionButton>
+          </TileActionStack>
         )}
 
         {/* Bottom shortcut into the workspace. */}

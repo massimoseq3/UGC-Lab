@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
 import {
-  Loader2, Download, Trash2, Bookmark, Check, Film, Image as ImageIcon,
+  Loader2, Download, Bookmark, Check, Film, Image as ImageIcon,
   Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy,
   LayoutGrid, List, Maximize2,
 } from 'lucide-react'
@@ -16,6 +16,7 @@ import { downloadImage } from '../../../utils/downloadImage'
 import type { ImageHistoryItem, VideoHistoryItem, MusicHistoryItem } from '../../../stores/types'
 import AudioTile from './AudioTile'
 import GenerationProgress from '../../../components/GenerationProgress'
+import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import GeneratingBackdrop from '../../../components/GeneratingBackdrop'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import type { PlaygroundMode, InFlightGen } from '../types'
@@ -424,7 +425,7 @@ function HistoryListRow({
               <Copy className="h-4 w-4" />
             </ListRowButton>
           )}
-          <ListRowDeleteButton onDelete={onDelete} />
+          <TileDeleteButton variant="chrome" onDelete={onDelete} />
         </div>
         </div>
       </div>
@@ -478,7 +479,7 @@ function ListRowButton({
   tone?: 'default' | 'saved'
 }) {
   const toneClass = tone === 'saved'
-    ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300'
+    ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300 light:text-emerald-700'
     : 'border-ink/10 bg-ink/[0.03] text-ink-300 hover:bg-ink/[0.08] hover:text-ink-100'
   return (
     <button
@@ -488,36 +489,6 @@ function ListRowButton({
       className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${toneClass}`}
     >
       {children}
-    </button>
-  )
-}
-
-// Two-click delete for list rows — same model as DeleteConfirmButton but styled
-// for the list surface (no media backdrop to sit over).
-function ListRowDeleteButton({ onDelete }: { onDelete: () => void }) {
-  const [confirming, setConfirming] = useState(false)
-  return (
-    <button
-      type="button"
-      title={confirming ? 'Click again to delete' : 'Delete'}
-      onClick={(e) => {
-        e.stopPropagation()
-        if (!confirming) {
-          setConfirming(true)
-          setTimeout(() => setConfirming(false), 3000)
-          return
-        }
-        onDelete()
-      }}
-      // Idle is a fixed 8×8 circle; only "Confirm" grows into a pill.
-      className={`flex h-8 items-center justify-center rounded-full border transition-colors ${
-        confirming
-          ? 'gap-1 px-2 border-red-400/50 bg-red-500/20 text-red-300 light:text-red-700'
-          : 'w-8 border-ink/10 bg-ink/[0.03] text-ink-300 hover:border-red-400/40 hover:bg-red-500/15 hover:text-red-300'
-      }`}
-    >
-      <Trash2 className="h-4 w-4" />
-      {confirming && <span className="text-[9px] font-medium uppercase tracking-wider">Confirm</span>}
     </button>
   )
 }
@@ -560,8 +531,8 @@ function ImageTile({
         )}
         {/* Hover action stack — top-right vertical column, app-wide standard
             order: download · save · copy · delete. */}
-        <div className="absolute right-1.5 top-1.5 flex flex-col items-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <TileButton
+        <TileActionStack>
+          <TileActionButton
             title="Download"
             onClick={async (e) => {
               e.stopPropagation()
@@ -570,21 +541,21 @@ function ImageTile({
             }}
           >
             <Download className="h-4 w-4" />
-          </TileButton>
-          <TileButton
+          </TileActionButton>
+          <TileActionButton
             title={isSaved ? 'Saved to B-Rolls' : isSaving ? 'Saving…' : 'Save to B-Rolls Bank'}
             tone={isSaved ? 'saved' : 'default'}
             onClick={(e) => { e.stopPropagation(); if (!isSaved && !isSaving) onSave() }}
           >
             {isSaved ? <Check className="h-4 w-4" /> : isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bookmark className="h-4 w-4" />}
-          </TileButton>
+          </TileActionButton>
           {item.prompt && (
-            <TileButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
+            <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
               <Copy className="h-4 w-4" />
-            </TileButton>
+            </TileActionButton>
           )}
-          <DeleteConfirmButton onDelete={onDelete} />
-        </div>
+          <TileDeleteButton onDelete={onDelete} />
+        </TileActionStack>
       </div>
       {modelLabel && (
         <p className="mt-1 truncate text-center text-[10px] font-medium tracking-wider text-ink-500">
@@ -707,8 +678,8 @@ function VideoTile({
 
         {/* Hover action stack — top-right vertical column, app-wide standard
             order: download · copy · delete (video has no save-to-bank). */}
-        <div className="absolute right-1.5 top-1.5 flex flex-col items-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-          <TileButton
+        <TileActionStack>
+          <TileActionButton
             title="Download"
             onClick={async (e) => {
               e.stopPropagation()
@@ -717,14 +688,14 @@ function VideoTile({
             }}
           >
             <Download className="h-4 w-4" />
-          </TileButton>
+          </TileActionButton>
           {item.prompt && (
-            <TileButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
+            <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
               <Copy className="h-4 w-4" />
-            </TileButton>
+            </TileActionButton>
           )}
-          <DeleteConfirmButton onDelete={onDelete} />
-        </div>
+          <TileDeleteButton onDelete={onDelete} />
+        </TileActionStack>
       </div>
       {modelLabel && (
         <p className="mt-1 truncate text-center text-[10px] font-medium tracking-wider text-ink-500">
@@ -1179,65 +1150,6 @@ function ModalBarButton({
 }
 
 // ── Shared bits ─────────────────────────────────────────────────
-
-// Two-click delete confirm. First click flips to a red "Confirm?" state for
-// 3 s; second click within the window fires onDelete. Mirrors VariationCard's
-// inline pattern so the house style stays consistent — no modal dialog.
-export function DeleteConfirmButton({ onDelete }: { onDelete: () => void }) {
-  const [confirming, setConfirming] = useState(false)
-  return (
-    <button
-      type="button"
-      title={confirming ? 'Click again to delete' : 'Delete'}
-      onClick={(e) => {
-        e.stopPropagation()
-        if (!confirming) {
-          setConfirming(true)
-          setTimeout(() => setConfirming(false), 3000)
-          return
-        }
-        onDelete()
-      }}
-      // Idle is a fixed 8×8 circle; only "Confirm" grows into a pill.
-      className={`flex h-8 items-center justify-center rounded-full border backdrop-blur transition-colors ${
-        confirming
-          ? 'gap-1 px-2 border-red-400/60 bg-red-500/45 text-red-50'
-          : 'w-8 border-white/20 bg-black/35 text-white hover:bg-red-500/30 hover:text-red-100 hover:border-red-400/40'
-      }`}
-    >
-      <Trash2 className="h-4 w-4" />
-      {confirming && <span className="text-[9px] font-medium uppercase tracking-wider">Confirm</span>}
-    </button>
-  )
-}
-
-function TileButton({
-  children,
-  onClick,
-  title,
-  tone = 'default',
-}: {
-  children: React.ReactNode
-  onClick: (e: React.MouseEvent) => void
-  title: string
-  tone?: 'default' | 'saved' | 'danger'
-}) {
-  const toneClass = tone === 'saved'
-    ? 'border-emerald-400/50 bg-emerald-500/30 text-emerald-100'
-    : tone === 'danger'
-    ? 'border-white/20 bg-black/35 text-white hover:bg-red-500/30 hover:text-red-100 hover:border-red-400/40'
-    : 'border-white/20 bg-black/35 text-white hover:bg-black/50'
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={`flex h-8 w-8 items-center justify-center rounded-full border backdrop-blur transition-colors ${toneClass}`}
-    >
-      {children}
-    </button>
-  )
-}
 
 function aspectStyle(ar: string): React.CSSProperties {
   const [w, h] = ar.split(':').map(Number)

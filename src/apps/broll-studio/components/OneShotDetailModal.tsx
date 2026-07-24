@@ -50,6 +50,7 @@ import {
 import { downloadImage } from '../../../utils/downloadImage'
 import { copyToClipboard } from '../../../utils/clipboard'
 import { humanizeError } from '../../../utils/friendlyError'
+import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 
 interface OneShotDetailModalProps {
   segment: OneShotSegment
@@ -115,11 +116,7 @@ export default function OneShotDetailModal({
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
 
   useEffect(() => { setDraft(cardState.editablePrompt) }, [cardState.editablePrompt])
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
+  useCloseOnEscape(true, onClose)
   useCloseOnAppSwitch(true, onClose)
 
   // A text-selection drag that starts inside the content and releases over the

@@ -91,6 +91,17 @@ export default function BrollStudio() {
   const [selectedScriptId, setSelectedScriptId] = usePersistedState<string | null>(`${baseKey}:scriptId`, null)
   const [scriptText, setScriptText] = usePersistedState(`${baseKey}:scriptText`, '')
   const [additionalContext, setAdditionalContext] = usePersistedState(`${baseKey}:context`, '')
+
+  // Panel-level "New" — wipes the input column back to a blank slate. Inputs
+  // ONLY: the current result, every card's images/videos, and all history rows
+  // stay put, because outputs are the user's work.
+  const handleClearInputs = () => {
+    setSelectedProductId(null)
+    setSelectedModelId(null)
+    setSelectedScriptId(null)
+    setScriptText('')
+    setAdditionalContext('')
+  }
   const [result, setResult] = usePersistedState<BrollResult | null>(
     `${baseKey}:result`,
     null,
@@ -474,7 +485,7 @@ export default function BrollStudio() {
     } catch (err) {
       const msg = humanizeError(err, 'Concept generation failed. Check your API key and try again.')
       setError(msg)
-      useAppStore.getState().addToast(`Concept generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     } finally {
       setIsGenerating(false)
     }
@@ -510,7 +521,7 @@ export default function BrollStudio() {
       useAppStore.getState().addToast('Variation added', 'success')
     } catch (err) {
       const msg = humanizeError(err, 'Could not add a variation. Try again.')
-      useAppStore.getState().addToast(`Add variation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     } finally {
       setIsAddingVariation(false)
     }
@@ -552,7 +563,7 @@ export default function BrollStudio() {
     } catch (err) {
       const msg = humanizeError(err, 'Storyboard generation failed. Check your API key and try again.')
       setError(msg)
-      useAppStore.getState().addToast(`Storyboard failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     } finally {
       setIsGenerating(false)
     }
@@ -598,7 +609,7 @@ export default function BrollStudio() {
       useAppStore.getState().addToast('Style locked from your references', 'success')
     } catch (err) {
       const msg = humanizeError(err, 'Could not read the style from those images.')
-      useAppStore.getState().addToast(`Style analysis failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     } finally {
       setIsAnalyzingStyle(false)
     }
@@ -651,7 +662,7 @@ export default function BrollStudio() {
     } catch (err) {
       const msg = humanizeError(err, 'B-Roll generation failed. Check your API key and try again.')
       setError(msg)
-      useAppStore.getState().addToast(`B-roll generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     } finally {
       setIsGenerating(false)
     }
@@ -736,6 +747,7 @@ export default function BrollStudio() {
           onSelectProduct={() => setPickerMode('products')}
           onSelectModel={() => setPickerMode('models')}
           onSelectScript={() => setPickerMode('scripts')}
+          onClearInputs={handleClearInputs}
           onClearProduct={() => setSelectedProductId(null)}
           onClearModel={() => setSelectedModelId(null)}
           onClearScript={() => setSelectedScriptId(null)}

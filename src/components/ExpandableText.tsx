@@ -1,7 +1,8 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Maximize2, X } from 'lucide-react'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
+import useCloseOnEscape from '../hooks/useCloseOnEscape'
 
 // Per-app accent for the modal's focus ring + Done button. Literal class
 // strings (Tailwind can't build class names from props at runtime).
@@ -106,12 +107,7 @@ export default function ExpandTextModal({
 
   useCloseOnAppSwitch(open, onClose)
 
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  useCloseOnEscape(open, onClose)
 
   if (!open) return null
 

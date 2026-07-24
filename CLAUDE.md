@@ -35,6 +35,14 @@ Senior frontend engineer + product architect. Push back when something's flawed.
 
 **Styling.** Tailwind only. Per-app accent palettes are custom Tailwind families (`influencers-*`, `scripts-*`, `voice-*`, `broll-*`, `playground-*`) defined in the `@theme` block of `index.css` (Ad Analyzer uses literal `#FF5257`); the matching hexes for sidebar/bank chrome live in `constants.ts`. Change an accent there, not by sprinkling new color classes. Tracking-tight text. Transitions 200–300 ms for panels, 150 ms for hover. Tags use `TAG_STYLES` from `models.ts` (Recommended green / New fuchsia / Fast sky / Cheap zinc). **Single-line inputs, select-style triggers, chips, and buttons are fully rounded (`rounded-full`), not rectangles** — Massimo's preferred aesthetic; multi-line textareas use `rounded-2xl`.
 
+**Shared UI idioms.** Reach for these instead of re-implementing — each one had drifted into 3–4 near-identical copies before it was extracted:
+- `components/tileActions.tsx` — the hover action column on every generated media tile. `TileActionStack` + `TileActionButton` + `TileStarButton` + `TileDeleteButton`, in the order **[Star] → Download → Save → Copy → extras → Delete**. 32px circles, `bg-black/55`, no backdrop-blur (it stutters under the opacity fade).
+- `TileDeleteButton` is the **only** delete idiom: two-click, arms into a red "Confirm" pill, reverts after 3s. Never a confirm modal. `variant='chrome'` for panel surfaces, `size='sm'` for compact history rows.
+- `hooks/useCloseOnEscape.ts` — every dismissible overlay takes it, alongside the existing backdrop click (and `useCloseOnAppSwitch` when body-portaled).
+- `components/ClearAllButton.tsx` — the panel-level reset at the top of each input column. Labelled **"New"**, because it clears inputs only; outputs and history always survive.
+- Panel headers are `h-[57px]` + `border-b border-ink/5` on **both** panes of a two-pane app, rendered even when a pane is empty, so the hairlines align.
+- Keyboard focus is one global `:focus-visible` outline in `index.css`. Don't add per-component focus rings.
+
 **Theming (light default + dark mode).** Driven by `data-theme` on `<html>`: an inline script in `index.html` sets it pre-paint; `stores/themeStore.ts` owns the preference (`dark`/`light`/`system`, own localStorage key `ai-ugc-lab-theme`, deliberately per-browser — never cloud-synced, survives sign-out). New browsers default to `dark` — the store fallback and the index.html bootstrap must agree. Switchers: Settings → Appearance + the menu bar's top-right quick toggle. UI chrome must use the semantic tokens from `index.css`, never literal white/zinc/dark hexes:
 - `ink` — fg chrome (white in dark, near-black in light): `border-ink/10`, `bg-ink/5`, `text-ink`. `paper` is its inverse (`bg-ink text-paper` buttons).
 - `surface-0/1/2` — page → panel → popover elevation.
@@ -42,7 +50,7 @@ Senior frontend engineer + product architect. Push back when something's flawed.
 - Accent families auto-flip their 100–400/600 tints in light mode.
 Exceptions that stay literal: anything overlaying user media (badges/scrims/play buttons → `text-white`, `bg-black/60`, `from-black/85`), white text on solid accent buttons, modal backdrops. Status tints (-100…-400 colored text on tinted bg) need a `light:` darker variant (`text-red-300 light:text-red-700`; the `light:` custom variant is defined in `index.css`). `AppBackground.tsx` holds the per-theme canvas gradient.
 
-**Errors.** End-user generation surfaces show friendly copy via `humanizeError()` (see `utils/friendlyError.ts`). Infra/admin/Settings surfaces still surface the raw kie.ai message — the operator debugs there. Note: the kie envelope can return `{ code: 5xx, msg: "...maintained..." }` inside an HTTP 200 during maintenance windows — not a code bug.
+**Errors.** End-user generation surfaces show friendly copy via `humanizeError()` (see `utils/friendlyError.ts`). It always returns a **complete sentence** — toast it verbatim and name the operation in the `fallback`; never prefix the result (``addToast(`Video generation failed: ${msg}`)`` printed the operation twice). Infra/admin/Settings surfaces still surface the raw kie.ai message — the operator debugs there. Note: the kie envelope can return `{ code: 5xx, msg: "...maintained..." }` inside an HTTP 200 during maintenance windows — not a code bug.
 
 ## Tech Stack
 

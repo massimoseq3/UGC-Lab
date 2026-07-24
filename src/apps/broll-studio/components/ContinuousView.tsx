@@ -66,6 +66,8 @@ import { useAppStore } from '../../../stores/appStore'
 import { useCreditsStore } from '../../../stores/creditsStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
+import { TileActionStack, TileActionButton } from '../../../components/tileActions'
+import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
 import { getModel, getDefaultModel, snapVideoDurationUp, estimateCredits, formatCredits, officialSavingsPercent, type VideoMode, type ImageResolution } from '../../../utils/models'
 import { humanizeError } from '../../../utils/friendlyError'
@@ -153,6 +155,7 @@ export default function ContinuousView({
   const [confirmModelPanelOpen, setConfirmModelPanelOpen] = useState(false)
   const balance = useCreditsStore((s) => s.balance)
   useCloseOnAppSwitch(!!confirmGen, () => setConfirmGen(null))
+  useCloseOnEscape(!!confirmGen, () => setConfirmGen(null))
 
   // Keyframes are images, so the frame-batch confirm dialog mirrors Line-by-
   // Line's "Generate images" dialog: the shared B-Roll image model plus a
@@ -344,7 +347,7 @@ export default function ContinuousView({
       updateFrame(key, (prev) => ({
         inFlightImages: prev.inFlightImages.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)),
       }))
-      useAppStore.getState().addToast(`Image generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
       return false
     }
 
@@ -370,7 +373,7 @@ export default function ContinuousView({
       updateFrame(key, (prev) => ({
         inFlightImages: prev.inFlightImages.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)),
       }))
-      useAppStore.getState().addToast(`Image generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
       return false
     }
   }
@@ -378,6 +381,10 @@ export default function ContinuousView({
   // Sequential chain-generate: walk the frames in order so each generation can
   // reference the previous keyframe. Skips frames that already have one.
   const [chainRunning, setChainRunning] = useState(false)
+  // Where the sequential keyframe walk has got to. This chain is genuinely
+  // staged (each frame chains off the previous one's chosen image), so the
+  // position is real information — not a fake progress bar.
+  const [chainAt, setChainAt] = useState<{ step: number; of: number } | null>(null)
   const runAllFrames = async (
     frameIndices: number[],
     override?: { aspectRatio: string; resolution: ImageResolution },
@@ -389,7 +396,9 @@ export default function ContinuousView({
       // Always walk in index order so each frame can chain off the previous
       // frame's (possibly just-regenerated) keyframe.
       const ordered = [...frameIndices].sort((a, b) => a - b)
+      let step = 0
       for (const frameIndex of ordered) {
+        setChainAt({ step: ++step, of: ordered.length })
         const frame = result.frames.find((f) => f.index === frameIndex)
         if (!frame || frame.concepts.length === 0) continue
         const picked = selectionsRef.current[String(frameIndex)]
@@ -423,6 +432,7 @@ export default function ContinuousView({
       }
     } finally {
       setChainRunning(false)
+      setChainAt(null)
     }
   }
 
@@ -535,7 +545,7 @@ export default function ContinuousView({
       updateClip(key, (prev) => ({
         inFlightVideos: prev.inFlightVideos.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)),
       }))
-      useAppStore.getState().addToast(`Video generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     }
   }
 
@@ -633,7 +643,7 @@ export default function ContinuousView({
       updateFrame(frameKey, (prev) => ({
         inFlightVideos: prev.inFlightVideos.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)),
       }))
-      useAppStore.getState().addToast(`Video generation failed: ${msg}`, 'error')
+      useAppStore.getState().addToast(msg, 'error')
     }
   }
 
@@ -741,7 +751,7 @@ export default function ContinuousView({
               if (!existing) return prev
               return { ...prev, [key]: { ...existing, inFlightVideos: existing.inFlightVideos.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)) } }
             })
-            useAppStore.getState().addToast(`Video resume failed: ${msg}`, 'error')
+            useAppStore.getState().addToast(msg, 'error')
           } finally {
             resumingRef.current.delete(resumeKey)
           }
@@ -993,7 +1003,9 @@ export default function ContinuousView({
             className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {chainRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
-            {chainRunning ? 'Chaining frames…' : 'Generate frames'}
+            {chainRunning
+              ? chainAt ? `Frame ${chainAt.step} of ${chainAt.of}…` : 'Chaining frames…'
+              : 'Generate frames'}
           </button>
           <button
             type="button"
@@ -1679,34 +1691,27 @@ function FrameConceptCard({
             copy. Stills only (keyframes), so no send-to-Playground; no trash
             (structural card). Shown once an image exists. */}
         {hasImage && (
-          <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            <button
-              type="button"
+          <TileActionStack>
+            <TileActionButton
               title="Download image"
-              onClick={(e) => { e.stopPropagation(); void handleDownload() }}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/50"
+              onClick={() => { void handleDownload() }}
             >
-              <Download className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
+              <Download className="h-4 w-4" />
+            </TileActionButton>
+            <TileActionButton
               title={saved ? 'Saved to B-Rolls bank' : saving ? 'Saving…' : 'Save to B-Rolls bank'}
-              onClick={(e) => { e.stopPropagation(); void handleSave() }}
-              className={`flex h-7 w-7 items-center justify-center rounded-full border backdrop-blur transition-colors ${
-                saved ? 'border-emerald-400/50 bg-emerald-500/30 text-emerald-100' : 'border-white/20 bg-black/35 text-white hover:bg-black/50'
-              }`}
+              tone={saved ? 'saved' : 'default'}
+              onClick={() => { void handleSave() }}
             >
-              {saved ? <Check className="h-3.5 w-3.5" /> : saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bookmark className="h-3.5 w-3.5" />}
-            </button>
-            <button
-              type="button"
+              {saved ? <Check className="h-4 w-4" /> : saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bookmark className="h-4 w-4" />}
+            </TileActionButton>
+            <TileActionButton
               title={copied ? 'Prompt copied' : 'Copy prompt'}
-              onClick={(e) => { e.stopPropagation(); void handleCopy() }}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/50"
+              onClick={() => { void handleCopy() }}
             >
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
-          </div>
+              {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+            </TileActionButton>
+          </TileActionStack>
         )}
 
         {/* Hover action row. Before any image → Generate. Once an image exists →
@@ -1898,32 +1903,26 @@ function ClipCard({
         {/* Hover action stack — top-right, app-wide order: download · copy ·
             send-to-Playground. No save (video) and no trash (structural card). */}
         {currentVideo && (
-          <div className="absolute right-2 top-2 z-10 flex flex-col items-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-            <button
-              type="button"
+          <TileActionStack>
+            <TileActionButton
               title="Download video"
-              onClick={(e) => { e.stopPropagation(); void handleDownload() }}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/50"
+              onClick={() => { void handleDownload() }}
             >
-              <Download className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
+              <Download className="h-4 w-4" />
+            </TileActionButton>
+            <TileActionButton
               title={copied ? 'Prompt copied' : 'Copy prompt'}
-              onClick={(e) => { e.stopPropagation(); void handleCopy() }}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/50"
+              onClick={() => { void handleCopy() }}
             >
-              {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
-            <button
-              type="button"
+              {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+            </TileActionButton>
+            <TileActionButton
               title="Use in Playground as Gemini Omni source clip"
-              onClick={(e) => { e.stopPropagation(); void sendClipToPlayground(currentVideo) }}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/50"
+              onClick={() => { void sendClipToPlayground(currentVideo) }}
             >
-              <Film className="h-3.5 w-3.5" />
-            </button>
-          </div>
+              <Film className="h-4 w-4" />
+            </TileActionButton>
+          </TileActionStack>
         )}
 
         {/* Bottom shortcut into the workspace. */}
