@@ -281,9 +281,15 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     if (nextRes !== cardState.cardVideoResolution) {
       updates.cardVideoResolution = nextRes
     }
-    // Audio: force ON for every audio-capable model. Force OFF when the
-    // model can't do audio. Matches the user's "audio on by default" ask.
-    updates.cardVideoAudio = c.supportsAudio === true
+    // Audio: default ON for an audio-capable model, but only on a genuine
+    // model FLIP — same rule as resolution above. Forcing it on every mount
+    // silently undid a Mute the user had set, and audio is a billed tier, so
+    // reopening a card to check it re-armed the more expensive generation.
+    // A model that can't do audio always clamps off, flip or not.
+    const nextAudio = c.supportsAudio === true && (modelChanged || cardState.cardVideoAudio)
+    if (nextAudio !== cardState.cardVideoAudio) {
+      updates.cardVideoAudio = nextAudio
+    }
     if (Object.keys(updates).length) onUpdateState(updates)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoModelId])

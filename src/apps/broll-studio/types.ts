@@ -180,6 +180,11 @@ export interface InFlightVideo {
   resolution: string
   audio: boolean
   sourceBRollId?: string
+  // The still this clip animates from (asset ref, not a data URI — these
+  // entries are persisted). Only set for image/reference-to-video gens, and
+  // only so Retry can replay the SAME generation instead of silently falling
+  // back to text-to-video.
+  startFrameRef?: string
   error?: string | null
 }
 

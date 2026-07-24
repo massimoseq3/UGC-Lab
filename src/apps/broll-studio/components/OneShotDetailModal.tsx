@@ -44,7 +44,7 @@ import {
   estimateCredits,
   formatCredits,
   videoResolutionLabel,
-  snapVideoDuration,
+  snapVideoDurationUp,
   officialSavingsPercent,
 } from '../../../utils/models'
 import { downloadImage } from '../../../utils/downloadImage'
@@ -143,7 +143,11 @@ export default function OneShotDetailModal({
     if (constraints.aspectRatios.length > 0 && !constraints.aspectRatios.includes(cardState.aspectRatio)) {
       updates.aspectRatio = constraints.aspectRatios[0]
     }
-    const snapped = snapVideoDuration(cardState.durationSeconds, constraints.durations)
+    // Snap UP, matching fire time (runSegmentVideo) — rounding down would cut
+    // the clip short of the speech it was planned for. snapVideoDuration picks
+    // the nearest at-or-BELOW option, so merely opening this modal on a model
+    // with a coarser grid used to shorten the card behind the user's back.
+    const snapped = snapVideoDurationUp(cardState.durationSeconds, constraints.durations)
     if (snapped !== cardState.durationSeconds) updates.durationSeconds = snapped
     if (Object.keys(updates).length) onUpdate(() => updates)
     // eslint-disable-next-line react-hooks/exhaustive-deps

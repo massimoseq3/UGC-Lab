@@ -166,7 +166,9 @@ export default function ContinuousView({
 
   // Standalone-Animate video model — its own pick (separate from the clip's
   // frames-to-video model, since animating a single still is image-to-video or
-  // reference-to-video). Default Seedance 2.0, which can do both.
+  // reference-to-video). Defaults to the clip model, Seedance 1.5 Pro: it does
+  // image-to-video (not reference-to-video), which is the branch runFrameAnimate
+  // prefers anyway, so one still animates from the chosen keyframe directly.
   const continuousAnimateModelId = useSettingsStore((s) => s.perAppModel['broll-studio:continuous:animate']) ?? CONTINUOUS_DEFAULT_MODEL_ID
 
   // Fresh reads inside async chains (the sequential frame walk sets a

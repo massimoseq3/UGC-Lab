@@ -21,9 +21,10 @@ import { getChatEndpointPath, getModel, snapVideoDurationUp } from '../../../uti
 // panel greys the rest via requireMode='frames-to-video' so the user can see
 // (and understand) why they're unavailable. Image-only (Kling Turbo) and
 // frame-less (Gemini Omni, Grok) models are listed but land greyed.
-// Seedance 2.0 is the default — cheap, first/last-frame native, and it generates
-// the transitional SFX this style leans on. The picker lives in the CLIP modal,
-// not the left panel: the model only matters once there are keyframes.
+// Seedance 1.5 Pro is the default — first/last-frame native and materially
+// cheaper per clip than the 2.0 family, at a quality that holds up for this
+// style. The picker lives in the CLIP modal, not the left panel: the model
+// only matters once there are keyframes to animate.
 export const CONTINUOUS_MODEL_IDS = [
   'bytedance/seedance-2',
   'bytedance/seedance-2-fast',
