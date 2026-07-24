@@ -224,6 +224,7 @@ export function createDefaultOneShotCardState(segment: OneShotSegment, modelId: 
     inFlightVideos: [],
     refsCharacter: true,
     refsProduct: true,
+    carryPrevFrame: true,
     aspectRatio: '9:16',
     resolution,
     durationSeconds,
@@ -256,6 +257,7 @@ export function backfillOneShotCardState(raw: Partial<OneShotCardState> & Record
     inFlightVideos: inFlight.filter((e) => Date.now() - (e.startedAt ?? 0) < STALE_MS),
     refsCharacter: raw.refsCharacter !== false,
     refsProduct: raw.refsProduct !== false,
+    carryPrevFrame: raw.carryPrevFrame !== false,
     aspectRatio: (raw.aspectRatio as string) ?? '9:16',
     resolution: (raw.resolution as string) ?? '720p',
     durationSeconds: typeof raw.durationSeconds === 'number' ? raw.durationSeconds : 5,
@@ -280,6 +282,15 @@ export function createDefaultContinuousFrameState(concept: ContinuousConcept): C
     refsProduct: true,
     aspectRatio: '9:16',
     resolution: '1K',
+    // Standalone-animate defaults. Motion seeds from the concept's departure
+    // motion (final-frame concepts have none → empty, user can write one).
+    animateMotion: concept.motionPrompt ?? '',
+    videos: [],
+    currentVideoIndex: 0,
+    inFlightVideos: [],
+    videoDurationSeconds: defaultVideoDuration(),
+    videoResolution: defaultVideoResolution(),
+    videoAudio: true,
   }
 }
 
@@ -339,6 +350,18 @@ export function backfillContinuousFrameState(raw: Partial<ContinuousFrameCardSta
     refsProduct: raw.refsProduct !== false,
     aspectRatio: (raw.aspectRatio as string) ?? '9:16',
     resolution: (raw.resolution as ImageResolution) ?? '1K',
+    // Standalone-animate fields (added later — default for legacy rows). Video
+    // TTL matches the clip cards' 60-min window so a refresh resumes recent gens.
+    animateMotion: (raw.animateMotion as string) ?? '',
+    videos: Array.isArray(raw.videos) ? (raw.videos as ContinuousFrameCardState['videos']) : [],
+    currentVideoIndex: typeof raw.currentVideoIndex === 'number'
+      ? Math.max(0, Math.min(raw.currentVideoIndex, Math.max(0, (Array.isArray(raw.videos) ? raw.videos.length : 0) - 1)))
+      : Math.max(0, (Array.isArray(raw.videos) ? raw.videos.length : 0) - 1),
+    inFlightVideos: (Array.isArray(raw.inFlightVideos) ? (raw.inFlightVideos as ContinuousFrameCardState['inFlightVideos']) : [])
+      .filter((e) => Date.now() - (e.startedAt ?? 0) < 60 * 60_000),
+    videoDurationSeconds: typeof raw.videoDurationSeconds === 'number' ? raw.videoDurationSeconds : 5,
+    videoResolution: (raw.videoResolution as string) ?? '720p',
+    videoAudio: raw.videoAudio !== false,
   }
 }
 

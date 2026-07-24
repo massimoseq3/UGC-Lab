@@ -68,6 +68,11 @@ interface VariationCardProps {
   // Realism / legacy leave the render untouched. See applyStyleToPrompt.
   resultStyle?: string
   resultRealism?: boolean
+  // One shared voice description for the ad's dialogue clips. Only DIALOGUE
+  // cards use it — appended to their video prompt at fire time so every talking
+  // clip shares one voice. Editing it (via the modal) updates the shared value.
+  voiceProfile?: string
+  onUpdateVoiceProfile?: (text: string) => void
 }
 
 export default function VariationCard(props: VariationCardProps) {
@@ -94,6 +99,8 @@ export default function VariationCard(props: VariationCardProps) {
     batchImageOverride,
     resultStyle,
     resultRealism,
+    voiceProfile,
+    onUpdateVoiceProfile,
   } = props
 
   const hasImages = cardState.images.length > 0
@@ -545,8 +552,14 @@ export default function VariationCard(props: VariationCardProps) {
         style: resultStyle,
         realism: resultRealism,
       })
+      // A DIALOGUE card gets the shared voice profile appended at fire time so
+      // every talking clip is read by the same voice. Like the STYLE block, it
+      // rides outside the persisted prompt (promptText stays clean).
+      const finalPrompt = variation.tag === 'DIALOGUE' && voiceProfile?.trim()
+        ? `${styledPrompt}\n\n=== VOICE PROFILE (same voice in every dialogue clip) ===\n${voiceProfile.trim()}`
+        : styledPrompt
       const { taskId, videoEndpoint } = await startVideoTask({
-        prompt: styledPrompt,
+        prompt: finalPrompt,
         mode: effectiveMode,
         firstFrameDataUri,
         referenceDataUris,
@@ -643,7 +656,17 @@ export default function VariationCard(props: VariationCardProps) {
       useAppStore.getState().addToast('Could not load the start frame.', 'error')
       return
     }
-    await runVideoTask('image-to-video', dataUri, undefined, videoModelId)
+    // Use the image however the picked model can: as a true start frame when it
+    // supports image-to-video, otherwise as a reference image for a
+    // reference-to-video model. Either way the chosen still drives the clip.
+    const modes = (videoModelId ? getModel(videoModelId)?.modes : undefined) ?? []
+    if (modes.includes('image-to-video')) {
+      await runVideoTask('image-to-video', dataUri, undefined, videoModelId)
+    } else if (modes.includes('reference-to-video')) {
+      await runVideoTask('reference-to-video', undefined, [dataUri], videoModelId)
+    } else {
+      useAppStore.getState().addToast("This model can't animate a still — pick one that takes a start frame or reference images.", 'error')
+    }
   }
 
   const handleGenerateVideo = async (videoModelId: string | undefined) => {
@@ -1059,6 +1082,8 @@ export default function VariationCard(props: VariationCardProps) {
           handleResetVideo={handleResetVideo}
           handleRetryInFlight={handleRetryInFlight}
           handleDismissInFlight={handleDismissInFlight}
+          voiceProfile={voiceProfile}
+          onUpdateVoiceProfile={onUpdateVoiceProfile}
         />
       )}
     </>

@@ -83,6 +83,11 @@ export interface BrollResult {
   // optional so legacy rows fall back to the UGC Realism label.
   styleId?: string
   styleBrief?: string
+  // One shared voice description for the whole ad's dialogue clips. Auto-written
+  // in "With Dialogue" delivery and user-editable; appended to every DIALOGUE
+  // card's video prompt at fire time so all talking clips share one voice.
+  // Undefined in silent delivery and on legacy rows.
+  voiceProfile?: string
 }
 
 export interface ReferenceImage {
@@ -103,6 +108,12 @@ export interface BrollInput {
   // reference frames) overrides the preset `styleId` when present.
   styleId: string
   styleBrief?: string
+  // 'silent'   — every variation is silent b-roll (the default; a voiceover is
+  //              laid over in the edit).
+  // 'dialogue' — one variation per scene is a talking-to-camera DIALOGUE shot
+  //              (the character speaks the exact line); the other three stay
+  //              silent b-roll. Reuses OneShotDelivery — see BrollStudio.
+  delivery: OneShotDelivery
 }
 
 export interface GeneratedImage {
@@ -309,6 +320,11 @@ export interface OneShotCardState {
   inFlightVideos: InFlightVideo[]
   refsCharacter: boolean
   refsProduct: boolean
+  // Follow-up clips (segment index > 1) carry the previous clip's LAST FRAME as
+  // a reference image so the setting + character position continue. On by
+  // default; the user can toggle it off per clip. Ignored on the first clip and
+  // when the previous clip hasn't rendered yet (no frame to grab).
+  carryPrevFrame?: boolean
   aspectRatio: string
   resolution: string
   // Seeded from the segment's planned length; user-overridable in the detail
@@ -387,10 +403,10 @@ export interface ContinuousSelection {
   imageIndex: number
 }
 
-// Per-concept card state, keyed `${frameIndex}:${conceptId}`. Image-only —
-// frames never generate video directly. Mirrors the Line-by-Line card's image
-// half (prompt history, per-card aspect/resolution) so the frame modal offers
-// the same controls.
+// Per-concept card state, keyed `${frameIndex}:${conceptId}`. Primarily an image
+// card (mirrors the Line-by-Line card's image half), plus an optional STANDALONE
+// Animate path: the frame modal's Animate tab image-to-video's this frame's
+// chosen still on its own (NOT chained into the keyframe sequence).
 export interface ContinuousFrameCardState {
   editablePrompt: string
   // Linear undo/redo history, same shape as CardState — pushed on Enhance /
@@ -407,6 +423,16 @@ export interface ContinuousFrameCardState {
   refsProduct: boolean
   aspectRatio: string
   resolution: ImageResolution
+  // ── Standalone Animate (frame modal's Animate tab) ──
+  // Editable motion for the one-off image-to-video of this frame's still,
+  // seeded from the concept's departure motion. Independent of the chained clip.
+  animateMotion: string
+  videos: GeneratedVideo[]
+  currentVideoIndex: number
+  inFlightVideos: InFlightVideo[]
+  videoDurationSeconds: number
+  videoResolution: string
+  videoAudio: boolean
 }
 
 // Per-clip card state, keyed `c${sceneIndex}`. Video-only — the clip animates

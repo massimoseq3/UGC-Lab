@@ -1,4 +1,4 @@
-import type { BrollInput, BrollResult, Scene, PromptVariation, ReferenceImage, VariationTag, VariationRefs, LinePosition } from '../types'
+import type { BrollInput, BrollResult, Scene, PromptVariation, ReferenceImage, VariationTag, VariationRefs, LinePosition, OneShotDelivery } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import {
   kieChatCompletions,
@@ -40,11 +40,19 @@ function nextId() {
  * Every clip is SILENT b-roll — no one speaks. A finished voiceover is laid
  * over these shots in the edit.
  */
-const PROMPT_FORMAT = `Every prompt is ONE flowing paragraph — usually 40-80 words, longer when the idea needs it. Plain, concrete, readable — no labels, no field names, no line breaks, no "Style:" trailer.
+// Shared readable-paragraph rules — no silence clause, so both the silent b-roll
+// format and the "With Dialogue" talking-card format can build on it.
+const PROMPT_FORMAT_CORE = `Every prompt is ONE flowing paragraph — usually 40-80 words, longer when the idea needs it. Plain, concrete, readable — no labels, no field names, no line breaks, no "Style:" trailer.
 
-Write it like you're describing a clip you already filmed: what's in frame, what the character physically does (the exact gesture, gaze, micro-expression), where the light comes from, and — only when it matters — where the camera sits, always as a position ("framed from chest height an arm's length away", "from directly above"), never as a device. You may end with the natural sound of the moment (a dry crunch, a wrapper crinkle, room tone) — never dialogue, never music.
+Write it like you're describing a clip you already filmed: what's in frame, what the character physically does (the exact gesture, gaze, micro-expression), where the light comes from, and — only when it matters — where the camera sits, always as a position ("framed from chest height an arm's length away", "from directly above"), never as a device.`
+
+const PROMPT_FORMAT = `${PROMPT_FORMAT_CORE} You may end with the natural sound of the moment (a dry crunch, a wrapper crinkle, room tone) — never dialogue, never music.
 
 The footage is SILENT: no one speaks, mouths words, or addresses the viewer. A voiceover is laid over these clips in the edit.`
+
+// The talking-card format for "With Dialogue" delivery — the character speaks
+// the scene's line to camera. Used by the DIALOGUE regen/enhance paths.
+const PROMPT_FORMAT_DIALOGUE = `${PROMPT_FORMAT_CORE} The character looks into the lens and SPEAKS the scene's line — embed the exact words verbatim (the character … says: "…"). Audio is on: just them talking, no background music, no extra voiceover.`
 
 const SYSTEM_INSTRUCTION = `# ROLE
 
@@ -179,10 +187,42 @@ Wrap every scene in this exact XML envelope. Do not include any text outside the
 </VAR_4>
 </SCENE>`
 
+// Delivery override appended to the system instruction ONLY in "With Dialogue"
+// mode. Read last, so it wins over the "every shot is SILENT" doctrine for VAR_1
+// while leaving the other three variations untouched. The Line-by-Line dialogue
+// card is deliberately lighter than One-Shot's — a single independent clip, so
+// no shared VOICE PROFILE block; the character just speaks the scene's line.
+const DIALOGUE_DELIVERY_ADDENDUM = `
+
+# DELIVERY OVERRIDE — WITH DIALOGUE (READ LAST, HIGHEST PRIORITY)
+
+This ad is delivered WITH DIALOGUE. For EVERY scene, VAR_1 is NOT silent b-roll — it is a talking-to-camera DIALOGUE shot. VAR_2, VAR_3 and VAR_4 stay silent b-roll exactly as described above (three genuinely different lenses).
+
+VAR_1 rules, every scene:
+- <TAG>DIALOGUE</TAG> and <REFS>character</REFS>.
+- The character is on camera, looking into the lens, and SPEAKS the scene's exact <LINE> word-for-word. Write ONE flowing paragraph that embeds the line verbatim, e.g.: "the character, [expression/gesture], looks into the lens and says: \\"<the exact line>\\"". A real person talking to their phone — natural, not a news anchor.
+- Describe the delivery, expression, gesture, setting, and where the light comes from. This is the ONE variation that is NOT silent — the character speaks and audio is on. The "footage is SILENT / no one speaks" rule in the PROMPT FORMAT and SHOW-DON'T-TELL sections governs VAR_2, VAR_3 and VAR_4 only — it does NOT apply to VAR_1.
+- Still obey every other rule: camera is a viewpoint not a prop (never name the filming device), gender-neutral language ("the character", "they/them"), UGC realism, after-not-before.
+
+# VOICE PROFILE (emit ONCE, after the last scene)
+
+After the final </SCENE>, output exactly ONE block — the ONLY content allowed outside the scene envelopes:
+
+<VOICE_PROFILE>
+VOICE — describe, in rich and reproducible detail, HOW the character sounds: perceived age and gender of the voice, accent / region, pitch, pace, texture (warm, raspy, breathy, smooth), energy, and 1-2 signature quirks (uptalk, a slight vocal fry, a laugh living in the voice). One dense paragraph you could hand to a TTS engine and get the same person every time. Describe ONLY the sound, never appearance.
+</VOICE_PROFILE>
+
+This one voice is shared by every dialogue clip in the ad, so it must be self-contained and consistent.`
+
 export async function generateBroll(input: BrollInput): Promise<BrollResult> {
   const { apiKey, endpoint } = getChatEndpoint()
 
-  let prompt = `Break this script into B-Roll scenes following the system rules. For EACH scene emit four variations: four genuinely DIFFERENT ideas for showing what that line SAYS — make metaphors literal, show the act, the feeling, the proof. Pick four distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF), declared in each <TAG> field. Every shot is silent — no one speaks (a voiceover is added later). Each prompt is ONE readable paragraph (usually 40-80 words, longer when the idea needs it). Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation honouring the VISIBILITY rule.\n\nScript:\n${input.scriptText}`
+  const withDialogue = input.delivery === 'dialogue'
+  const variationBrief = withDialogue
+    ? `For EACH scene emit four variations: VAR_1 is a DIALOGUE shot where the character speaks the exact line to camera (<TAG>DIALOGUE</TAG>, <REFS>character</REFS>), and VAR_2–VAR_4 are three genuinely DIFFERENT silent b-roll ideas for showing what the line SAYS. Pick three distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF) for VAR_2–VAR_4, declared in each <TAG> field.`
+    : `For EACH scene emit four variations: four genuinely DIFFERENT ideas for showing what that line SAYS — make metaphors literal, show the act, the feeling, the proof. Pick four distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF), declared in each <TAG> field. Every shot is silent — no one speaks (a voiceover is added later).`
+
+  let prompt = `Break this script into B-Roll scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph (usually 40-80 words, longer when the idea needs it). Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation honouring the VISIBILITY rule.\n\nScript:\n${input.scriptText}`
 
   if (input.productContext) {
     prompt += `\n\n${input.productContext}`
@@ -194,8 +234,11 @@ export async function generateBroll(input: BrollInput): Promise<BrollResult> {
     prompt += `\n\nAdditional context:\n${input.additionalContext}`
   }
 
+  const systemInstruction = withDialogue
+    ? SYSTEM_INSTRUCTION + DIALOGUE_DELIVERY_ADDENDUM
+    : SYSTEM_INSTRUCTION
   const messages: ChatMessage[] = [
-    { role: 'system', content: [{ type: 'text', text: SYSTEM_INSTRUCTION }] },
+    { role: 'system', content: [{ type: 'text', text: systemInstruction }] },
     { role: 'user', content: [{ type: 'text', text: prompt }] },
   ]
   const responseText = await kieChatCompletions(apiKey, endpoint, messages)
@@ -204,12 +247,21 @@ export async function generateBroll(input: BrollInput): Promise<BrollResult> {
   // each card's prompt (and the realism stack toggled) at fire time — the scene
   // prompts themselves stay style-neutral, exactly like Continuous.
   return {
-    scenes: parseScenes(responseText),
+    scenes: parseScenes(responseText, input.delivery),
     style: styleBriefFor({ styleId: input.styleId, styleBrief: input.styleBrief }),
     realism: styleUsesRealism(input.styleId, !!input.styleBrief?.trim()),
     styleId: input.styleId,
     styleBrief: input.styleBrief?.trim() || undefined,
+    voiceProfile: withDialogue ? extractVoiceProfile(responseText) : undefined,
   }
+}
+
+// Pull the shared <VOICE_PROFILE> block out of a dialogue-mode response. Strips
+// a leading "VOICE —" label if present. Undefined when the model omitted it.
+function extractVoiceProfile(responseText: string): string | undefined {
+  const raw = responseText.match(/<VOICE_PROFILE>([\s\S]*?)<\/VOICE_PROFILE>/)?.[1]?.trim()
+  if (!raw) return undefined
+  return raw.replace(/^VOICE\s*[—–-]\s*/i, '').trim() || undefined
 }
 
 // Parse the LLM's strict-XML output into Scene records. New schema:
@@ -223,7 +275,7 @@ export async function generateBroll(input: BrollInput): Promise<BrollResult> {
 // Tolerant of legacy output that emits <VAR_N>plain text</VAR_N> with no
 // nested tags — falls back to position-based TAG defaults so a slightly
 // off-schema response still produces usable variations.
-function parseScenes(responseText: string): Scene[] {
+function parseScenes(responseText: string, delivery: OneShotDelivery = 'silent'): Scene[] {
   const scenes: Scene[] = []
   const sceneRegex = /<SCENE>([\s\S]*?)<\/SCENE>/g
   const lineRegex = /<LINE>([\s\S]*?)<\/LINE>/
@@ -231,9 +283,11 @@ function parseScenes(responseText: string): Scene[] {
   const visibilityRegex = /<VISIBILITY>([\s\S]*?)<\/VISIBILITY>/
 
   // All four variations carry the LLM's per-line role pick in <TAG>; these
-  // defaults only apply when the tag is missing or unrecognised. No talking
-  // heads any more — every role is silent b-roll.
-  const FALLBACK_TAGS: VariationTag[] = ['ACTION', 'EMOTIONAL', 'PRODUCT', 'POV']
+  // defaults only apply when the tag is missing or unrecognised. In dialogue
+  // delivery VAR_1 is the talking card, so its fallback is DIALOGUE.
+  const FALLBACK_TAGS: VariationTag[] = delivery === 'dialogue'
+    ? ['DIALOGUE', 'ACTION', 'EMOTIONAL', 'PRODUCT']
+    : ['ACTION', 'EMOTIONAL', 'PRODUCT', 'POV']
 
   let match
   let number = 1
@@ -327,10 +381,15 @@ function parsePosition(raw: string | undefined): LinePosition | undefined {
 // in the VariationTag union so legacy persisted cards still render.
 const ALL_TAGS: VariationTag[] = ['ACTION', 'EMOTIONAL', 'PRODUCT', 'POV', 'ENVIRONMENT', 'TRANSITION', 'PROOF']
 
+// Tags the parser will accept off the wire. Superset of ALL_TAGS (which is the
+// silent-b-roll menu offered to the model) plus DIALOGUE — emitted for VAR_1 in
+// "With Dialogue" delivery — and legacy STATIC, so old persisted rows survive.
+const PARSEABLE_TAGS: VariationTag[] = [...ALL_TAGS, 'DIALOGUE', 'STATIC']
+
 function parseTag(raw: string | undefined): VariationTag | undefined {
   if (!raw) return undefined
   const r = raw.toUpperCase().trim()
-  return ALL_TAGS.find((t) => t === r)
+  return PARSEABLE_TAGS.find((t) => t === r)
 }
 
 function parseRefs(raw: string | undefined): VariationRefs | undefined {
@@ -343,9 +402,10 @@ function parseRefs(raw: string | undefined): VariationRefs | undefined {
 // Sensible default when the LLM emits a variation without a <REFS> tag.
 // Hook / reframe lines with VISIBILITY=no force product off regardless.
 function defaultRefsFor(tag: VariationTag, productVisible: boolean | undefined): VariationRefs {
-  // Legacy STATIC anchor cards are sourced entirely from the character
-  // reference — the product never belongs in them, whatever VISIBILITY says.
-  if (tag === 'STATIC') return 'character'
+  // A talking DIALOGUE card and a legacy STATIC anchor are sourced entirely from
+  // the character reference — the product never belongs in them, whatever
+  // VISIBILITY says.
+  if (tag === 'STATIC' || tag === 'DIALOGUE') return 'character'
   if (productVisible === false) {
     if (tag === 'PRODUCT') return 'none'
     if (tag === 'ENVIRONMENT') return 'none'
@@ -493,9 +553,9 @@ export async function finishImageTask(taskId: string, modelId: string, resolutio
 // One-line role brief per tag, shared by the regenerate + free-form variation
 // prompts so a forced tag always carries its definition.
 const TAG_BRIEFS: Record<VariationTag, string> = {
-  // Legacy roles — no longer offered (every shot is silent b-roll now), but a
-  // forced regen of an old card could still pass one, so keep them voiceless.
-  DIALOGUE: 'A silent shot of the character on camera, present and natural but NOT speaking — lips closed, no words mouthed. A voiceover is added later.',
+  // DIALOGUE is the "With Dialogue" talking card: the character looks into the
+  // lens and speaks the scene's exact line. STATIC stays a legacy silent anchor.
+  DIALOGUE: 'A talking-to-camera shot: the character looks into the lens and SPEAKS the scene\'s exact script line word-for-word, natural like a real person talking to their phone. Audio is on. Embed the line verbatim (the character ... says: "…").',
   STATIC: 'A silent shot of the character in their own space, present and natural but NOT speaking — lips closed, no words mouthed. A voiceover is added later.',
   ACTION: "Act out the line's strongest image, literally — if the line has a metaphor or comparison, make it real on screen (\"tasted like cardboard\" → the character deadpan biting actual cardboard). Silent.",
   EMOTIONAL: 'The feeling of the line landing on the character inside a real moment — a slump against the fridge, a slow exhale over the sink. Silent, never a face in a void.',
@@ -519,9 +579,16 @@ export async function generateNewVariation(
 ): Promise<PromptVariation> {
   const { apiKey, endpoint } = getChatEndpoint()
 
+  const isDialogue = forceTag === 'DIALOGUE'
   const tagInstruction = forceTag
     ? `The variation MUST be a ${forceTag} shot. ${TAG_BRIEFS[forceTag]}`
     : `Pick the shot role yourself from this menu — choose what this specific line earns:\n${ALL_TAGS.map((t) => `- ${t}: ${TAG_BRIEFS[t]}`).join('\n')}`
+
+  // A DIALOGUE regen keeps the character speaking the line (dialogue format);
+  // everything else is silent b-roll (the default doctrine).
+  const deliveryClause = isDialogue
+    ? `This is a DIALOGUE shot: the character looks into the lens and SPEAKS the line above word-for-word. Embed it verbatim, e.g.: the character, [expression/gesture], looks into the lens and says: "${scriptLine}". Natural delivery — a real person talking to their phone, not a news anchor. Audio is on.`
+    : `This is SILENT b-roll — no one speaks; a voiceover is laid over the footage later. The character never talks to camera or mouths words.`
 
   const prompt = `Generate a single new creative image generation prompt for this B-Roll scene:
 
@@ -531,9 +598,9 @@ ${tagInstruction ? `\n${tagInstruction}\n` : ''}
 ${productContext ? `\n${productContext}\n` : ''}${modelContext ? `\n${modelContext}\nIMPORTANT: never describe the character's physical appearance in detail. Refer to them as "the character" — a visual reference image will be attached.\n` : ''}
 # PROMPT FORMAT
 
-${PROMPT_FORMAT}
+${isDialogue ? PROMPT_FORMAT_DIALOGUE : PROMPT_FORMAT}
 
-This is SILENT b-roll — no one speaks; a voiceover is laid over the footage later. The character never talks to camera or mouths words.
+${deliveryClause}
 
 SHOW, DON'T TELL — the shot must visualize what the line SAYS, so a viewer could guess the line from the footage alone. If the line has a metaphor or vivid image, consider making it literal on screen, even if absurd ("tasted like cardboard" → the character deadpan biting actual cardboard). Never a person passively existing while the line plays. Bring a genuinely fresh idea, not a re-angle of an obvious shot.
 
@@ -600,6 +667,13 @@ export async function enhanceVariationPrompt(
 ): Promise<string> {
   const { apiKey, endpoint } = getChatEndpoint()
 
+  const isDialogue = variation.tag === 'DIALOGUE'
+  // The silent doctrine governs every b-roll lens; a DIALOGUE card is the one
+  // exception — the rewrite must KEEP the character speaking the line.
+  const soundRule = isDialogue
+    ? `- This is a DIALOGUE shot: the character speaks the script line to camera. KEEP the spoken line in the rewrite, verbatim (the character … says: "…") — do not strip the speech or mute them. Audio is on; no background music or extra voiceover.`
+    : `- This is SILENT b-roll: no one speaks and no words are mouthed. If the draft has the character talking to camera, keep the shot, drop the speech. Sound, if mentioned, is only the natural sound of the moment — no dialogue, no music, no voiceover.`
+
   const userMessage = `Rewrite the draft below for the ${variation.tag} variation of this scene. Keep the user's intent; tighten the language; obey the framework.
 
 Scene ${scene.number} — LINE: "${scene.scriptLine}"
@@ -615,7 +689,7 @@ Rules:
 - UGC realism — filmed-at-home natural light and handheld feel; nothing commercial or studio-lit; no captions or on-screen text.
 - THE CAMERA IS A VIEWPOINT, NOT A PROP. Strip every mention of the filming device — no phone, iPhone, smartphone, front camera, tripod, or ring light as an object in the scene; nothing held, propped, or reflected; no mirror selfie. Rewrite any such phrasing as a position: "phone held at arm's length below chin level" becomes "framed from just below chin height, about an arm's length away". If the user's draft names a device, keep their intended shot, drop the equipment.
 - Honour the variation's lens: ${TAG_BRIEFS[variation.tag]}
-- This is SILENT b-roll: no one speaks and no words are mouthed. If the draft has the character talking to camera, keep the shot, drop the speech. Sound, if mentioned, is only the natural sound of the moment — no dialogue, no music, no voiceover.
+${soundRule}
 
 Draft:
 """
