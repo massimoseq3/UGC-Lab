@@ -10,7 +10,7 @@ import {
 import { getChatEndpointPath } from '../../../utils/models'
 import { formatKeyframeTimestamp, type Keyframe } from '../utils/extractKeyframes'
 
-const CHAT_MODEL_ID = 'gemini-3-flash'
+const CHAT_MODEL_ID = 'gemini-3-6-flash'
 // Streaming fallback timeout — kept generous since chat completions don't
 // have intermediate progress signals like the task-based flow.
 const STREAM_TIMEOUT_MS = 300_000
@@ -334,9 +334,8 @@ async function pollChatTaskText(taskId: string): Promise<string> {
 
 async function streamChatText(messages: ChatMessage[]): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  // Pin the fallback to the same model the perception pass uses (Gemini 3) — the
-  // app-wide chat default is now 3.6, but this pass can carry video, which only
-  // the Gemini 3 jobs/streaming path is proven to handle.
+  // Pin the fallback to the same model the perception pass uses so both passes
+  // stay on one model even if createTask rejects and we drop to streaming.
   const endpoint = getChatEndpointPath(CHAT_MODEL_ID)
   return kieChatCompletions(apiKey, endpoint, messages, {
     timeoutMs: STREAM_TIMEOUT_MS,

@@ -7,8 +7,8 @@
 
 import { estimateCredits } from '../../../utils/models'
 
-// The perception pass runs on Gemini 3 Flash (see analyzeAd.ts CHAT_MODEL_ID).
-const CHAT_MODEL_ID = 'gemini-3-flash'
+// The analysis passes run on Gemini 3.6 Flash (see analyzeAd.ts CHAT_MODEL_ID).
+const CHAT_MODEL_ID = 'gemini-3-6-flash'
 
 // Per second of video: Gemini samples the inline clip at ~1 fps (each frame
 // billed like an image, ~258 tokens) plus ~32 audio tokens/sec. Rounded to 300
