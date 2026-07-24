@@ -2,11 +2,12 @@ import { useRef } from 'react'
 import { Music, Film } from 'lucide-react'
 import { fileToDataUri } from '../../utils/kie'
 import { readMediaDuration } from '../../utils/media'
-import { RefSlotPill, RefChip } from './RefSlot'
+import { RefGroup, MediaCard, MediaAddCard } from './refInputParts'
 
-// Upload slot for non-image media references (Seedance 2's reference audio
-// and reference video clips). Upload-only — the bank picker doesn't surface
-// audio/video rows yet. Attached clips render as labelled chips.
+// Upload slot for non-image media references (Seedance 2's reference audio and
+// reference video clips). Upload-only — the bank picker doesn't surface
+// audio/video rows yet. Rendered as a labelled group: attached clips are media
+// cards, with a dashed add card to upload more.
 
 export interface MediaRefValue {
   dataUri: string
@@ -60,28 +61,27 @@ export default function MediaRefStrip({
     onChange([...values, { dataUri, name: file.name, durationSeconds }])
   }
 
-  // Fragment, not a block: the parent's attachment row flows the pill and its
-  // chips together with the other slots.
   return (
-    <>
-      <RefSlotPill
-        icon={Icon}
-        label={label}
-        count={values.length}
-        max={max}
-        disabled={values.length >= max}
-        onClick={() => fileInputRef.current?.click()}
-      />
-
-      {values.map((v, i) => (
-        <RefChip
-          key={i}
-          icon={Icon}
-          label={v.name}
-          meta={v.durationSeconds != null ? `${Math.round(v.durationSeconds)}s` : undefined}
-          onRemove={() => onChange(values.filter((_, idx) => idx !== i))}
-        />
-      ))}
+    <RefGroup label={label} count={values.length} max={max}>
+      <div className="flex flex-col gap-2">
+        {values.map((v, i) => (
+          <MediaCard
+            key={i}
+            icon={Icon}
+            label={v.name}
+            meta={v.durationSeconds != null ? `${Math.round(v.durationSeconds)}s` : undefined}
+            onRemove={() => onChange(values.filter((_, idx) => idx !== i))}
+          />
+        ))}
+        {values.length < max && (
+          <MediaAddCard
+            icon={Icon}
+            label={`Upload ${kind}`}
+            helper={maxTotalSeconds ? `≤ ${maxTotalSeconds}s total` : undefined}
+            onClick={() => fileInputRef.current?.click()}
+          />
+        )}
+      </div>
 
       <input
         ref={fileInputRef}
@@ -93,6 +93,6 @@ export default function MediaRefStrip({
           e.target.value = ''
         }}
       />
-    </>
+    </RefGroup>
   )
 }

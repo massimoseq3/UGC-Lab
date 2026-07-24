@@ -247,45 +247,6 @@ export default function OneShotDetailModal({
                 </div>
                 <div className="-mx-5 -mt-1 border-b border-ink/5" />
 
-                {/* Model picker — slide-in side panel (like CardDetailModal's
-                    video model), controlled so it persists to the One-Shot key. */}
-                <button
-                  type="button"
-                  onClick={() => setModelPanelOpen(true)}
-                  className="flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
-                >
-                  {model ? (
-                    <>
-                      <ProviderLogo provider={model.provider ?? ''} />
-                      <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                        <span className="truncate text-[13px] font-medium text-ink-100">{model.displayName}</span>
-                        {model.tags.includes('recommended') && (
-                          <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
-                        )}
-                        {officialSavingsPercent(oneShotModelId) != null && (
-                          <SavingsPill pct={officialSavingsPercent(oneShotModelId)!} />
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
-                  )}
-                  <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
-                </button>
-                <ModelSidePanel
-                  appId="broll-studio"
-                  task="video"
-                  allowedModelIds={ONE_SHOT_MODEL_IDS}
-                  enabledModelIds={ONE_SHOT_ENABLED_MODEL_IDS}
-                  value={oneShotModelId}
-                  onChange={(id) => useSettingsStore.getState().setAppModel('broll-studio:oneshot:video', id)}
-                  isOpen={modelPanelOpen}
-                  onClose={() => setModelPanelOpen(false)}
-                  requireMode={hasRefs ? 'reference-to-video' : undefined}
-                  requireModeNote="Greyed-out models aren't built for One-Shot's ref + audio multi-cut — they'd drop your refs and render a plain text-to-video clip."
-                  costParams={{ durationSeconds: cardState.durationSeconds, resolution: cardState.resolution, audio: cardState.audio }}
-                />
-
                 {/* Reference slot cards — same chrome as CardDetailModal; the
                     whole card and the tick both toggle whether the ref is sent
                     (the product/character themselves are picked in the left
@@ -441,6 +402,44 @@ export default function OneShotDetailModal({
 
             {/* Pinned footer — settings + Generate */}
             <div className="shrink-0 border-t border-ink/5 px-5 py-4">
+              {/* Model picker — sits directly above the output pills it
+                  configures, controlled so it persists to the One-Shot key. */}
+              <button
+                type="button"
+                onClick={() => setModelPanelOpen(true)}
+                className="mb-3 flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
+              >
+                {model ? (
+                  <>
+                    <ProviderLogo provider={model.provider ?? ''} />
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <span className="truncate text-[13px] font-medium text-ink-100">{model.displayName}</span>
+                      {model.tags.includes('recommended') && (
+                        <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
+                      )}
+                      {officialSavingsPercent(oneShotModelId) != null && (
+                        <SavingsPill pct={officialSavingsPercent(oneShotModelId)!} />
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
+                )}
+                <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
+              </button>
+              <ModelSidePanel
+                appId="broll-studio"
+                task="video"
+                allowedModelIds={ONE_SHOT_MODEL_IDS}
+                enabledModelIds={ONE_SHOT_ENABLED_MODEL_IDS}
+                value={oneShotModelId}
+                onChange={(id) => useSettingsStore.getState().setAppModel('broll-studio:oneshot:video', id)}
+                isOpen={modelPanelOpen}
+                onClose={() => setModelPanelOpen(false)}
+                requireMode={hasRefs ? 'reference-to-video' : undefined}
+                requireModeNote="Greyed-out models aren't built for One-Shot's ref + audio multi-cut — they'd drop your refs and render a plain text-to-video clip."
+                costParams={{ durationSeconds: cardState.durationSeconds, resolution: cardState.resolution, audio: cardState.audio }}
+              />
               <div className="mb-3 flex flex-wrap items-center gap-1.5">
                 {constraints && (
                   <>

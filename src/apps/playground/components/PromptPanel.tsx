@@ -36,8 +36,9 @@ import {
 } from '../../../utils/models'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { fileToDataUri } from '../../../utils/kie'
-import VideoInputSlot, { type VideoInputValue } from '../../../components/video/VideoInputSlot'
-import VideoRefStrip from '../../../components/video/VideoRefStrip'
+import { type VideoInputValue } from '../../../components/video/VideoInputSlot'
+import FrameSlot from '../../../components/video/FrameSlot'
+import RefTiles from '../../../components/video/RefTiles'
 import MediaRefStrip, { type MediaRefValue } from '../../../components/video/MediaRefStrip'
 import { readMediaDuration } from '../../../utils/media'
 import OmniInputsSection from './OmniInputsSection'
@@ -615,68 +616,14 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
       {/* Middle: scrollable body — model picker, preset, refs, prompt. */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <div className="flex h-full flex-col overflow-y-auto">
-          <div className="flex grow flex-col gap-3 px-5 pb-6 pt-3">
-            {/* Model — video mode uses the slide-in side panel (matching
-                B-Roll); image / music keep the inline dropdown. */}
-            <div>
-              {state.mode === 'video' ? (
-                <>
-                  {/* Trigger — provider logo + name + star + "% off", an arrow
-                      (not a chevron) for the slide-in, and no credits badge. */}
-                  <button
-                    type="button"
-                    onClick={() => setModelPanelOpen(true)}
-                    className="flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
-                  >
-                    {model ? (
-                      <>
-                        <ProviderLogo provider={model.provider} />
-                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                          <span className="truncate text-[13px] font-medium text-ink-100">{model.displayName}</span>
-                          {model.tags.includes('recommended') && (
-                            <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
-                          )}
-                          {modelSavings != null && <SavingsPill pct={modelSavings} />}
-                        </div>
-                      </>
-                    ) : (
-                      <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
-                    )}
-                    <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
-                  </button>
-                  <ModelSidePanel
-                    appId="playground"
-                    task="video"
-                    mode={pickerMode}
-                    isOpen={modelPanelOpen}
-                    onClose={() => setModelPanelOpen(false)}
-                    value={state.modelId}
-                    onChange={(modelId) => onChange({ ...state, modelId })}
-                    costParams={{
-                      durationSeconds: isMotionControl ? motionDuration : state.durationSeconds,
-                      resolution: state.resolution,
-                      audio: state.audio,
-                      videoInput: state.refs.some((r) => r.slot === 'omni-clip'),
-                    }}
-                  />
-                </>
-              ) : (
-                <ModelPicker
-                  appId="playground"
-                  task={taskForMode}
-                  mode={pickerMode}
-                  value={state.modelId}
-                  onChange={(modelId) => onChange({ ...state, modelId })}
-                />
-              )}
-
-              {/* Output settings (resolution / aspect / duration / audio,
-                  per mode) now live in the footer, just above Generate. */}
-            </div>
+          <div className="flex grow flex-col gap-3 px-5 pb-4 pt-3">
+            {/* Model picker now lives in the footer, above the output-settings
+                pills (see below) — the scrollable body opens straight into the
+                reference inputs. */}
 
             {/* Reference inputs — every slot the active model accepts renders
-                as a pill in one wrapping row, with whatever is attached to it
-                following as a chip or thumbnail. */}
+                as a labelled group (big frame squares, thumbnail tiles, media
+                cards) stacked in one column. */}
             {hasRefsSection && (
               <>
                 {state.mode === 'video' && isMotionControl && (
@@ -689,30 +636,30 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   />
                 )}
                 {state.mode === 'video' && !isMotionControl && hasAnyRefSlot && (
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex flex-col gap-3">
                     {supportsFrames && (
-                      <>
-                        <VideoInputSlot
-                          label="Start Frame"
+                      <div className="grid grid-cols-2 gap-2">
+                        <FrameSlot
+                          label="Start frame"
                           value={startFrameValue()}
                           onChange={(v) => setSlot('start', v)}
                           bankType="brolls"
                           tabs={PLAYGROUND_FRAME_TABS}
                         />
-                        <VideoInputSlot
-                          label="End Frame"
-                          helper={supportsEndFrame ? undefined : 'not supported'}
+                        <FrameSlot
+                          label="End frame"
                           value={supportsEndFrame ? endFrameValue() : null}
                           onChange={(v) => supportsEndFrame && setSlot('end', v)}
                           bankType="brolls"
                           tabs={PLAYGROUND_FRAME_TABS}
                           disabled={!supportsEndFrame}
+                          disabledNote="Not supported"
                         />
-                      </>
+                      </div>
                     )}
                     {refsAllowed && (
-                      <VideoRefStrip
-                        label="Reference Images"
+                      <RefTiles
+                        label="Reference images"
                         values={refStripValues()}
                         onChange={setRefStrip}
                         max={maxRefs}
@@ -722,7 +669,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                     )}
                     {supportsRefAudio && (
                       <MediaRefStrip
-                        label="Reference Audio"
+                        label="Reference audio"
                         kind="audio"
                         values={mediaStripValues('audio')}
                         onChange={(v) => setMediaStrip('audio', v)}
@@ -733,7 +680,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                     )}
                     {supportsRefVideos && (
                       <MediaRefStrip
-                        label="Reference Videos"
+                        label="Reference videos"
                         kind="video"
                         values={mediaStripValues('video')}
                         onChange={(v) => setMediaStrip('video', v)}
@@ -748,16 +695,14 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   </div>
                 )}
                 {state.mode === 'image' && (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <VideoRefStrip
-                      label="Reference Images"
-                      values={refStripValues()}
-                      onChange={setRefStrip}
-                      max={4}
-                      bankType="models"
-                      tabs={PLAYGROUND_REF_TABS}
-                    />
-                  </div>
+                  <RefTiles
+                    label="Reference images"
+                    values={refStripValues()}
+                    onChange={setRefStrip}
+                    max={4}
+                    bankType="models"
+                    tabs={PLAYGROUND_REF_TABS}
+                  />
                 )}
               </>
             )}
@@ -926,8 +871,64 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
         />
       </div>
 
-      {/* Bottom: pinned footer — output settings + big Generate button. */}
+      {/* Bottom: pinned footer — model picker + output settings + big Generate
+          button. The model picker sits directly above the output-settings pills
+          it configures. */}
       <div className="shrink-0 border-t border-ink/5 px-5 py-4">
+        {/* Model — video mode uses the slide-in side panel (matching B-Roll);
+            image / music keep the inline dropdown (which auto-opens upward here). */}
+        <div className="mb-3">
+          {state.mode === 'video' ? (
+            <>
+              {/* Trigger — provider logo + name + star + "% off", an arrow
+                  (not a chevron) for the slide-in, and no credits badge. */}
+              <button
+                type="button"
+                onClick={() => setModelPanelOpen(true)}
+                className="flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
+              >
+                {model ? (
+                  <>
+                    <ProviderLogo provider={model.provider} />
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <span className="truncate text-[13px] font-medium text-ink-100">{model.displayName}</span>
+                      {model.tags.includes('recommended') && (
+                        <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
+                      )}
+                      {modelSavings != null && <SavingsPill pct={modelSavings} />}
+                    </div>
+                  </>
+                ) : (
+                  <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
+                )}
+                <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
+              </button>
+              <ModelSidePanel
+                appId="playground"
+                task="video"
+                mode={pickerMode}
+                isOpen={modelPanelOpen}
+                onClose={() => setModelPanelOpen(false)}
+                value={state.modelId}
+                onChange={(modelId) => onChange({ ...state, modelId })}
+                costParams={{
+                  durationSeconds: isMotionControl ? motionDuration : state.durationSeconds,
+                  resolution: state.resolution,
+                  audio: state.audio,
+                  videoInput: state.refs.some((r) => r.slot === 'omni-clip'),
+                }}
+              />
+            </>
+          ) : (
+            <ModelPicker
+              appId="playground"
+              task={taskForMode}
+              mode={pickerMode}
+              value={state.modelId}
+              onChange={(modelId) => onChange({ ...state, modelId })}
+            />
+          )}
+        </div>
         {/* Output settings — resolution / aspect (+ duration, audio, lyrics
             per mode). Sits just above Generate; dropdowns open upward. */}
         <div className="mb-3 flex flex-wrap items-center gap-1.5">
