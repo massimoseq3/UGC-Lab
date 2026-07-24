@@ -203,14 +203,19 @@ export default function VariationCard(props: VariationCardProps) {
   }
 
   // Push a new entry onto the prompt undo/redo stack, trimming any forward
-  // redo branch. Caller pre-pads CardState.editablePrompt with the new value.
+  // redo branch. Reads the card's LIVE history rather than this render's copy:
+  // the textarea stays editable during Enhance / Regenerate, so a snapshot
+  // captured at click time truncated away anything the user committed while the
+  // LLM was working, with no Undo path back to it.
   const pushPromptHistory = (newPrompt: string) => {
-    const truncated = cardState.promptHistory.slice(0, cardState.promptHistoryIndex + 1)
-    const nextHistory = [...truncated, newPrompt]
-    onUpdateState({
-      editablePrompt: newPrompt,
-      promptHistory: nextHistory,
-      promptHistoryIndex: nextHistory.length - 1,
+    onUpdateStateFn((prev) => {
+      const truncated = prev.promptHistory.slice(0, prev.promptHistoryIndex + 1)
+      const nextHistory = [...truncated, newPrompt]
+      return {
+        editablePrompt: newPrompt,
+        promptHistory: nextHistory,
+        promptHistoryIndex: nextHistory.length - 1,
+      }
     })
   }
 

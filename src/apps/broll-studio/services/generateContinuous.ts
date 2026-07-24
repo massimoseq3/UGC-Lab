@@ -492,7 +492,18 @@ export interface FrameContext {
 export function frameContextFor(
   result: ContinuousResult,
   frameIndex: number,
-  ctx: { productContext?: string; modelContext?: string; conceptLabel?: string },
+  ctx: {
+    productContext?: string
+    modelContext?: string
+    conceptLabel?: string
+    // The motions actually in play on the clips either side of this frame —
+    // the picked concept's motion, or whatever the user hand-edited. Pass them
+    // whenever they're known: `scene.motionPrompt` is only ever the FIRST
+    // concept's motion, so grounding a rewrite in it describes a chain the
+    // storyboard isn't using once the user picks concept 2 or 3.
+    inboundMotion?: string
+    outboundMotion?: string
+  },
 ): FrameContext {
   const frame = result.frames.find((f) => f.index === frameIndex)
   const inbound = result.scenes.find((s) => s.index === frameIndex - 1)
@@ -501,8 +512,8 @@ export function frameContextFor(
     style: result.style,
     conceptLabel: ctx.conceptLabel,
     scriptLine: outbound?.scriptLine ?? '',
-    inboundMotion: inbound?.motionPrompt,
-    outboundMotion: outbound?.motionPrompt,
+    inboundMotion: ctx.inboundMotion?.trim() || inbound?.motionPrompt,
+    outboundMotion: ctx.outboundMotion?.trim() || outbound?.motionPrompt,
     isFinal: !outbound,
     isOpening: frameIndex === 1,
     existingLabels: frame?.concepts.map((c) => c.label) ?? [],

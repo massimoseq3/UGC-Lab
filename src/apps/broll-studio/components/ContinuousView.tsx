@@ -269,12 +269,39 @@ export default function ContinuousView({
     return false
   }
 
-  // The chosen keyframe image ref for a frame slot, or undefined.
-  const keyframeRef = (frameIndex: number): string | undefined => {
-    const sel = selectionsRef.current[String(frameIndex)]
+  const lookupKeyframe = (
+    frameIndex: number,
+    sels: Record<string, ContinuousSelection>,
+    states: Record<string, ContinuousFrameCardState>,
+  ): string | undefined => {
+    const sel = sels[String(frameIndex)]
     if (!sel) return undefined
-    const card = frameStatesRef.current[frameKey(frameIndex, sel.conceptId)]
-    return card?.images[sel.imageIndex]?.imageUrl
+    return states[frameKey(frameIndex, sel.conceptId)]?.images[sel.imageIndex]?.imageUrl
+  }
+
+  // The chosen keyframe image ref for a frame slot, read through the refs.
+  // ONLY for async chains — the sequential frame walk sets a selection and the
+  // next iteration must see it before React has re-rendered.
+  const keyframeRef = (frameIndex: number): string | undefined =>
+    lookupKeyframe(frameIndex, selectionsRef.current, frameStatesRef.current)
+
+  // Render-time version. The refs above are synced in effects, so during the
+  // render that a pick triggers they still hold the PREVIOUS values — reading
+  // them here left "Generate all videos" one pick behind (picking the final
+  // frame last would leave the last clip out of the batch, or the button
+  // disabled while the clip card beside it already read "Keyframes ready").
+  const keyframeRefLive = (frameIndex: number): string | undefined =>
+    lookupKeyframe(frameIndex, selections, frameStates)
+
+  // The aspect a frame's keyframe images were actually generated at. Clips must
+  // follow it: the frame modal offers the image model's full aspect list, so a
+  // storyboard shot 16:9 used to be animated into a hardcoded 9:16 canvas, and
+  // the fixed first/last frames arrived cropped or letterboxed — discovered
+  // only after the video credits were spent.
+  const keyframeAspect = (frameIndex: number): string => {
+    const sel = selectionsRef.current[String(frameIndex)]
+    if (!sel) return '9:16'
+    return frameStatesRef.current[frameKey(frameIndex, sel.conceptId)]?.aspectRatio ?? '9:16'
   }
 
   const toDataUri = async (ref: string): Promise<string | null> => {
@@ -303,6 +330,16 @@ export default function ContinuousView({
     // Chain reference: the previous frame's chosen keyframe. First in the ref
     // list so the preamble's "FIRST attached image" clause holds.
     const chainRefUrl = card.chainLink && frameIndex > 1 ? keyframeRef(frameIndex - 1) : undefined
+    // Generating a middle frame before the one it chains from is allowed (the
+    // per-row button only disables once THIS frame is picked), but it silently
+    // loses the character/style lock — say so, since the drift only becomes
+    // visible once the image lands.
+    if (card.chainLink && frameIndex > 1 && !chainRefUrl) {
+      useAppStore.getState().addToast(
+        `No keyframe picked for Frame ${frameIndex - 1} yet — generating Frame ${frameIndex} without the continuity reference.`,
+        'info',
+      )
+    }
     const cardExtras = extraRefs[key] ?? []
     const refs: ReferenceImage[] = [
       ...(chainRefUrl ? [{ dataUrl: chainRefUrl, label: 'style' }] : []),
@@ -464,6 +501,13 @@ export default function ContinuousView({
     const resolution = constraints && !constraints.resolutions.includes(clipCard.resolution)
       ? constraints.default ?? constraints.resolutions[0]
       : clipCard.resolution
+    // Match the canvas the endpoints were drawn on, clamped to what this model
+    // offers. The frames are fixed inputs, so a mismatch crops or letterboxes.
+    const startAspect = keyframeAspect(sceneIndex)
+    const aspectRatio = constraints && constraints.aspectRatios.length > 0
+      && !constraints.aspectRatios.includes(startAspect)
+      ? constraints.aspectRatios[0]
+      : startAspect
 
     const promptText = buildContinuousPrompt(`${clipCard.editablePrompt.trim()}\n\n${CLIP_AUDIO_RULE}`, result.style)
 
@@ -478,7 +522,7 @@ export default function ContinuousView({
           startedAt: Date.now(),
           prompt: promptText,
           mode: 'frames-to-video',
-          aspectRatio: '9:16',
+          aspectRatio,
           durationSeconds,
           resolution,
           audio: clipCard.audio,
@@ -493,7 +537,7 @@ export default function ContinuousView({
         mode: 'frames-to-video',
         firstFrameDataUri,
         lastFrameDataUri,
-        aspectRatio: '9:16',
+        aspectRatio,
         durationSeconds,
         resolution,
         audio: clipCard.audio,
@@ -508,7 +552,7 @@ export default function ContinuousView({
       if (!claimTask('video', taskId)) return
       claimedTaskId = taskId
 
-      const res = await finishVideoTask(taskId, continuousModelId, videoEndpoint, durationSeconds, '9:16')
+      const res = await finishVideoTask(taskId, continuousModelId, videoEndpoint, durationSeconds, aspectRatio)
       const assetRef = `asset://${res.assetId}`
       const newVideo: GeneratedVideo = {
         url: assetRef,
@@ -598,13 +642,18 @@ export default function ContinuousView({
     const resolution = constraints && !constraints.resolutions.includes(frameCard.videoResolution)
       ? constraints.default ?? constraints.resolutions[0]
       : frameCard.videoResolution
+    // Animate on the canvas this frame was drawn at, clamped to the model's list.
+    const aspectRatio = constraints && constraints.aspectRatios.length > 0
+      && !constraints.aspectRatios.includes(frameCard.aspectRatio)
+      ? constraints.aspectRatios[0]
+      : frameCard.aspectRatio
     const promptText = buildContinuousPrompt(`${motion}\n\n${CLIP_AUDIO_RULE}`, result.style)
 
     const inFlightId = crypto.randomUUID()
     updateFrame(frameKey, (prev) => ({
       inFlightVideos: [
         ...prev.inFlightVideos,
-        { id: inFlightId, taskId: null, modelId: continuousAnimateModelId, startedAt: Date.now(), prompt: promptText, mode: animateMode, aspectRatio: '9:16', durationSeconds, resolution, audio: frameCard.videoAudio },
+        { id: inFlightId, taskId: null, modelId: continuousAnimateModelId, startedAt: Date.now(), prompt: promptText, mode: animateMode, aspectRatio, durationSeconds, resolution, audio: frameCard.videoAudio },
       ],
     }))
 
@@ -615,7 +664,7 @@ export default function ContinuousView({
         mode: animateMode,
         firstFrameDataUri: animateMode === 'image-to-video' ? frameDataUri : undefined,
         referenceDataUris: animateMode === 'reference-to-video' ? [frameDataUri] : undefined,
-        aspectRatio: '9:16',
+        aspectRatio,
         durationSeconds,
         resolution,
         audio: frameCard.videoAudio,
@@ -630,7 +679,7 @@ export default function ContinuousView({
       if (!claimTask('video', taskId)) return
       claimedTaskId = taskId
 
-      const res = await finishVideoTask(taskId, continuousAnimateModelId, videoEndpoint, durationSeconds, '9:16')
+      const res = await finishVideoTask(taskId, continuousAnimateModelId, videoEndpoint, durationSeconds, aspectRatio)
       const assetRef = `asset://${res.assetId}`
       const newVideo: GeneratedVideo = {
         url: assetRef, modelId: continuousAnimateModelId, prompt: promptText, aspectRatio: res.aspectRatio,
@@ -856,7 +905,19 @@ export default function ContinuousView({
 
   const readyClipIndices = result.scenes
     .map((s) => s.index)
-    .filter((i) => keyframeRef(i) && keyframeRef(i + 1))
+    .filter((i) => keyframeRefLive(i) && keyframeRefLive(i + 1))
+
+  // Rewrite context for the open frame, grounded in the motions actually on the
+  // clips either side (the picked concept's, or the user's hand-edit) rather
+  // than the storyboard's first-concept fallback.
+  const openFrameContext = (frameIndex: number, conceptLabel: string) =>
+    frameContextFor(result, frameIndex, {
+      productContext,
+      modelContext,
+      conceptLabel,
+      inboundMotion: clipStates[clipKey(frameIndex - 1)]?.editablePrompt,
+      outboundMotion: clipStates[clipKey(frameIndex)]?.editablePrompt,
+    })
 
   // Every generated clip across all rows, in scene order, for "Download all".
   const allClipEntries = result.scenes.flatMap((s) => {
@@ -1316,11 +1377,11 @@ export default function ContinuousView({
           onGenerate={() => void runFrameImage(openFrameKey)}
           onEnhancePrompt={() => enhanceContinuousFrame(
             frameStates[openFrameKey]?.editablePrompt ?? '',
-            frameContextFor(result, openFrame.index, { productContext, modelContext, conceptLabel: openConcept.label }),
+            openFrameContext(openFrame.index, openConcept.label),
             openFrame.index,
           )}
           onRegeneratePrompt={() => regenerateContinuousFrame(
-            frameContextFor(result, openFrame.index, { productContext, modelContext, conceptLabel: openConcept.label }),
+            openFrameContext(openFrame.index, openConcept.label),
             openFrame.index,
           )}
           onRetryInFlight={(id) => {
