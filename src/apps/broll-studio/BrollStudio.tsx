@@ -12,6 +12,7 @@ import RightPanel from './components/RightPanel'
 import { brollHistoryMode } from './components/BrollHistoryView'
 import { backfillCardState, backfillOneShotCardState, backfillContinuousFrameState, backfillContinuousClipState } from './cardState'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { getModel } from '../../utils/models'
 import BankPicker from '../../components/BankPicker'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 import { humanizeError } from '../../utils/friendlyError'
@@ -729,6 +730,19 @@ export default function BrollStudio() {
     }
   }
 
+  // Adopt a restored row's video model. These keys are the user's persistent
+  // per-app picks, so a change outlives the session being opened — announce it
+  // instead of letting a history click quietly redefine their default.
+  const restoreAppModel = (key: string, modelId: string) => {
+    const settings = useSettingsStore.getState()
+    if (settings.perAppModel[key] === modelId) return
+    settings.setAppModel(key, modelId)
+    useAppStore.getState().addToast(
+      `Video model set to ${getModel(modelId)?.displayName ?? modelId} to match this session`,
+      'info',
+    )
+  }
+
   // Restore a B-Roll session from history. Loads all inputs + result +
   // cardStates back into the workspace. Images/videos resume from their
   // asset:// refs (IndexedDB / R2). Sets sessionId so further edits update
@@ -770,8 +784,11 @@ export default function BrollStudio() {
     }
     setOneShotCardStates(restoredOneShot)
     if (item.oneShotDelivery) setOneShotDelivery(item.oneShotDelivery)
-    if (item.oneShotModelId) {
-      useSettingsStore.getState().setAppModel('broll-studio:oneshot:video', item.oneShotModelId)
+    // Only the mode being restored adopts the row's model — a One-Shot row has
+    // no business rewriting the Continuous pick, and vice versa. Even then it's
+    // a persistent setting, so say so rather than changing it behind the user.
+    if (rowMode === 'oneshot' && item.oneShotModelId) {
+      restoreAppModel('broll-studio:oneshot:video', item.oneShotModelId)
     }
 
     // Continuous snapshot (absent on older rows).
@@ -807,8 +824,8 @@ export default function BrollStudio() {
       setContinuousStyleId('')
       setStyleChosen(false)
     }
-    if (item.continuousModelId) {
-      useSettingsStore.getState().setAppModel('broll-studio:continuous:video', item.continuousModelId)
+    if (rowMode === 'continuous' && item.continuousModelId) {
+      restoreAppModel('broll-studio:continuous:video', item.continuousModelId)
     }
     setActiveHistoryId(item.id)
   }
