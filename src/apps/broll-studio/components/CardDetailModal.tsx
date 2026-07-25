@@ -18,6 +18,7 @@ import {
   Coins,
   ChevronRight,
   Star,
+  Link2,
 } from 'lucide-react'
 import ModelPicker from '../../../components/ModelPicker'
 import ModelSidePanel from '../../../components/ModelSidePanel'
@@ -101,6 +102,9 @@ interface CardDetailModalProps {
   // cards only). Editing it updates the value shared by every dialogue clip.
   voiceProfile?: string
   onUpdateVoiceProfile?: (text: string) => void
+  // DIALOGUE cards only: the previous scene's chosen talking-head still. Renders
+  // a "Previous cut" reference slot whose toggle is cardState.chainLink.
+  chainImageRef?: string
 }
 
 // Playground-faithful per-variation workspace.
@@ -146,6 +150,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     handleDismissInFlight,
     voiceProfile,
     onUpdateVoiceProfile,
+    chainImageRef,
   } = props
 
   const [tab, setTab] = useState<Tab>(initialTab ?? 'image')
@@ -470,6 +475,23 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         pick from the bank; the tick-circle toggles whether the
                         ref is sent. */}
                     <div className="grid grid-cols-2 gap-2">
+                      {/* Previous cut — a DIALOGUE card chains off the last
+                          talking-head still so the ad reads as one continuous
+                          piece to camera. Image tab only: the chain is applied
+                          when the still is rendered, and the clip inherits it by
+                          animating that still. */}
+                      {isDialogue && chainImageRef && tab === 'image' && (
+                        <ReferenceSlotCard
+                          icon={<Link2 className="h-4 w-4 text-broll-300" />}
+                          accentClass="bg-broll-500/15 text-broll-300"
+                          kind="Previous cut"
+                          name="Chain link"
+                          imageRef={chainImageRef}
+                          onClick={() => onUpdateState({ chainLink: cardState.chainLink === false })}
+                          active={cardState.chainLink !== false}
+                          onToggleActive={() => onUpdateState({ chainLink: cardState.chainLink === false })}
+                        />
+                      )}
                       <ReferenceSlotCard
                         icon={<User className="h-4 w-4 text-influencers-400 light:text-influencers-600" />}
                         accentClass="bg-influencers-500/15 text-influencers-400 light:text-influencers-600"
