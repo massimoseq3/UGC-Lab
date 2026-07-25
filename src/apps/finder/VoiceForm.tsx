@@ -15,6 +15,10 @@ export default function VoiceForm({ item, onSave, onCancel }: VoiceFormProps) {
   const [style, setStyle] = useState(item?.style ?? DEFAULT_VOICE_SETTINGS.style)
   const [pace, setPace] = useState(item?.pace ?? DEFAULT_VOICE_SETTINGS.pace)
   const [accent, setAccent] = useState(item?.accent ?? DEFAULT_VOICE_SETTINGS.accent)
+  // Optional direction. Part of the preset so loading it in Voiceovers restores
+  // the whole read — voice, delivery params, AND the scene/tone it was written for.
+  const [scene, setScene] = useState(item?.scene ?? '')
+  const [sampleContext, setSampleContext] = useState(item?.sampleContext ?? '')
   const [linkedModelId] = useState(item?.linkedModelId ?? '')
   const [saving, setSaving] = useState(false)
 
@@ -25,6 +29,8 @@ export default function VoiceForm({ item, onSave, onCancel }: VoiceFormProps) {
       setStyle(item.style)
       setPace(item.pace)
       setAccent(item.accent)
+      setScene(item.scene ?? '')
+      setSampleContext(item.sampleContext ?? '')
     }
   }, [item])
 
@@ -44,8 +50,8 @@ export default function VoiceForm({ item, onSave, onCancel }: VoiceFormProps) {
         pace,
         accent,
         temperature: item?.temperature ?? DEFAULT_VOICE_SETTINGS.temperature,
-        scene: item?.scene,
-        sampleContext: item?.sampleContext,
+        scene: scene.trim() || undefined,
+        sampleContext: sampleContext.trim() || undefined,
         linkedModelId,
       })
     } finally {
@@ -95,6 +101,19 @@ export default function VoiceForm({ item, onSave, onCancel }: VoiceFormProps) {
         <SelectField label="Accent" value={accent} options={VOICE_ACCENTS} onChange={setAccent} />
       </div>
 
+      <TextAreaField
+        label="Scene"
+        value={scene}
+        onChange={setScene}
+        placeholder="e.g. A bright, upbeat product demo in a sunny kitchen."
+      />
+      <TextAreaField
+        label="Tone / context"
+        value={sampleContext}
+        onChange={setSampleContext}
+        placeholder="e.g. An excited creator sharing a product they love with a friend."
+      />
+
       <button
         type="submit"
         disabled={saving}
@@ -104,6 +123,34 @@ export default function VoiceForm({ item, onSave, onCancel }: VoiceFormProps) {
         {saving ? 'Saving…' : (item ? 'Save Changes' : 'Add Voice Preset')}
       </button>
     </form>
+  )
+}
+
+function TextAreaField({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string
+  value: string
+  placeholder: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] font-medium uppercase tracking-widest text-ink-500">
+        {label} <span className="normal-case tracking-normal text-ink-600">· optional</span>
+      </span>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={2}
+        maxLength={1000}
+        placeholder={placeholder}
+        className="resize-none rounded-2xl border border-ink/10 bg-transparent px-3 py-2 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
+      />
+    </label>
   )
 }
 
