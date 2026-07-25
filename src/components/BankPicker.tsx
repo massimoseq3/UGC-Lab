@@ -242,7 +242,7 @@ export default function BankPicker({
         ref={panelRef}
         className={`fixed z-[80] flex flex-col border-ink/5 bg-surface-1/95 backdrop-blur-2xl transition-transform duration-300 ease-out ${
           isDesktop
-            ? `right-0 top-0 bottom-0 w-[380px] border-l ${isOpen ? 'translate-x-0' : 'translate-x-full'}`
+            ? `right-0 top-0 bottom-0 w-[560px] border-l ${isOpen ? 'translate-x-0' : 'translate-x-full'}`
             : `inset-x-0 bottom-0 top-14 border-t rounded-t-2xl ${isOpen ? 'translate-y-0' : 'translate-y-full'}`
         }`}
       >
@@ -276,6 +276,7 @@ export default function BankPicker({
               // from several banks and add them all at once.
               onChange={(t) => { setActiveTab(t); setSearch(''); setSort('newest') }}
               options={normalizedTabs.map((t) => ({ value: t.type, label: BANK_CONFIG[t.type].label }))}
+              dense
             />
           </div>
         )}
@@ -324,42 +325,33 @@ export default function BankPicker({
           ) : (
             <div
               className={
-                // Influencers and products pack into a 2-column grid;
-                // b-rolls flow through a masonry column layout (mixed 16:9 / 9:16
-                // stills pack with no left-aligned gaps — matches the main Bank);
-                // scripts (9:16 cards) stay a 2-up grid; voices single-column rows.
-                currentBankType === 'models' || currentBankType === 'products'
-                  ? 'grid grid-cols-2 gap-2'
-                  : currentBankType === 'brolls'
-                  ? 'columns-2 gap-2'
-                  : currentBankType === 'scripts'
-                  ? 'grid grid-cols-2 gap-2'
-                  : 'flex flex-col gap-2'
+                // Everything with a thumbnail (influencers, products, b-rolls,
+                // scripts) packs into the same dense grid the main Bank uses —
+                // `grid-flow-row-dense` backfills the hole a wide card leaves.
+                // Voices are text rows, so they stay single-column.
+                // Three columns only from `md` — that's the breakpoint where the
+                // panel becomes the fixed 560px slide-over; below it the sheet is
+                // full-width on a phone, where three tiles would be unreadable.
+                currentBankType === 'voices'
+                  ? 'flex flex-col gap-2'
+                  : 'grid grid-flow-row-dense grid-cols-2 items-start gap-2 md:grid-cols-3'
               }
             >
               {sorted.map((item) => {
                 const isSelected = multiSelect && selectedIds.includes(item.id)
-                // A character sheet spans the full row only when it is actually
-                // wide (a 16:9 turnaround, unreadable squeezed into one
-                // portrait-width column). Sheets render in whatever aspect the
-                // character was generated at, so a 9:16 sheet stays a normal
-                // one-column tile like every other card — measured on load
-                // rather than assumed from the sheetImage stamp.
-                const isLandscape = landscapeIds.has(item.id)
-                const isLandscapeBroll = currentBankType === 'brolls' && isLandscape
-                const isWideSheet = currentBankType === 'models' && isLandscape
-                const wrapperClass =
-                  currentBankType === 'brolls'
-                    ? 'relative mb-3.5 break-inside-avoid'
-                    : `relative ${isWideSheet ? 'col-span-2' : ''}`
+                // A b-roll still or character sheet spans two columns only when it
+                // is actually wide (a 16:9 frame or turnaround, unreadable squeezed
+                // into one portrait-width column). Sheets render in whatever aspect
+                // the character was generated at, so a 9:16 sheet stays a normal
+                // one-column tile like every other card — measured on load rather
+                // than assumed from the sheetImage stamp.
+                const isWide =
+                  (currentBankType === 'brolls' || currentBankType === 'models') &&
+                  landscapeIds.has(item.id)
                 return (
                   <div
                     key={item.id}
-                    className={wrapperClass}
-                    // Landscape (16:9) b-rolls span the full masonry width instead
-                    // of squeezing into one narrow column. Inline style (not a
-                    // Tailwind class) because `column-span` is set dynamically.
-                    style={isLandscapeBroll ? { columnSpan: 'all' } : undefined}
+                    className={`relative ${isWide ? 'col-span-2' : ''}`}
                   >
                     <BankItemCard
                       bankType={currentBankType}
