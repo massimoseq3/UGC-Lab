@@ -230,7 +230,11 @@ export default function InfluencerEditModal({
     () => inFlight.filter((g) => g.lineageId === lineageKey),
     [inFlight, lineageKey],
   )
-  const generating = lineageInFlight.length > 0
+  // Count only — never a gate. Edits queue in parallel (CharacterStudio owns the
+  // jobs), so the Generate buttons stay live while work is running and the
+  // in-flight tiles on the right are the feedback. Mirrors the main form's
+  // "Generate Character · N running" pill.
+  const runningCount = lineageInFlight.length
   const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set())
   const [savingId, setSavingId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -401,7 +405,7 @@ export default function InfluencerEditModal({
     // A visual style is an instruction in its own right — picking one and
     // hitting Generate is a valid "restyle this, change nothing else", so the
     // typed box may be empty as long as one of the two is present.
-    if ((!typed && !styleDirective) || generating || !selected) return
+    if ((!typed && !styleDirective) || !selected) return
     // Style goes LAST so it reads as the final directive, and stands alone as
     // the whole instruction when nothing was typed.
     const instruction = styleDirective
@@ -429,7 +433,7 @@ export default function InfluencerEditModal({
   }
 
   function handleSheet() {
-    if (generating || !selected) return
+    if (!selected) return
     // Image-to-image off the cover so the sheet keeps the exact same person —
     // startCharacterTask swaps to an i2i model and leads with an identity lock.
     // The panel doesn't change between modes, so whatever is set up there rides
@@ -812,12 +816,15 @@ export default function InfluencerEditModal({
                 <button
                   type="button"
                   onClick={handleEdit}
-                  disabled={(!prompt.trim() && !styleDirective) || generating || !selected}
+                  disabled={(!prompt.trim() && !styleDirective) || !selected}
                   className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-influencers-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-influencers-400 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-                  {generating ? 'Generating edit…' : 'Generate Edit'}
-                  {!generating && creditsLabel && (
+                  <Wand2 className="h-4 w-4" />
+                  <span>
+                    Generate Edit
+                    {runningCount > 0 && ` · ${runningCount} running`}
+                  </span>
+                  {creditsLabel && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                       <Coins className="h-3 w-3" strokeWidth={2} />
                       {creditsLabel}
@@ -828,12 +835,15 @@ export default function InfluencerEditModal({
                 <button
                   type="button"
                   onClick={handleSheet}
-                  disabled={generating || !selected}
+                  disabled={!selected}
                   className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-influencers-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-influencers-400 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LayoutGrid className="h-4 w-4" />}
-                  {generating ? 'Generating character sheet…' : 'Generate Character Sheet'}
-                  {!generating && creditsLabel && (
+                  <LayoutGrid className="h-4 w-4" />
+                  <span>
+                    Generate Character Sheet
+                    {runningCount > 0 && ` · ${runningCount} running`}
+                  </span>
+                  {creditsLabel && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                       <Coins className="h-3 w-3" strokeWidth={2} />
                       {creditsLabel}
