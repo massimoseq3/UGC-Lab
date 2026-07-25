@@ -51,13 +51,9 @@ export default function EditorArea({
 
   return (
     <div className="flex flex-col md:h-full md:overflow-hidden">
-      {/* Header band — matches the right panel's Settings/History strip (and
-          every other app's 57px panel header) so the two columns' rules line
-          up. Holds the panel-level "New" reset. */}
-      <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-8">
-        <ClearAllButton onClear={onClearInputs} label="New" />
-      </div>
-      {/* Body */}
+      {/* Body — no header band here on purpose: the panel-level "New" reset
+          rides in the action row above the textarea (beside Enhance) instead,
+          so the editor column has no near-empty strip across its top. */}
       <div className="flex flex-1 flex-col px-8 pt-6 md:overflow-hidden">
         {/* Pull from Script bank — dashed "click to select" when empty; a
             filled pill with a hover refresh icon / X-clear once a bank script
@@ -116,11 +112,13 @@ export default function EditorArea({
           <div className="h-px flex-1 bg-ink/[0.07]" />
         </div>
 
-        {/* Enhance — appears once there's a script. Rewrites it with square-
-            bracket expression tags (e.g. [warmly], [excited]) so the read is
-            emotive. Only inserts direction; never changes the spoken words. */}
-        {canGenerate && (
-          <div className="mb-2 flex justify-end">
+        {/* Action row — the "New" reset always, plus Enhance once there's a
+            script. Enhance rewrites it with square-bracket expression tags
+            (e.g. [warmly], [excited]) so the read is emotive: it only inserts
+            direction, never changes the spoken words. */}
+        <div className="mb-2 flex items-center justify-end gap-2">
+          <ClearAllButton onClear={onClearInputs} label="New" />
+          {canGenerate && (
             <button
               type="button"
               onClick={onEnhance}
@@ -133,8 +131,8 @@ export default function EditorArea({
               {isEnhancing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               {isEnhancing ? 'Enhancing…' : 'Enhance'}
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Textarea — borderless, full-bleed, minimal aesthetic */}
         <textarea
