@@ -52,6 +52,10 @@ export default function BankItemCard({ bankType, item, onClick, selected, accent
         onClick={onClick}
         selected={selected}
         selectedStyle={accentSelected}
+        // Character sheets can be wide (16:9 turnaround) or tall (9:16
+        // stacked); the picker uses this to span a wide one across both
+        // columns and leave a tall one as a normal tile.
+        onLandscape={onLandscape}
       />
     )
   }

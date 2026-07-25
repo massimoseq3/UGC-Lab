@@ -15,13 +15,11 @@ interface GenerateBarProps {
   onAspectRatioChange: (value: string) => void
   resolution: ImageResolution
   onResolutionChange: (value: ImageResolution) => void
-  // Portrait vs character-sheet output. Sheets offer their own aspect picker
-  // (16:9 horizontal turnaround or 9:16 vertical) kept separate from the
-  // portrait aspect so switching modes preserves each.
+  // Portrait vs character-sheet output. Both modes read the SAME aspect and
+  // resolution — flipping the toggle changes what gets generated, never the
+  // output settings the user picked.
   sheetMode: boolean
   onSheetModeChange: (value: boolean) => void
-  sheetAspect: string
-  onSheetAspectChange: (value: string) => void
   inFlightCount: number
 }
 
@@ -31,7 +29,12 @@ interface GenerateBarProps {
 const ASPECT_OPTIONS = ['9:16', '16:9', '1:1']
 // Character sheets only orient horizontally (turnaround strip) or vertically
 // (stacked panels) — no square option, the panel layout needs the long axis.
+// A 1:1 pick therefore shows as 9:16 in sheet mode; the stored portrait aspect
+// is left untouched, so flipping back to Portrait still reads 1:1.
 const SHEET_ASPECT_OPTIONS = ['16:9', '9:16']
+function sheetAspectFor(ar: string): string {
+  return normalizeAspect(ar) === '16:9' ? '16:9' : '9:16'
+}
 function normalizeAspect(ar: string): string {
   if (ar.includes('16:9')) return '16:9'
   if (ar.includes('1:1')) return '1:1'
@@ -51,8 +54,6 @@ export default function GenerateBar({
   onResolutionChange,
   sheetMode,
   onSheetModeChange,
-  sheetAspect,
-  onSheetAspectChange,
   inFlightCount,
 }: GenerateBarProps) {
   const persistedModel = useSettingsStore((s) => s.getAppModel('character-studio:image:text-to-image'))
@@ -121,8 +122,8 @@ export default function GenerateBar({
               size="lg"
               openDirection="up"
               options={SHEET_ASPECT_OPTIONS}
-              value={sheetAspect.includes('9:16') ? '9:16' : '16:9'}
-              onChange={onSheetAspectChange}
+              value={sheetAspectFor(aspectRatio)}
+              onChange={onAspectRatioChange}
               render={(v) => (
                 <span className="flex items-center gap-1.5">
                   <AspectIcon ratio={v} />

@@ -26,18 +26,16 @@ export default function CharacterStudio() {
   const baseKey = useProjectScopedKey('character-studio')
   const [profile, setProfile] = usePersistedState<CharacterProfile>(`${baseKey}:profile`, createEmptyProfile())
   const [activeTab, setActiveTab] = usePersistedState<TabId>(`${baseKey}:tab`, 'physical')
-  // Characters open at 2K by default — portraits hold up better reused as
-  // references. The user can drop to 1K or bump to 4K from the resolution
-  // toggle. Key bumped to :v2 so the new default lands over a stored 1K.
-  const [resolution, setResolution] = usePersistedState<ImageResolution>(`${baseKey}:resolution:v2`, '2K')
-  // Portrait vs character-sheet output. Flipping either way resets resolution
-  // to the 2K sweet spot (1K is too soft for reuse as a reference, 4K burns
-  // credits for detail that rarely pays off) — the user can still bump a
-  // specific gen afterwards. Persisted so a refresh mid-session keeps the mode.
+  // Characters open at 1K by default — cheap enough to iterate on freely, and
+  // a portrait that earns its keep can be re-run at 2K/4K from the resolution
+  // toggle. Key bumped to :v3 so the new default lands over a stored 2K.
+  const [resolution, setResolution] = usePersistedState<ImageResolution>(`${baseKey}:resolution:v3`, '1K')
+  // Portrait vs character-sheet output. Flipping the toggle changes WHAT gets
+  // generated and nothing else — resolution and aspect are the user's picks and
+  // carry across both modes untouched. (Both used to reset on every flip, which
+  // silently undid a deliberate 4K or 9:16 choice.) Persisted so a refresh
+  // mid-session keeps the mode.
   const [sheetMode, setSheetMode] = usePersistedState<boolean>(`${baseKey}:sheet-mode`, false)
-  // Sheet orientation — kept separate from the portrait aspect so flipping
-  // modes preserves each. Defaults to the horizontal turnaround layout.
-  const [sheetAspect, setSheetAspect] = usePersistedState<string>(`${baseKey}:sheet-aspect`, '16:9')
 
   // The image model actually used for portraits/sheets (persisted picker
   // selection, else the app default). Subscribed reactively so a model swap
@@ -55,14 +53,10 @@ export default function CharacterStudio() {
     setResolution((r) => clampImageResolution(selectedImageModelId, r))
   }, [selectedImageModelId, setResolution])
 
-  const handleSheetModeChange = (on: boolean) => {
-    if (on === sheetMode) return
-    // Both directions land on 2K (clamped down when the model tops out lower);
-    // any 4K choice is a deliberate per-mode override, not carried across.
-    setResolution(clampImageResolution(selectedImageModelId, '2K'))
-    if (on) setSheetAspect('16:9')
-    setSheetMode(on)
-  }
+  // A sheet needs a long axis — its panel grid can't lay out square — so a 1:1
+  // pick renders the sheet vertically. The portrait aspect itself is left
+  // alone; flipping back to Portrait still shows 1:1.
+  const sheetAspect = (profile.aspectRatio ?? '').includes('16:9') ? '16:9' : '9:16'
   const [extractedThumb, setExtractedThumb] = usePersistedState<string | null>(`${baseKey}:thumb`, null)
 
   // Parallel generations: persisted to localStorage so a mid-flight refresh
@@ -290,7 +284,7 @@ export default function CharacterStudio() {
     // Snapshot every input the gen depends on at click time — the user can
     // freely mutate the form while this job runs in parallel.
     const snapshotKind: GenerationKind = sheetMode ? 'sheet' : 'portrait'
-    const snapshotAspect = sheetMode ? (sheetAspect.includes('9:16') ? '9:16' : '16:9') : (profile.aspectRatio || '9:16')
+    const snapshotAspect = sheetMode ? sheetAspect : (profile.aspectRatio || '9:16')
     void launchGen({ profile: { ...profile }, resolution, kind: snapshotKind, aspect: snapshotAspect })
   }
 
@@ -365,9 +359,7 @@ export default function CharacterStudio() {
           resolution={resolution}
           onResolutionChange={setResolution}
           sheetMode={sheetMode}
-          onSheetModeChange={handleSheetModeChange}
-          sheetAspect={sheetAspect}
-          onSheetAspectChange={setSheetAspect}
+          onSheetModeChange={setSheetMode}
           inFlightCount={inFlight.length}
         />
       </div>
