@@ -363,12 +363,12 @@ export interface OneShotCardState {
 export interface ContinuousConcept {
   id: string
   label: string
-  // The concept's assigned shot class ('Wide' / 'Detail' / 'Character' — see
-  // SHOT_SLOTS). Scale variety across a frame's concepts is structural, not
-  // requested: each slot is handed a shot class the storyboard must obey, so
-  // every frame ships one un-cropped option. Shown as a chip on the card and
-  // fed back into Regenerate so a fresh take can't drift to a medium shot.
-  // Absent on legacy sessions and on hand-added concepts.
+  // The concept's shot size, off SHOT_LADDER ('Wide' / 'Macro' / 'Close-up'…).
+  // Chosen per beat by the storyboard, not assigned by slot — but the three
+  // concepts of a frame must sit at three different sizes, with at least one
+  // medium-wide or wider, so there is always an un-cropped option. Shown as a
+  // chip on the card and fed back into Enhance/Regenerate so a rewrite can't
+  // drift to a medium shot. Absent on legacy sessions and hand-added concepts.
   shot?: string
   prompt: string
   // Which reference images this staging should attach, as decided by the
@@ -412,6 +412,12 @@ export interface ContinuousScene {
   // frame rewrite so a regenerated prompt still executes the planned link.
   // Absent on legacy sessions written before transitions existed.
   transition?: string
+  // The one physical thing happening in this beat, as a verb in progress. Every
+  // scene gets its own, distinct from every other scene's, and all of a frame's
+  // concepts show THAT action from different cameras — so a beat reads as an
+  // event rather than a person or object simply being present. Rides into every
+  // frame rewrite. Absent on legacy sessions.
+  action?: string
   sfx: string
   // Planned clip length — spoken seconds snapped UP onto the plan model's grid.
   durationSeconds: number
@@ -421,6 +427,12 @@ export interface ContinuousResult {
   // The storyboard-wide style block, appended to every image/video prompt at
   // fire time (never shown inside the editable per-frame prompt).
   style: string
+  // The ONE physical location the whole ad happens in, appended to every frame
+  // prompt at fire time next to the style. Told to the storyboard once, the
+  // location drifted frame to frame — scene 1 in a sunlit kitchen, scene 2 in a
+  // void, a chrome surface and a gym — and a clip cannot interpolate between two
+  // different sets. Absent on legacy sessions, where nothing is appended.
+  world?: string
   styleId: string
   // True only for the UGC Realism style — the one look that keeps the app's
   // iPhone-realism suffix on. Every stylized storyboard bypasses it. Optional

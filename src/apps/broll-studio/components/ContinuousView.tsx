@@ -500,7 +500,7 @@ export default function ContinuousView({
           productExcluded,
         })
       : undefined
-    const promptText = buildContinuousPrompt(card.editablePrompt, result.style)
+    const promptText = buildContinuousPrompt(card.editablePrompt, result.style, result.world)
 
     const inFlightId = crypto.randomUUID()
     updateFrame(key, (prev) => ({
@@ -1579,6 +1579,7 @@ export default function ContinuousView({
           conceptShot={openConcept.shot}
           scriptLine={result.scenes.find((s) => s.index === openFrame.index)?.scriptLine ?? ''}
           style={result.style}
+          world={result.world}
           cardState={openFrameCard}
           chainImageRef={openFrame.index > 1 ? keyframeRef(openFrame.index - 1) : undefined}
           characterRef={characterRef}
@@ -1631,6 +1632,7 @@ export default function ContinuousView({
           sceneNumber={openScene.index}
           scriptLine={openScene.scriptLine}
           style={result.style}
+          world={result.world}
           transition={openScene.transition}
           cardState={openClipCard}
           modelId={continuousModelId}
