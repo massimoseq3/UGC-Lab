@@ -121,7 +121,7 @@ interface ContinuousFrameModalProps {
   frameLabel: string    // "Frame 3" / "Final Frame"
   frameNumber: number   // the frame index, shown as a serif "01" in the header
   conceptLabel: string  // the concept's staging slug
-  conceptShot?: string  // its assigned shot class ("Wide" / "Detail" / "Character")
+  conceptShot?: string  // its shot size off SHOT_LADDER, shown as a chip
   scriptLine: string    // the narration line this frame opens ('' for final)
   style: string
   cardState: ContinuousFrameCardState
@@ -808,10 +808,6 @@ interface ContinuousClipModalProps {
   sceneNumber: number   // the scene index, shown as a serif "01" in the header
   scriptLine: string
   style: string
-  // The storyboard's plan for this boundary: the connective device plus the
-  // anchor element both keyframes carry. Shown read-only — it's what the motion
-  // below is supposed to execute.
-  transition?: string
   cardState: ContinuousClipCardState
   modelId: string
   startImageRef?: string
@@ -833,7 +829,6 @@ export function ContinuousClipModal({
   sceneNumber,
   scriptLine,
   style,
-  transition,
   cardState,
   modelId,
   startImageRef,
@@ -962,35 +957,18 @@ export function ContinuousClipModal({
 
               <StyleNote style={style} />
 
-              {/* The boundary's planned device + anchor. Read-only: it's the
-                  storyboard's plan for how these two frames connect, and the
-                  motion below is what executes it. */}
-              {transition?.trim() && (
-                <div className="rounded-2xl border border-ink/10 bg-ink/[0.03] px-3.5 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">Transition</p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-ink-400">{transition.trim()}</p>
-                </div>
-              )}
-
-              {/* Motion prompt — the path between the two fixed frames: what
-                  leaves the start, what carries the shot across, how it settles.
-                  Auto-filled from the picked keyframe's own motion, then
-                  rewritten against BOTH rendered frames once the pair is set.
-                  Enhance sharpens it; Regenerate re-reads the frames. */}
+              {/* Motion prompt — how the shot animates from the first frame to
+                  the last. Auto-filled from the picked keyframe's own motion.
+                  Enhance sharpens it; Regenerate re-reads both rendered frames
+                  and rewrites it — on demand, not on every keyframe change. */}
               <div className="flex grow flex-col">
-                {cardState.linking && (
-                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] text-broll-300">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Writing the transition from both keyframes…
-                  </p>
-                )}
                 <div className="relative flex grow flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
                   <textarea
                     value={draft}
                     onChange={(e) => { setDraft(e.target.value); onUpdate(() => ({ editablePrompt: e.target.value, motionEdited: true })) }}
                     onBlur={commitDraft}
                     rows={8}
-                    placeholder="Describe the path between the two frames — what leaves the start, what carries the shot across, how it settles, and one sound…"
+                    placeholder="Describe the animation — what moves, how the camera moves, how it comes to rest, and one sound…"
                     className="relative min-h-[160px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                   />
                   <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
@@ -1012,7 +990,7 @@ export function ContinuousClipModal({
                             ? 'Pick a start keyframe first'
                             : framesReady
                               ? 'Rewrite the motion by reading both chosen keyframes'
-                              : 'Rewrite the motion from the chosen start keyframe (pick an end keyframe for a full transition)'
+                              : 'Rewrite the motion from the chosen start keyframe (pick an end keyframe to read both)'
                         }
                         onClick={() => void runPromptTool(onRegenerateMotion, 'Regenerate')}
                         disabled={promptWorking || !startImageRef}
