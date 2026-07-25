@@ -1233,19 +1233,21 @@ function EndpointThumb({ label, imageRef }: { label: string; imageRef?: string }
   )
 }
 
-// One take in the clip's gallery. Clicking it makes that take the clip's COVER
-// — what the card face plays, what the card's Download button saves, and what
-// the download picker pre-ticks. Parity with Line-by-Line's VideoTile, which
-// has had cover selection all along.
+// One take in a video gallery. In the CLIP modal, clicking it makes that take
+// the clip's COVER — what the card face plays, what the card's Download button
+// saves, and what the download picker pre-ticks (parity with Line-by-Line's
+// VideoTile, which has had cover selection all along). The frame modal's
+// Animate tab reuses this tile for standalone animations of a keyframe, where
+// nothing consumes a cover — it omits `onSelect` and gets a plain tile.
 function ClipVideoTile({
   video,
-  selected,
+  selected = false,
   onSelect,
   onDelete,
 }: {
   video: GeneratedVideo
-  selected: boolean
-  onSelect: () => void
+  selected?: boolean
+  onSelect?: () => void
   onDelete: () => void
 }) {
   const url = useAssetUrl(video.url)
@@ -1264,7 +1266,7 @@ function ClipVideoTile({
     <ModalVideoPlayer
       url={url}
       onClick={onSelect}
-      className={selected ? 'border-broll-500/70 ring-2 ring-broll-500/40' : 'border-ink/10 hover:border-ink/30'}
+      className={selected ? 'border-broll-500/70 ring-2 ring-broll-500/40' : onSelect ? 'border-ink/10 hover:border-ink/30' : 'border-ink/10'}
     >
       <div className="pointer-events-none absolute right-1.5 top-1.5 flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
         <button type="button" title="Download" onClick={handleDownload} className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm hover:bg-black/80"><Download className="h-3.5 w-3.5" /></button>
