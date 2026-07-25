@@ -15,7 +15,7 @@ import { useBankStore } from '../../../stores/bankStore'
 import { usePersistedState } from '../../../hooks/usePersistedState'
 import { getContinuousStyle } from '../services/generateContinuous'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
-import { TileDeleteButton } from '../../../components/tileActions'
+import { TileActionStack, TileDeleteButton } from '../../../components/tileActions'
 
 interface BrollHistoryViewProps {
   // Already filtered by the parent (see isRetiredOneShotRow) so the tab's
@@ -26,39 +26,66 @@ interface BrollHistoryViewProps {
   onDelete: (id: string) => void
 }
 
-// First image url found across a mode's card states — the visual anchor for the
-// row thumbnail.
-function firstImageIn(cardStates: Record<string, { images?: { imageUrl?: string }[] }> | undefined): string | null {
-  if (!cardStates) return null
-  for (const k in cardStates) {
-    const url = cardStates[k].images?.[0]?.imageUrl
-    if (url) return url
-  }
-  return null
+// ── Card cover media ─────────────────────────────────────────────────────
+// A card shows a small mosaic rather than one thumbnail, so a session reads as
+// what it produced. Stills first (cheap, reliable <img>), then clip posters —
+// a Continuous session that only rendered clips still gets a face.
+const MAX_COVERS = 3
+
+interface CoverMedia { kind: 'image' | 'video'; ref: string }
+interface MediaStateish {
+  images?: { imageUrl?: string }[]
+  videos?: { url?: string }[]
 }
 
-// First video url found across a mode's card states — used as a poster when a
-// mode produced only clips (Continuous clips) and no still.
-function firstVideoIn(cardStates: Record<string, { videos?: { url?: string }[] }> | undefined): string | null {
-  if (!cardStates) return null
-  for (const k in cardStates) {
-    const url = cardStates[k].videos?.[0]?.url
-    if (url) return url
+function collectImages(states: Record<string, MediaStateish> | undefined, out: CoverMedia[]) {
+  if (!states) return
+  for (const k in states) {
+    for (const img of states[k].images ?? []) {
+      if (img.imageUrl && out.length < MAX_COVERS) out.push({ kind: 'image', ref: img.imageUrl })
+    }
   }
-  return null
 }
 
-// Derive the row's cover from whatever media the session produced, in either
-// mode. Prefer a still (cheap, reliable <img>) from line cards or continuous
-// keyframes; otherwise fall back to a video first-frame poster.
-function historyThumb(item: BrollHistoryItem): { imageRef?: string; videoRef?: string } {
-  const lineImg = firstImageIn(item.cardStates as Record<string, CardState>)
-  if (lineImg) return { imageRef: lineImg }
-  const frameImg = firstImageIn(item.continuousFrameStates as Record<string, ContinuousFrameCardState> | undefined)
-  if (frameImg) return { imageRef: frameImg }
-  const clipVid = firstVideoIn(item.continuousClipStates as Record<string, ContinuousClipCardState> | undefined)
-  if (clipVid) return { videoRef: clipVid }
-  return {}
+function collectVideos(states: Record<string, MediaStateish> | undefined, out: CoverMedia[]) {
+  if (!states) return
+  for (const k in states) {
+    for (const vid of states[k].videos ?? []) {
+      if (vid.url && out.length < MAX_COVERS) out.push({ kind: 'video', ref: vid.url })
+    }
+  }
+}
+
+// Up to MAX_COVERS pieces of media from whatever the session produced, in
+// either mode.
+function historyCovers(item: BrollHistoryItem): CoverMedia[] {
+  const out: CoverMedia[] = []
+  const line = item.cardStates as Record<string, CardState> | undefined
+  const frames = item.continuousFrameStates as Record<string, ContinuousFrameCardState> | undefined
+  const clips = item.continuousClipStates as Record<string, ContinuousClipCardState> | undefined
+  collectImages(line, out)
+  collectImages(frames, out)
+  if (out.length < MAX_COVERS) {
+    collectVideos(clips, out)
+    collectVideos(line, out)
+    collectVideos(frames, out)
+  }
+  return out
+}
+
+// How much finished media a session holds — the card's "what's in here" line.
+function mediaTally(item: BrollHistoryItem): { images: number; videos: number } {
+  let images = 0
+  let videos = 0
+  for (const states of [item.cardStates, item.continuousFrameStates, item.continuousClipStates] as
+    (Record<string, MediaStateish> | undefined)[]) {
+    if (!states) continue
+    for (const k in states) {
+      images += states[k].images?.length ?? 0
+      videos += states[k].videos?.length ?? 0
+    }
+  }
+  return { images, videos }
 }
 
 function sceneCount(result: BrollResult | null): number {
@@ -380,27 +407,34 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
             <span className="text-sm text-ink-500">No matches.</span>
           </div>
         ) : (
-          <div className="flex flex-col gap-1 p-2">
+          <div className="flex flex-col gap-6 px-5 py-4">
             {groups.map(([dayTs, dayItems]) => (
-              <div key={dayTs} className="flex flex-col gap-0.5">
-                <div className="my-2 flex items-center justify-center">
-                  <span className="rounded-full bg-ink/[0.06] px-3 py-1 text-[11px] font-medium text-ink-300">
+              <div key={dayTs} className="flex flex-col gap-3">
+                {/* Day header sits left of a hairline rather than centred over
+                    the list: with a grid below it, a centred pill reads as a
+                    divider between two unrelated blocks. */}
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">
                     {sectionLabel(dayTs)}
                   </span>
+                  <span className="text-[11px] text-ink-600">{dayItems.length}</span>
+                  <span className="h-px flex-1 bg-ink/[0.07]" />
                 </div>
 
-                {dayItems.map((item) => (
-                  <HistoryRow
-                    key={item.id}
-                    item={item}
-                    displayTs={sortTs(item, sort)}
-                    title={titles.get(item.id) ?? 'B-Roll session'}
-                    activity={activity.get(item.id)}
-                    isActive={activeId === item.id}
-                    onSelect={() => onSelect(item)}
-                    onDelete={() => onDelete(item.id)}
-                  />
-                ))}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                  {dayItems.map((item) => (
+                    <HistoryCard
+                      key={item.id}
+                      item={item}
+                      displayTs={sortTs(item, sort)}
+                      title={titles.get(item.id) ?? 'B-Roll session'}
+                      activity={activity.get(item.id)}
+                      isActive={activeId === item.id}
+                      onSelect={() => onSelect(item)}
+                      onDelete={() => onDelete(item.id)}
+                    />
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -410,7 +444,58 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
   )
 }
 
-function HistoryRow({
+// One piece of the cover mosaic. Each tile resolves its own asset ref, so the
+// card can show several without a hook loop.
+function CoverTile({ media, className = '' }: { media: CoverMedia; className?: string }) {
+  const url = useAssetUrl(media.ref)
+  if (!url) return <span className={`${className} h-full w-full bg-ink/[0.05]`} />
+  if (media.kind === 'video') {
+    // The <video> element paints its first frame as the poster; the `#t=0.1`
+    // fragment nudges the browser to decode+show that frame instead of a blank
+    // element.
+    return (
+      <video
+        src={`${url}#t=0.1`}
+        muted
+        playsInline
+        preload="metadata"
+        className={`${className} h-full w-full object-cover`}
+      />
+    )
+  }
+  return <img src={url} alt="" className={`${className} h-full w-full object-cover`} />
+}
+
+// The cover: one still full-bleed, two side by side, three as a big left tile
+// plus a stacked pair. Anything richer competes with the meta below it.
+function CardCover({ covers }: { covers: CoverMedia[] }) {
+  if (covers.length === 0) {
+    return (
+      <span className="flex h-full w-full items-center justify-center bg-ink/[0.04] text-broll-300/50">
+        <Film className="h-7 w-7" strokeWidth={1.5} />
+      </span>
+    )
+  }
+  if (covers.length === 1) {
+    return <CoverTile media={covers[0]} />
+  }
+  if (covers.length === 2) {
+    return (
+      <div className="grid h-full w-full grid-cols-2 gap-px">
+        {covers.map((m, i) => <CoverTile key={i} media={m} />)}
+      </div>
+    )
+  }
+  return (
+    <div className="grid h-full w-full grid-cols-3 grid-rows-2 gap-px">
+      <CoverTile media={covers[0]} className="col-span-2 row-span-2" />
+      <CoverTile media={covers[1]} />
+      <CoverTile media={covers[2]} />
+    </div>
+  )
+}
+
+function HistoryCard({
   item,
   displayTs,
   title,
@@ -432,8 +517,8 @@ function HistoryRow({
   onDelete: () => void
 }) {
   const result = item.result as BrollResult | null
-  const { imageRef, videoRef } = useMemo(() => historyThumb(item), [item])
-  const thumbUrl = useAssetUrl(imageRef ?? videoRef ?? '')
+  const covers = useMemo(() => historyCovers(item), [item])
+  const tally = useMemo(() => mediaTally(item), [item])
   const mode = brollHistoryMode(item)
   const isContinuous = mode === 'continuous'
   const continuousResult = item.continuousResult as BrollResult | null
@@ -446,68 +531,75 @@ function HistoryRow({
   return (
     <div
       onClick={onSelect}
-      className={`group flex cursor-pointer items-center gap-3 rounded-full px-3 py-2.5 transition-colors ${
-        isActive ? 'bg-broll-500/15 ring-1 ring-broll-500/20' : 'hover:bg-ink/[0.04]'
+      className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border text-left transition-all ${
+        isActive
+          ? 'border-broll-500/50 bg-broll-500/[0.08] ring-1 ring-broll-500/40'
+          : 'border-ink/5 bg-ink/[0.03] hover:-translate-y-px hover:border-ink/15 hover:bg-ink/[0.05]'
       }`}
     >
-      <div className="relative h-10 w-10 shrink-0">
-        {thumbUrl && imageRef ? (
-          <img
-            src={thumbUrl}
-            alt=""
-            className="h-full w-full rounded-full border border-ink/10 object-cover"
-          />
-        ) : thumbUrl && videoRef ? (
-          // Video-only session (Continuous clips): the <video> element
-          // paints its first frame as the poster. The `#t=0.1` fragment nudges the
-          // browser to decode+show that frame instead of a blank element.
-          <video
-            src={`${thumbUrl}#t=0.1`}
-            muted
-            playsInline
-            preload="metadata"
-            className="h-full w-full rounded-full border border-ink/10 object-cover"
-          />
-        ) : (
-          <span className="flex h-full w-full items-center justify-center rounded-full bg-ink/[0.04] text-broll-300/70">
-            <Film className="h-5 w-5" />
+      <div className="relative aspect-[16/10] overflow-hidden">
+        <CardCover covers={covers} />
+
+        {/* Scrim only where text sits, so the media stays the loudest thing on
+            the card. */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-black/60 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/70 to-transparent" />
+
+        <span className="absolute left-2.5 top-2.5 rounded-full bg-black/55 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
+          {MODE_BADGE[mode]}
+        </span>
+
+        <div className="absolute inset-x-2.5 bottom-2.5 flex items-center gap-1.5 overflow-hidden">
+          <span className="shrink-0 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white">
+            {count} {countLabel}
           </span>
-        )}
-        {generating > 0 && <GeneratingPulseRing family="broll" />}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium leading-snug text-ink-100">{title}</p>
-        <div className="mt-1 flex items-center gap-1.5 overflow-hidden text-[11px] text-ink-500">
-          {/* While a session has work in flight, the live count replaces the
-              static meta — that's the answer the member is looking for when they
-              open History mid-render. */}
-          {generating > 0 ? (
-            <GeneratingChip family="broll" label={activityLabel(activity!)} />
-          ) : (
-            <>
-              <span className="shrink-0 rounded-full bg-broll-500/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-broll-300">
-                {MODE_BADGE[mode]}
-              </span>
-              {styleLabel && (
-                <span className="min-w-0 truncate rounded-full bg-ink/[0.06] px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-ink-300">
-                  {styleLabel}
-                </span>
-              )}
-              <span className="shrink-0">{count} {countLabel}</span>
-            </>
+          {styleLabel && (
+            <span className="min-w-0 truncate rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white/80">
+              {styleLabel}
+            </span>
           )}
+        </div>
+
+        <TileActionStack forceVisible={isActive}>
+          <TileDeleteButton variant="media" size="sm" onDelete={onDelete} />
+        </TileActionStack>
+
+        {generating > 0 && <GeneratingPulseRing family="broll" shape="rect" />}
+      </div>
+
+      <div className="flex min-h-0 flex-col gap-1 px-3 py-2.5">
+        <p className="line-clamp-2 text-[13px] font-medium leading-snug text-ink-100">{title}</p>
+        <div className="flex items-center gap-1.5 overflow-hidden text-[11px] text-ink-500">
+          {/* While a session has work in flight, the live count replaces the
+              media tally — that's the answer the member is looking for when they
+              open History mid-render. The timestamp stays either way. */}
+          {generating > 0 ? (
+            <>
+              <GeneratingChip family="broll" label={activityLabel(activity!)} />
+              <span className="shrink-0">·</span>
+            </>
+          ) : (
+            (tally.images > 0 || tally.videos > 0) && (
+              <>
+                <span className="truncate">
+                  {[
+                    tally.images > 0 ? `${tally.images} still${tally.images === 1 ? '' : 's'}` : null,
+                    tally.videos > 0 ? `${tally.videos} clip${tally.videos === 1 ? '' : 's'}` : null,
+                  ].filter(Boolean).join(' · ')}
+                </span>
+                <span className="shrink-0">·</span>
+              </>
+            )
+          )}
+          <span className="shrink-0">{formatRelative(displayTs)}</span>
           {failed > 0 && (
             <span className="flex shrink-0 items-center gap-1 text-red-400 light:text-red-600">
               <AlertCircle className="h-2.5 w-2.5" />
               {failed} failed
             </span>
           )}
-          <span className="shrink-0">·</span>
-          <span className="shrink-0">{formatRelative(displayTs)}</span>
         </div>
       </div>
-
-      <TileDeleteButton variant="chrome" size="sm" alwaysVisible={isActive} onDelete={onDelete} />
     </div>
   )
 }

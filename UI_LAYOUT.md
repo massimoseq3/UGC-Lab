@@ -469,6 +469,25 @@ mute button. Clicking the card body opens the modal on Image, as before.
   Video / Animate** button.
 - **Right:** a masonry gallery of this card's generations.
 
+### Right history (`components/BrollHistoryView.tsx`)
+
+The other half of the Scenes / History tab pair. Header block: full-width search
+field, then mode filter pills (All · Line-by-Line · Continuous — only when more
+than one mode is present, preceded by an "N sessions rendering" chip while
+anything is in flight) on the left with the sort dropdown (Newest / Oldest /
+Recently updated) on the right.
+
+Below it, a **card grid** (`1 → sm:2 → xl:3 → 2xl:4`) sectioned by day, each
+section led by a left-aligned "TODAY / YESTERDAY / date" label + item count + a
+hairline. Each card: a 16:10 **cover mosaic** of up to three of that session's
+own stills/clips (1 full-bleed, 2 split, 3 as big-left-plus-stacked-pair; a film
+glyph when the session has no media yet), with the mode badge top-left, scene
+count + visual-style pill bottom-left, and the two-click delete top-right on
+hover. Under the cover: a two-line title (product · influencer · script) and a
+meta line — "6 stills · 2 clips · 3h ago", or a live "Generating N images…" chip
+plus a red "N failed" marker while work is in flight. Clicking a card loads that
+session and flips to Scenes.
+
 ---
 
 ## 7. Playground — `src/apps/playground/`
