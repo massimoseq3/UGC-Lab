@@ -8,7 +8,7 @@ export type SceneType =
   | 'B-ROLL REACTION'
   | 'B-ROLL ENVIRONMENT'
 
-// Shot role for a variation. Every scene now gets 4 SILENT b-roll variations,
+// Shot role for a variation. Every scene now gets 3 SILENT b-roll variations,
 // each role picked by the LLM per line from the selectable menu (ALL_TAGS), so
 // the mix adapts to what each script line earns. No shot speaks — a voiceover is
 // laid over the footage in the edit.
@@ -115,9 +115,9 @@ export interface BrollInput {
   // 'silent'   — every variation is silent b-roll (the default; a voiceover is
   //              laid over in the edit).
   // 'dialogue' — one variation per scene is a talking-to-camera DIALOGUE shot
-  //              (the character speaks the exact line); the other three stay
-  //              silent b-roll. Reuses OneShotDelivery — see BrollStudio.
-  delivery: OneShotDelivery
+  //              (the character speaks the exact line); the rest stay silent
+  //              b-roll.
+  delivery: BrollDelivery
 }
 
 export interface GeneratedImage {
@@ -264,94 +264,17 @@ export interface CardState {
   videoPrompt: string | null
 }
 
-// ── One Shot mode ──────────────────────────────────────────────
-// Instead of splitting the script line-by-line into silent stills, One Shot
-// asks the LLM for 4 complete video concepts — each a full master prompt a
-// multi-cut-capable model (Seedance 2.0 etc.) renders as ONE ≤15s clip. A
-// script longer than the model's max clip splits into sequential segments
-// that share identical world/voice blocks so they cut together.
-
-export type BrollMode = 'line' | 'oneshot' | 'continuous'
+// The B-Roll workspace's two modes. One-Shot (whole script → one multi-cut
+// clip) was pulled in July 2026: no model on kie could hold a 30s ad together
+// well enough to ship, so it burned video credits for footage nobody used. Its
+// history rows are kept on disk untouched (BrollHistoryItem.oneShot*, hidden
+// from the History list) so the mode can come back with a model that can
+// actually do it. Do not reuse 'oneshot' for anything else.
+export type BrollMode = 'line' | 'continuous'
 
 // 'dialogue' — the character speaks the actual script lines on camera.
-// 'silent'   — pure silent b-roll montage; a voiceover is laid over in the
-//              edit (the line-by-line mode's posture, at full-clip scale).
-export type OneShotDelivery = 'dialogue' | 'silent'
-
-export interface OneShotSegment {
-  index: number              // 1-based position within the concept
-  scriptExcerpt: string      // the exact script slice this clip covers
-  prompt: string             // scene blueprint for this clip (+ VOICE PROFILE when dialogue)
-  durationSeconds: number    // snapped UP onto the plan model's duration grid
-}
-
-export interface OneShotConcept {
-  id: string
-  angle: string              // short creative-angle title, e.g. "DEMO-FIRST"
-  summary: string            // one-line concept description
-  segments: OneShotSegment[]
-  // The ONE_SHOT_ANGLES pool entry this concept was generated from. `angle`
-  // above is the LLM's own slug and can't be matched back to the pool, so
-  // Add-variation reads this to pick a genuinely unused angle. Absent on rows
-  // generated before it existed.
-  poolAngle?: string
-}
-
-export interface OneShotResult {
-  concepts: OneShotConcept[]
-  delivery: OneShotDelivery
-  // Visual style resolved at generation time, appended as a STYLE block to each
-  // clip prompt at fire time (see applyStyleToPrompt). Optional — legacy rows
-  // and the demo default to the untouched UGC render.
-  style?: string
-  // True only for UGC Realism (keeps the iPhone-realism stack on). Stylized
-  // looks set false; undefined on legacy rows is treated as UGC.
-  realism?: boolean
-  // Model the segment split was computed against. A later model swap shows a
-  // stale-plan hint instead of silently re-splitting.
-  modelId: string
-  estimatedSeconds: number
-  segmentCount: number
-  // True when the script needed more than MAX_SEGMENTS clips — the LLM was
-  // told to tighten beats rather than drop lines, but the user should trim.
-  capped?: boolean
-  // Sample data shown when no kie.ai key is set — a preview of the feature,
-  // not a real generation. Drives the "sample concepts" banner.
-  demo?: boolean
-  // Written by Import prompts. A fan-out that returns fewer than 4 concepts
-  // means calls failed; an import of 3 concepts means the member pasted 3, so
-  // the "the rest failed" notice has to stay off.
-  imported?: boolean
-}
-
-// Slim per-segment card state, keyed `${conceptId}:${segmentIndex}`. Reuses
-// GeneratedVideo / InFlightVideo verbatim so the resume walker, videoHistory
-// push, and asset handling are identical to line-by-line cards.
-export interface OneShotCardState {
-  editablePrompt: string
-  // Undo/redo history for the blueprint, same shape as CardState — pushed on
-  // Enhance / Regenerate / commit-after-edit; the index points at the live entry.
-  promptHistory: string[]
-  promptHistoryIndex: number
-  videos: GeneratedVideo[]
-  currentVideoIndex: number
-  inFlightVideos: InFlightVideo[]
-  refsCharacter: boolean
-  refsProduct: boolean
-  // Follow-up clips (segment index > 1) carry the previous clip's LAST FRAME as
-  // a reference image so the setting + character position continue. On by
-  // default; the user can toggle it off per clip. Ignored on the first clip and
-  // when the previous clip hasn't rendered yet (no frame to grab).
-  carryPrevFrame?: boolean
-  aspectRatio: string
-  resolution: string
-  // Seeded from the segment's planned length; user-overridable in the detail
-  // modal. Snapped to the active model's grid at fire time.
-  durationSeconds: number
-  // Kept on even in silent delivery: the prompt's AUDIO rules ban speech and
-  // music, but diegetic room tone is wanted footage an editor can always mute.
-  audio: boolean
-}
+// 'silent'   — pure silent b-roll; a voiceover is laid over in the edit.
+export type BrollDelivery = 'dialogue' | 'silent'
 
 // ── Continuous mode (keyframe chain) ─────────────────────────────
 // Zack-D-Films-style continuous ads. The script splits into narration scenes;

@@ -293,11 +293,16 @@ export interface BrollHistoryItem {
   // broll-studio's internal types.
   result: unknown
   cardStates: Record<string, unknown>
-  // One Shot mode snapshot. Absent on legacy rows (=> 'line'). All modes'
-  // payloads can coexist on one row — the session holds them all.
+  // Which mode this session was generated in. Absent on legacy rows (=> 'line').
+  // 'oneshot' is retired — no UI produces it any more, but persisted rows keep it
+  // (see the oneShot* fields below), so it stays in the union.
   mode?: 'line' | 'oneshot' | 'continuous'
   // Line-by-Line delivery. Absent on legacy rows (=> 'silent', all-silent b-roll).
   lineDelivery?: 'dialogue' | 'silent'
+  // Retired One-Shot mode's snapshot. Nothing writes these any more and the
+  // History list hides rows that carry only these (isRetiredOneShotRow) — they
+  // are kept, untouched, so no member loses a session or its rendered clips if
+  // the mode returns. Do not prune them in a cleanup pass.
   oneShotResult?: unknown
   oneShotCardStates?: Record<string, unknown>
   oneShotDelivery?: 'dialogue' | 'silent'

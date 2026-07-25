@@ -44,7 +44,7 @@ interface ModelPickerProps {
   // Cost params for the per-row credit estimate (e.g. current resolution),
   // mirroring ModelSidePanel. Defaults to a single image at base resolution.
   costParams?: CostEstimateParams
-  // Restrict the list to these registry ids (e.g. B-Roll One Shot's
+  // Restrict the list to these registry ids (e.g. B-Roll Continuous'
   // multi-cut-capable allowlist). Omit for the full task/mode catalog.
   allowedModelIds?: string[]
   // Override the settingsStore key this picker reads/writes. Without it the

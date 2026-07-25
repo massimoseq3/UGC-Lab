@@ -498,7 +498,7 @@ function InFlightTile({ entry }: { entry: ModalEntry }) {
 
 // A standalone 9:16 in-flight placeholder tile — the same face as the card the
 // generation was fired from (see components/GeneratingMedia). The Continuous
-// frame/clip and One-Shot modals import this so a generating keyframe or clip
+// frame/clip modals import this so a generating keyframe or clip
 // reads as a real card in the gallery grid rather than a flat text row.
 export function PendingMediaTile(props: GeneratingMediaProps & { aspectRatio?: string }) {
   return <PendingMedia {...props} />
@@ -508,8 +508,8 @@ export function PendingMediaTile(props: GeneratingMediaProps & { aspectRatio?: s
 // autoplay muted; the top-left button plays with sound; a mute toggle appears
 // while playing/unmuted). No native controls, so it reads the same as the
 // Line-by-Line gallery tiles. Children are overlaid (action stack, duration
-// badge). Used by the Continuous clip modal and the One-Shot modal so their
-// video playback matches Line-by-Line.
+// badge). Used by the Continuous clip modal so its video playback matches
+// Line-by-Line.
 export function ModalVideoPlayer({ url, children }: { url: string | null | undefined; children?: React.ReactNode }) {
   const videoElRef = useRef<HTMLVideoElement>(null)
   const [hovering, setHovering] = useState(false)

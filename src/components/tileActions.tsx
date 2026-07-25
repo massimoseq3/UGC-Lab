@@ -3,7 +3,7 @@ import { Loader2, Star, Trash2 } from 'lucide-react'
 
 // The hover action controls that sit on top of a generated media tile —
 // Characters' gallery, Playground's history grid, B-Roll's variation /
-// continuous / one-shot cards, the Bank's image cards, and the detail-modal
+// continuous cards, the Bank's image cards, and the detail-modal
 // galleries. These were four near-identical inline copies that had already
 // drifted apart (h-7 vs h-8 buttons, bg-black/35 vs /55 scrims, blurred vs
 // not), so they live here now.

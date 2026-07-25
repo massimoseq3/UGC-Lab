@@ -29,7 +29,8 @@ export interface VideoGenInput {
   firstFrameDataUri?: string
   lastFrameDataUri?: string
   referenceDataUris?: string[]
-  // Kling 3.0: allow multi-cut inside one generation (One Shot mode).
+  // Kling 3.0: allow multi-cut inside one generation. Unused today — every
+  // B-Roll clip is a single continuous take.
   multiShots?: boolean
   // Continuous mode: skip the iPhone-realism suffix — the stylized aesthetic is
   // the opposite of the UGC stack (the style block rides in the prompt itself).

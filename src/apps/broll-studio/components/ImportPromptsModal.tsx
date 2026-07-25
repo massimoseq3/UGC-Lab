@@ -11,19 +11,16 @@ import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 const MODE_LABEL: Record<BrollMode, string> = {
   line: 'Line-by-Line',
   continuous: 'Continuous',
-  oneshot: 'One-Shot',
 }
 
 const MODE_WHAT: Record<BrollMode, string> = {
-  line: 'four shot prompts per script line',
+  line: 'three shot prompts per script line',
   continuous: 'a keyframe chain — scenes, keyframe concepts and their motion',
-  oneshot: 'four full-ad concepts, each as timestamped clip blueprints',
 }
 
 const BRIEF_FILENAME: Record<BrollMode, string> = {
   line: 'line-by-line-brief.txt',
   continuous: 'continuous-brief.txt',
-  oneshot: 'one-shot-brief.txt',
 }
 
 // Text-ish files only — the importer reads the tagged envelope, so anything a
@@ -194,9 +191,7 @@ export default function ImportPromptsModal({
               placeholder={
                 mode === 'continuous'
                   ? '<STORYBOARD>\n<STYLE>…</STYLE>\n<SCENE_1>…'
-                  : mode === 'oneshot'
-                    ? '<CONCEPT>\n<ANGLE>…</ANGLE>…'
-                    : '<SCENE>\n<LINE>…</LINE>…'
+                  : '<SCENE>\n<LINE>…</LINE>…'
               }
               className="h-[34vh] w-full resize-none border-0 bg-transparent px-4 pb-3 pt-3 font-mono text-[12px] leading-relaxed text-ink-200 placeholder-ink-700 outline-none"
             />

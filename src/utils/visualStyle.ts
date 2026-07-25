@@ -28,7 +28,7 @@ export interface ContinuousStyle {
   // The style direction itself: one dense paragraph covering the same five
   // axes as STYLE_ANALYSIS_SYSTEM (medium & render / forms / palette / light /
   // camera & finish). This is what `styleBriefFor` returns, so it's appended
-  // verbatim to every Line-by-Line and One-Shot prompt and seeds Continuous'
+  // verbatim to every Line-by-Line prompt and seeds Continuous'
   // <STYLE> block. It must stay product-agnostic — it rides prompts for every
   // script, so it describes how things look, never what is in frame.
   brief: string
@@ -155,10 +155,10 @@ export async function analyzeStyleReferences(images: string[]): Promise<string> 
 
 // The style paragraph a mode fires with: the reverse-engineered reference brief
 // when the user supplied one, otherwise the selected preset's brief. Shared by
-// all three modes (structural type so each mode's own input satisfies it).
-// Always `brief`, never `hint` — Line-by-Line and One-Shot append this verbatim
-// with no LLM expansion step, so a preset shipping the picker's one-line blurb
-// gave those two modes a fraction of the direction a custom style gets.
+// both modes (structural type so each mode's own input satisfies it).
+// Always `brief`, never `hint` — Line-by-Line appends this verbatim with no LLM
+// expansion step, so a preset shipping the picker's one-line blurb gave it a
+// fraction of the direction a custom style gets.
 export function styleBriefFor(input: { styleId: string; styleBrief?: string }): string {
   return input.styleBrief?.trim() || getContinuousStyle(input.styleId).brief
 }

@@ -46,7 +46,7 @@ export const CONTINUOUS_DEFAULT_MODEL_ID = 'bytedance/seedance-1.5-pro'
 // per-frame "Add concept" button.
 export const CONCEPTS_PER_FRAME = 3
 
-// ~2.4 words/sec narration pace — same assumption as Scripts / One-Shot.
+// ~2.4 words/sec narration pace — same assumption as Scripts.
 const WORDS_PER_SECOND = 2.4
 
 function wordCount(text: string): number {
@@ -87,7 +87,7 @@ export function buildContinuousPrompt(editable: string, style: string): string {
   return `${trimmed}\n\nSTYLE: ${style.trim()}`
 }
 
-// Fire-time style treatment for Line-by-Line and One-Shot results (the shared
+// Fire-time style treatment for Line-by-Line results (the shared
 // counterpart of buildContinuousPrompt). Only an explicitly stylized look
 // (realism === false — e.g. 3D Animated, Anime, or a custom brief distilled
 // from reference frames) actually restyles the render: its STYLE block is
@@ -188,7 +188,7 @@ And the subject stays SAFELY IN FRAME: held in the middle band of the picture �
 
 // ── Prompt formats ─────────────────────────────────────────────
 //
-// One flowing paragraph each, matching Line-by-Line and One-Shot: the labelled
+// One flowing paragraph each, matching Line-by-Line: the labelled
 // multi-field structure these used to carry read disjointed and crowded out the
 // actual idea. Keyframes keep one extra requirement the clip modes don't need —
 // an explicit safe-zone note, because 9:16 platform UI overlays the frame edges.

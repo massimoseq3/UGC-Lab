@@ -1,24 +1,18 @@
-import type { BrollResult, PromptVariation, CardState, ReferenceImage, BrollMode, OneShotResult, OneShotCardState, ContinuousResult, ContinuousSelection, ContinuousFrameCardState, ContinuousClipCardState } from '../types'
+import { useMemo } from 'react'
+import type { BrollResult, PromptVariation, CardState, ReferenceImage, BrollMode, ContinuousResult, ContinuousSelection, ContinuousFrameCardState, ContinuousClipCardState } from '../types'
 import type { Product, Model, BrollHistoryItem } from '../../../stores/types'
 import type { ContinuousStoryboardOp } from '../continuousEdits'
 import { useBankStore } from '../../../stores/bankStore'
 import { usePersistedState, useProjectScopedKey } from '../../../hooks/usePersistedState'
 import ScenesView from './ScenesView'
-import OneShotView from './OneShotView'
 import ContinuousView from './ContinuousView'
-import BrollHistoryView from './BrollHistoryView'
+import BrollHistoryView, { isRetiredOneShotRow } from './BrollHistoryView'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 
 interface RightPanelProps {
   mode: BrollMode
   result: BrollResult | null
-  oneShotResult: OneShotResult | null
-  oneShotModelId: string
-  oneShotCardStates: Record<string, OneShotCardState>
-  setOneShotCardStates: React.Dispatch<React.SetStateAction<Record<string, OneShotCardState>>>
-  onAddOneShotVariation: () => void
-  isAddingVariation?: boolean
-  // Continuous mode (keyframe chain) state — owned by BrollStudio, like One Shot.
+  // Continuous mode (keyframe chain) state — owned by BrollStudio.
   continuousResult: ContinuousResult | null
   continuousModelId: string
   continuousFrameStates: Record<string, ContinuousFrameCardState>
@@ -60,12 +54,6 @@ export default function RightPanel(props: RightPanelProps) {
   const {
     mode,
     result,
-    oneShotResult,
-    oneShotModelId,
-    oneShotCardStates,
-    setOneShotCardStates,
-    onAddOneShotVariation,
-    isAddingVariation,
     continuousResult,
     continuousModelId,
     continuousFrameStates,
@@ -101,16 +89,17 @@ export default function RightPanel(props: RightPanelProps) {
   const baseKey = useProjectScopedKey('broll-studio')
   const [tab, setTab] = usePersistedState<Tab>(`${baseKey}:rightTab`, 'scenes')
 
-  const brollHistory = useBankStore((s) => s.brollHistory)
+  const allHistory = useBankStore((s) => s.brollHistory)
   const deleteBrollHistory = useBankStore((s) => s.deleteBrollHistory)
+  // Sessions from the retired One-Shot mode stay on disk but aren't listed —
+  // there's no mode left to open them in. Filtered here so the tab's count and
+  // the list below always agree.
+  const brollHistory = useMemo(() => allHistory.filter((it) => !isRetiredOneShotRow(it)), [allHistory])
 
-  const isOneShot = mode === 'oneshot'
   const isContinuous = mode === 'continuous'
-  const sceneCount = isOneShot
-    ? (oneShotResult?.concepts.length ?? 0)
-    : isContinuous
-      ? (continuousResult?.scenes.length ?? 0)
-      : (result?.scenes.length ?? 0)
+  const sceneCount = isContinuous
+    ? (continuousResult?.scenes.length ?? 0)
+    : (result?.scenes.length ?? 0)
   const historyCount = brollHistory.length
 
   return (
@@ -123,7 +112,7 @@ export default function RightPanel(props: RightPanelProps) {
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'scenes', label: isOneShot ? 'One-Shot Storyboard' : isContinuous ? 'Continuous Storyboard' : 'Line by Line Storyboard', badge: sceneCount > 0 ? sceneCount : undefined },
+            { value: 'scenes', label: isContinuous ? 'Continuous Storyboard' : 'Line by Line Storyboard', badge: sceneCount > 0 ? sceneCount : undefined },
             { value: 'history', label: 'History', badge: historyCount > 0 ? historyCount : undefined },
           ]}
         />
@@ -150,24 +139,6 @@ export default function RightPanel(props: RightPanelProps) {
             setSelections={setContinuousSelections}
             onAddConcept={onAddContinuousConcept}
             onEditStoryboard={onEditContinuousStoryboard}
-          />
-        ) : tab === 'scenes' && isOneShot ? (
-          <OneShotView
-            result={oneShotResult}
-            isGenerating={isGenerating}
-            error={error}
-            characterRef={characterRef}
-            productRef={productRef}
-            selectedModel={selectedModel}
-            selectedProduct={selectedProduct}
-            productName={selectedProduct?.productName}
-            productContext={productContext}
-            modelContext={modelContext}
-            oneShotModelId={oneShotModelId}
-            cardStates={oneShotCardStates}
-            setCardStates={setOneShotCardStates}
-            onAddVariation={onAddOneShotVariation}
-            isAddingVariation={isAddingVariation}
           />
         ) : tab === 'scenes' ? (
           <ScenesView
