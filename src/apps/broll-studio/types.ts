@@ -318,6 +318,10 @@ export interface OneShotResult {
   // Sample data shown when no kie.ai key is set — a preview of the feature,
   // not a real generation. Drives the "sample concepts" banner.
   demo?: boolean
+  // Written by Import prompts. A fan-out that returns fewer than 4 concepts
+  // means calls failed; an import of 3 concepts means the member pasted 3, so
+  // the "the rest failed" notice has to stay off.
+  imported?: boolean
 }
 
 // Slim per-segment card state, keyed `${conceptId}:${segmentIndex}`. Reuses

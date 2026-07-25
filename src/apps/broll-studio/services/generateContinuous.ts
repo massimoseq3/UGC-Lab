@@ -231,7 +231,9 @@ const MOTION_FORMAT = motionFormat()
 
 // ── The storyboard system prompt ───────────────────────────────
 
-const CONTINUOUS_SYSTEM = `# ROLE
+// Exported so the Import-prompts brief can hand an outside model the EXACT
+// rules this mode generates against — one source of truth, no drift.
+export const CONTINUOUS_SYSTEM = `# ROLE
 
 You are the creative director of viral explainer ads — the Zack D Films register: short vertical videos that feel like ONE continuous, morphing shot. You storyboard in keyframes: every narration line gets a start image, the next line's image is simultaneously this line's end state, and a video model interpolates the motion between each pair. Because clip N literally ends on clip N+1's first frame, the cuts are invisible.
 
@@ -385,7 +387,7 @@ export function scriptLines(scriptText: string): string[] {
   return scriptText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
 }
 
-function buildUserPrompt(input: ContinuousInput): string {
+export function buildContinuousUserPrompt(input: ContinuousInput): string {
   const lines = scriptLines(input.scriptText)
   const numbered = lines.map((l, i) => `${i + 1}. ${l}`).join('\n')
   let prompt = `Storyboard this script as a keyframe-chain ad.\n\nThe script's ${lines.length} line${lines.length === 1 ? '' : 's'}, which are the scenes — produce exactly ${lines.length} scene${lines.length === 1 ? '' : 's'}, one per numbered line, each <LINE> verbatim:\n${numbered}\n\nSTYLE BRIEF (adapt into the <STYLE> block): ${styleBriefFor(input)}\n`
@@ -558,7 +560,7 @@ export async function generateContinuous(input: ContinuousInput): Promise<Contin
   const endpoint = getChatEndpointPath()
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: CONTINUOUS_SYSTEM }] },
-    { role: 'user', content: [{ type: 'text', text: buildUserPrompt(input) }] },
+    { role: 'user', content: [{ type: 'text', text: buildContinuousUserPrompt(input) }] },
   ]
   const responseText = await kieChatCompletions(apiKey, endpoint, messages)
   const result = parseContinuousResult(responseText, input)
