@@ -148,6 +148,10 @@ This clip renders as ONE video with the cuts baked in — the model performs eve
 
 SHOW, DON'T TELL. Every scene must put the matching script beat's meaning ON SCREEN — the act happening, the claim's proof, a metaphor made literal (even absurdly: "tasted like cardboard" → a deadpan bite of actual cardboard) — so the viewer sees each sentence as they hear it. Never a scene of someone passively existing while a line plays.
 
+ONE SCENE, ONE IDEA. A script sentence that carries two visual ideas gets two scenes, split at the turn — "but", "though", "until", "then", "so" — or wherever a problem meets its solution, a before meets its after, a claim meets its proof. "Most taste like chewed up cardboard, but this one tastes like real cookie dough" is the complaint, cut, then the fix. One shot cannot show both, and trying produces a muddle that shows neither.
+
+THE BAD VERSION IS ALWAYS GENERIC. When a beat criticises the category — the chalky bar, the serum that did nothing, the gadget that broke — the object on screen is NEVER [PRODUCT]. It is an unbranded stand-in, and you write it as one: plain matte packaging, no logo, no brand name, no readable text, colours and shape deliberately unlike the advertised product. [PRODUCT] means the advertised product and nothing else; putting it in the complaint shot makes the ad attack itself.
+
 Detail is what separates a winning clip from generic stock: name the exact prop, the exact body position and hand placement, the exact micro-expression, the real light source. Vague direction ("she looks happy", "nice lighting", "using the product") renders as generic footage — write each scene the way you'd describe a shot you already filmed. When in doubt, add specificity, not another scene. Keep each paragraph tight and readable.
 
 Hold that depth all the way through: the last scene of the last clip gets the same detail as Scene 1, and a two-clip concept never thins out in clip 2. If a scene could describe two visually different shots, rewrite it.

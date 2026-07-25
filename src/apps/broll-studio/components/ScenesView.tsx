@@ -900,19 +900,29 @@ function SceneSection({
             />
           )
         })}
-        <AddNewCard onAdd={(variation) => onAddVariation(scene.number, variation)} />
+        <AddNewCard onAdd={(variation) => onAddVariation(scene.number, variation)} productVisible={scene.productVisible} />
       </div>
     </div>
   )
 }
 
-function AddNewCard({ onAdd }: { onAdd: (variation: PromptVariation) => void }) {
+function AddNewCard({
+  onAdd,
+  productVisible,
+}: {
+  onAdd: (variation: PromptVariation) => void
+  productVisible?: boolean
+}) {
   const handleAdd = () => {
     onAdd({
       id: `manual-${Date.now()}`,
       label: 'Manual Option',
       tag: 'ACTION',
-      refs: 'both',
+      // Follow the scene's product visibility: on a line that attacks the
+      // category, attaching the product reference renders the advertised
+      // product as the thing being criticised. The user can flip it back on
+      // from the card's ref pills.
+      refs: productVisible === false ? 'character' : 'both',
       prompt: '',
     })
   }

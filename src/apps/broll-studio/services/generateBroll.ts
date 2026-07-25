@@ -117,9 +117,11 @@ The ONE exception: a PROOF shot may show a screen as the deliberate subject bein
 
 # NON-NEGOTIABLE RULES
 
-1. SCRIPT SEGMENTATION — each <LINE> is a complete sentence (ends in . ! or ?), never cut mid-clause. Merge any fragment of four words or fewer forward into the next sentence ("Listen up." + "This serum changed my skin." → one <LINE>). Never a standalone scene for "Listen up", "Be honest", "So...", "Right?".
+1. SCRIPT SEGMENTATION — ONE LINE, ONE IDEA. A scene is one shot, and one shot can only show one thing. Split any sentence carrying two visual ideas into two <LINE>s — the giveaway is a turn ("but", "though", "however", "until", "then", "so", "that's why") or a problem paired with its solution, a before with its after, a claim with its proof. "Most taste like chewed up cardboard, but this one tastes like real cookie dough" is TWO lines: the complaint, then the fix. Never cut mid-clause, and every <LINE> must be a speakable phrase of at least five words — merge anything shorter forward ("Listen up." + "This serum changed my skin." → one <LINE>). Never a standalone scene for "Listen up", "Be honest", "So...", "Right?". The <LINE>s are the actual voiceover: use the script's exact words in the script's order, dropping only a connecting word at a split. Never paraphrase, add, or reorder.
 
 2. PRODUCT VISIBILITY IS LOCKED TO THE VOICEOVER — if VISIBILITY is no, the product appears nowhere: not in the background, not blurred, not implied by packaging-coloured objects. If the line itself names or references the product ("this bar", "I tried it"), VISIBILITY is YES regardless of position — the viewer hears it named, so the shot may show it.
+
+2b. THE BAD VERSION IS ALWAYS GENERIC — when VISIBILITY is no but the line still needs a category object on screen (the cardboard-tasting bar, the serum that did nothing, the old gadget), that object is an UNBRANDED STAND-IN and you must say so in the prompt: plain matte packaging, no logo, no brand name, no readable text, in colours and a shape deliberately unlike the advertised product. "A brittle chalky bar in a plain unmarked grey wrapper, no logo or text anywhere" is right; "a protein bar" is wrong — the model fills that blank with the attached product reference and the ad ends up trashing its own product. The words "the product" mean the advertised product and nothing else; never use them for a stand-in.
 
 3. GENDER-NEUTRAL LANGUAGE — never he/him/she/her, never "subject". Always "the character" and "they/them/their". The character reference may be any gender.
 
@@ -337,7 +339,7 @@ function parseScenes(responseText: string, delivery: OneShotDelivery = 'silent')
       if (!cleanPrompt) continue
 
       const label = labelRaw || defaultLabelFor(tag)
-      const refs = parseRefs(refsRaw) ?? defaultRefsFor(tag, productVisible)
+      const refs = clampRefsToVisibility(parseRefs(refsRaw) ?? defaultRefsFor(tag, productVisible), productVisible)
 
       variations.push({
         id: nextId(),
@@ -398,6 +400,15 @@ function parseRefs(raw: string | undefined): VariationRefs | undefined {
   const r = raw.toLowerCase().trim()
   if (r === 'character' || r === 'product' || r === 'both' || r === 'none') return r
   return undefined
+}
+
+// Visibility is the hard rule; the LLM's <REFS> pick is only a preference. A
+// scene whose voiceover forbids the product never attaches the product
+// reference, even when the model asked for it — attaching it is how the
+// advertised product ends up rendered as the thing the ad is criticising.
+function clampRefsToVisibility(refs: VariationRefs, productVisible: boolean | undefined): VariationRefs {
+  if (productVisible !== false) return refs
+  return refs === 'both' || refs === 'character' ? 'character' : 'none'
 }
 
 // Sensible default when the LLM emits a variation without a <REFS> tag.

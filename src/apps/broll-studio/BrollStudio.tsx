@@ -12,6 +12,14 @@ import StyleModal, { BROLL_STYLE_ACCENT, type StyleSelection } from '../../compo
 import RightPanel from './components/RightPanel'
 import { brollHistoryMode } from './components/BrollHistoryView'
 import { backfillCardState, backfillOneShotCardState, backfillContinuousFrameState, backfillContinuousClipState } from './cardState'
+import {
+  editSceneLine,
+  splitScene,
+  mergeSceneWithNext,
+  deleteScene,
+  type ContinuousBundle,
+  type ContinuousStoryboardOp,
+} from './continuousEdits'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { getModel } from '../../utils/models'
 import BankPicker from '../../components/BankPicker'
@@ -745,6 +753,37 @@ export default function BrollStudio() {
     })
   }
 
+  // Structural storyboard edits (edit line / split / merge / delete). The pure
+  // operations live in continuousEdits.ts; this applies whichever one the view
+  // asked for across all four pieces of state at once, since the frame cards,
+  // clip cards and keyframe picks are all keyed by scene/frame POSITION and a
+  // partial apply would silently mis-key them against the new plan.
+  const handleEditContinuousStoryboard = useCallback((op: ContinuousStoryboardOp) => {
+    if (!continuousResult) return
+    const bundle: ContinuousBundle = {
+      result: continuousResult,
+      frameStates: continuousFrameStates,
+      clipStates: continuousClipStates,
+      selections: continuousSelections,
+    }
+    const next =
+      op.kind === 'edit' ? editSceneLine(bundle, op.sceneIndex, op.line)
+      : op.kind === 'split' ? splitScene(bundle, op.sceneIndex, op.at)
+      : op.kind === 'merge' ? mergeSceneWithNext(bundle, op.sceneIndex)
+      : deleteScene(bundle, op.sceneIndex)
+    if (!next) {
+      useAppStore.getState().addToast("That edit doesn't apply to this scene.", 'error')
+      return
+    }
+    setContinuousResult(next.result)
+    setContinuousFrameStates(next.frameStates)
+    setContinuousClipStates(next.clipStates)
+    setContinuousSelections(next.selections)
+  }, [
+    continuousResult, continuousFrameStates, continuousClipStates, continuousSelections,
+    setContinuousResult, setContinuousFrameStates, setContinuousClipStates, setContinuousSelections,
+  ])
+
   const handleGenerate = async () => {
     if (mode === 'oneshot') return handleGenerateOneShot()
     if (mode === 'continuous') return handleGenerateContinuous()
@@ -950,6 +989,7 @@ export default function BrollStudio() {
           continuousSelections={continuousSelections}
           setContinuousSelections={setContinuousSelections}
           onAddContinuousConcept={handleAddContinuousConcept}
+          onEditContinuousStoryboard={handleEditContinuousStoryboard}
           isGenerating={isGenerating}
           error={error}
           onAddVariation={handleAddVariation}
