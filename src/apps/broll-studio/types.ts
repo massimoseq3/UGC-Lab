@@ -364,6 +364,11 @@ export interface ContinuousConcept {
   id: string
   label: string
   prompt: string
+  // Which reference images this staging should attach, as decided by the
+  // storyboard. Mirrors PromptVariation.refs — the card turns it into the two
+  // toggle pills the user can override. Absent on legacy sessions and on
+  // hand-added concepts, which fall back to the scene's product visibility.
+  refs?: VariationRefs
   // Departure motion for THIS specific staging — how this concept animates
   // forward into the next beat. Motion belongs to the start frame's concept,
   // not the frame pair: picking a concept as the keyframe auto-carries its
@@ -387,6 +392,12 @@ export interface ContinuousScene {
   index: number
   scriptLine: string
   motionPrompt: string
+  // Whether the real product is allowed on screen for this beat. False on lines
+  // that attack the category ("stop eating chalky protein bars") — those show an
+  // unbranded generic stand-in, and the product reference must NOT attach or the
+  // model renders the user's own packaging as the thing being criticised.
+  // Absent on legacy sessions, which are treated as visible (the old behaviour).
+  productVisible?: boolean
   // The boundary between this frame and the next one, as planned by the
   // storyboard: the connective device plus the ANCHOR element every concept on
   // both sides carries. A pair with no shared anchor can't be interpolated —

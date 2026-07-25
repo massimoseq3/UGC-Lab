@@ -22,6 +22,13 @@ import {
   Film,
   ChevronRight,
   Star,
+  Link2,
+  Link2Off,
+  RefreshCw,
+  Pencil,
+  SplitSquareVertical,
+  Merge,
+  Trash2,
 } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
@@ -35,6 +42,7 @@ import AspectIcon from '../../../components/AspectIcon'
 import { ContinuousFrameModal, ContinuousClipModal } from './ContinuousDetailModals'
 import type {
   ContinuousResult,
+  ContinuousConcept,
   ContinuousFrame,
   ContinuousScene,
   ContinuousSelection,
@@ -77,6 +85,7 @@ import { downloadImage } from '../../../utils/downloadImage'
 import { downloadAssetsZip } from '../../../utils/downloadZip'
 import { copyToClipboard } from '../../../utils/clipboard'
 import { sendClipToPlayground } from '../services/sendClipToPlayground'
+import type { ContinuousStoryboardOp } from '../continuousEdits'
 
 // Every clip is silent narration-wise — the voiceover and music land in the
 // edit. Appended to the motion prompt at fire time so hand-edits can't drop it.
@@ -109,6 +118,10 @@ interface ContinuousViewProps {
   setSelections: React.Dispatch<React.SetStateAction<Record<string, ContinuousSelection>>>
   // Appends one fresh concept to a frame (BrollStudio owns the result state).
   onAddConcept: (frameIndex: number) => void
+  // Structural storyboard edits — retype / split / merge / delete a scene.
+  // Applied in BrollStudio because they reindex the frame, clip and selection
+  // maps together.
+  onEditStoryboard: (op: ContinuousStoryboardOp) => void
 }
 
 // Right-panel view for Continuous mode: one row per scene (its keyframe's
@@ -134,10 +147,13 @@ export default function ContinuousView({
   selections,
   setSelections,
   onAddConcept,
+  onEditStoryboard,
 }: ContinuousViewProps) {
   // Open modal: a frame concept ("3:cont-xxx") or a clip ("c2").
   const [openFrameKey, setOpenFrameKey] = useState<string | null>(null)
   const [openClipKey, setOpenClipKey] = useState<string | null>(null)
+  // Scene index whose edit dialog is open (retype / split / merge / delete).
+  const [editingScene, setEditingScene] = useState<number | null>(null)
   // Extra user-attached reference images per frame card (memory-only, like the
   // Line-by-Line card's extraRefs — data: URIs are too big to persist).
   const [extraRefs, setExtraRefs] = useState<Record<string, ReferenceImage[]>>({})
@@ -187,9 +203,13 @@ export default function ContinuousView({
     setFrameStates((prev) => {
       const next: Record<string, ContinuousFrameCardState> = {}
       for (const frame of result.frames) {
+        // Frame N opens scene N (the final frame opens none), so that scene's
+        // product visibility is this frame's — the fallback for concepts the
+        // storyboard gave no refs of its own.
+        const productVisible = result.scenes.find((s) => s.index === frame.index)?.productVisible
         for (const concept of frame.concepts) {
           const key = frameKey(frame.index, concept.id)
-          next[key] = prev[key] ?? createDefaultContinuousFrameState(concept)
+          next[key] = prev[key] ?? createDefaultContinuousFrameState(concept, { productVisible })
         }
       }
       return next
@@ -216,6 +236,28 @@ export default function ContinuousView({
       const existing = prev[key]
       if (!existing) return prev
       return { ...prev, [key]: { ...existing, ...updater(existing) } }
+    })
+  }
+
+  // ── Row-level chain control ──────────────────────────────────
+  // The chain (frame N generating with frame N-1's picked keyframe attached) is
+  // what holds the look together, so it stays on by default. But when the user
+  // wants a genuinely different shot of the same moment, the previous frame is
+  // the enemy: every concept anchors to it and the three "variations" come back
+  // as three near-copies. Per-concept toggles exist in the frame modal; this
+  // flips the whole frame at once, next to the button that actually fires it.
+  const frameChainOn = (frame: ContinuousFrame): boolean =>
+    frame.concepts.every((c) => frameStates[frameKey(frame.index, c.id)]?.chainLink !== false)
+
+  const toggleFrameChain = (frame: ContinuousFrame) => {
+    const on = !frameChainOn(frame)
+    setFrameStates((prev) => {
+      const next = { ...prev }
+      for (const c of frame.concepts) {
+        const key = frameKey(frame.index, c.id)
+        if (next[key]) next[key] = { ...next[key], chainLink: on }
+      }
+      return next
     })
   }
 
@@ -398,16 +440,26 @@ export default function ContinuousView({
     }
   }, [result, selections, frameStates, clipStates])
 
-  // ── Keyframe image generation (chained) ──────────────────────
-  // Returns true on success so the sequential "Generate frames" walk can chain.
+  // ── Keyframe image generation ────────────────────────────────
+  // Resolves to the new image's index in the card's images[], or null if
+  // nothing rendered. The index matters to the batch runner: it picks the
+  // keyframe deterministically afterwards rather than letting whichever
+  // parallel generation finished first win.
   const runFrameImage = async (
     key: string,
     override?: { aspectRatio: string; resolution: ImageResolution },
     repick = false,
-  ): Promise<boolean> => {
-    if (!result || guardDemo()) return false
+    // The batch runner picks for the whole frame once its concepts have all
+    // landed, so it suppresses the per-image auto-pick.
+    opts?: { autoPick?: boolean },
+  ): Promise<number | null> => {
+    if (!result || guardDemo()) return null
     const card = frameStatesRef.current[key]
-    if (!card || !card.editablePrompt.trim()) return false
+    if (!card) return null
+    if (!card.editablePrompt.trim()) {
+      useAppStore.getState().addToast('Write or generate a prompt for this concept first.', 'info')
+      return null
+    }
     const frameIndex = Number(key.split(':')[0])
     // Batch runs choose one resolution/aspect for the whole chain; a single-card
     // generate (from the modal) passes no override and keeps the card's own.
@@ -434,12 +486,18 @@ export default function ContinuousView({
       ...(card.refsProduct && productRef ? [productRef] : []),
       ...cardExtras,
     ]
+    // A product exists in the bank but this frame is not attaching it — the
+    // beat criticises the category, so the preamble has to name the exclusion
+    // out loud. Otherwise a chained previous keyframe carries the real
+    // packaging back in through the side door.
+    const productExcluded = !!productRef && !card.refsProduct
     const preamble = refs.length > 0
       ? buildContinuousPreamble({
           chain: !!chainRefUrl,
           character: !!(card.refsCharacter && characterRef),
           product: !!(card.refsProduct && productRef),
           extras: cardExtras.length,
+          productExcluded,
         })
       : undefined
     const promptText = buildContinuousPrompt(card.editablePrompt, result.style)
@@ -472,11 +530,11 @@ export default function ContinuousView({
         inFlightImages: prev.inFlightImages.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)),
       }))
       useAppStore.getState().addToast(msg, 'error')
-      return false
+      return null
     }
 
     // Own this poll before the taskId is persisted — see taskRegistry.
-    if (!claimTask('image', taskId)) return false
+    if (!claimTask('image', taskId)) return null
     try {
       const imageUrl = await finishImageTask(taskId, modelId, resolution)
       const newImage: GeneratedImage = { imageUrl, prompt: promptText, modelId, createdAt: Date.now() }
@@ -489,73 +547,121 @@ export default function ContinuousView({
       // Auto-pick the first image a frame produces as its keyframe — the user
       // can always click a different one. `repick` (a regenerate of an already-
       // picked frame) moves the keyframe onto the freshly generated image.
-      setSelections((prev) => {
-        if (!repick && prev[String(frameIndex)]) return prev
-        return { ...prev, [String(frameIndex)]: { conceptId: key.slice(key.indexOf(':') + 1), imageIndex: newIndex } }
-      })
-      return true
+      // Suppressed for batch runs, which pick once all of a frame's concepts
+      // have landed so the choice isn't a race between parallel generations.
+      if (opts?.autoPick !== false) {
+        setSelections((prev) => {
+          if (!repick && prev[String(frameIndex)]) return prev
+          return { ...prev, [String(frameIndex)]: { conceptId: key.slice(key.indexOf(':') + 1), imageIndex: newIndex } }
+        })
+      }
+      return newIndex
     } catch (err) {
       const msg = humanizeError(err, 'Image generation failed. Try again.')
       updateFrame(key, (prev) => ({
         inFlightImages: prev.inFlightImages.map((e) => (e.id === inFlightId ? { ...e, error: msg } : e)),
       }))
       useAppStore.getState().addToast(msg, 'error')
-      return false
+      return null
     } finally {
       releaseTask('image', taskId)
     }
   }
 
-  // Sequential chain-generate: walk the frames in order so each generation can
-  // reference the previous keyframe. Skips frames that already have one.
+  // Batch keyframe generate. Skips frames that already have a picked keyframe.
   const [chainRunning, setChainRunning] = useState(false)
-  // Where the sequential keyframe walk has got to. This chain is genuinely
-  // staged (each frame chains off the previous one's chosen image), so the
-  // position is real information — not a fake progress bar.
+  // Where a SEQUENTIAL walk has got to. Only meaningful when frames are chained
+  // (each waits on the previous one's chosen image); a parallel run leaves it
+  // null because there is no meaningful "step N of M".
   const [chainAt, setChainAt] = useState<{ step: number; of: number } | null>(null)
+
+  // Concepts of a frame that a batch run would actually fire — every one with a
+  // prompt written. The batch used to render `concepts[0]` only, which left the
+  // other two cards as plain text and auto-picked the keyframe for the user:
+  // the mode's whole pick-a-concept step never actually happened unless you
+  // opened each card by hand.
+  const batchConceptsFor = (frameIndex: number): ContinuousConcept[] => {
+    const frame = result?.frames.find((f) => f.index === frameIndex)
+    if (!frame) return []
+    return frame.concepts.filter((c) => frameStatesRef.current[frameKey(frameIndex, c.id)]?.editablePrompt.trim())
+  }
+
+  // One frame's share of the batch: all of its concepts in parallel, then ONE
+  // deterministic pick. Returns false only on a real generation failure — a
+  // skip (already picked, or an existing image just needs selecting) counts as
+  // success.
+  const runOneFrameOfBatch = async (
+    frameIndex: number,
+    override?: { aspectRatio: string; resolution: ImageResolution },
+    includeExisting = false,
+  ): Promise<boolean> => {
+    const frame = result?.frames.find((f) => f.index === frameIndex)
+    if (!frame || frame.concepts.length === 0) return true
+    const picked = selectionsRef.current[String(frameIndex)]
+    if (picked && !includeExisting) return true
+
+    // Nothing rendered yet but an image is already sitting there (a hand-run
+    // concept): just select it rather than re-billing the frame.
+    if (!picked) {
+      const withImage = frame.concepts.find((c) => (frameStatesRef.current[frameKey(frameIndex, c.id)]?.images.length ?? 0) > 0)
+      if (withImage) {
+        const card = frameStatesRef.current[frameKey(frameIndex, withImage.id)]!
+        setSelections((prev) => ({ ...prev, [String(frameIndex)]: { conceptId: withImage.id, imageIndex: card.currentImageIndex } }))
+        return true
+      }
+    }
+
+    const targets = batchConceptsFor(frameIndex)
+    if (targets.length === 0) return true
+    const indices = await Promise.all(
+      targets.map((c) => runFrameImage(frameKey(frameIndex, c.id), override, false, { autoPick: false })),
+    )
+    const landed = targets
+      .map((c, i) => ({ conceptId: c.id, imageIndex: indices[i] }))
+      .filter((e): e is { conceptId: string; imageIndex: number } => e.imageIndex !== null)
+    if (landed.length === 0) return false
+
+    // Keep the user's own concept choice across a regenerate; otherwise take the
+    // leftmost concept that rendered. Never "whichever finished first".
+    const keep = picked ? landed.find((e) => e.conceptId === picked.conceptId) : undefined
+    const chosen = keep ?? landed[0]
+    setSelections((prev) => ({ ...prev, [String(frameIndex)]: chosen }))
+    return true
+  }
+
   const runAllFrames = async (
     frameIndices: number[],
     override?: { aspectRatio: string; resolution: ImageResolution },
     includeExisting = false,
   ) => {
     if (!result || chainRunning) return
+    const ordered = [...frameIndices].sort((a, b) => a - b)
+    // Sequencing only buys something when a frame in the batch actually
+    // references the previous keyframe. Chaining is off by default now, so the
+    // common case is a plain parallel fan-out — a six-frame storyboard renders
+    // in one image-generation's time instead of six.
+    const anyChained = ordered.some((i) => {
+      const frame = result.frames.find((f) => f.index === i)
+      return !!frame?.concepts.some((c) => frameStatesRef.current[frameKey(i, c.id)]?.chainLink)
+    })
     setChainRunning(true)
     try {
-      // Always walk in index order so each frame can chain off the previous
-      // frame's (possibly just-regenerated) keyframe.
-      const ordered = [...frameIndices].sort((a, b) => a - b)
+      if (!anyChained) {
+        await Promise.all(ordered.map((frameIndex) => runOneFrameOfBatch(frameIndex, override, includeExisting)))
+        return
+      }
+      // Chained run: walk in index order so each frame can reference the
+      // previous frame's (possibly just-regenerated) keyframe.
       let step = 0
       for (const frameIndex of ordered) {
         setChainAt({ step: ++step, of: ordered.length })
-        const frame = result.frames.find((f) => f.index === frameIndex)
-        if (!frame || frame.concepts.length === 0) continue
-        const picked = selectionsRef.current[String(frameIndex)]
-        if (picked) {
-          // Already has a keyframe. Skip unless the user opted to regenerate —
-          // then re-run the picked concept and move the keyframe onto the new image.
-          if (!includeExisting) continue
-          const ok = await runFrameImage(frameKey(frameIndex, picked.conceptId), override, true)
-          if (!ok) {
-            useAppStore.getState().addToast(`Stopped at Frame ${frameIndex} — fix it and run again.`, 'error')
-            break
-          }
-          await new Promise((r) => setTimeout(r, 0))
-          continue
-        }
-        // Prefer a concept that already has an image (just needs selecting).
-        const withImage = frame.concepts.find((c) => (frameStatesRef.current[frameKey(frameIndex, c.id)]?.images.length ?? 0) > 0)
-        if (withImage) {
-          const card = frameStatesRef.current[frameKey(frameIndex, withImage.id)]!
-          setSelections((prev) => ({ ...prev, [String(frameIndex)]: { conceptId: withImage.id, imageIndex: card.currentImageIndex } }))
-          // Let the ref effect observe the new selection before the next loop.
-          await new Promise((r) => setTimeout(r, 0))
-          continue
-        }
-        const ok = await runFrameImage(frameKey(frameIndex, frame.concepts[0].id), override)
+        const ok = await runOneFrameOfBatch(frameIndex, override, includeExisting)
         if (!ok) {
           useAppStore.getState().addToast(`Stopped at Frame ${frameIndex} — fix it and run again.`, 'error')
           break
         }
+        // Let the ref effect observe the new selection before the next frame
+        // reads it as its chain reference.
         await new Promise((r) => setTimeout(r, 0))
       }
     } finally {
@@ -1068,8 +1174,11 @@ export default function ContinuousView({
     if (fresh.length === 0 && done.length === 0) return
     // When everything's already picked the dialog still opens — with the toggle
     // as the only path forward, so "regenerate the lot" stays possible but never
-    // accidental.
-    setIncludeExisting(false)
+    // accidental. One exception: pressing a single row's own button IS the
+    // explicit intent, so it pre-arms the toggle rather than opening on
+    // "Nothing to generate" — that dead-end was the only way back into a frame
+    // once its keyframe had been auto-picked.
+    setIncludeExisting(frameIndices?.length === 1 && fresh.length === 0)
     setConfirmGen({ kind: 'frames', fresh, done })
   }
   // Put each clip through the SAME fire-time clamp runClipVideo applies —
@@ -1115,10 +1224,13 @@ export default function ContinuousView({
   const frameTargets = confirmGen?.kind === 'frames'
     ? (includeExisting ? [...confirmGen.fresh, ...confirmGen.done] : confirmGen.fresh)
     : []
+  // Every concept of every target frame renders, so the batch costs images, not
+  // frames — price and label it that way or a 6-frame run quietly bills triple.
+  const frameImageCount = frameTargets.reduce((sum, i) => sum + batchConceptsFor(i).length, 0)
   const framesPerImage = frameImageModelId
     ? estimateCredits(frameImageModelId, { imageCount: 1, resolution: effectiveFramesRes })
     : null
-  const framesCredits = framesPerImage != null ? framesPerImage * frameTargets.length : null
+  const framesCredits = framesPerImage != null ? framesPerImage * frameImageCount : null
   const framesOverBudget = framesCredits != null && balance !== null && framesCredits > balance
 
   const confirmGenerate = () => {
@@ -1171,12 +1283,12 @@ export default function ContinuousView({
             // Only a chain walk already underway blocks this — a single frame
             // card rendering on its own doesn't, so the two can overlap.
             disabled={chainRunning}
-            title="Generate a keyframe image for every frame that doesn't have one yet, chained in order for consistency"
+            title="Generate a keyframe image for every frame that doesn't have one yet"
             className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {chainRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
             {chainRunning
-              ? chainAt ? `Frame ${chainAt.step} of ${chainAt.of}…` : 'Chaining frames…'
+              ? chainAt ? `Frame ${chainAt.step} of ${chainAt.of}…` : 'Generating frames…'
               : 'Generate frames'}
           </button>
           <button
@@ -1218,6 +1330,9 @@ export default function ContinuousView({
             clipState={clipStates[clipKey(scene.index)]}
             framePicked={!!selections[String(scene.index)]}
             chainRunning={chainRunning}
+            chainOn={frameChainOn(result.frames.find((f) => f.index === scene.index)!)}
+            onToggleChain={() => toggleFrameChain(result.frames.find((f) => f.index === scene.index)!)}
+            onEditScene={() => setEditingScene(scene.index)}
             onGenerateFrame={() => requestFrames([scene.index])}
             onOpenConcept={setOpenFrameKey}
             onOpenClip={() => setOpenClipKey(clipKey(scene.index))}
@@ -1238,6 +1353,8 @@ export default function ContinuousView({
           selection={selections[String(finalFrame.index)]}
           frameStates={frameStates}
           chainRunning={chainRunning}
+          chainOn={frameChainOn(finalFrame)}
+          onToggleChain={() => toggleFrameChain(finalFrame)}
           onGenerateFrame={() => requestFrames([finalFrame.index])}
           onOpenConcept={setOpenFrameKey}
           onGenerateConcept={(key) => void runFrameImage(key)}
@@ -1250,6 +1367,16 @@ export default function ContinuousView({
           onSaveImage={saveKeyframeToBank}
         />
       </div>
+
+      {editingScene !== null && result.scenes.find((s) => s.index === editingScene) && (
+        <SceneEditModal
+          scene={result.scenes.find((s) => s.index === editingScene)!}
+          hasNext={result.scenes.some((s) => s.index === editingScene + 1)}
+          canDelete={result.scenes.length > 1}
+          onApply={onEditStoryboard}
+          onClose={() => setEditingScene(null)}
+        />
+      )}
 
       {/* Cost-confirm popup — clips are expensive; the frame batch is a count
           confirm so a 12-frame chain never fires on a stray click. */}
@@ -1316,10 +1443,10 @@ export default function ContinuousView({
                 <h3 className="text-sm font-medium text-ink-100">
                   {frameTargets.length === 0
                     ? 'Nothing to generate'
-                    : `Generate ${frameTargets.length} keyframe${frameTargets.length === 1 ? '' : 's'}?`}
+                    : `Generate ${frameImageCount} image${frameImageCount === 1 ? '' : 's'} across ${frameTargets.length} frame${frameTargets.length === 1 ? '' : 's'}?`}
                 </h3>
                 <p className="mt-1 text-xs text-ink-500">
-                  Frames generate one after another so each can reference the previous keyframe — the chain keeps the style locked.
+                  Every concept of each frame renders so you have a real choice; the leftmost one that lands becomes the keyframe until you click another. All parallel — any frame set to Chained waits for the one before it instead.
                   {confirmGen.done.length > 0 && !includeExisting && (
                     <> {confirmGen.done.length} frame{confirmGen.done.length === 1 ? '' : 's'} already
                     {confirmGen.done.length === 1 ? ' has' : ' have'} a keyframe and will be skipped.</>
@@ -1530,7 +1657,159 @@ export default function ContinuousView({
   )
 }
 
+// ── Scene editor ─────────────────────────────────────────────────
+// The storyboard's segmentation is a guess the LLM makes before any frame
+// exists, and one bad split (a line carrying two visual ideas) used to mean
+// regenerating everything. This edits the plan in place: retype the narration,
+// split it in two at the cursor, fold it into the next beat, or drop it.
+
+function SceneEditModal({
+  scene,
+  hasNext,
+  canDelete,
+  onApply,
+  onClose,
+}: {
+  scene: ContinuousScene
+  hasNext: boolean
+  canDelete: boolean
+  onApply: (op: ContinuousStoryboardOp) => void
+  onClose: () => void
+}) {
+  const [line, setLine] = useState(scene.scriptLine)
+  // Where the caret sits, so "Split here" knows where to cut. Seeded to the end
+  // so a split with no click lands somewhere harmless rather than at 0.
+  const [caret, setCaret] = useState(scene.scriptLine.length)
+  const [armedDelete, setArmedDelete] = useState(false)
+  const textRef = useRef<HTMLTextAreaElement | null>(null)
+  useCloseOnEscape(true, onClose)
+  useCloseOnAppSwitch(true, onClose)
+
+  const trimmed = line.trim()
+  const head = line.slice(0, caret).trim()
+  const tail = line.slice(caret).trim()
+  const canSplit = !!head && !!tail && trimmed === scene.scriptLine.trim()
+  const dirty = trimmed !== scene.scriptLine.trim()
+
+  const syncCaret = () => setCaret(textRef.current?.selectionStart ?? line.length)
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl border border-ink/10 bg-ink-950/95 p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-medium text-ink-100">Scene {scene.index}</h3>
+            <p className="mt-1 text-xs text-ink-500">This line is the voiceover heard over the clip.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full p-1 text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-200">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <textarea
+          ref={textRef}
+          value={line}
+          onChange={(e) => { setLine(e.target.value); setCaret(e.target.selectionStart) }}
+          onClick={syncCaret}
+          onKeyUp={syncCaret}
+          onSelect={syncCaret}
+          rows={3}
+          className="mt-4 w-full resize-none rounded-2xl border border-ink/10 bg-ink/[0.03] px-3.5 py-3 text-sm leading-relaxed text-ink-100 placeholder:text-ink-600 focus:border-ink/20 focus:outline-none"
+          placeholder="What the voiceover says over this clip"
+        />
+
+        <p className="mt-2 text-[11px] leading-relaxed text-ink-500">
+          {canSplit
+            ? <>Split here → <span className="text-ink-300">&ldquo;{head}&rdquo;</span> then <span className="text-ink-300">&ldquo;{tail}&rdquo;</span>, with a blank keyframe between them to write or regenerate.</>
+            : dirty
+              ? 'Save the line before splitting it.'
+              : 'One scene shows one idea. Put the cursor where the line turns — usually at a “but”, “until” or “then” — to split it in two.'}
+        </p>
+
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={!canSplit}
+            onClick={() => { onApply({ kind: 'split', sceneIndex: scene.index, at: caret }); onClose() }}
+            className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <SplitSquareVertical className="h-3.5 w-3.5" />
+            Split here
+          </button>
+          <button
+            type="button"
+            disabled={!hasNext || dirty}
+            title={hasNext ? 'Fold the next scene into this one — the keyframe between them is removed' : 'No scene after this one'}
+            onClick={() => { onApply({ kind: 'merge', sceneIndex: scene.index }); onClose() }}
+            className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Merge className="h-3.5 w-3.5" />
+            Merge with next
+          </button>
+          {/* Two-click arm rather than a nested confirm dialog — the house
+              delete idiom, and this one throws away rendered keyframes. */}
+          <button
+            type="button"
+            disabled={!canDelete}
+            onClick={() => {
+              if (!armedDelete) { setArmedDelete(true); return }
+              onApply({ kind: 'delete', sceneIndex: scene.index })
+              onClose()
+            }}
+            onBlur={() => setArmedDelete(false)}
+            title={canDelete ? 'Remove this scene and the keyframe it opens' : 'A storyboard needs at least one scene'}
+            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+              armedDelete
+                ? 'border-red-500/40 bg-red-500/15 text-red-300 light:text-red-700'
+                : 'border-ink/10 bg-ink/[0.03] text-ink-400 hover:border-red-500/30 hover:text-red-300'
+            }`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {armedDelete ? 'Confirm delete' : 'Delete scene'}
+          </button>
+          <button
+            type="button"
+            disabled={!dirty || !trimmed}
+            onClick={() => { onApply({ kind: 'edit', sceneIndex: scene.index, line }); onClose() }}
+            className="ml-auto rounded-full bg-broll-500 px-4 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Save line
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 // ── Scene row — keyframe concepts + the clip into the next frame ──
+
+// Row-level chain switch. Chained (the default) locks the look to the previous
+// keyframe; unchained frees every concept on this row to be its own shot, which
+// is what you want when the beat stays put and only the framing changes. Frame 1
+// has nothing to chain from, so it never renders one.
+function ChainToggle({ frameIndex, chainOn, onToggle }: { frameIndex: number; chainOn: boolean; onToggle: () => void }) {
+  if (frameIndex <= 1) return null
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={
+        chainOn
+          ? `Chained to Frame ${frameIndex - 1}: every concept here inherits its look. Turn off for genuinely different shots.`
+          : `Unchained: concepts here generate from the character, product and style only — more variety, looser continuity.`
+      }
+      className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors ${
+        chainOn
+          ? 'border-broll-500/25 bg-broll-500/10 text-broll-300 hover:bg-broll-500/15'
+          : 'border-ink/10 bg-ink/[0.03] text-ink-500 hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-300'
+      }`}
+    >
+      {chainOn ? <Link2 className="h-3.5 w-3.5" /> : <Link2Off className="h-3.5 w-3.5" />}
+      {chainOn ? `Chained to ${String(frameIndex - 1).padStart(2, '0')}` : 'Unchained'}
+    </button>
+  )
+}
 
 function SceneRow({
   scene,
@@ -1541,6 +1820,9 @@ function SceneRow({
   clipState,
   framePicked,
   chainRunning,
+  chainOn,
+  onToggleChain,
+  onEditScene,
   onGenerateFrame,
   onOpenConcept,
   onOpenClip,
@@ -1557,6 +1839,9 @@ function SceneRow({
   clipState?: ContinuousClipCardState
   framePicked: boolean
   chainRunning: boolean
+  chainOn: boolean
+  onToggleChain: () => void
+  onEditScene: () => void
   onGenerateFrame: () => void
   onOpenConcept: (key: string) => void
   onOpenClip: () => void
@@ -1580,25 +1865,40 @@ function SceneRow({
             <span className="inline-flex w-fit rounded-full border border-ink/10 bg-ink/[0.03] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-400">
               Scene {scene.index}
             </span>
-            <p
-              className="truncate text-lg font-normal not-italic leading-relaxed text-ink-400"
-              style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
-              title={scene.scriptLine}
+            {/* The line is the edit affordance: click it to retype, split,
+                merge or delete the beat. A storyboard the user can't fix is a
+                storyboard they have to regenerate from scratch. */}
+            <button
+              type="button"
+              onClick={onEditScene}
+              title="Edit this scene — retype, split, merge or delete"
+              className="group/line flex min-w-0 items-center gap-2 text-left"
             >
-              &ldquo;{scene.scriptLine}&rdquo;
-            </p>
+              <span
+                className="truncate text-lg font-normal not-italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200"
+                style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
+              >
+                &ldquo;{scene.scriptLine}&rdquo;
+              </span>
+              <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-700 opacity-0 transition-opacity group-hover/line:opacity-100" />
+            </button>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onGenerateFrame}
-          disabled={chainRunning || framePicked}
-          title={framePicked ? 'A keyframe is already picked for this scene' : 'Generate the keyframe image for this scene'}
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {framePicked ? <Check className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
-          {framePicked ? 'Frame picked' : 'Generate frame'}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <ChainToggle frameIndex={frame.index} chainOn={chainOn} onToggle={onToggleChain} />
+          <button
+            type="button"
+            onClick={onGenerateFrame}
+            disabled={chainRunning}
+            title={framePicked
+              ? 'Render this scene\'s concepts again — the keyframe moves onto the fresh image'
+              : 'Render every concept for this scene'}
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {framePicked ? <RefreshCw className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
+            {framePicked ? 'Regenerate frame' : 'Generate frame'}
+          </button>
+        </div>
       </div>
 
       {/* Image concepts stay in their own grid (rows of four at xl); the clip
@@ -1649,6 +1949,8 @@ function FinalFrameRow({
   selection,
   frameStates,
   chainRunning,
+  chainOn,
+  onToggleChain,
   onGenerateFrame,
   onOpenConcept,
   onGenerateConcept,
@@ -1660,6 +1962,8 @@ function FinalFrameRow({
   selection?: ContinuousSelection
   frameStates: Record<string, ContinuousFrameCardState>
   chainRunning: boolean
+  chainOn: boolean
+  onToggleChain: () => void
   onGenerateFrame: () => void
   onOpenConcept: (key: string) => void
   onGenerateConcept: (key: string) => void
@@ -1691,16 +1995,21 @@ function FinalFrameRow({
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onGenerateFrame}
-          disabled={chainRunning || framePicked}
-          title={framePicked ? 'A keyframe is already picked for the final frame' : 'Generate the final keyframe image'}
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {framePicked ? <Check className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
-          {framePicked ? 'Frame picked' : 'Generate frame'}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <ChainToggle frameIndex={frame.index} chainOn={chainOn} onToggle={onToggleChain} />
+          <button
+            type="button"
+            onClick={onGenerateFrame}
+            disabled={chainRunning}
+            title={framePicked
+              ? 'Render the final frame\'s concepts again — the keyframe moves onto the fresh image'
+              : 'Render every concept for the final frame'}
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {framePicked ? <RefreshCw className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
+            {framePicked ? 'Regenerate frame' : 'Generate frame'}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">

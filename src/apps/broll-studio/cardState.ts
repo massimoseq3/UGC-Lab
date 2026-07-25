@@ -267,9 +267,17 @@ export function backfillOneShotCardState(raw: Partial<OneShotCardState> & Record
 
 // ── Continuous mode card states ──────────────────────────────────
 
-// Fresh per-concept keyframe card (image-only). Refs default on when the bank
-// items exist — the view drops absent refs at fire time anyway.
-export function createDefaultContinuousFrameState(concept: ContinuousConcept): ContinuousFrameCardState {
+// Fresh per-concept keyframe card (image-only). Refs come from the storyboard's
+// own per-concept call; absent that (legacy rows, hand-added concepts) they fall
+// back to the scene's product visibility, and absent that to both on — the view
+// drops refs whose bank item is missing at fire time anyway.
+export function createDefaultContinuousFrameState(
+  concept: ContinuousConcept,
+  opts?: { productVisible?: boolean },
+): ContinuousFrameCardState {
+  const toggles = concept.refs
+    ? refsToToggles(concept.refs)
+    : { refsCharacter: true, refsProduct: opts?.productVisible !== false }
   return {
     editablePrompt: concept.prompt,
     promptHistory: [concept.prompt],
@@ -277,9 +285,17 @@ export function createDefaultContinuousFrameState(concept: ContinuousConcept): C
     images: [],
     currentImageIndex: 0,
     inFlightImages: [],
-    chainLink: true,
-    refsCharacter: true,
-    refsProduct: true,
+    // Chaining to the previous keyframe is OFF by default. It was on, and it
+    // cost more than it bought: all three of a frame's concepts anchor to the
+    // same previous image and come back as three near-copies of it, which is
+    // the one thing this mode's pick-a-concept step exists to avoid. The look is
+    // already held by the storyboard-wide STYLE block plus the character and
+    // product references, and the clip is a frames-to-video interpolation — it
+    // morphs between two unrelated frames perfectly well, guided by the scene's
+    // TRANSITION anchor. Chaining stays available per frame (the row toggle) for
+    // the case it's genuinely good at: coming back to the same room.
+    chainLink: false,
+    ...toggles,
     aspectRatio: '9:16',
     resolution: '1K',
     // Standalone-animate defaults. Motion seeds from the concept's departure
@@ -345,7 +361,11 @@ export function backfillContinuousFrameState(raw: Partial<ContinuousFrameCardSta
       ? Math.max(0, Math.min(raw.currentImageIndex, Math.max(0, images.length - 1)))
       : Math.max(0, images.length - 1),
     inFlightImages: inFlight.filter((e) => Date.now() - (e.startedAt ?? 0) < STALE_MS),
-    chainLink: raw.chainLink !== false,
+    // Opt-in, matching the fresh-card default: only an explicitly stored `true`
+    // chains. A row persisted before the field existed reads as off, so a
+    // reopened session behaves like a new one rather than quietly re-chaining
+    // the next frame the user regenerates.
+    chainLink: raw.chainLink === true,
     refsCharacter: raw.refsCharacter !== false,
     refsProduct: raw.refsProduct !== false,
     aspectRatio: (raw.aspectRatio as string) ?? '9:16',

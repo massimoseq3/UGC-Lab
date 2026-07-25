@@ -11,7 +11,7 @@
 // style except UGC Realism bypasses the app's deterministic iPhone-realism
 // stack — "unedited photorealism, zero bokeh" actively fights a 3D render.
 
-import type { ContinuousConcept, ContinuousFrame, ContinuousResult, ContinuousScene } from '../types'
+import type { ContinuousConcept, ContinuousFrame, ContinuousResult, ContinuousScene, VariationRefs } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { kieChatCompletions, type ChatMessage } from '../../../utils/kie'
 import { getChatEndpointPath, getModel, snapVideoDurationUp } from '../../../utils/models'
@@ -108,11 +108,21 @@ export function applyStyleToPrompt(
 // Reference preamble for keyframe image generation. The chain reference (the
 // previous frame's chosen keyframe) is the character-lock protocol: it fixes
 // style/character/environment continuity without inheriting composition.
-export function buildContinuousPreamble(opts: { chain: boolean; character: boolean; product: boolean; extras: number }): string {
+export function buildContinuousPreamble(opts: {
+  chain: boolean
+  character: boolean
+  product: boolean
+  extras: number
+  // True when a product reference EXISTS but is deliberately withheld from this
+  // frame — the beat criticises the category, so the item on screen has to be an
+  // unbranded stand-in. Without saying so out loud, a chained previous keyframe
+  // that showed the real packaging drags the branding straight back in.
+  productExcluded?: boolean
+}): string {
   const parts: string[] = []
   if (opts.chain) {
     parts.push(
-      'The FIRST attached image is the previous keyframe of this same sequence. Maintain its exact art style, rendering technique, character design, colour palette, material language, and environment continuity — this new frame must look like the very next moment of the same film. Do NOT copy its composition, camera angle, or framing: build the new shot entirely from the scene description below.',
+      'The FIRST attached image is the previous keyframe of this same sequence. Maintain its exact art style, rendering technique, character design, colour palette, material language, and environment continuity — this new frame must look like the very next moment of the same film. This is a DIFFERENT camera setup in the same world: do not reuse its composition, shot size, camera angle, subject placement, or background layout. Build the framing entirely from the scene description below; the reference governs how things look, never where they sit.',
     )
   }
   if (opts.character) {
@@ -120,6 +130,11 @@ export function buildContinuousPreamble(opts: { chain: boolean; character: boole
   }
   if (opts.product) {
     parts.push("Match the product's shape, label text, and colours exactly to the product reference image, translated into the sequence's art style.")
+  }
+  if (opts.productExcluded) {
+    parts.push(
+      'NO product reference is attached to this frame on purpose: the advertised product must NOT appear here, in any attached image or not. Any product-like object described below is a generic unbranded stand-in — blank or plain packaging, no logo, no brand name, no readable label, and deliberately unlike the advertised product in colour and shape. If a previous keyframe is attached and shows the real packaging, do not carry it into this frame.',
+    )
   }
   if (opts.extras > 0) {
     parts.push('Any remaining attached images are additional appearance references — use them for identity and detail only, never for composition.')
@@ -189,11 +204,38 @@ You are the creative director of viral explainer ads — the Zack D Films regist
 
 Turn the user's script into a STORYBOARD:
 
-1. Split the script into narration SCENES (complete sentences — never cut mid-clause; merge any fragment of four words or fewer forward into the next sentence).
-2. For every scene, design its START keyframe. After the last scene, design one FINAL keyframe (the end state the last clip lands on). So there is always exactly ONE more frame than there are scenes.
-3. For every scene, declare the TRANSITION that carries its keyframe into the next one — see THE CHAIN below. Design both frames around it.
-4. Give every keyframe ${CONCEPTS_PER_FRAME} distinct visual CONCEPTS.
-5. For every CONCEPT of every non-final keyframe, write the MOTION that animates THAT specific staging across into the next beat. Motion belongs to the staging, not the scene — a wide aerial and a macro close-up of the same beat travel differently, so each concept gets its own motion, and each one has to execute the scene's transition. Final-frame concepts get NO motion (nothing leaves the last frame).
+1. Split the script into narration SCENES — see SEGMENTATION below. One scene carries exactly ONE visual idea.
+2. For every scene, decide VISIBILITY: whether the advertised product is allowed on screen for that beat — see WHOSE PRODUCT IS ON SCREEN below.
+3. For every scene, design its START keyframe. After the last scene, design one FINAL keyframe (the end state the last clip lands on). So there is always exactly ONE more frame than there are scenes.
+4. For every scene, declare the TRANSITION that carries its keyframe into the next one — see THE CHAIN below. Design both frames around it.
+5. Give every keyframe ${CONCEPTS_PER_FRAME} distinct visual CONCEPTS, each declaring the REFERENCE IMAGES it needs.
+6. For every CONCEPT of every non-final keyframe, write the MOTION that animates THAT specific staging across into the next beat. Motion belongs to the staging, not the scene — a wide aerial and a macro close-up of the same beat travel differently, so each concept gets its own motion, and each one has to execute the scene's transition. Final-frame concepts get NO motion (nothing leaves the last frame).
+
+# SEGMENTATION — ONE SCENE, ONE IDEA
+
+A scene is one keyframe, and one image can only show one thing. So the unit is the IDEA, not the sentence.
+
+- Split any sentence that carries two visual ideas into two scenes. The giveaway is a turn: "but", "though", "however", "until", "then", "so", "and then", "that's why". Each side of the turn gets its own scene. "Most taste like chewed up cardboard, but this one tastes like real cookie dough" is TWO scenes — the complaint, then the fix. Trying to draw both at once produces a muddle that shows neither.
+- Also split a sentence that states a problem and its solution, a before and an after, or a claim and its proof.
+- Never cut mid-clause. Every scene must be a speakable, self-contained phrase of at least five words; merge anything shorter forward into the next one. Never a standalone scene for "Listen up", "Be honest", "So...", "Right?".
+- The <LINE> values are the actual voiceover. Use the script's EXACT words, in the script's order, splitting only at clause boundaries — reading every <LINE> in sequence must reproduce the script. You may drop the connecting word at a split ("but", "so") and nothing else. Never paraphrase, never add words, never reorder.
+
+# WHOSE PRODUCT IS ON SCREEN
+
+The user's own product photo is attached as a reference. Handing it to a shot that criticises the category makes the ad attack its own product — the single worst failure in this mode. So every scene declares VISIBILITY:
+
+- VISIBILITY no — the advertised product may NOT appear anywhere in this scene's frames: not held, not in the background, not blurred, not implied by packaging-coloured objects. This is the default for any line that names the category as the PROBLEM ("stop eating chalky protein bars", "most of them taste like cardboard", "I wasted years on serums that did nothing"), and for hook and reframe lines generally.
+- VISIBILITY yes — the product may appear. Any line that points at the product itself ("this one", "this bar", "I tried it", the brand name) is YES regardless of where it sits in the ad, and payoff and CTA lines are almost always yes.
+
+When VISIBILITY is no but the line still needs a category object on screen (the bad bar, the useless serum, the old gadget), that object is a GENERIC STAND-IN, and you must SAY so in the prompt — never just omit the product and hope. Write it in explicitly: a plain unbranded item in blank matte packaging, no logo, no brand name, no readable text, in colours and a shape deliberately unlike the advertised product. "A brittle chalky bar in a plain unmarked grey wrapper, no logo or text anywhere" is right. "A protein bar" is wrong — the model fills that blank with the attached reference.
+
+# REFERENCE IMAGES — PER CONCEPT
+
+Each concept declares REFS: character / product / both / none.
+
+- Attach the CHARACTER reference whenever a person could appear, even just their hands. When unsure, attach it — a missing character reference loses the face.
+- Attach the PRODUCT reference only when the advertised product is actually in the frame. It is a hard exclusion, not a preference: when VISIBILITY is no, REFS may NEVER include product. A generic stand-in gets NO product reference — that is the whole point.
+- Use "none" for frames with neither a person nor the product (a bare environment, an abstract insert, a pure metaphor).
 
 # SHOW, DON'T TELL — THIS IS THE WHOLE JOB
 
@@ -204,7 +246,7 @@ Each narration line will be HEARD over the footage. The frames must SHOW what th
 - If the line makes a claim, show the evidence.
 - If the line is emotional, show the emotion landing inside a real moment — never a face in a void.
 
-When the script names the product, the product IS the visual. A viewer watching with the sound off should be able to guess the narration.
+When the script points at the product itself, the product IS the visual. When the script attacks the category, the generic stand-in is the visual — never the product. A viewer watching with the sound off should be able to guess the narration.
 
 # SPECIFICITY
 
@@ -217,7 +259,8 @@ Banned everywhere: "beautiful", "stunning", "modern", "clean", "minimalist", "hi
 - Each keyframe is a single striking image: one clear subject, one readable idea. If a frame needs a sentence of explanation to work, simplify the idea — then describe the simpler idea in full detail.
 - SAFE FRAMING: vertical 9:16 with platform UI overlaying the edges — keep the subject centred with comfortable margins, never so zoomed that crucial elements touch the frame edge.
 - CONTINUITY IS EVERYTHING: consecutive keyframes must read as two moments of the same world. Same character design, same palette, same environment unless the story moves. Frame N+1 must be a state that frame N can physically morph or move into, and it must carry the boundary's anchor.
-- Refer to the on-screen person as "the character" and the product as "the product" — reference images fix their exact look. Never describe the character's identity (gender, age, ethnicity, hair colour, skin tone); pose, expression, gesture, and body language ARE required.
+- Refer to the on-screen person as "the character" and the advertised product as "the product" — reference images fix their exact look. Never describe the character's identity (gender, age, ethnicity, hair colour, skin tone); pose, expression, gesture, and body language ARE required.
+- The words "the product" mean the ADVERTISED product and nothing else. Never use them for a generic stand-in — describe that one physically instead ("a plain unmarked bar in a blank grey wrapper").
 - Gender-neutral language only: never he/him/his/she/her, never "subject". Use "the character" or "they/them/their".
 - Never mention the art style, medium, or render technique inside a frame prompt — the style is appended separately.
 
@@ -255,22 +298,25 @@ Wrap your answer in this exact XML envelope. No text outside the tags, no markdo
 <STORYBOARD>
 <STYLE>One dense paragraph of 90-150 words locking the visual style for the whole sequence — medium and rendering technique, how forms and figures are treated, the named colour palette, the lighting register, and the camera/finish character. Adapt the style brief you are given to this specific script and product. This paragraph is appended verbatim to every image and video prompt, so it must be pure style direction with no subject matter in it.</STYLE>
 <SCENE_1>
-<LINE>exact narration slice, a complete sentence</LINE>
+<LINE>exact narration slice, one visual idea, in the script's own words</LINE>
+<VISIBILITY>yes|no</VISIBILITY>
 <TRANSITION>one line: the device carrying this keyframe into the next one, plus the anchor element every concept on BOTH sides must show in the same screen position and scale — e.g. "match cut on the circular glow: the temple light becomes the factory's central lamp, same size, centred, same warm amber"</TRANSITION>
 <FRAME>
 <CONCEPT_1>
 <LABEL>2-4 word slug naming the actual idea, e.g. INSIDE THE BOTTLE</LABEL>
+<REFS>character|product|both|none</REFS>
 <PROMPT>one flowing paragraph — the still, described, with the boundary anchors written in</PROMPT>
 <MOTION>one paragraph: how THIS staging travels across — departure vector and camera move, the crossing mechanism that executes the transition, then the settle. Arrival as movement, never as a picture of the end frame.</MOTION>
 </CONCEPT_1>
-<CONCEPT_2>a DIFFERENT idea for the same story state, carrying the same anchors, same depth, with its OWN matched MOTION</CONCEPT_2>
-<CONCEPT_3>a DIFFERENT idea again, carrying the same anchors, same depth, with its OWN matched MOTION</CONCEPT_3>
+<CONCEPT_2>a DIFFERENT idea for the same story state, carrying the same anchors, same depth, with its OWN REFS and its OWN matched MOTION</CONCEPT_2>
+<CONCEPT_3>a DIFFERENT idea again, carrying the same anchors, same depth, with its OWN REFS and its OWN matched MOTION</CONCEPT_3>
 </FRAME>
 </SCENE_1>
 (repeat <SCENE_N> for every scene, in script order)
 <FINAL_FRAME>
 <CONCEPT_1>
 <LABEL>2-4 word slug</LABEL>
+<REFS>character|product|both|none</REFS>
 <PROMPT>one flowing paragraph — the still, described, carrying the last boundary's anchor (NO motion; nothing leaves the final frame)</PROMPT>
 </CONCEPT_1>
 <CONCEPT_2>...</CONCEPT_2>
@@ -295,12 +341,14 @@ function buildUserPrompt(input: ContinuousInput): string {
   if (input.styleBrief?.trim()) {
     prompt += `\nThat style brief was reverse-engineered from reference frames the user supplied. Honour it exactly — it outranks any default look you would otherwise reach for.\n`
   }
-  if (input.productContext) prompt += `\n${input.productContext}\n`
+  if (input.productContext) {
+    prompt += `\n${input.productContext}\nThis is the ADVERTISED product — a photo of it is attached as a reference to any frame whose REFS include product. Decide VISIBILITY per scene: a line that attacks the category shows a generic unbranded stand-in, described as such in the prompt, with no product reference attached.\n`
+  }
   if (input.modelContext) {
     prompt += `\n${input.modelContext}\nIMPORTANT: never describe the character's physical appearance — say "the character"; a reference image fixes their look.\n`
   }
   if (input.additionalContext) prompt += `\nAdditional context and instructions:\n${input.additionalContext}\n`
-  prompt += `\nWrite the full <STORYBOARD> now. Every keyframe concept gets the same depth — no thinning out on the later scenes.`
+  prompt += `\nWrite the full <STORYBOARD> now. Split any line that carries two visual ideas into two scenes. Every keyframe concept gets the same depth — no thinning out on the later scenes.`
   return prompt
 }
 
@@ -316,8 +364,18 @@ function extractTag(source: string, tag: string): string | null {
 function cleanPromptBody(text: string): string {
   return text
     .replace(/<LABEL>[\s\S]*?<\/LABEL>/gi, '')
-    .replace(/<\/?(STORYBOARD|SCENE_\d+|CONCEPT_\d+|FINAL_FRAME|FRAME|PROMPT|LABEL|LINE|MOTION|TRANSITION|STYLE)>/gi, '')
+    .replace(/<REFS>[\s\S]*?<\/REFS>/gi, '')
+    .replace(/<VISIBILITY>[\s\S]*?<\/VISIBILITY>/gi, '')
+    .replace(/<\/?(STORYBOARD|SCENE_\d+|CONCEPT_\d+|FINAL_FRAME|FRAME|PROMPT|LABEL|REFS|VISIBILITY|LINE|MOTION|TRANSITION|STYLE)>/gi, '')
     .trim()
+}
+
+// The concept's declared reference set. Undefined when the tag is missing or
+// unrecognised, so the card can fall back to the scene's product visibility
+// rather than to a wrong-but-confident value.
+function parseConceptRefs(raw: string | null): VariationRefs | undefined {
+  const v = raw?.trim().toLowerCase()
+  return v === 'character' || v === 'product' || v === 'both' || v === 'none' ? v : undefined
 }
 
 let idCounter = 0
@@ -327,21 +385,31 @@ function nextConceptId(): string {
 
 const MAX_SCENES = 40
 
-function parseConcepts(frameBlock: string): ContinuousConcept[] {
+function parseConcepts(frameBlock: string, productVisible: boolean | undefined): ContinuousConcept[] {
   const concepts: ContinuousConcept[] = []
   for (let j = 1; j <= CONCEPTS_PER_FRAME + 2; j++) {
     const block = extractTag(frameBlock, `CONCEPT_${j}`)
     if (!block) continue
-    // Read MOTION before cleaning the block, then strip the whole concept down to
-    // its PROMPT body (falling back to the block minus its control tags).
+    // Read MOTION and REFS before cleaning the block, then strip the whole
+    // concept down to its PROMPT body (falling back to the block minus its
+    // control tags).
     const motion = cleanPromptBody(extractTag(block, 'MOTION') ?? '')
+    const declared = parseConceptRefs(extractTag(block, 'REFS'))
     const promptRaw = extractTag(block, 'PROMPT') ?? block
     const prompt = cleanPromptBody(promptRaw)
     if (!prompt) continue
+    // Visibility is the hard rule, refs are the model's preference — so a scene
+    // marked "product must not appear" strips product out of the refs even when
+    // the concept asked for it. This is the failure the whole feature exists to
+    // stop: attaching the real packaging to a shot that trashes the category.
+    const refs = declared && productVisible === false
+      ? (declared === 'both' || declared === 'character' ? 'character' : 'none')
+      : declared
     concepts.push({
       id: nextConceptId(),
       label: extractTag(block, 'LABEL') ?? `Option ${concepts.length + 1}`,
       prompt,
+      ...(refs ? { refs } : {}),
       ...(motion ? { motionPrompt: motion } : {}),
     })
   }
@@ -360,8 +428,12 @@ export function parseContinuousResult(responseText: string, input: ContinuousInp
     const sceneBlock = extractTag(body, `SCENE_${i}`)
     if (!sceneBlock) break
     const line = extractTag(sceneBlock, 'LINE') ?? ''
+    // Only an explicit "no" hides the product — a missing tag leaves visibility
+    // undefined, which reads as the old always-attach behaviour.
+    const visibilityRaw = extractTag(sceneBlock, 'VISIBILITY')?.trim().toLowerCase()
+    const productVisible = visibilityRaw === 'no' ? false : visibilityRaw === 'yes' ? true : undefined
     const frameBlock = extractTag(sceneBlock, 'FRAME') ?? sceneBlock
-    const concepts = parseConcepts(frameBlock)
+    const concepts = parseConcepts(frameBlock, productVisible)
     if (concepts.length === 0) continue
     frames.push({ index: frames.length + 1, concepts })
     // Motion now rides on each concept (per-staging departure motion). The scene
@@ -374,6 +446,7 @@ export function parseContinuousResult(responseText: string, input: ContinuousInp
       index: scenes.length + 1,
       scriptLine: line,
       motionPrompt: sceneMotion,
+      ...(productVisible === undefined ? {} : { productVisible }),
       // The boundary's connective device + anchor. Rides as context into every
       // motion rewrite so a regenerated clip still executes the planned link.
       transition: cleanPromptBody(extractTag(sceneBlock, 'TRANSITION') ?? ''),
@@ -386,8 +459,10 @@ export function parseContinuousResult(responseText: string, input: ContinuousInp
   // Final frame — the end state the last clip lands on. If the model dropped
   // it, reuse the last scene frame's concepts (fresh ids) so the chain still
   // has an end anchor rather than a broken last clip.
+  // The final frame is the ad's payoff — the product is allowed, so no
+  // visibility clamp here.
   const finalBlock = extractTag(body, 'FINAL_FRAME')
-  const finalConcepts = finalBlock ? parseConcepts(finalBlock) : []
+  const finalConcepts = finalBlock ? parseConcepts(finalBlock, undefined) : []
   frames.push({
     index: frames.length + 1,
     concepts: finalConcepts.length > 0
@@ -432,6 +507,10 @@ export interface FrameContext {
   // drops the anchor breaks the chain, so both ride into every frame tool.
   inboundTransition?: string
   outboundTransition?: string
+  // Whether the advertised product may appear in THIS frame (the visibility of
+  // the scene it opens). Rides into every rewrite so an Enhance or Regenerate
+  // can't quietly put the branded product back into a category-bashing beat.
+  productVisible?: boolean
   isFinal: boolean
   isOpening: boolean
   existingLabels: string[]
@@ -466,6 +545,7 @@ export function frameContextFor(
     outboundMotion: ctx.outboundMotion?.trim() || outbound?.motionPrompt,
     inboundTransition: inbound?.transition,
     outboundTransition: outbound?.transition,
+    productVisible: outbound?.productVisible,
     isFinal: !outbound,
     isOpening: frameIndex === 1,
     existingLabels: frame?.concepts.map((c) => c.label) ?? [],
@@ -488,7 +568,12 @@ function frameBriefBlock(ctx: FrameContext, frameIndex: number): string {
   if (!ctx.isFinal && ctx.outboundTransition?.trim()) {
     out += `The transition OUT of this frame — its anchor must also be visible here, in the stated position and scale:\n${ctx.outboundTransition.trim()}\n`
   }
-  if (ctx.productContext) out += `\n${ctx.productContext}\n`
+  if (ctx.productContext) {
+    out += `\n${ctx.productContext}\n`
+    out += ctx.productVisible === false
+      ? 'PRODUCT VISIBILITY: NO for this beat — the advertised product must not appear in this frame at all. If the line needs a category object, describe a GENERIC unbranded stand-in explicitly: plain matte packaging, no logo, no brand name, no readable text, colours and shape deliberately unlike the advertised product. Never call it "the product".\n'
+      : 'PRODUCT VISIBILITY: the advertised product may appear in this frame.\n'
+  }
   if (ctx.modelContext) out += `\n${ctx.modelContext}\nNever describe the character's appearance — say "the character".\n`
   out += `\nThis is keyframe ${frameIndex} of the sequence, and it must still connect with the motions above whichever way the neighbouring frames are staged.`
   return out
