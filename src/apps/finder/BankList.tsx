@@ -93,6 +93,7 @@ function ProductCard({ item, onEdit, onDelete, inFlight }: { item: Product; onEd
   const resolvedImage = useAssetUrl(item.productImage)
   const toggleStar = useBankStore((s) => s.toggleStar)
   const state = productState(item)
+  const photoCount = 1 + (item.extraImages?.length ?? 0)
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -131,6 +132,11 @@ function ProductCard({ item, onEdit, onDelete, inFlight }: { item: Product; onEd
       {/* Bottom info overlay — product name wraps to two centered lines. */}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/55 to-transparent px-3 pb-2.5 pt-10 text-center">
         <span className="block line-clamp-2 text-[13px] font-semibold leading-tight tracking-tight text-zinc-100">{item.productName}</span>
+        {/* Extra angles are only visible inside the form and the ref pickers —
+            this line is what tells you a product carries more than one shot. */}
+        {photoCount > 1 && (
+          <span className="mt-0.5 block text-[10px] font-medium tracking-tight text-zinc-400">{photoCount} photos</span>
+        )}
       </div>
       {/* Hover action stack — star · download · delete. */}
       <TileActionStack forceVisible={confirm}>

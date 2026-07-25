@@ -827,6 +827,7 @@ export function ExtraRefsRow({
         onClose={() => setPickerOpen(false)}
         onSelect={handleBankPick}
         tabs={['products', 'models', { type: 'brolls', filter: (it) => !!(it as BRoll).imageUrl }]}
+        expandProductImages
       />
     </div>
   )

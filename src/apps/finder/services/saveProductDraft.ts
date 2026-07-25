@@ -32,6 +32,12 @@ export async function saveProductDraft(opts: DraftSaveOptions): Promise<DraftSav
   const dataUrl = await fileToDataUri(file)
   const assetRef = await saveFromDataUrl(dataUrl)
 
+  // Extra angles carried over from an abandoned form are still data URIs —
+  // persist them as assets so the bank row never holds a blob in localStorage.
+  const extraImages = await Promise.all(
+    (initial?.extraImages ?? []).map((src) => (src.startsWith('data:') ? saveFromDataUrl(src) : Promise.resolve(src))),
+  )
+
   const placeholderName = placeholderNameFor(file, initial)
   const store = useBankStore.getState()
 
@@ -45,15 +51,16 @@ export async function saveProductDraft(opts: DraftSaveOptions): Promise<DraftSav
     offer: '',
     cta: '',
     ...initial,
-    // Override anything in `initial` so the row always points to the persisted asset.
+    // Override anything in `initial` so the row always points to persisted assets.
     productImage: assetRef,
+    extraImages,
     confirmed: false,
   })
 
   onStart?.(id)
 
   try {
-    const extracted = await extractProductInfo(file, listingText)
+    const extracted = await extractProductInfo(file, listingText, extraImages)
     await store.updateProduct(id, {
       ...extracted,
       productName: extracted.productName?.trim() || placeholderName,

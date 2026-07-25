@@ -85,6 +85,7 @@ export default function RefTiles({ label, values, onChange, max, bankType, tabs 
         onSelectMany={handleBankPickMany}
         filter={tabs ? undefined : (item) => !!(item as { imageUrl?: string }).imageUrl}
         tabs={tabs}
+        expandProductImages
       />
     </RefGroup>
   )

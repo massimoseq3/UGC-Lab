@@ -120,6 +120,7 @@ export default function VideoInputSlot({ label, helper, value, onChange, bankTyp
         // a global one because Characters / Products always have an image.
         filter={tabs ? undefined : (item) => !!(item as BRoll).imageUrl}
         tabs={tabs}
+        expandProductImages
       />
     </>
   )

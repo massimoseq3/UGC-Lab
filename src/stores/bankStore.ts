@@ -451,6 +451,13 @@ export const useBankStore = create<BankState>((set, get) => ({
     if (updates.productImage && old.productImage && old.productImage !== updates.productImage) {
       cleanupAssets(old.productImage)
     }
+    // Extra angles are this product's own assets (nothing else links them), so
+    // one dropped from the form is purged outright.
+    if (updates.extraImages && old.extraImages?.length) {
+      const kept = new Set([updated.productImage, ...updates.extraImages])
+      const dropped = old.extraImages.filter((ref) => !kept.has(ref))
+      if (dropped.length) cleanupAssets(...dropped)
+    }
     set((state) => {
       const next = { products: state.products.map((p) => p.id === id ? updated : p) }
       saveToStorage({ ...state, ...next })
@@ -469,7 +476,7 @@ export const useBankStore = create<BankState>((set, get) => ({
       return next
     })
     dropRow('products', id)
-    if (item.productImage) void cleanupAssets(item.productImage)
+    void cleanupAssets(item.productImage, ...(item.extraImages ?? []))
     reportSuccess('Product deleted')
   },
 
