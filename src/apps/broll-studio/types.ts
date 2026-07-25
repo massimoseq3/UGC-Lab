@@ -387,6 +387,13 @@ export interface ContinuousScene {
   index: number
   scriptLine: string
   motionPrompt: string
+  // The boundary between this frame and the next one, as planned by the
+  // storyboard: the connective device plus the ANCHOR element every concept on
+  // both sides carries. A pair with no shared anchor can't be interpolated —
+  // the video model hard-cuts onto the end frame. Rides into every motion and
+  // frame rewrite so a regenerated prompt still executes the planned link.
+  // Absent on legacy sessions written before transitions existed.
+  transition?: string
   sfx: string
   // Planned clip length — spoken seconds snapped UP onto the plan model's grid.
   durationSeconds: number
@@ -461,6 +468,14 @@ export interface ContinuousClipCardState {
   // auto-syncs to its start frame's picked concept; once true, picks stop
   // clobbering the user's text.
   motionEdited: boolean
+  // Which endpoint pair the current motion was written against — `start|end`
+  // keyframe asset refs. Set when the pair-aware vision pass rewrites the
+  // motion from the two ACTUAL rendered frames; a re-pick on either end changes
+  // the key and re-links. Absent while the motion is still the storyboard's
+  // start-frame seed.
+  linkedPair?: string
+  // True while that vision pass is in flight (transient; a hydrate clears it).
+  linking?: boolean
   videos: GeneratedVideo[]
   currentVideoIndex: number
   inFlightVideos: InFlightVideo[]

@@ -219,48 +219,29 @@ export default function ContinuousView({
     })
   }
 
-  // Auto-sync each clip's motion to its START frame's picked concept, until the
-  // user hand-edits it. Clip N starts on frame N (same index as the scene), so a
-  // keyframe pick on frame N carries THAT staging's departure motion into the
-  // clip. Motion is now a per-concept property, so the right prompt is ready the
-  // moment the keyframe is chosen — no per-pair generation, no stale generic text.
-  useEffect(() => {
-    if (!result) return
-    setClipStates((prev) => {
-      let changed = false
-      const next = { ...prev }
-      for (const scene of result.scenes) {
-        const key = clipKey(scene.index)
-        const clip = next[key]
-        if (!clip || clip.motionEdited) continue
-        const sel = selections[String(scene.index)]
-        if (!sel) continue
-        const concept = result.frames
-          .find((f) => f.index === scene.index)?.concepts
-          .find((c) => c.id === sel.conceptId)
-        const motion = concept?.motionPrompt?.trim()
-        if (!motion || motion === clip.editablePrompt.trim()) continue
-        next[key] = { ...clip, editablePrompt: motion, promptHistory: [motion], promptHistoryIndex: 0 }
-        changed = true
-      }
-      return changed ? next : prev
-    })
-  }, [result, selections, setClipStates])
+  // Motion-tool context for a clip: its narration line, where the story goes
+  // next, the boundary's planned transition, and the clip's real length (motion
+  // that finishes early leaves the model idling, and an idling model jumps).
+  const motionContextFor = (sceneIndex: number) => {
+    const scene = result?.scenes.find((s) => s.index === sceneIndex)
+    return {
+      scriptLine: scene?.scriptLine ?? '',
+      nextScriptLine: result?.scenes.find((s) => s.index === sceneIndex + 1)?.scriptLine,
+      transition: scene?.transition,
+      durationSeconds: clipStates[clipKey(sceneIndex)]?.durationSeconds ?? scene?.durationSeconds,
+    }
+  }
 
-  // Motion-tool context for a clip: its own narration line + where the story
-  // goes next (direction only — the tools never paint the end frame).
-  const motionContextFor = (sceneIndex: number) => ({
-    scriptLine: result?.scenes.find((s) => s.index === sceneIndex)?.scriptLine ?? '',
-    nextScriptLine: result?.scenes.find((s) => s.index === sceneIndex + 1)?.scriptLine,
-  })
-
-  // Vision regenerate reads the clip's ACTUAL chosen start keyframe image.
+  // Vision rewrite from the clip's ACTUAL rendered endpoints — both frames when
+  // the end keyframe is picked, which is what lets the model describe a path
+  // that reaches it instead of a departure that snaps.
   const regenerateMotionFromFrame = async (sceneIndex: number): Promise<string> => {
     const startRef = keyframeRef(sceneIndex)
     if (!startRef) throw new Error('Pick a start keyframe for this clip first.')
-    const dataUri = await toDataUri(startRef)
-    if (!dataUri) throw new Error('Could not load the start keyframe image.')
-    return regenerateContinuousMotion(dataUri, motionContextFor(sceneIndex))
+    const endRef = keyframeRef(sceneIndex + 1)
+    const [start, end] = await Promise.all([toDataUri(startRef), endRef ? toDataUri(endRef) : null])
+    if (!start) throw new Error('Could not load the start keyframe image.')
+    return regenerateContinuousMotion({ start, end: end ?? undefined }, motionContextFor(sceneIndex))
   }
 
   const guardDemo = (): boolean => {
@@ -312,6 +293,110 @@ export default function ContinuousView({
     if (!asset) return null
     return `data:${asset.mimeType};base64,${asset.base64}`
   }
+
+  // ── Clip motion: seed, then link ─────────────────────────────
+  // Two stages, because the storyboard writes each concept's motion before the
+  // user has picked the frame it has to land on.
+  //
+  // 1. SEED (below): a keyframe pick on frame N drops that staging's own motion
+  //    into clip N immediately, so the card is never empty.
+  // 2. LINK (further below): once BOTH of a clip's endpoints are picked, a
+  //    vision pass rewrites the motion from the two ACTUAL rendered images. That
+  //    is the pass that stops the hard cut — a departure written blind can't
+  //    describe a path to a frame it has never seen, so the model animates, runs
+  //    out of direction, and snaps onto the last image.
+  //
+  // Both stages stand down the moment the user hand-edits the motion.
+  const pairKeyFor = (sceneIndex: number): string | null => {
+    const start = lookupKeyframe(sceneIndex, selections, frameStates)
+    const end = lookupKeyframe(sceneIndex + 1, selections, frameStates)
+    return start && end ? `${start}|${end}` : null
+  }
+
+  useEffect(() => {
+    if (!result) return
+    setClipStates((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const scene of result.scenes) {
+        const key = clipKey(scene.index)
+        const clip = next[key]
+        if (!clip || clip.motionEdited) continue
+        // Don't clobber a motion already linked against the pair on screen. A
+        // re-pick on either end changes the pair key, so the seed refreshes and
+        // the link effect then upgrades it again.
+        if (clip.linkedPair && clip.linkedPair === pairKeyFor(scene.index)) continue
+        const sel = selections[String(scene.index)]
+        if (!sel) continue
+        const concept = result.frames
+          .find((f) => f.index === scene.index)?.concepts
+          .find((c) => c.id === sel.conceptId)
+        const motion = concept?.motionPrompt?.trim()
+        if (!motion || motion === clip.editablePrompt.trim()) continue
+        next[key] = { ...clip, editablePrompt: motion, promptHistory: [motion], promptHistoryIndex: 0, linkedPair: undefined }
+        changed = true
+      }
+      return changed ? next : prev
+    })
+  }, [result, selections, frameStates, setClipStates])
+
+  // Refs version, for reading the pair AFTER an await — the state captured in
+  // the effect's closure is a render old by then.
+  const pairKeyLive = (sceneIndex: number): string | null => {
+    const start = keyframeRef(sceneIndex)
+    const end = keyframeRef(sceneIndex + 1)
+    return start && end ? `${start}|${end}` : null
+  }
+
+  // One in-flight link per clip, tracked outside state so a re-render mid-call
+  // can't fire a second one. Failures are remembered per (clip, pair) so a
+  // persistent error retries on the next pick, not on every state change.
+  const linkingRef = useRef<Set<string>>(new Set())
+  const failedLinksRef = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (!result || result.demo) return
+    if (!useSettingsStore.getState().getKieApiKey()) return
+    for (const scene of result.scenes) {
+      const key = clipKey(scene.index)
+      const clip = clipStates[key]
+      if (!clip || clip.motionEdited) continue
+      const pair = pairKeyFor(scene.index)
+      if (!pair || clip.linkedPair === pair || linkingRef.current.has(key)) continue
+      if (failedLinksRef.current.has(`${key}|${pair}`)) continue
+      const [startRef, endRef] = pair.split('|')
+
+      linkingRef.current.add(key)
+      updateClip(key, () => ({ linking: true }))
+      void (async () => {
+        try {
+          const [start, end] = await Promise.all([toDataUri(startRef), toDataUri(endRef)])
+          if (!start || !end) throw new Error('Could not load the keyframe images.')
+          const motion = (await regenerateContinuousMotion({ start, end }, motionContextFor(scene.index))).trim()
+          if (!motion) throw new Error('The transition came back empty.')
+          setClipStates((prev) => {
+            const cur = prev[key]
+            // The pair may have moved (or the user may have started typing)
+            // while the call was out — a stale answer must not land.
+            if (!cur || cur.motionEdited || pairKeyLive(scene.index) !== pair) return prev
+            return {
+              ...prev,
+              [key]: { ...cur, editablePrompt: motion, promptHistory: [motion], promptHistoryIndex: 0, linkedPair: pair },
+            }
+          })
+        } catch (err) {
+          // The seeded motion still generates, so this is degraded, not broken.
+          // A toast per clip during a batch of picks would be noise; the modal's
+          // "Regenerate from frames" is the manual retry.
+          failedLinksRef.current.add(`${key}|${pair}`)
+          console.warn('Continuous: could not link clip motion to its keyframes', err)
+        } finally {
+          linkingRef.current.delete(key)
+          updateClip(key, () => ({ linking: false }))
+        }
+      })()
+    }
+  }, [result, selections, frameStates, clipStates])
 
   // ── Keyframe image generation (chained) ──────────────────────
   // Returns true on success so the sequential "Generate frames" walk can chain.
@@ -1417,6 +1502,7 @@ export default function ContinuousView({
           sceneNumber={openScene.index}
           scriptLine={openScene.scriptLine}
           style={result.style}
+          transition={openScene.transition}
           cardState={openClipCard}
           modelId={continuousModelId}
           startImageRef={keyframeRef(openScene.index)}
@@ -1959,7 +2045,16 @@ function ClipCard({
                 <ArrowRight className="h-3.5 w-3.5" />
                 <ImageIcon className="h-4 w-4" />
               </span>
-              <p className="text-[11px] font-medium text-ink-300">Keyframes ready</p>
+              {/* While the pair-aware motion is being written, say so — the
+                  prompt on screen is still the start frame's seed. */}
+              {clipState?.linking ? (
+                <p className="flex items-center gap-1.5 text-[11px] font-medium text-broll-300">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Writing the transition…
+                </p>
+              ) : (
+                <p className="text-[11px] font-medium text-ink-300">Keyframes ready</p>
+              )}
               <p className="text-[10px] leading-relaxed text-ink-500">{clipState?.editablePrompt.split('\n')[0]}</p>
             </div>
           </>

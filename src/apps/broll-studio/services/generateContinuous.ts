@@ -144,13 +144,40 @@ Always state the framing: the shot size (macro / close-up / medium / wide / over
 
 Never name the art style, medium, or render technique — the style block is appended separately to every prompt. No captions, subtitles, watermarks, on-screen text, logos, or UI of any kind.`
 
-const MOTION_FORMAT = `Every motion prompt is ONE short flowing paragraph — usually 35-60 words. No labels, no field names.
+// The clip is a first-frame/last-frame interpolation: BOTH endpoints are fixed
+// images the model has to hit. A prompt describing only the departure leaves it
+// with no path to the end frame — it plays the described move, runs out of
+// direction, and snaps onto the last image in the closing beats. That snap is
+// the hard cut this whole mode exists to avoid. So a motion prompt is a
+// TRAJECTORY: what leaves, what carries it across, and how it settles.
+//
+// The one rule that makes this work: arrival is written as MOVEMENT (what
+// decelerates, eases, comes to rest), never as a PICTURE of the end frame.
+// Painting the end tableau in words is what makes a model race there and freeze
+// for the rest of the clip — the failure the old departure-only rule was
+// guarding against. Both failures are avoidable; only one of them needs silence.
+function motionFormat(durationSeconds?: number): string {
+  const pacing = durationSeconds
+    ? `PACING: this clip runs ${durationSeconds} seconds. Spread the movement across all ${durationSeconds} seconds so something is still travelling as the shot settles — a move that finishes early leaves the model idling, and an idling model jumps.`
+    : `PACING: the clip runs about as long as its narration line takes to speak (roughly 2.4 words per second, never under three seconds). Spread the movement across that whole span so something is still travelling as the shot settles — a move that finishes early leaves the model idling, and an idling model jumps.`
+  return `Every motion prompt is ONE flowing paragraph — usually 45-75 words. No labels, no field names.
 
-Describe ONLY the motion that LEAVES this exact start frame: what in the frame begins to move and in which direction, as a vector ("lifts up and back", "rotates open clockwise", "collapses inward"), the transformation as it starts happening ("the powder begins to spill and dissolve"), then how the camera itself moves — push in, pull back, orbit left, tilt down, track alongside, or hold steady — and how fast. End with one transitional sound direction (a soft whoosh, a low building rumble, a gentle pop, or silence).
+The clip opens on a fixed start image and lands on a fixed end image. Your paragraph is the PATH between them, written as one unbroken move in three beats, in order:
 
-CRITICAL — describe the DEPARTURE, never the destination. The end frame is handed to the video model as a fixed last image, so where the clip lands is already locked. If you describe the end composition in words, the model races there and freezes early, killing the middle of the clip. So never paint the end tableau, the final pose, or the arrival state — write only the movement outward from this start frame, present tense, as motion in progress.
+1. DEPARTURE — what in the start frame begins to move and in which direction, as a vector ("lifts up and back", "rotates open clockwise", "collapses inward"), and how the camera starts moving: push in, pull back, orbit left, tilt down, track alongside, or hold steady.
+2. THE CROSSING — the mechanism that physically carries the shot from the first image to the second: the transformation as it happens ("the powder spills and dissolves into drifting light"), the camera travelling through or around something, one form morphing into another, an object sweeping across the lens. This beat keeps the middle of the clip alive; without it the model runs out of direction and cuts.
+3. THE SETTLE — the arrival written as MOVEMENT: what decelerates, what eases open, what comes to rest, where the camera slows and stops.
 
-Keep it physical and simple — this is interpolation direction for one specific staging, not a new scene. Never write dialogue, narration, or music; a voiceover and a music bed are added later in the edit.`
+CRITICAL — arrival is MOTION, never CONTENT. Write how the shot lands: "the push-in decelerates as the raised hand eases to a stop and the light steadies". Never write what it lands ON — the end pose, the end composition, the end tableau as a picture. The end image is already handed to the model as a fixed last frame; describing how it LOOKS makes the model race there and freeze for the rest of the clip. Describe the landing, not the thing landed on.
+
+${pacing}
+
+Never name an edit — no "cut to", "dissolve to", "transition to", "then we see". The entire point is that nothing cuts.
+
+Keep it physical and specific to this one staging — this is transition direction, not a new scene. Close with one sound direction (a soft whoosh, a low building rumble, a gentle pop, or silence). Never write dialogue, narration, or music; a voiceover and a music bed are added later in the edit.`
+}
+
+const MOTION_FORMAT = motionFormat()
 
 // ── The storyboard system prompt ───────────────────────────────
 
@@ -164,8 +191,9 @@ Turn the user's script into a STORYBOARD:
 
 1. Split the script into narration SCENES (complete sentences — never cut mid-clause; merge any fragment of four words or fewer forward into the next sentence).
 2. For every scene, design its START keyframe. After the last scene, design one FINAL keyframe (the end state the last clip lands on). So there is always exactly ONE more frame than there are scenes.
-3. Give every keyframe ${CONCEPTS_PER_FRAME} distinct visual CONCEPTS.
-4. For every CONCEPT of every non-final keyframe, write the MOTION that animates THAT specific staging forward into the next beat. Motion belongs to the staging, not the scene — a wide aerial and a macro close-up of the same beat move differently, so each concept gets its own departure motion. Final-frame concepts get NO motion (nothing leaves the last frame).
+3. For every scene, declare the TRANSITION that carries its keyframe into the next one — see THE CHAIN below. Design both frames around it.
+4. Give every keyframe ${CONCEPTS_PER_FRAME} distinct visual CONCEPTS.
+5. For every CONCEPT of every non-final keyframe, write the MOTION that animates THAT specific staging across into the next beat. Motion belongs to the staging, not the scene — a wide aerial and a macro close-up of the same beat travel differently, so each concept gets its own motion, and each one has to execute the scene's transition. Final-frame concepts get NO motion (nothing leaves the last frame).
 
 # SHOW, DON'T TELL — THIS IS THE WHOLE JOB
 
@@ -188,10 +216,23 @@ Banned everywhere: "beautiful", "stunning", "modern", "clean", "minimalist", "hi
 
 - Each keyframe is a single striking image: one clear subject, one readable idea. If a frame needs a sentence of explanation to work, simplify the idea — then describe the simpler idea in full detail.
 - SAFE FRAMING: vertical 9:16 with platform UI overlaying the edges — keep the subject centred with comfortable margins, never so zoomed that crucial elements touch the frame edge.
-- CONTINUITY IS EVERYTHING: consecutive keyframes must read as two moments of the same world. Same character design, same palette, same environment unless the story moves. Frame N+1 must be a state that frame N can physically morph or move into.
+- CONTINUITY IS EVERYTHING: consecutive keyframes must read as two moments of the same world. Same character design, same palette, same environment unless the story moves. Frame N+1 must be a state that frame N can physically morph or move into, and it must carry the boundary's anchor.
 - Refer to the on-screen person as "the character" and the product as "the product" — reference images fix their exact look. Never describe the character's identity (gender, age, ethnicity, hair colour, skin tone); pose, expression, gesture, and body language ARE required.
 - Gender-neutral language only: never he/him/his/she/her, never "subject". Use "the character" or "they/them/their".
 - Never mention the art style, medium, or render technique inside a frame prompt — the style is appended separately.
+
+# THE CHAIN — HOW ONE FRAME BECOMES THE NEXT
+
+This is the single most important constraint in the storyboard. Every clip is generated by a model that is handed frame N as its fixed first image and frame N+1 as its fixed last image, and has to invent the path between them. If the two frames share nothing, there IS no path — the model animates for a second and then hard-cuts onto the last image. A beautiful pair that cannot morph is a failure.
+
+So every scene declares a TRANSITION, which is two things in one line:
+
+- The DEVICE that carries the shot across: a match cut on a shared shape, the camera pushing through an object into the next space, one form morphing into another, an object sweeping across the lens as a wipe, a pull-back that reveals the next frame's space around this one, a whip pan that lands in the new place.
+- The ANCHOR: one concrete element that is on screen in BOTH frames, at roughly the same position in frame and roughly the same scale, so the model has something to hold while everything else changes. A circular glow that becomes a lamp. A hand that stays in the lower third. A vertical column of light that becomes a doorway. Same shape, same place, new meaning.
+
+The anchor belongs to the BOUNDARY, not to one staging: every one of frame N's ${CONCEPTS_PER_FRAME} concepts and every one of frame N+1's ${CONCEPTS_PER_FRAME} concepts must carry that same anchor, in that same screen position and scale. That is what lets the user pick any concept on either side and still get a seamless clip. Write the anchor into the prompt text of every concept on both sides of the boundary — never leave it implied.
+
+Frames may change scale, place, and subject freely as long as the anchor survives the change. That is the trick the style runs on: the anchor holds, everything around it transforms.
 
 # KEYFRAME PROMPT FORMAT (EVERY CONCEPT)
 
@@ -199,7 +240,9 @@ ${KEYFRAME_FORMAT}
 
 # CONCEPT VARIATIONS
 
-The ${CONCEPTS_PER_FRAME} concepts for one keyframe are ${CONCEPTS_PER_FRAME} genuinely DIFFERENT ideas for picturing that same story state — a different visual metaphor, a different subject, a different scale — not one idea framed three ways. A macro close-up, a wide aerial, and an inside-the-object view of the same beat. Whichever concept the user picks, the sequence must still connect: every concept of frame N must work as the end of frame N-1's motion. Each concept carries its OWN departure motion, matched to its staging. Every concept gets the same depth on both the frame and its motion; a thinner alternative is a failure.
+The ${CONCEPTS_PER_FRAME} concepts for one keyframe are ${CONCEPTS_PER_FRAME} genuinely DIFFERENT ideas for picturing that same story state — a different visual metaphor, a different subject, a different scale — not one idea framed three ways. A macro close-up, a wide aerial, and an inside-the-object view of the same beat.
+
+The variety is in the idea; the anchors are NOT negotiable. Every concept of a frame carries the incoming boundary's anchor and the outgoing boundary's anchor, in the stated screen position and scale — that is what keeps any combination of picks connectable. Each concept carries its OWN motion, matched to its staging and executing its scene's transition. Every concept gets the same depth on both the frame and its motion; a thinner alternative is a failure.
 
 # MOTION PROMPT FORMAT (EVERY SCENE)
 
@@ -213,21 +256,22 @@ Wrap your answer in this exact XML envelope. No text outside the tags, no markdo
 <STYLE>One dense paragraph of 90-150 words locking the visual style for the whole sequence — medium and rendering technique, how forms and figures are treated, the named colour palette, the lighting register, and the camera/finish character. Adapt the style brief you are given to this specific script and product. This paragraph is appended verbatim to every image and video prompt, so it must be pure style direction with no subject matter in it.</STYLE>
 <SCENE_1>
 <LINE>exact narration slice, a complete sentence</LINE>
+<TRANSITION>one line: the device carrying this keyframe into the next one, plus the anchor element every concept on BOTH sides must show in the same screen position and scale — e.g. "match cut on the circular glow: the temple light becomes the factory's central lamp, same size, centred, same warm amber"</TRANSITION>
 <FRAME>
 <CONCEPT_1>
 <LABEL>2-4 word slug naming the actual idea, e.g. INSIDE THE BOTTLE</LABEL>
-<PROMPT>one flowing paragraph — the still, described</PROMPT>
-<MOTION>one short paragraph: how THIS staging animates forward — what moves and where, how the camera moves, then the transitional sound. Departure only, never the end state.</MOTION>
+<PROMPT>one flowing paragraph — the still, described, with the boundary anchors written in</PROMPT>
+<MOTION>one paragraph: how THIS staging travels across — departure vector and camera move, the crossing mechanism that executes the transition, then the settle. Arrival as movement, never as a picture of the end frame.</MOTION>
 </CONCEPT_1>
-<CONCEPT_2>a DIFFERENT idea for the same story state, same depth, with its OWN matched MOTION</CONCEPT_2>
-<CONCEPT_3>a DIFFERENT idea again, same depth, with its OWN matched MOTION</CONCEPT_3>
+<CONCEPT_2>a DIFFERENT idea for the same story state, carrying the same anchors, same depth, with its OWN matched MOTION</CONCEPT_2>
+<CONCEPT_3>a DIFFERENT idea again, carrying the same anchors, same depth, with its OWN matched MOTION</CONCEPT_3>
 </FRAME>
 </SCENE_1>
 (repeat <SCENE_N> for every scene, in script order)
 <FINAL_FRAME>
 <CONCEPT_1>
 <LABEL>2-4 word slug</LABEL>
-<PROMPT>one flowing paragraph — the still, described (NO motion; nothing leaves the final frame)</PROMPT>
+<PROMPT>one flowing paragraph — the still, described, carrying the last boundary's anchor (NO motion; nothing leaves the final frame)</PROMPT>
 </CONCEPT_1>
 <CONCEPT_2>...</CONCEPT_2>
 <CONCEPT_3>...</CONCEPT_3>
@@ -272,7 +316,7 @@ function extractTag(source: string, tag: string): string | null {
 function cleanPromptBody(text: string): string {
   return text
     .replace(/<LABEL>[\s\S]*?<\/LABEL>/gi, '')
-    .replace(/<\/?(STORYBOARD|SCENE_\d+|CONCEPT_\d+|FINAL_FRAME|FRAME|PROMPT|LABEL|LINE|MOTION|STYLE)>/gi, '')
+    .replace(/<\/?(STORYBOARD|SCENE_\d+|CONCEPT_\d+|FINAL_FRAME|FRAME|PROMPT|LABEL|LINE|MOTION|TRANSITION|STYLE)>/gi, '')
     .trim()
 }
 
@@ -330,6 +374,9 @@ export function parseContinuousResult(responseText: string, input: ContinuousInp
       index: scenes.length + 1,
       scriptLine: line,
       motionPrompt: sceneMotion,
+      // The boundary's connective device + anchor. Rides as context into every
+      // motion rewrite so a regenerated clip still executes the planned link.
+      transition: cleanPromptBody(extractTag(sceneBlock, 'TRANSITION') ?? ''),
       sfx: extractTag(sceneBlock, 'SFX') ?? '',
       durationSeconds: sceneDuration(line || input.scriptText, input.modelId),
     })
@@ -381,6 +428,10 @@ export interface FrameContext {
   scriptLine: string
   inboundMotion?: string
   outboundMotion?: string
+  // The connective device + anchor on each side of this frame. A rewrite that
+  // drops the anchor breaks the chain, so both ride into every frame tool.
+  inboundTransition?: string
+  outboundTransition?: string
   isFinal: boolean
   isOpening: boolean
   existingLabels: string[]
@@ -413,6 +464,8 @@ export function frameContextFor(
     scriptLine: outbound?.scriptLine ?? '',
     inboundMotion: ctx.inboundMotion?.trim() || inbound?.motionPrompt,
     outboundMotion: ctx.outboundMotion?.trim() || outbound?.motionPrompt,
+    inboundTransition: inbound?.transition,
+    outboundTransition: outbound?.transition,
     isFinal: !outbound,
     isOpening: frameIndex === 1,
     existingLabels: frame?.concepts.map((c) => c.label) ?? [],
@@ -426,9 +479,15 @@ function frameBriefBlock(ctx: FrameContext, frameIndex: number): string {
   out += ctx.isOpening
     ? '\nThis is the OPENING keyframe of the ad.\n'
     : `\nThe motion ARRIVING at this frame (from the previous keyframe):\n${ctx.inboundMotion || '(not specified)'}\n`
+  if (ctx.inboundTransition?.trim()) {
+    out += `The transition INTO this frame — the anchor named here must be visible in this frame, in the stated position and scale:\n${ctx.inboundTransition.trim()}\n`
+  }
   out += ctx.isFinal
     ? 'This is the FINAL keyframe — the end state the last clip lands on.\n'
     : `The narration line this frame opens: "${ctx.scriptLine}"\nThe motion LEAVING this frame (into the next keyframe):\n${ctx.outboundMotion || '(not specified)'}\n`
+  if (!ctx.isFinal && ctx.outboundTransition?.trim()) {
+    out += `The transition OUT of this frame — its anchor must also be visible here, in the stated position and scale:\n${ctx.outboundTransition.trim()}\n`
+  }
   if (ctx.productContext) out += `\n${ctx.productContext}\n`
   if (ctx.modelContext) out += `\n${ctx.modelContext}\nNever describe the character's appearance — say "the character".\n`
   out += `\nThis is keyframe ${frameIndex} of the sequence, and it must still connect with the motions above whichever way the neighbouring frames are staged.`
@@ -490,32 +549,52 @@ one flowing paragraph
 }
 
 // ── Clip motion tools ──────────────────────────────────────────
-// The motion prompt is departure-framed (see MOTION_FORMAT): it describes how
-// the START keyframe animates forward, and deliberately never paints the end
-// frame — the end image is a hard last-frame constraint, so re-describing it in
-// words makes the model arrive early and freeze. Both tools honour that.
+// The storyboard writes each concept's motion before the user has picked the
+// frame it has to land on — so it can only ever be right for one of the next
+// frame's concepts. These tools close that gap: given the two ACTUAL rendered
+// endpoints, they write the path between the pair the user actually chose.
 
 export interface MotionContext {
   scriptLine: string       // the narration heard over this clip
   nextScriptLine?: string  // where the story goes next (direction, not destination)
+  // The boundary's planned device + anchor, from the storyboard.
+  transition?: string
+  // The clip's real length, so the movement is paced to fill it.
+  durationSeconds?: number
 }
 
-// Fresh motion written from the clip's ACTUAL chosen start keyframe image — the
-// vision escape hatch for when the rendered frame diverged from the concept
-// text. `startImageDataUri` is a data: URI (the view converts the asset ref).
-export async function regenerateContinuousMotion(startImageDataUri: string, ctx: MotionContext): Promise<string> {
+function motionBriefBlock(ctx: MotionContext): string {
+  let out = `The narration heard over this clip: "${ctx.scriptLine}"\n`
+  out += ctx.nextScriptLine
+    ? `The story then moves toward: "${ctx.nextScriptLine}".\n`
+    : 'This is the final beat of the ad.\n'
+  if (ctx.transition?.trim()) out += `\nThe planned transition for this boundary — the device to execute and the anchor that carries across:\n${ctx.transition.trim()}\n`
+  return out
+}
+
+// Fresh motion written from the clip's ACTUAL rendered endpoints. With both
+// frames attached this is the real fix for a clip that hard-cuts: the model
+// sees what it starts on AND what it must land on, so it can describe a path
+// that actually connects them. `endImageDataUri` is optional only because the
+// end keyframe may not be picked yet — with one image it falls back to writing
+// a departure that heads in the story's direction.
+export async function regenerateContinuousMotion(
+  frames: { start: string; end?: string },
+  ctx: MotionContext,
+): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const endpoint = getChatEndpointPath()
-  const user = `Write the MOTION for one clip of a keyframe-chain ad. The attached image is this clip's START frame — the fixed first frame the video begins on. Describe only how THIS frame animates forward.
+  const framing = frames.end
+    ? `Two images are attached. The FIRST is this clip's fixed START frame; the SECOND is its fixed END frame. The video model begins exactly on the first and must land exactly on the second, inventing everything in between. Study both, find what they share, and write the path that carries one into the other.`
+    : `The attached image is this clip's fixed START frame — the end frame has not been chosen yet. Write the path leaving this frame, headed in the story's direction.`
+  const user = `Write the MOTION for one clip of a keyframe-chain ad. ${framing}
 
-The narration heard over this clip: "${ctx.scriptLine}"
-${ctx.nextScriptLine ? `The story then moves toward: "${ctx.nextScriptLine}" — head the motion in that direction, but do NOT describe that end state.` : 'This is the final beat of the ad.'}
-
-${MOTION_FORMAT}
+${motionBriefBlock(ctx)}
+${motionFormat(ctx.durationSeconds)}
 
 ${FRAME_ENVELOPE_NOTE}
 <MOTION>
-one short flowing paragraph
+one flowing paragraph
 </MOTION>`
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: CONTINUOUS_SYSTEM }] },
@@ -523,7 +602,8 @@ one short flowing paragraph
       role: 'user',
       content: [
         { type: 'text', text: user },
-        { type: 'image_url', image_url: { url: startImageDataUri } },
+        { type: 'image_url', image_url: { url: frames.start } },
+        ...(frames.end ? [{ type: 'image_url' as const, image_url: { url: frames.end } }] : []),
       ],
     },
   ]
@@ -535,11 +615,10 @@ one short flowing paragraph
 export async function enhanceContinuousMotion(draft: string, ctx: MotionContext): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const endpoint = getChatEndpointPath()
-  const user = `Rewrite the motion prompt below to be MORE detailed and specific while keeping the SAME movement, direction, camera move, and sound. Sharpen the motion vectors and the transformation; do not change what happens or add a new beat.
+  const user = `Rewrite the motion prompt below to be MORE detailed and specific while keeping the SAME movement, direction, camera move, and sound. Sharpen the motion vectors and the transformation; do not change what happens or add a new beat. If the draft stops at the departure and never crosses or settles, that is exactly what you are here to fix — complete the trajectory.
 
-The narration heard over this clip: "${ctx.scriptLine}"
-
-${MOTION_FORMAT}
+${motionBriefBlock(ctx)}
+${motionFormat(ctx.durationSeconds)}
 
 Current motion:
 """
@@ -548,7 +627,7 @@ ${draft}
 
 ${FRAME_ENVELOPE_NOTE}
 <MOTION>
-one short flowing paragraph
+one flowing paragraph
 </MOTION>`
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: CONTINUOUS_SYSTEM }] },
@@ -572,17 +651,20 @@ const DEMO_STYLE =
 const DEMO_SCENES = [
   {
     line: 'Your brain never actually switches off at night.',
-    motion: 'The amber glow at the sleeping character\'s temple begins to swell and pulse, brightening as it starts to bloom outward across the pillow. The camera pushes in slowly and steadily from outside the window toward that glow. A soft airy whoosh building into a low hum.',
+    transition: 'Push through the glow: the warm circular light at the temple holds dead centre at the same scale and becomes the factory hall\'s central lamp as the camera travels into it.',
+    motion: 'The amber glow at the sleeping character\'s temple swells and pulses, blooming outward across the pillow as the camera pushes in steadily from outside the window straight toward it. The glow opens and the camera keeps travelling into the light, the bedroom sliding past the edges of frame and dissolving into warm haze, the light widening around the lens until it reads as a room rather than a point. The push decelerates as the space settles open around it. A soft airy whoosh building into a low hum.',
     sfx: 'a soft airy whoosh',
   },
   {
     line: 'While you sleep, it runs a full cleanup cycle, flushing out the waste that builds up all day.',
-    motion: 'The amber orbs lining the pathways start streaming forward and converging toward one central channel, the loose grey dust lifting and beginning to travel with them. The camera orbits slowly left and drifts gently down to follow the flow. A shimmering hum with a soft rushing undertone.',
+    transition: 'Morph on the central channel: the vertical stream of amber light stays centred at the same width and becomes the falling column of powder.',
+    motion: 'The amber orbs lining the pathways stream forward and converge into the central channel while the loose grey dust lifts and travels with them, the camera orbiting slowly left and drifting down to follow the flow. The channel tightens into a single bright column running up the middle of frame, its edges softening as the surrounding hall falls away and the light thickens into falling grain. The orbit slows and the drift eases to a stop as the column steadies. A shimmering hum with a soft rushing undertone.',
     sfx: 'a gentle shimmering hum',
   },
   {
     line: 'One scoop of this before bed gives that cycle everything it needs.',
-    motion: 'The scoop tips and the powder begins to spill, the falling grains catching light and starting to twist into a rising spiral. The camera pulls back steadily with a slight tilt up as the spiral climbs. A soft magical pop, then a warm settling chime.',
+    transition: 'Pull back on the rising spiral: the amber helix stays centred and lengthens into the aura wrapping the sleeping character.',
+    motion: 'The scoop tips and the powder spills, the falling grains catching light and twisting into a rising spiral as the camera pulls back steadily with a slight tilt up. The spiral climbs and widens as the pull-back opens the room around it, its light spreading outward across the bedding and softening at the edges until it wraps rather than rises. The pull-back decelerates and the drifting light eases into stillness. A soft magical pop, then a warm settling chime.',
     sfx: 'a soft magical pop',
   },
 ]
@@ -666,6 +748,7 @@ export function buildDemoContinuousResult(modelId: string, styleId: string): Con
       index: i + 1,
       scriptLine: s.line,
       motionPrompt: s.motion,
+      transition: s.transition,
       sfx: s.sfx,
       durationSeconds: sceneDuration(s.line, modelId),
     })),
