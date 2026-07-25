@@ -29,12 +29,26 @@ export function GeneratingChip({ label, family = 'broll' }: { label: string; fam
   )
 }
 
-// Overlay for a round history thumbnail while its row has work in flight.
-export function GeneratingPulseRing({ family = 'broll' }: { family?: Family }) {
+// Overlay for a history thumbnail while its row has work in flight. `shape`
+// matches what it sits on: 'circle' for a round row thumb, 'rect' for a card
+// cover — which draws the ring inside, since a card cover clips its overflow
+// and an outset ring would be invisible.
+const SHAPE = {
+  circle: 'rounded-full',
+  rect: 'rounded-none ring-inset',
+} as const
+
+export function GeneratingPulseRing({
+  family = 'broll',
+  shape = 'circle',
+}: {
+  family?: Family
+  shape?: keyof typeof SHAPE
+}) {
   const a = ACCENT[family]
   return (
-    <span className={`pointer-events-none absolute inset-0 rounded-full ring-2 ${a.ring}`}>
-      <span className={`absolute inset-0 animate-pulse rounded-full ${a.wash}`} />
+    <span className={`pointer-events-none absolute inset-0 ring-2 ${SHAPE[shape]} ${a.ring}`}>
+      <span className={`absolute inset-0 animate-pulse ${shape === 'circle' ? 'rounded-full' : ''} ${a.wash}`} />
     </span>
   )
 }
