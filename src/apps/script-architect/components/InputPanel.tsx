@@ -1,7 +1,7 @@
 import { useState, type ComponentType } from 'react'
-import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Film, UserRound, Sparkles, Undo2, Redo2, Eraser, Shuffle, FishingHook } from 'lucide-react'
+import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Film, UserRound, Sparkles, Undo2, Redo2, Eraser, Shuffle, FishingHook, Video } from 'lucide-react'
 import type { Model, Product, Script } from '../../../stores/types'
-import { WRITE_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNT, VARIATION_COUNTS, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount } from '../types'
+import { WRITE_LENGTHS, WRITE_STYLE_META, WRITE_STYLE_GROUP_META, writeStylesInGroup, HOOK_CATEGORY_META, HOOK_COUNT, VARIATION_COUNTS, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteStyleGroup, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount } from '../types'
 
 // The cinematic 'prompt' format is single-clip-capped, so it only offers the
 // shorter durations a video model can render in one generation.
@@ -637,7 +637,9 @@ export default function InputPanel({
                 }`}
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
-                  <FileText className="h-5 w-5" strokeWidth={1.75} />
+                  {styleChosen && WRITE_STYLE_META[writeStyle].group === 'format'
+                    ? <Video className="h-5 w-5" strokeWidth={1.75} />
+                    : <FileText className="h-5 w-5" strokeWidth={1.75} />}
                 </div>
                 <div className="min-w-0 flex-1">
                   {styleChosen ? (
@@ -648,7 +650,7 @@ export default function InputPanel({
                   ) : (
                     <>
                       <div className="text-sm font-medium text-ink-300">Script Style</div>
-                      <div className="text-xs text-ink-600">Choose how the script is structured</div>
+                      <div className="text-xs text-ink-600">A structure to argue with, or a format to hide in</div>
                     </>
                   )}
                 </div>
@@ -1001,32 +1003,50 @@ export default function InputPanel({
         open={styleSlideOpen}
         onClose={() => setStyleSlideOpen(false)}
         title="Choose a style"
-        subtitle="How the script is structured"
+        subtitle="How the ad is built — and what kind of content it looks like"
       >
-        <div className="flex flex-col gap-2 p-4">
-          {(Object.keys(WRITE_STYLE_META) as WriteStyle[]).map((style) => {
-            const active = styleChosen && style === writeStyle
+        {/* Two sections: Structures (how the argument is built) and Formats
+            (the kind of content the ad imitates). Formats also stage the shots
+            in the Scenes output, so they're worth telling apart at the picker. */}
+        <div className="flex flex-col gap-5 p-4">
+          {(Object.keys(WRITE_STYLE_GROUP_META) as WriteStyleGroup[]).map((group) => {
+            const GroupIcon = group === 'format' ? Video : FileText
             return (
-              <button
-                key={style}
-                type="button"
-                onClick={() => { onWriteStyleChange(style); setStyleChosen(true); setStyleSlideOpen(false) }}
-                className={`flex items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
-                  active
-                    ? 'border-scripts-500/30 bg-scripts-500/10'
-                    : 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'
-                }`}
-              >
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${active ? 'bg-scripts-500/10 text-scripts-400' : 'bg-ink/5 text-ink-500'}`}>
-                  <FileText className="h-5 w-5" strokeWidth={1.75} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className={`text-[13px] font-medium tracking-tight ${active ? 'text-scripts-300' : 'text-ink-200'}`}>
-                    {WRITE_STYLE_META[style].label}
+              <div key={group} className="flex flex-col gap-2">
+                <div className="px-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-widest text-ink-500">
+                    {WRITE_STYLE_GROUP_META[group].label}
                   </div>
-                  <div className="text-[11px] leading-snug text-ink-500">{WRITE_STYLE_META[style].hint}</div>
+                  <div className="mt-0.5 text-[11px] leading-snug text-ink-600">
+                    {WRITE_STYLE_GROUP_META[group].hint}
+                  </div>
                 </div>
-              </button>
+                {writeStylesInGroup(group).map((style) => {
+                  const active = styleChosen && style === writeStyle
+                  return (
+                    <button
+                      key={style}
+                      type="button"
+                      onClick={() => { onWriteStyleChange(style); setStyleChosen(true); setStyleSlideOpen(false) }}
+                      className={`flex items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
+                        active
+                          ? 'border-scripts-500/30 bg-scripts-500/10'
+                          : 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'
+                      }`}
+                    >
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${active ? 'bg-scripts-500/10 text-scripts-400' : 'bg-ink/5 text-ink-500'}`}>
+                        <GroupIcon className="h-5 w-5" strokeWidth={1.75} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className={`text-[13px] font-medium tracking-tight ${active ? 'text-scripts-300' : 'text-ink-200'}`}>
+                          {WRITE_STYLE_META[style].label}
+                        </div>
+                        <div className="text-[11px] leading-snug text-ink-500">{WRITE_STYLE_META[style].hint}</div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
             )
           })}
         </div>
