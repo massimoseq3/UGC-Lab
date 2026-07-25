@@ -623,7 +623,7 @@ function ProductsBankZone({ children, onBulkFiles }: { children: React.ReactNode
 function ProductsList({ items, onEdit, onDelete, sort, inFlightIds }: { items: Product[]; onEdit: (id: string) => void; onDelete: (id: string) => void; sort: SortOrder; inFlightIds?: Set<string> }) {
   const sorted = useMemo(() => sortByOrder(items, sort, (p) => p.productName), [items, sort])
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
       {sorted.map((p) => (
         <ProductCard
           key={p.id}

@@ -1,26 +1,53 @@
 import { useMemo, useState } from 'react'
-import { Search, FileText, PenLine, Clapperboard, FishingHook } from 'lucide-react'
+import { Search, FileText } from 'lucide-react'
 import type { ScriptHistoryItem } from '../../../stores/types'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
-import { WRITE_STYLE_META, HOOK_CATEGORY_META, isHookCategoryChoice, parseHooks } from '../types'
-import { TileDeleteButton } from '../../../components/tileActions'
+import { WRITE_STYLE_META, HOOK_CATEGORY_META, isHookCategoryChoice, parseHooks, hooksPlainText } from '../types'
+import { TileActionStack, TileDeleteButton } from '../../../components/tileActions'
 
 const isHooksItem = (item: ScriptHistoryItem) => item.mode === 'write' && item.writeFormat === 'hooks'
 
-// A clean, recognisable title for a history row — "<Product> · <descriptor>"
-// — so the list reads as titles you click to restore, not raw script dumps.
-function historyTitle(item: ScriptHistoryItem): string {
-  const product = item.productName?.trim()
-  const descriptor = isHooksItem(item)
-    ? (isHookCategoryChoice(item.hookCategory) && item.hookCategory !== 'auto'
-        ? `${HOOK_CATEGORY_META[item.hookCategory].label} Hooks`
-        : 'Hooks')
-    : item.mode === 'write'
-      ? (item.writeStyle && item.writeStyle in WRITE_STYLE_META
-          ? WRITE_STYLE_META[item.writeStyle as keyof typeof WRITE_STYLE_META].label
-          : 'Written script')
-      : item.mode === 'remix' ? 'Remix' : 'Scenes'
-  return product ? `${product} · ${descriptor}` : descriptor
+// The badge each card leads with — the kind of thing this run produced, plus
+// (for Write New) which style wrote it. Same information the old rows carried
+// in their title, moved onto the card's own label so the title can be the
+// product.
+function historyBadge(item: ScriptHistoryItem): { label: string; className: string } {
+  if (isHooksItem(item)) {
+    const family = isHookCategoryChoice(item.hookCategory) && item.hookCategory !== 'auto'
+      ? `${HOOK_CATEGORY_META[item.hookCategory].label} Hooks`
+      : 'Hooks'
+    return { label: family, className: 'bg-amber-500/15 text-amber-300 light:text-amber-700 border-amber-500/20' }
+  }
+  if (item.mode === 'remix') {
+    return { label: 'Remix', className: 'bg-scripts-500/15 text-scripts-300 border-scripts-500/20' }
+  }
+  if (item.mode === 'reverse-engineer' || (item.mode === 'write' && item.writeFormat === 'scenes')) {
+    return { label: 'Scenes', className: 'bg-fuchsia-500/15 text-fuchsia-300 light:text-fuchsia-700 border-fuchsia-500/20' }
+  }
+  if (item.mode === 'write' && item.writeFormat === 'prompt') {
+    return { label: 'Cinematic', className: 'bg-sky-500/15 text-sky-300 light:text-sky-700 border-sky-500/20' }
+  }
+  const style = item.writeStyle && item.writeStyle in WRITE_STYLE_META
+    ? WRITE_STYLE_META[item.writeStyle as keyof typeof WRITE_STYLE_META].label
+    : 'Script'
+  return { label: style, className: 'bg-emerald-500/15 text-emerald-300 light:text-emerald-700 border-emerald-500/20' }
+}
+
+// The card's preview text — the first take, exactly as written. Hooks strip
+// their <FAMILY> tags (UI metadata, not script text).
+function previewText(item: ScriptHistoryItem): string {
+  const first = item.variations[0] ?? ''
+  return (isHooksItem(item) ? hooksPlainText(first) : first).trim()
+}
+
+function countLabel(item: ScriptHistoryItem): string {
+  if (isHooksItem(item)) {
+    const n = parseHooks(item.variations[0] ?? '').length
+    return `${n} hook${n === 1 ? '' : 's'}`
+  }
+  const n = item.variations.length
+  if (item.mode === 'write') return `${n} take${n === 1 ? '' : 's'}`
+  return `${n} variation${n === 1 ? '' : 's'}`
 }
 
 interface HistoryViewProps {
@@ -28,12 +55,6 @@ interface HistoryViewProps {
   activeId: string | null
   onSelect: (item: ScriptHistoryItem) => void
   onDelete: (id: string) => void
-}
-
-// Two-click confirm delete — the shared control, so destructive actions behave
-// identically in every history list.
-function DeleteRowButton({ onDelete, alwaysVisible }: { onDelete: () => void; alwaysVisible: boolean }) {
-  return <TileDeleteButton variant="chrome" size="sm" alwaysVisible={alwaysVisible} onDelete={onDelete} />
 }
 
 export default function HistoryView({ items, activeId, onSelect, onDelete }: HistoryViewProps) {
@@ -84,57 +105,110 @@ export default function HistoryView({ items, activeId, onSelect, onDelete }: His
             <span className="text-sm text-ink-500">No matches.</span>
           </div>
         ) : (
-          <div className="flex flex-col gap-1 p-2">
+          <div className="flex flex-col gap-6 px-5 py-4">
             {groups.map(([dayTs, dayItems]) => (
-              <div key={dayTs} className="flex flex-col gap-0.5">
-                <div className="my-2 flex items-center justify-center">
-                  <span className="rounded-full bg-ink/[0.06] px-3 py-1 text-[11px] font-medium text-ink-300">
+              <div key={dayTs} className="flex flex-col gap-3">
+                {/* Day header sits left of a hairline rather than centred over
+                    the list: with a grid below it, a centred pill reads as a
+                    divider between two unrelated blocks. */}
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">
                     {sectionLabel(dayTs)}
                   </span>
+                  <span className="text-[11px] text-ink-600">{dayItems.length}</span>
+                  <span className="h-px flex-1 bg-ink/[0.07]" />
                 </div>
 
-                {dayItems.map((item) => {
-                  const isActive = activeId === item.id
-                  const hooksRow = isHooksItem(item)
-                  const ModeIcon = hooksRow ? FishingHook : item.mode === 'write' ? PenLine : item.mode === 'remix' ? FileText : Clapperboard
-                  const modeColor = hooksRow ? 'text-amber-300 light:text-amber-700' : item.mode === 'write' ? 'text-emerald-300 light:text-emerald-700' : item.mode === 'remix' ? 'text-scripts-300' : 'text-fuchsia-300 light:text-fuchsia-700'
-                  const count = hooksRow ? parseHooks(item.variations[0] ?? '').length : item.variations.length
-                  const countLabel = hooksRow
-                    ? `${count} hook${count === 1 ? '' : 's'}`
-                    : item.mode === 'write'
-                      ? `${count} take${count === 1 ? '' : 's'}`
-                      : `${count} variation${count === 1 ? '' : 's'}`
-                  return (
-                    <div
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                  {dayItems.map((item) => (
+                    <HistoryCard
                       key={item.id}
-                      onClick={() => onSelect(item)}
-                      className={`group flex cursor-pointer items-center gap-3 rounded-full px-3.5 py-3 transition-colors ${
-                        isActive ? 'bg-scripts-500/15 ring-1 ring-scripts-500/20' : 'hover:bg-ink/[0.04]'
-                      }`}
-                    >
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink/[0.04] ${modeColor}`}>
-                        <ModeIcon className="h-4 w-4" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium leading-snug text-ink-100">
-                          {historyTitle(item)}
-                        </p>
-                        <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-500">
-                          <span>{countLabel}</span>
-                          <span>·</span>
-                          <span className="shrink-0">{formatRelative(item.createdAt)}</span>
-                        </div>
-                      </div>
-
-                      <DeleteRowButton onDelete={() => onDelete(item.id)} alwaysVisible={isActive} />
-                    </div>
-                  )
-                })}
+                      item={item}
+                      isActive={activeId === item.id}
+                      onSelect={() => onSelect(item)}
+                      onDelete={() => onDelete(item.id)}
+                    />
+                  ))}
+                </div>
               </div>
             ))}
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// One run as a little script box — mirrors the Bank's script cards, because the
+// thing worth recognising is the writing itself. A 36px icon and a one-line
+// title showed none of it.
+function HistoryCard({
+  item,
+  isActive,
+  onSelect,
+  onDelete,
+}: {
+  item: ScriptHistoryItem
+  isActive: boolean
+  onSelect: () => void
+  onDelete: () => void
+}) {
+  const [confirm, setConfirm] = useState(false)
+  const badge = historyBadge(item)
+  const preview = previewText(item)
+  // Rows are generated against a product, so the product names the card. The
+  // fallbacks cover odd/legacy rows — the brief's first line before the badge
+  // label, which would otherwise just repeat the pill above it.
+  const title = item.productName?.trim()
+    || item.inputSummary.split('\n').map((l) => l.trim()).find(Boolean)
+    || badge.label
+
+  return (
+    <div
+      onClick={onSelect}
+      // Fixed height rather than an aspect ratio: the panel is half the window,
+      // so a portrait card would fill it and only one row would ever be on
+      // screen. This is deep enough for ~10 lines — enough to recognise the take.
+      className={`group relative flex h-[272px] cursor-pointer flex-col overflow-hidden rounded-2xl border p-4 transition-all card-soft-shadow ${
+        isActive
+          ? 'border-scripts-500/50 bg-scripts-500/[0.08] ring-1 ring-scripts-500/40'
+          : 'border-ink/5 bg-ink/[0.03] hover:-translate-y-px hover:border-ink/15 hover:bg-ink/[0.05]'
+      }`}
+    >
+      <div className="flex flex-col gap-2">
+        <span
+          className={`w-fit max-w-[calc(100%-2rem)] shrink-0 truncate rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest ${badge.className}`}
+        >
+          {badge.label}
+        </span>
+        <span className="line-clamp-2 text-sm font-semibold leading-snug tracking-tight text-ink-100">
+          {title}
+        </span>
+      </div>
+
+      {/* The take itself, fading out at the bottom. Masked rather than covered
+          by a gradient so the fade holds on the selected card's tinted fill. */}
+      <div
+        className="mt-3 flex-1 overflow-hidden"
+        style={{
+          maskImage: 'linear-gradient(to bottom, #000 72%, transparent)',
+          WebkitMaskImage: 'linear-gradient(to bottom, #000 72%, transparent)',
+        }}
+      >
+        <p className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-ink-400">
+          {preview || 'Empty script'}
+        </p>
+      </div>
+
+      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-ink-600">
+        <span className="truncate">{countLabel(item)}</span>
+        <span className="shrink-0">·</span>
+        <span className="shrink-0 text-ink-700">{formatRelative(item.createdAt)}</span>
+      </div>
+
+      <TileActionStack forceVisible={confirm || isActive}>
+        <TileDeleteButton variant="chrome" size="sm" onDelete={onDelete} onArmedChange={setConfirm} />
+      </TileActionStack>
     </div>
   )
 }
