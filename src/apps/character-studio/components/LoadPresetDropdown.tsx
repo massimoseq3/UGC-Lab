@@ -63,8 +63,8 @@ function PresetCard({ imageRef, imageUrl, name, onClick }: { imageRef?: string; 
           <Sparkles className="h-6 w-6 text-ink-700" strokeWidth={1.5} />
         </div>
       )}
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2 pt-6">
-        <span className="block truncate text-[11px] font-semibold tracking-tight text-zinc-100">{name}</span>
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2.5 pt-7">
+        <span className="block truncate text-[13px] font-semibold tracking-tight text-zinc-100">{name}</span>
       </div>
     </button>
   )
@@ -119,8 +119,10 @@ export function PresetPickerSlideOver({
   }
 
   return (
-    <SlideOver open={open} onClose={onClose} title={title} subtitle={subtitle}>
-      <div className="p-3">
+    // Wide panel (560px, same as BankPicker) — at 380px three portrait cards
+    // per row were too small to tell the faces apart.
+    <SlideOver open={open} onClose={onClose} title={title} subtitle={subtitle} size="wide">
+      <div className="px-4 py-3">
         <div className="px-1 pb-2 pt-0.5 text-[9px] font-semibold uppercase tracking-widest text-ink-500">
           Starters
         </div>

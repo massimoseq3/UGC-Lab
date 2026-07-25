@@ -1004,6 +1004,7 @@ export default function InputPanel({
         onClose={() => setStyleSlideOpen(false)}
         title="Choose a style"
         subtitle="How the ad is built — and what kind of content it looks like"
+        size="wide"
       >
         {/* Two sections: Structures (how the argument is built) and Formats
             (the kind of content the ad imitates). Formats also stage the shots
@@ -1058,6 +1059,7 @@ export default function InputPanel({
         onClose={() => setHookSlideOpen(false)}
         title="Choose a hook style"
         subtitle={`Which formula family the ${HOOK_COUNT} hooks draw from`}
+        size="wide"
       >
         <div className="flex flex-col gap-2 p-4">
           {(Object.keys(HOOK_CATEGORY_META) as HookCategoryChoice[]).map((choice) => {

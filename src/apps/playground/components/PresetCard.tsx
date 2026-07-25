@@ -60,8 +60,8 @@ export default function PresetCard({ preset, onClick }: PresetCardProps) {
         </div>
       )}
 
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2 pt-6">
-        <span className="block truncate text-center text-[11px] font-semibold tracking-tight text-zinc-100">
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2.5 pt-7">
+        <span className="block truncate text-center text-[13px] font-semibold tracking-tight text-zinc-100">
           {preset.title}
         </span>
       </div>
