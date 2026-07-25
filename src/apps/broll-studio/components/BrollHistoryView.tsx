@@ -5,8 +5,6 @@ import type { BrollHistoryItem } from '../../../stores/types'
 import type {
   BrollResult,
   CardState,
-  OneShotResult,
-  OneShotCardState,
   ContinuousResult,
   ContinuousFrameCardState,
   ContinuousClipCardState,
@@ -20,6 +18,8 @@ import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history
 import { TileDeleteButton } from '../../../components/tileActions'
 
 interface BrollHistoryViewProps {
+  // Already filtered by the parent (see isRetiredOneShotRow) so the tab's
+  // count and this list can't disagree.
   items: BrollHistoryItem[]
   activeId: string | null
   onSelect: (item: BrollHistoryItem) => void
@@ -38,7 +38,7 @@ function firstImageIn(cardStates: Record<string, { images?: { imageUrl?: string 
 }
 
 // First video url found across a mode's card states — used as a poster when a
-// mode produced only clips (One-Shot, Continuous clips) and no still.
+// mode produced only clips (Continuous clips) and no still.
 function firstVideoIn(cardStates: Record<string, { videos?: { url?: string }[] }> | undefined): string | null {
   if (!cardStates) return null
   for (const k in cardStates) {
@@ -48,18 +48,14 @@ function firstVideoIn(cardStates: Record<string, { videos?: { url?: string }[] }
   return null
 }
 
-// Derive the row's cover from whatever media the session produced, in ANY mode.
-// Prefer a still (cheap, reliable <img>) from line cards or continuous keyframes;
-// otherwise fall back to a video first-frame poster. This is why previously
-// One-Shot / Continuous rows never showed a cover — the old helper only read the
-// line-mode card states.
+// Derive the row's cover from whatever media the session produced, in either
+// mode. Prefer a still (cheap, reliable <img>) from line cards or continuous
+// keyframes; otherwise fall back to a video first-frame poster.
 function historyThumb(item: BrollHistoryItem): { imageRef?: string; videoRef?: string } {
   const lineImg = firstImageIn(item.cardStates as Record<string, CardState>)
   if (lineImg) return { imageRef: lineImg }
   const frameImg = firstImageIn(item.continuousFrameStates as Record<string, ContinuousFrameCardState> | undefined)
   if (frameImg) return { imageRef: frameImg }
-  const oneShotVid = firstVideoIn(item.oneShotCardStates as Record<string, OneShotCardState> | undefined)
-  if (oneShotVid) return { videoRef: oneShotVid }
   const clipVid = firstVideoIn(item.continuousClipStates as Record<string, ContinuousClipCardState> | undefined)
   if (clipVid) return { videoRef: clipVid }
   return {}
@@ -108,7 +104,6 @@ function tallyStates(states: Record<string, CardStateish> | undefined, now: numb
 function rowActivity(item: BrollHistoryItem, now: number): RowActivity {
   const out: RowActivity = { images: 0, videos: 0, generating: 0, failed: 0 }
   tallyStates(item.cardStates as Record<string, CardStateish> | undefined, now, out)
-  tallyStates(item.oneShotCardStates as Record<string, CardStateish> | undefined, now, out)
   tallyStates(item.continuousFrameStates as Record<string, CardStateish> | undefined, now, out)
   tallyStates(item.continuousClipStates as Record<string, CardStateish> | undefined, now, out)
   return out
@@ -124,20 +119,29 @@ function activityLabel(a: RowActivity): string {
 // A session accumulates results across modes (state isn't cleared on a mode
 // switch), and the saved `mode` is only the last-active one — unreliable for
 // telling what a row *is*. So derive the row's mode from its richest content:
-// prefer the special modes' own results (continuous, then one-shot); a lingering
-// line result is the weakest signal. Both the badge/filter AND selecting the row
-// use this, so what you see always matches where a click takes you.
+// prefer Continuous' own result; a lingering line result is the weaker signal.
+// Both the badge/filter AND selecting the row use this, so what you see always
+// matches where a click takes you.
 export function brollHistoryMode(item: BrollHistoryItem): BrollMode {
   if (item.continuousResult) return 'continuous'
-  if (item.oneShotResult) return 'oneshot'
   const line = item.result as BrollResult | null
   if (line?.scenes?.length) return 'line'
-  return item.mode ?? 'line'
+  return item.mode === 'continuous' ? 'continuous' : 'line'
+}
+
+// A session from the retired One-Shot mode, and nothing else — no keyframe
+// storyboard, no line scenes. The row and its clips stay on disk (and in the
+// cloud) untouched; it's just not listed, because there's no longer a mode to
+// open it in. Delete this, not the data, when One-Shot comes back.
+export function isRetiredOneShotRow(item: BrollHistoryItem): boolean {
+  if (item.continuousResult) return false
+  if ((item.result as BrollResult | null)?.scenes?.length) return false
+  return !!item.oneShotResult || item.mode === 'oneshot'
 }
 
 // Friendly visual-style label for the row's style pill. Prefers the style baked
 // into the active mode's result (authoritative for line/continuous), then the
-// row-level snapshot (the only source for One-Shot, whose result has no styleId).
+// row-level snapshot.
 function historyStyleLabel(item: BrollHistoryItem, mode: BrollMode): string | null {
   // A named custom style (one saved to the Styles bank) shows its own name
   // wherever a brief is in play; an unnamed one-off still reads "Custom style".
@@ -163,16 +167,14 @@ function historyStyleLabel(item: BrollHistoryItem, mode: BrollMode): string | nu
 const MODE_BADGE: Record<BrollMode, string> = {
   line: 'Line-by-Line',
   continuous: 'Continuous',
-  oneshot: 'One-Shot',
 }
 
 // Mode filter pills.
-type ModeFilter = 'all' | 'line' | 'continuous' | 'oneshot'
+type ModeFilter = 'all' | BrollMode
 const MODE_FILTERS: { id: ModeFilter; label: string }[] = [
   { id: 'all', label: 'All' },
   { id: 'line', label: 'Line-by-Line' },
   { id: 'continuous', label: 'Continuous' },
-  { id: 'oneshot', label: 'One-Shot' },
 ]
 function itemMode(it: BrollHistoryItem): Exclude<ModeFilter, 'all'> {
   return brollHistoryMode(it)
@@ -433,18 +435,10 @@ function HistoryRow({
   const { imageRef, videoRef } = useMemo(() => historyThumb(item), [item])
   const thumbUrl = useAssetUrl(imageRef ?? videoRef ?? '')
   const mode = brollHistoryMode(item)
-  const isOneShot = mode === 'oneshot'
   const isContinuous = mode === 'continuous'
-  const oneShotResult = item.oneShotResult as OneShotResult | undefined
   const continuousResult = item.continuousResult as BrollResult | null
-  const count = isOneShot
-    ? (oneShotResult?.concepts?.length ?? 0)
-    : isContinuous
-      ? sceneCount(continuousResult)
-      : sceneCount(result)
-  const countLabel = isOneShot
-    ? `concept${count === 1 ? '' : 's'}`
-    : `scene${count === 1 ? '' : 's'}`
+  const count = isContinuous ? sceneCount(continuousResult) : sceneCount(result)
+  const countLabel = `scene${count === 1 ? '' : 's'}`
   const styleLabel = historyStyleLabel(item, mode)
   const generating = activity?.generating ?? 0
   const failed = activity?.failed ?? 0
@@ -464,7 +458,7 @@ function HistoryRow({
             className="h-full w-full rounded-full border border-ink/10 object-cover"
           />
         ) : thumbUrl && videoRef ? (
-          // Video-only session (One-Shot / Continuous clips): the <video> element
+          // Video-only session (Continuous clips): the <video> element
           // paints its first frame as the poster. The `#t=0.1` fragment nudges the
           // browser to decode+show that frame instead of a blank element.
           <video

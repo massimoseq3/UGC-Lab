@@ -3,9 +3,8 @@ import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
 import type { Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
-import type { BrollResult, PromptVariation, ReferenceImage, VariationTag, VariationRefs, CardState, BrollMode, OneShotDelivery, OneShotResult, OneShotCardState, ContinuousResult, ContinuousConcept, ContinuousSelection, ContinuousFrameCardState, ContinuousClipCardState } from './types'
+import type { BrollResult, PromptVariation, ReferenceImage, VariationTag, VariationRefs, CardState, BrollMode, BrollDelivery, ContinuousResult, ContinuousConcept, ContinuousSelection, ContinuousFrameCardState, ContinuousClipCardState } from './types'
 import { generateBroll } from './services/generateBroll'
-import { generateOneShot, generateOneShotVariation, buildDemoOneShotResult, ONE_SHOT_DEFAULT_MODEL_ID } from './services/generateOneShot'
 import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
 import InputPanel from './components/InputPanel'
 import ImportPromptsModal from './components/ImportPromptsModal'
@@ -13,7 +12,7 @@ import type { ImportContext, ImportParsed } from './services/importPrompts'
 import StyleModal, { BROLL_STYLE_ACCENT, type StyleSelection } from '../../components/StyleModal'
 import RightPanel from './components/RightPanel'
 import { brollHistoryMode } from './components/BrollHistoryView'
-import { backfillCardState, backfillOneShotCardState, backfillContinuousFrameState, backfillContinuousClipState } from './cardState'
+import { backfillCardState, backfillContinuousFrameState, backfillContinuousClipState } from './cardState'
 import {
   editSceneLine,
   splitScene,
@@ -177,39 +176,25 @@ export default function BrollStudio() {
     },
   )
 
-  // ── One Shot mode state ──────────────────────────────────────
+  // ── Mode ─────────────────────────────────────────────────────
   // Defaults keep existing users in line-by-line with zero change.
   const [mode, setMode] = usePersistedState<BrollMode>(`${baseKey}:mode`, 'line', {
-    // The keyframe-chain mode shipped briefly as 'animated' before the rename.
-    sanitize: (raw) => ((raw as string) === 'animated' ? 'continuous' : raw),
-  })
-  const [oneShotDelivery, setOneShotDelivery] = usePersistedState<OneShotDelivery>(`${baseKey}:oneShotDelivery`, 'dialogue')
-  // Line-by-Line delivery: 'silent' (all cards silent b-roll — today's default)
-  // or 'dialogue' (one talking card per scene + three silent b-roll cards).
-  const [lineDelivery, setLineDelivery] = usePersistedState<OneShotDelivery>(`${baseKey}:lineDelivery`, 'silent')
-  const [oneShotResult, setOneShotResult] = usePersistedState<OneShotResult | null>(`${baseKey}:oneShotResult`, null)
-  const [oneShotCardStates, setOneShotCardStates] = usePersistedState<Record<string, OneShotCardState>>(
-    `${baseKey}:oneShotCardStates`,
-    {},
-    {
-      sanitize: (raw) => {
-        const next: Record<string, OneShotCardState> = {}
-        for (const k in raw) {
-          next[k] = backfillOneShotCardState(raw[k] as Partial<OneShotCardState> & Record<string, unknown>)
-        }
-        return next
-      },
+    sanitize: (raw) => {
+      // The keyframe-chain mode shipped briefly as 'animated' before the rename.
+      if ((raw as string) === 'animated') return 'continuous'
+      // One-Shot was retired — anyone left standing in it lands in Line-by-Line
+      // rather than on a mode the toggle no longer offers.
+      if ((raw as string) === 'oneshot') return 'line'
+      return raw
     },
-  )
-  // The One Shot model selection lives in settingsStore like every other model
-  // pick. Seedance 2.0 (not the app's Omni default) — it's the only default
-  // that does 15s multi-cut with refs AND audio.
-  const oneShotModelId =
-    useSettingsStore((s) => s.perAppModel['broll-studio:oneshot:video']) ?? ONE_SHOT_DEFAULT_MODEL_ID
+  })
+  // Line-by-Line delivery: 'silent' (all cards silent b-roll — today's default)
+  // or 'dialogue' (one talking card per scene + silent b-roll cards).
+  const [lineDelivery, setLineDelivery] = usePersistedState<BrollDelivery>(`${baseKey}:lineDelivery`, 'silent')
 
   // ── Continuous mode (keyframe chain) state ─────────────────────
   // Until the user actively picks a style, the look falls back to a mode-
-  // specific default: UGC Realism for Line-by-Line / One-Shot, 3D Animated for
+  // specific default: UGC Realism for Line-by-Line, 3D Animated for
   // Continuous. `styleChosen` (not the raw id) gates this so a legacy persisted
   // id from the old app-wide default doesn't masquerade as an explicit pick.
   const [continuousStyleId, setContinuousStyleId] = usePersistedState<string>(`${baseKey}:continuousStyle`, '')
@@ -260,7 +245,6 @@ export default function BrollStudio() {
     useSettingsStore((s) => s.perAppModel['broll-studio:continuous:video']) ?? CONTINUOUS_DEFAULT_MODEL_ID
 
   const [isGenerating, setIsGenerating] = useState(false)
-  const [isAddingVariation, setIsAddingVariation] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pickerMode, setPickerMode] = useState<PickerMode>(null)
   const [highlightField, setHighlightField] = useState<string | null>(null)
@@ -277,7 +261,6 @@ export default function BrollStudio() {
           cs.videoStatus === 'generating' ||
           cs.isPromptWorking === true,
       ) ||
-      Object.values(oneShotCardStates).some((cs) => cs.inFlightVideos.length > 0) ||
       Object.values(continuousFrameStates).some((cs) => cs.inFlightImages.some((e) => !e.error)) ||
       Object.values(continuousClipStates).some((cs) => cs.inFlightVideos.some((e) => !e.error)),
   )
@@ -309,7 +292,7 @@ export default function BrollStudio() {
   // same precedence as the history badge — and their row keeps updating.
   const [sessionMode, setSessionMode] = usePersistedState<BrollMode>(
     `${baseKey}:sessionMode`,
-    continuousResult ? 'continuous' : oneShotResult ? 'oneshot' : 'line',
+    continuousResult ? 'continuous' : 'line',
   )
 
   // The style the CURRENT session's content was actually generated with —
@@ -383,18 +366,17 @@ export default function BrollStudio() {
     // Only this session's own mode counts — a leftover sibling result in the
     // workspace must not keep an empty row alive or leak into the snapshot.
     const sessionResult = sessionMode === 'line' ? result : null
-    const sessionOneShot = sessionMode === 'oneshot' ? oneShotResult : null
     const sessionContinuous = sessionMode === 'continuous' ? continuousResult : null
-    if ((!sessionResult && !sessionOneShot && !sessionContinuous) || !sessionIdRef.current) return
+    if ((!sessionResult && !sessionContinuous) || !sessionIdRef.current) return
     const handle = setTimeout(() => {
       const item: BrollHistoryItem = {
         id: sessionIdRef.current,
         // Candidate creation time — only applied to a brand-new row; the store
         // preserves the original `createdAt` on every subsequent save.
         createdAt: Date.now(),
-        // Row-level style snapshot for the history pill (works across all three
-        // modes, incl. One-Shot whose result carries no styleId), stamped at
-        // generation time so a later mode-toggle can't rewrite it.
+        // Row-level style snapshot for the history pill (works across both
+        // modes), stamped at generation time so a later mode-toggle can't
+        // rewrite it.
         styleId: sessionStyleId || undefined,
         styleBrief: sessionStyleBrief ?? undefined,
         styleName: sessionStyleName ?? undefined,
@@ -408,10 +390,6 @@ export default function BrollStudio() {
         cardStates: sessionResult ? cardStates : {},
         mode: sessionMode,
         lineDelivery: sessionResult ? lineDelivery : undefined,
-        oneShotResult: sessionOneShot ?? undefined,
-        oneShotCardStates: sessionOneShot && Object.keys(oneShotCardStates).length > 0 ? oneShotCardStates : undefined,
-        oneShotDelivery: sessionOneShot ? oneShotDelivery : undefined,
-        oneShotModelId: sessionOneShot ? oneShotModelId : undefined,
         continuousResult: sessionContinuous ?? undefined,
         continuousFrameStates: sessionContinuous && Object.keys(continuousFrameStates).length > 0 ? continuousFrameStates : undefined,
         continuousClipStates: sessionContinuous && Object.keys(continuousClipStates).length > 0 ? continuousClipStates : undefined,
@@ -422,7 +400,7 @@ export default function BrollStudio() {
       upsertBrollHistory(item)
     }, 1000)
     return () => clearTimeout(handle)
-  }, [result, cardStates, lineDelivery, oneShotResult, oneShotCardStates, oneShotDelivery, oneShotModelId, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, sessionStyleId, sessionStyleBrief, sessionStyleName, continuousModelId, sessionMode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, upsertBrollHistory])
+  }, [result, cardStates, lineDelivery, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, sessionStyleId, sessionStyleBrief, sessionStyleName, continuousModelId, sessionMode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, upsertBrollHistory])
 
   const handleSelectProduct = (item: unknown) => {
     setSelectedProductId((item as Product).id)
@@ -526,91 +504,6 @@ export default function BrollStudio() {
     ...(characterRef ? [characterRef] : []),
     ...(productRef ? [productRef] : []),
   ]
-
-  const handleGenerateOneShot = async () => {
-    if (!scriptText.trim()) return
-    // No kie.ai key yet → show sample concepts so the member can see exactly
-    // what One Shot produces before they set up billing. Rendering a clip
-    // still needs a real key (the Generate Video button surfaces that).
-    if (!useSettingsStore.getState().kieApiKey) {
-      setSessionId(newSessionId())
-      setSessionMode('oneshot')
-      stampSessionStyle()
-      setOneShotCardStates({})
-      setOneShotResult(buildDemoOneShotResult(oneShotModelId, oneShotDelivery))
-      useAppStore.getState().addToast('Showing sample concepts — add your kie.ai key to generate from your own script', 'info')
-      return
-    }
-    setIsGenerating(true)
-    setError(null)
-    try {
-      const res = await generateOneShot({
-        scriptText,
-        delivery: oneShotDelivery,
-        modelId: oneShotModelId,
-        productContext,
-        modelContext,
-        additionalContext,
-        styleId: resolvedStyleId,
-        styleBrief: continuousStyleBrief ?? undefined,
-      })
-      // Same commit discipline as line mode: only rotate the session once we
-      // actually have concepts, so a failed call leaves the old ones intact.
-      setSessionId(newSessionId())
-      setSessionMode('oneshot')
-      stampSessionStyle()
-      setOneShotCardStates({})
-      setOneShotResult(res)
-      if (res.concepts.length < 4) {
-        useAppStore.getState().addToast(`${res.concepts.length} of 4 concepts generated — the rest failed`, 'error')
-      } else {
-        useAppStore.getState().addToast('One-Shot concepts ready', 'success')
-      }
-    } catch (err) {
-      const msg = humanizeError(err, 'Concept generation failed. Check your API key and try again.')
-      setError(msg)
-      useAppStore.getState().addToast(msg, 'error')
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
-  // "Add variation" — one more concept appended to the existing set, planned
-  // against the model the result was generated with so its clip split matches
-  // the others. The seed-card effect in OneShotView picks up the new segments.
-  const handleAddOneShotVariation = async () => {
-    if (!oneShotResult || isAddingVariation) return
-    if (!useSettingsStore.getState().kieApiKey) {
-      useAppStore.getState().addToast('Add your kie.ai key in Settings to generate more variations', 'info')
-      return
-    }
-    setIsAddingVariation(true)
-    try {
-      const concept = await generateOneShotVariation(
-        {
-          scriptText,
-          delivery: oneShotResult.delivery,
-          modelId: oneShotResult.modelId,
-          productContext,
-          modelContext,
-          additionalContext,
-          // Style is already fixed on oneShotResult; the new concept inherits it
-          // at fire time. Passed only to satisfy the input shape.
-          styleId: resolvedStyleId,
-          styleBrief: continuousStyleBrief ?? undefined,
-        },
-        oneShotResult.concepts.map((c) => c.poolAngle).filter((a): a is string => !!a),
-        oneShotResult.concepts.length,
-      )
-      setOneShotResult((prev) => (prev ? { ...prev, concepts: [...prev.concepts, concept] } : prev))
-      useAppStore.getState().addToast('Variation added', 'success')
-    } catch (err) {
-      const msg = humanizeError(err, 'Could not add a variation. Try again.')
-      useAppStore.getState().addToast(msg, 'error')
-    } finally {
-      setIsAddingVariation(false)
-    }
-  }
 
   const handleGenerateContinuous = async () => {
     if (!scriptText.trim()) return
@@ -799,8 +692,6 @@ export default function BrollStudio() {
     styleBrief: continuousStyleBrief ?? undefined,
     styleName: continuousStyleName ?? undefined,
     lineDelivery,
-    oneShotDelivery,
-    oneShotModelId,
     continuousModelId,
   }
 
@@ -821,20 +712,16 @@ export default function BrollStudio() {
     if (parsed.mode === 'line') {
       setCardStates({})
       setResult(parsed.lineResult ?? null)
-    } else if (parsed.mode === 'continuous') {
+    } else {
       setContinuousFrameStates({})
       setContinuousClipStates({})
       setContinuousSelections({})
       setContinuousResult(parsed.continuousResult ?? null)
-    } else {
-      setOneShotCardStates({})
-      setOneShotResult(parsed.oneShotResult ?? null)
     }
     useAppStore.getState().addToast(`Imported ${parsed.summary}`, 'success')
   }
 
   const handleGenerate = async () => {
-    if (mode === 'oneshot') return handleGenerateOneShot()
     if (mode === 'continuous') return handleGenerateContinuous()
     if (!scriptText.trim()) return
     setIsGenerating(true)
@@ -898,8 +785,8 @@ export default function BrollStudio() {
     setSelectedScriptId(item.scriptId ?? null)
     setScriptText(item.scriptText ?? '')
     setAdditionalContext(item.context ?? '')
-    // One-shot-only sessions store a placeholder `{ scenes: [] }` — restore
-    // that as null so line mode shows its empty state, not a blank grid.
+    // A row generated in another mode stores a placeholder `{ scenes: [] }` —
+    // restore that as null so line mode shows its empty state, not a blank grid.
     const lineResult = item.result as BrollResult | null
     setResult(lineResult && lineResult.scenes?.length > 0 ? lineResult : null)
     const restored: Record<string, CardState> = {}
@@ -919,21 +806,6 @@ export default function BrollStudio() {
     setMode(rowMode)
     // Further edits keep updating this row as the mode it actually is.
     setSessionMode(rowMode)
-    setOneShotResult((item.oneShotResult as OneShotResult | undefined) ?? null)
-    const restoredOneShot: Record<string, OneShotCardState> = {}
-    for (const k in (item.oneShotCardStates ?? {}) as Record<string, unknown>) {
-      restoredOneShot[k] = backfillOneShotCardState(
-        (item.oneShotCardStates as Record<string, Partial<OneShotCardState> & Record<string, unknown>>)[k],
-      )
-    }
-    setOneShotCardStates(restoredOneShot)
-    if (item.oneShotDelivery) setOneShotDelivery(item.oneShotDelivery)
-    // Only the mode being restored adopts the row's model — a One-Shot row has
-    // no business rewriting the Continuous pick, and vice versa. Even then it's
-    // a persistent setting, so say so rather than changing it behind the user.
-    if (rowMode === 'oneshot' && item.oneShotModelId) {
-      restoreAppModel('broll-studio:oneshot:video', item.oneShotModelId)
-    }
 
     // Continuous snapshot (absent on older rows).
     setContinuousResult((item.continuousResult as ContinuousResult | undefined) ?? null)
@@ -1007,9 +879,6 @@ export default function BrollStudio() {
           onModeChange={setMode}
           lineDelivery={lineDelivery}
           onLineDeliveryChange={setLineDelivery}
-          oneShotDelivery={oneShotDelivery}
-          onOneShotDeliveryChange={setOneShotDelivery}
-          oneShotModelId={oneShotModelId}
           styleChosen={styleIsPicked}
           styleLabel={styleLabel}
           styleHint={styleHint}
@@ -1024,12 +893,6 @@ export default function BrollStudio() {
         <RightPanel
           mode={mode}
           result={result}
-          oneShotResult={oneShotResult}
-          oneShotModelId={oneShotModelId}
-          oneShotCardStates={oneShotCardStates}
-          setOneShotCardStates={setOneShotCardStates}
-          onAddOneShotVariation={handleAddOneShotVariation}
-          isAddingVariation={isAddingVariation}
           continuousResult={continuousResult}
           continuousModelId={continuousModelId}
           continuousFrameStates={continuousFrameStates}

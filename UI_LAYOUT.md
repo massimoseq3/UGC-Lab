@@ -373,9 +373,9 @@ close (ChevronDown).
 
 ### Mode toggle (left panel header, 57px bar)
 
-Three-way `SegmentedToggle`, left→right: **Line-by-Line** (rows) ·
-**Continuous** (box) · **One-Shot** (clapperboard). All three Generate buttons
-carry an estimated-credits pill.
+Two-way `SegmentedToggle`, left→right: **Line-by-Line** (rows) ·
+**Continuous** (box). Both Generate buttons carry an estimated-credits pill.
+(A third mode, **One-Shot**, was retired — see `types.ts:BrollMode`.)
 
 The **References** eyebrow row below it ends in a pair of matching grey pills,
 left→right: **Import prompts** · **+ New** (`ClearAllButton`). Import prompts
@@ -384,7 +384,6 @@ Download as file) over *2 · Paste what it gives you back* (mono textarea +
 Upload a file + drop target), a live parse summary underneath, then
 Cancel · **Import prompts** in the footer.
 
-One-Shot swaps the right panel for concept rows (see `OneShotView.tsx`).
 **Continuous** is the keyframe-chain mode (`ContinuousView.tsx`): the left panel
 adds a **Visual Style** chip row (3D Animated / Claymation / Papercraft / Anime
 / Cinematic / UGC Realism) plus a dashed **Match a reference style** box —
@@ -434,12 +433,11 @@ Top tabs: **Scenes / History**. Scenes view: a control bar with the scene count
 
 - Header: big italic scene number + "Line N" chip + the quoted script line (left);
   a **Generate all** button for that scene (right).
-- A grid of **5 variation cards** plus an **Add option** affordance:
-  `grid-cols-2 → md:3 → xl:[repeat(5,1fr) 2.75rem]`. At `xl` all five cards sit on one
-  row and Add option collapses to a 44px full-height strip on the right end with
-  vertical (`writing-mode: vertical-rl`) text; below `xl` it wraps as a normal card.
-  The strip is pinned to `xl:col-start-6 xl:row-start-1` so added cards wrap past it
-  onto row 2 at full card width instead of landing in the narrow track.
+- A grid of **3 variation cards** plus an **Add option** card:
+  `grid-cols-2 → md:3 → xl:4`. At `xl` the three cards plus Add option fill one row
+  as four equal cells; Add option is a normal dashed card in the grid, not a strip.
+  (Sessions generated before the cut from four variations still render — the extra
+  card just wraps onto a second line.)
   Seven selectable variation tags (`ALL_TAGS` in `services/generateBroll.ts`):
   **Action · Emotional · Product shot · POV · Environment · Transition · Proof** — a
   colored chip top-left of each card (lime / pink / amber / violet / teal / sky /

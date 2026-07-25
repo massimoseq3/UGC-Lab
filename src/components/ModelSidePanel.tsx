@@ -87,7 +87,7 @@ interface ModelSidePanelProps {
   // Of the listed models, which are actually selectable. Any listed model NOT
   // in this set is shown greyed + disabled (same look as requireMode dimming).
   // Use for curated sets that aren't derivable from a single mode — e.g.
-  // One-Shot's "built for the ref+audio multi-cut" models. Omit to enable all.
+  // a "built for the ref+audio multi-cut" subset. Omit to enable all.
   enabledModelIds?: string[]
   // Optional controlled mode: when both are provided the panel reflects `value`
   // and reports picks through `onChange` instead of reading/writing settingsStore

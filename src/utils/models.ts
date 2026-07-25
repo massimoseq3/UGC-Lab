@@ -906,8 +906,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       supportsAudio: false,
     },
     // Default video model for Playground and B-Roll (Line-by-Line): cheap, fast,
-    // does text/image/reference-to-video. One-Shot and Continuous keep their own
-    // Seedance 2.0 defaults.
+    // does text/image/reference-to-video. Continuous keeps its own Seedance 1.5
+    // Pro default.
     defaultFor: ['broll-studio', 'playground'],
   },
 
@@ -1088,8 +1088,8 @@ export function snapVideoDuration(current: number, durations: number[]): number 
 }
 
 // Snap-UP sibling: nearest option at or above, capped at the model's longest.
-// One Shot uses this — a segment's spoken lines must FIT inside the clip, so
-// rounding down would truncate speech mid-sentence.
+// For clips whose spoken lines must FIT inside the duration — rounding down
+// would truncate speech mid-sentence.
 export function snapVideoDurationUp(current: number, durations: number[]): number {
   if (durations.length === 0 || durations.includes(current)) return current
   const above = durations.filter((d) => d > current)
@@ -1246,8 +1246,7 @@ export interface VideoGenOptions {
   motionVideoUrl?: string
   characterOrientation?: 'image' | 'video'
   // Kling 3.0 only: allow the model to cut between multiple shots inside one
-  // generation. Off for line-by-line b-roll (one continuous take per clip);
-  // B-Roll's One Shot mode turns it on for full multi-scene concepts.
+  // generation. Off for B-Roll (one continuous take per clip).
   multiShots?: boolean
 }
 

@@ -1,4 +1,4 @@
-import type { BrollInput, BrollResult, Scene, PromptVariation, ReferenceImage, VariationTag, VariationRefs, LinePosition, OneShotDelivery } from '../types'
+import type { BrollInput, BrollResult, Scene, PromptVariation, ReferenceImage, VariationTag, VariationRefs, LinePosition, BrollDelivery } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import {
   kieChatCompletions,
@@ -24,6 +24,22 @@ let idCounter = 0
 function nextId() {
   return `var-${Date.now()}-${++idCounter}`
 }
+
+/**
+ * How many variations the storyboard call asks for per line. Was 4; three good
+ * ideas beat three good ideas plus a filler — the fourth was reliably the
+ * weakest, and every extra card is another image (and often another video) on
+ * the member's own kie credits.
+ */
+export const VARIATIONS_PER_SCENE = 3
+
+/**
+ * How many <VAR_N> blocks the parser will still READ. Deliberately one more
+ * than we ask for: a storyboard written before the cut — or pasted in through
+ * Import prompts from an older brief — carries a VAR_4, and silently dropping
+ * a prompt the member already wrote is worse than showing a fourth card.
+ */
+const MAX_PARSED_VARIATIONS = 4
 
 /**
  * The shape every B-Roll prompt takes. Shared by all the prompt sites (scene
@@ -74,7 +90,7 @@ When the viewer hears the sentence and sees the sentence at the same time, the a
 
 # YOUR JOB
 
-For each voiceover line in the script, produce 4 variations — 4 genuinely DIFFERENT ideas for visualizing that line, not one idea filmed from four angles. Before writing, silently brainstorm: what's the literal image hiding in this line? the real-life moment behind it? the feeling? the visible proof? Then write the four best ideas as prompts.
+For each voiceover line in the script, produce 3 variations — 3 genuinely DIFFERENT ideas for visualizing that line, not one idea filmed from three angles. Before writing, silently brainstorm: what's the literal image hiding in this line? the real-life moment behind it? the feeling? the visible proof? Then write the three STRONGEST ideas as prompts — three you'd actually shoot, not two good ones and a filler.
 
 **Every shot is SILENT b-roll.** No one talks to camera, no one lip-syncs, no line is spoken. The finished voiceover is laid over these clips in the edit.
 
@@ -92,7 +108,7 @@ Tag each variation with the lens it uses (declare it in the <TAG> field):
 - PROOF = visible evidence the claim is real — the after-state, a side-by-side, an ordinary screen artifact (a timer, a streak). Never invent fake reviews, ratings, or statistics. The ONE lens where a phone may appear in frame, as the object being looked at.
 
 Lens rules:
-- The four tags must be different from each other, and each must produce a DIFFERENT CONCEPT — different subject, different idea, not the same beat reframed.
+- The three tags must be different from each other, and each must produce a DIFFERENT CONCEPT — different subject, different idea, not the same beat reframed.
 - When the line carries a metaphor or vivid image, at least one variation MUST make it literal (usually ACTION).
 - Choose for the line, not by habit, and vary the mix across the ad.
 - When VISIBILITY is no: PRODUCT is off the menu and no variation may show the product or its packaging.
@@ -138,7 +154,7 @@ The ONE exception: a PROOF shot may show a screen as the deliberate subject bein
 # SELF-CHECK BEFORE RETURNING
 
 1. Could someone watching this shot guess the line it belongs to? If not, the idea isn't visual enough — find the image inside the line and rewrite.
-2. Are the 4 variations four different IDEAS (different subject or concept), not one idea from four angles?
+2. Are the 3 variations three different IDEAS (different subject or concept), not one idea from three angles? With only three slots there is no room for a filler — if one is weaker than the others, replace it.
 3. If the line has a metaphor or vivid image, does one variation make it literal?
 4. Is every prompt ONE readable paragraph — no labels, no device named, silent?
 5. Does product visibility match the rule exactly?
@@ -181,29 +197,23 @@ Wrap every scene in this exact XML envelope. Do not include any text outside the
 <REFS>...</REFS>
 <PROMPT>...</PROMPT>
 </VAR_3>
-<VAR_4>
-<TAG>a DIFFERENT role from VAR_1, VAR_2 and VAR_3</TAG>
-<LABEL>...</LABEL>
-<REFS>...</REFS>
-<PROMPT>...</PROMPT>
-</VAR_4>
 </SCENE>`
 
 // Delivery override appended to the system instruction ONLY in "With Dialogue"
 // mode. Read last, so it wins over the "every shot is SILENT" doctrine for VAR_1
-// while leaving the other three variations untouched. The Line-by-Line dialogue
-// card is deliberately lighter than One-Shot's — a single independent clip, so
-// no shared VOICE PROFILE block; the character just speaks the scene's line.
+// while leaving the other variations untouched. The dialogue card is
+// deliberately light — a single independent clip, so no shared VOICE PROFILE
+// block per card; the character just speaks the scene's line.
 const DIALOGUE_DELIVERY_ADDENDUM = `
 
 # DELIVERY OVERRIDE — WITH DIALOGUE (READ LAST, HIGHEST PRIORITY)
 
-This ad is delivered WITH DIALOGUE. For EVERY scene, VAR_1 is NOT silent b-roll — it is a talking-to-camera DIALOGUE shot. VAR_2, VAR_3 and VAR_4 stay silent b-roll exactly as described above (three genuinely different lenses).
+This ad is delivered WITH DIALOGUE. For EVERY scene, VAR_1 is NOT silent b-roll — it is a talking-to-camera DIALOGUE shot. VAR_2 and VAR_3 stay silent b-roll exactly as described above (two genuinely different lenses).
 
 VAR_1 rules, every scene:
 - <TAG>DIALOGUE</TAG> and <REFS>character</REFS>.
 - The character is on camera, looking into the lens, and SPEAKS the scene's exact <LINE> word-for-word. Write ONE flowing paragraph that embeds the line verbatim, e.g.: "the character, [expression/gesture], looks into the lens and says: \\"<the exact line>\\"". A real person talking to their phone — natural, not a news anchor.
-- Describe the delivery, expression, gesture, setting, and where the light comes from. This is the ONE variation that is NOT silent — the character speaks and audio is on. The "footage is SILENT / no one speaks" rule in the PROMPT FORMAT and SHOW-DON'T-TELL sections governs VAR_2, VAR_3 and VAR_4 only — it does NOT apply to VAR_1.
+- Describe the delivery, expression, gesture, setting, and where the light comes from. This is the ONE variation that is NOT silent — the character speaks and audio is on. The "footage is SILENT / no one speaks" rule in the PROMPT FORMAT and SHOW-DON'T-TELL sections governs VAR_2 and VAR_3 only — it does NOT apply to VAR_1.
 - Still obey every other rule: camera is a viewpoint not a prop (never name the filming device), gender-neutral language ("the character", "they/them"), UGC realism, after-not-before.
 
 # VOICE PROFILE (emit ONCE, after the last scene)
@@ -219,7 +229,7 @@ This one voice is shared by every dialogue clip in the ad, so it must be self-co
 // The system instruction the scene call runs on, with the dialogue override
 // appended in "With Dialogue" delivery. Exported so the Import-prompts brief
 // hands an outside model the EXACT same rules — one source, no drift.
-export function brollSystemInstruction(delivery: OneShotDelivery): string {
+export function brollSystemInstruction(delivery: BrollDelivery): string {
   return delivery === 'dialogue' ? SYSTEM_INSTRUCTION + DIALOGUE_DELIVERY_ADDENDUM : SYSTEM_INSTRUCTION
 }
 
@@ -227,8 +237,8 @@ export function brollSystemInstruction(delivery: OneShotDelivery): string {
 export function buildBrollUserPrompt(input: BrollInput): string {
   const withDialogue = input.delivery === 'dialogue'
   const variationBrief = withDialogue
-    ? `For EACH scene emit four variations: VAR_1 is a DIALOGUE shot where the character speaks the exact line to camera (<TAG>DIALOGUE</TAG>, <REFS>character</REFS>), and VAR_2–VAR_4 are three genuinely DIFFERENT silent b-roll ideas for showing what the line SAYS. Pick three distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF) for VAR_2–VAR_4, declared in each <TAG> field.`
-    : `For EACH scene emit four variations: four genuinely DIFFERENT ideas for showing what that line SAYS — make metaphors literal, show the act, the feeling, the proof. Pick four distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF), declared in each <TAG> field. Every shot is silent — no one speaks (a voiceover is added later).`
+    ? `For EACH scene emit exactly three variations: VAR_1 is a DIALOGUE shot where the character speaks the exact line to camera (<TAG>DIALOGUE</TAG>, <REFS>character</REFS>), and VAR_2–VAR_3 are two genuinely DIFFERENT silent b-roll ideas for showing what the line SAYS. Pick two distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF) for VAR_2–VAR_3, declared in each <TAG> field.`
+    : `For EACH scene emit exactly three variations: three genuinely DIFFERENT ideas for showing what that line SAYS — make metaphors literal, show the act, the feeling, the proof. Pick three distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF), declared in each <TAG> field. Every shot is silent — no one speaks (a voiceover is added later). Three slots only, so every one has to earn its place — no filler fourth idea.`
 
   let prompt = `Break this script into B-Roll scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph (usually 40-80 words, longer when the idea needs it). Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation, erring toward attaching references whenever they could plausibly help — only the VISIBILITY=no product exclusion is a hard rule.\n\nScript:\n${input.scriptText}`
 
@@ -283,7 +293,7 @@ export function extractVoiceProfile(responseText: string): string | undefined {
 //     <LINE>...</LINE>
 //     <POSITION>hook|reframe|mechanism|payoff|CTA</POSITION>
 //     <VISIBILITY>yes|no</VISIBILITY>
-//     <VAR_N><TAG/><LABEL/><REFS/><PROMPT/></VAR_N>   (x4)
+//     <VAR_N><TAG/><LABEL/><REFS/><PROMPT/></VAR_N>   (x3)
 //   </SCENE>
 //
 // Tolerant of legacy output that emits <VAR_N>plain text</VAR_N> with no
@@ -292,16 +302,18 @@ export function extractVoiceProfile(responseText: string): string | undefined {
 //
 // Exported because Import prompts runs hand-written output through the SAME
 // parser the live call uses — an import can't drift from a generation.
-export function parseScenes(responseText: string, delivery: OneShotDelivery = 'silent'): Scene[] {
+export function parseScenes(responseText: string, delivery: BrollDelivery = 'silent'): Scene[] {
   const scenes: Scene[] = []
   const sceneRegex = /<SCENE>([\s\S]*?)<\/SCENE>/g
   const lineRegex = /<LINE>([\s\S]*?)<\/LINE>/
   const positionRegex = /<POSITION>([\s\S]*?)<\/POSITION>/
   const visibilityRegex = /<VISIBILITY>([\s\S]*?)<\/VISIBILITY>/
 
-  // All four variations carry the LLM's per-line role pick in <TAG>; these
+  // Every variation carries the LLM's per-line role pick in <TAG>; these
   // defaults only apply when the tag is missing or unrecognised. In dialogue
-  // delivery VAR_1 is the talking card, so its fallback is DIALOGUE.
+  // delivery VAR_1 is the talking card, so its fallback is DIALOGUE. Four
+  // entries, one more than we ask for, because the loop below still reads a
+  // VAR_4 when one is present (see MAX_PARSED_VARIATIONS).
   const FALLBACK_TAGS: VariationTag[] = delivery === 'dialogue'
     ? ['DIALOGUE', 'ACTION', 'EMOTIONAL', 'PRODUCT']
     : ['ACTION', 'EMOTIONAL', 'PRODUCT', 'POV']
@@ -322,7 +334,7 @@ export function parseScenes(responseText: string, delivery: OneShotDelivery = 's
         : undefined
 
     const variations: PromptVariation[] = []
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= MAX_PARSED_VARIATIONS; i++) {
       const varRegex = new RegExp(`<VAR_${i}>([\\s\\S]*?)<\\/VAR_${i}>`)
       const varBlock = block.match(varRegex)?.[1]
       if (!varBlock) continue
@@ -457,8 +469,8 @@ function defaultLabelFor(tag: VariationTag): string {
 
 // Build the identity-only scoping directive prepended to ref'd image prompts.
 // Only the clauses for refs that are actually attached appear, so a product-only
-// or character-only gen reads cleanly. Exported for One Shot mode, which
-// prepends the same directive to its reference-to-video prompts.
+// or character-only gen reads cleanly. Exported so other reference-carrying
+// surfaces can prepend the same directive.
 export function buildReferencePreamble(refs: ReferenceImage[]): string {
   const hasCharacter = refs.some((r) => r.label === 'character')
   const hasProduct = refs.some((r) => r.label === 'product')

@@ -444,7 +444,7 @@ export default function ScenesView({
   const allKeys = result.scenes.flatMap((s) => s.variations.map((_, i) => `${s.number}-${i}`))
 
   // Every rendered clip across every scene, for "Download all" — parity with
-  // Continuous and One-Shot. This is the mode that produces the most clips and
+  // Continuous. This is the mode that produces the most clips and
   // where videos are download-only, so bulk export matters most here; without
   // it the only way out was opening each card in turn.
   const allClipEntries = result.scenes.flatMap((s) =>
@@ -477,7 +477,7 @@ export default function ScenesView({
           <span className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-ink-400">
             {result.scenes.length} scene{result.scenes.length === 1 ? '' : 's'}
           </span>
-          {/* Style pill — parity with Continuous/One-Shot, so the member can see
+          {/* Style pill — parity with Continuous, so the member can see
               which look every b-roll clip is rendered in. */}
           <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-broll-500/25 bg-broll-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-broll-300">
             <Palette className="h-3 w-3 shrink-0" strokeWidth={2} />
@@ -863,9 +863,11 @@ function SceneSection({
         </button>
       </div>
 
-      {/* Four variations plus the Add-option card across one row at xl — five
-          equal cards, the Add card just another cell in the grid. */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      {/* Three variations plus the Add-option card across one row at xl — four
+          equal cards, the Add card just another cell in the grid. (A session
+          generated before the cut to three still renders: it simply wraps its
+          extra card onto a second line.) */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
         {scene.variations.map((variation, i) => {
           const key = `${scene.number}-${i}`
           const state = cardStates[key] ?? createDefaultCardState(variation)
@@ -928,7 +930,7 @@ function AddNewCard({
   }
   return (
     // A normal card in the grid: same 9/16 footprint as the variation cards, so
-    // the four variations plus this Add card fill the five-column row evenly.
+    // the three variations plus this Add card fill the four-column row evenly.
     <button
       onClick={handleAdd}
       title="Add a blank option to this scene"
@@ -952,8 +954,8 @@ function SkeletonScene() {
           <div className="skeleton h-3 w-48" />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-        {[0, 1, 2, 3].map((i) => (
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+        {[0, 1, 2].map((i) => (
           <div key={i} className="skeleton skeleton-card aspect-[9/16]" />
         ))}
       </div>

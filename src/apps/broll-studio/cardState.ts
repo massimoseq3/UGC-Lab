@@ -1,4 +1,4 @@
-import type { PromptVariation, CardState, OneShotSegment, OneShotCardState, ContinuousConcept, ContinuousScene, ContinuousFrameCardState, ContinuousClipCardState } from './types'
+import type { PromptVariation, CardState, ContinuousConcept, ContinuousScene, ContinuousFrameCardState, ContinuousClipCardState } from './types'
 import { refsToToggles } from './types'
 import { getDefaultModel, getModel, snapVideoDuration, type ImageResolution } from '../../utils/models'
 import { useSettingsStore } from '../../stores/settingsStore'
@@ -201,68 +201,6 @@ function legacyInFlightImages(card: Partial<CardState> & Record<string, unknown>
     }]
   }
   return []
-}
-
-// ── One Shot card state ────────────────────────────────────────
-
-// Fresh per-segment state for a One Shot concept. Resolution follows the
-// one-shot model's preferred tier (same reasoning as defaultVideoResolution,
-// but keyed on the model the concepts were planned against, not the per-card
-// line-mode selection).
-export function createDefaultOneShotCardState(segment: OneShotSegment, modelId: string): OneShotCardState {
-  const c = getModel(modelId)?.videoConstraints
-  const resolution = c
-    ? c.default ?? (c.resolutions.includes('720p') ? '720p' : c.resolutions[0] ?? '720p')
-    : '720p'
-  const durationSeconds = c ? snapVideoDuration(segment.durationSeconds, c.durations) : segment.durationSeconds
-  return {
-    editablePrompt: segment.prompt,
-    promptHistory: [segment.prompt],
-    promptHistoryIndex: 0,
-    videos: [],
-    currentVideoIndex: 0,
-    inFlightVideos: [],
-    refsCharacter: true,
-    refsProduct: true,
-    carryPrevFrame: true,
-    aspectRatio: '9:16',
-    resolution,
-    durationSeconds,
-    audio: true,
-  }
-}
-
-// Defensive hydrate for persisted One Shot card entries — same posture as
-// backfillCardState. Drops in-flight videos past the 60-min TTL so a refresh
-// doesn't try to resume a long-dead kie task.
-export function backfillOneShotCardState(raw: Partial<OneShotCardState> & Record<string, unknown>): OneShotCardState {
-  const STALE_MS = 60 * 60_000
-  const videos = Array.isArray(raw.videos) ? (raw.videos as OneShotCardState['videos']) : []
-  const inFlight = Array.isArray(raw.inFlightVideos) ? (raw.inFlightVideos as OneShotCardState['inFlightVideos']) : []
-  const editablePrompt = (raw.editablePrompt as string) ?? ''
-  const promptHistory = Array.isArray(raw.promptHistory) && (raw.promptHistory as string[]).length > 0
-    ? (raw.promptHistory as string[])
-    : [editablePrompt]
-  const promptHistoryIndex = typeof raw.promptHistoryIndex === 'number'
-    ? Math.max(0, Math.min(raw.promptHistoryIndex as number, promptHistory.length - 1))
-    : promptHistory.length - 1
-  return {
-    editablePrompt,
-    promptHistory,
-    promptHistoryIndex,
-    videos,
-    currentVideoIndex: typeof raw.currentVideoIndex === 'number'
-      ? Math.max(0, Math.min(raw.currentVideoIndex, Math.max(0, videos.length - 1)))
-      : Math.max(0, videos.length - 1),
-    inFlightVideos: inFlight.filter((e) => Date.now() - (e.startedAt ?? 0) < STALE_MS),
-    refsCharacter: raw.refsCharacter !== false,
-    refsProduct: raw.refsProduct !== false,
-    carryPrevFrame: raw.carryPrevFrame !== false,
-    aspectRatio: (raw.aspectRatio as string) ?? '9:16',
-    resolution: (raw.resolution as string) ?? '720p',
-    durationSeconds: typeof raw.durationSeconds === 'number' ? raw.durationSeconds : 5,
-    audio: raw.audio !== false,
-  }
 }
 
 // ── Continuous mode card states ──────────────────────────────────
