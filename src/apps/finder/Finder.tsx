@@ -135,6 +135,13 @@ export default function Finder() {
     if (saved.productImage && saved.productImage.startsWith('data:')) {
       saved.productImage = await saveFromDataUrl(saved.productImage)
     }
+    // Extra angles arrive from the form as data URIs on first add; already-saved
+    // ones come back as asset:// refs and pass through untouched.
+    if (saved.extraImages?.length) {
+      saved.extraImages = await Promise.all(
+        saved.extraImages.map((src) => (src.startsWith('data:') ? saveFromDataUrl(src) : Promise.resolve(src))),
+      )
+    }
     if (editingId) await updateProduct(editingId, saved)
     else await addProduct(saved)
     closeForm()

@@ -877,6 +877,7 @@ export default function InfluencerEditModal({
         onClose={() => setBankPickerOpen(false)}
         onSelect={handlePickFromBank}
         tabs={['products', 'models', { type: 'brolls', filter: (it) => !!(it as BRoll).imageUrl }]}
+        expandProductImages
       />
       <ExpandTextModal
         open={promptExpanded}

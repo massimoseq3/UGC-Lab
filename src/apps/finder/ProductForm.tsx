@@ -39,9 +39,33 @@ const FIELDS = ['productName', 'productDescription', 'targetMarket', 'painPoints
 
 const REQUIRED_KEYS = ['productName', 'productDescription'] as const
 
+// Extra angles beyond the hero shot. Four is enough to cover closed/open/label/
+// contents without turning the auto-fill call into a photo album.
+const MAX_EXTRA_IMAGES = 4
+
+// One extra-angle thumbnail. Its own component so `useAssetUrl` can resolve
+// each stored `asset://` ref (a hook can't run inside a .map callback).
+function ExtraImageThumb({ src, onRemove }: { src: string; onRemove: () => void }) {
+  const resolved = useAssetUrl(src)
+  return (
+    <div className="group/extra relative aspect-square overflow-hidden rounded-xl border border-ink/10 bg-ink/[0.02]">
+      {resolved && <img src={resolved} alt="" className="h-full w-full object-cover" />}
+      <button
+        type="button"
+        onClick={onRemove}
+        title="Remove this angle"
+        className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 backdrop-blur-sm transition-opacity hover:bg-black/80 group-hover/extra:opacity-100"
+      >
+        <X className="h-3 w-3" />
+      </button>
+    </div>
+  )
+}
+
 export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtraction }: ProductFormProps) {
   const [form, setForm] = useState({
     productImage: item?.productImage ?? '',
+    extraImages: item?.extraImages ?? [],
     productName: item?.productName ?? '',
     productDescription: item?.productDescription ?? '',
     targetMarket: item?.targetMarket ?? '',
@@ -56,6 +80,7 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
   })
   const [listingText, setListingText] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const extraFileRef = useRef<HTMLInputElement>(null)
   const dragDepthRef = useRef(0)
   const extractingFileRef = useRef<File | null>(null)
   const [localPreview, setLocalPreview] = useState<string | null>(null)
@@ -73,6 +98,7 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
     if (item) {
       setForm({
         productImage: item.productImage,
+        extraImages: item.extraImages ?? [],
         productName: item.productName,
         productDescription: item.productDescription,
         targetMarket: item.targetMarket,
@@ -110,10 +136,39 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
     reader.readAsDataURL(file)
   }
 
+  // Extra angles are read straight to data URIs and held on the form; the save
+  // path persists them to IndexedDB the same way the hero shot is persisted.
+  const addExtraImages = (files: FileList | null) => {
+    if (!files) return
+    const room = MAX_EXTRA_IMAGES - form.extraImages.length
+    const accepted: File[] = []
+    let rejected = false
+    for (const file of Array.from(files)) {
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type) || file.size > MAX_IMAGE_SIZE) { rejected = true; continue }
+      if (accepted.length < room) accepted.push(file)
+    }
+    if (rejected) setExtractError('Skipped a file — use JPG, PNG, or WebP under 10 MB.')
+    for (const file of accepted) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const dataUrl = reader.result as string
+        setForm((f) => (
+          f.extraImages.length >= MAX_EXTRA_IMAGES ? f : { ...f, extraImages: [...f.extraImages, dataUrl] }
+        ))
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const removeExtraImage = (index: number) => {
+    setForm((f) => ({ ...f, extraImages: f.extraImages.filter((_, i) => i !== index) }))
+  }
+
   const runExtraction = async (file: File) => {
     setExtractError(null)
     setIsExtracting(true)
     extractingFileRef.current = file
+    const extras = form.extraImages
 
     const reader = new FileReader()
     reader.onload = () => {
@@ -125,7 +180,7 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
     reader.readAsDataURL(file)
 
     try {
-      const result = await extractProductInfo(file, listingText)
+      const result = await extractProductInfo(file, listingText, extras)
       setForm((f) => ({ ...f, ...result }))
       setShowError(false)
     } catch (err) {
@@ -146,17 +201,8 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
     setExtractError(null)
     setIsExtracting(true)
     try {
-      let dataUri = displayImage
-      if (!dataUri.startsWith('data:')) {
-        const blob = await (await fetch(dataUri)).blob()
-        dataUri = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve(reader.result as string)
-          reader.onerror = () => reject(reader.error)
-          reader.readAsDataURL(blob)
-        })
-      }
-      const result = await extractProductInfo(dataUri, listingText)
+      // `displayImage` is a data: or blob: URL — the service resolves either.
+      const result = await extractProductInfo(displayImage, listingText, form.extraImages)
       setForm((f) => ({ ...f, ...result }))
       setShowError(false)
     } catch (err) {
@@ -290,8 +336,10 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
 
       {/* Side-by-side: image alone on the left, every field scrolls down the right. */}
       <div className="flex flex-col gap-6 md:flex-row lg:min-h-0 lg:flex-1">
-        {/* Left — just the product image */}
-        <div className="flex w-full shrink-0 flex-col gap-4 md:w-[300px] lg:min-h-0 lg:overflow-y-auto">
+        {/* Left — the product photos + listing copy. Deliberately does NOT
+            scroll: it stays put while the field column on the right moves, so
+            the image you're describing is always in view. */}
+        <div className="flex w-full shrink-0 flex-col gap-4 md:w-[300px] lg:min-h-0">
           {displayImage ? (
             <div className="group/img relative aspect-square w-full overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02]">
               <img src={displayImage} alt="" className="h-full w-full object-cover" />
@@ -329,6 +377,35 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
             </button>
           )}
 
+          {/* More angles — extra shots of the same product (box open, what's
+              inside, the label). They ride along in the auto-fill read and are
+              individually attachable wherever a reference image is picked. */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-medium uppercase tracking-widest text-ink-400">
+                More Angles <span className="normal-case tracking-normal text-ink-600">(optional)</span>
+              </span>
+              <span className="text-[10px] font-medium tabular-nums text-ink-600">
+                {form.extraImages.length}/{MAX_EXTRA_IMAGES}
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-2">
+              {form.extraImages.map((src, i) => (
+                <ExtraImageThumb key={`${src.slice(0, 32)}-${i}`} src={src} onRemove={() => removeExtraImage(i)} />
+              ))}
+              {form.extraImages.length < MAX_EXTRA_IMAGES && (
+                <button
+                  type="button"
+                  onClick={() => extraFileRef.current?.click()}
+                  title="Add another shot of this product"
+                  className="group flex aspect-square items-center justify-center rounded-xl border border-dashed border-ink/10 bg-ink/[0.02] transition-colors hover:border-ink/20"
+                >
+                  <ImagePlus className="h-4 w-4 text-ink-600 transition-colors group-hover:text-ink-400" />
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Listing copy — optional paste box that feeds auto-fill. Text from
               the product page carries the claims/specs/offer a photo can't. */}
           <label className="flex flex-col gap-1.5">
@@ -351,11 +428,21 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
               className="flex items-center justify-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-[12px] font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 light:text-emerald-700"
             >
               {isExtracting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {isExtracting ? 'Extracting…' : listingText.trim() ? 'Auto-fill from image + copy' : 'Auto-fill from image'}
+              {isExtracting
+                ? 'Extracting…'
+                : `Auto-fill from ${form.extraImages.length > 0 ? `${form.extraImages.length + 1} photos` : 'image'}${listingText.trim() ? ' + copy' : ''}`}
             </button>
           )}
         </div>
         <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" className="hidden" onChange={handleImage} />
+        <input
+          ref={extraFileRef}
+          type="file"
+          multiple
+          accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={(e) => { addExtraImages(e.target.files); e.target.value = '' }}
+        />
 
         {/* Right — every field + save (the only part that scrolls) */}
         <div className={`flex min-w-0 flex-1 flex-col gap-3 transition-opacity lg:min-h-0 lg:overflow-y-auto lg:pr-1 ${isExtracting ? 'pointer-events-none opacity-60' : ''}`}>

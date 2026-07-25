@@ -121,6 +121,7 @@ export default function FrameSlot({
         onSelect={handleBankPick}
         filter={tabs ? undefined : (item) => !!(item as { imageUrl?: string }).imageUrl}
         tabs={tabs}
+        expandProductImages
       />
     </>
   )

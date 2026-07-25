@@ -31,6 +31,24 @@ interface BankPickerProps {
   // can carry its own optional filter (used today to keep brolls with
   // `imageUrl` only when surfacing them as image refs).
   tabs?: Array<BankType | { type: BankType; filter?: (item: BankItem) => boolean }>
+  // Image-picking mode: a product with extra angles is listed as one tile per
+  // photo, so the caller can attach the open box rather than only the hero
+  // shot. Each tile hands back a shallow Product clone whose `productImage` is
+  // that angle — callers that only read the image work unchanged. Off by
+  // default: pickers that pick the *product* (B-Roll, Scripts) need the real
+  // row and its real id.
+  expandProductImages?: boolean
+}
+
+// One tile per photo for products carrying extra angles. The clone keeps every
+// field but `productImage` and `id` — the suffixed id keeps multi-select
+// selection unambiguous between two angles of the same product.
+function expandProducts(products: Product[]): Product[] {
+  return products.flatMap((p) =>
+    !p.extraImages?.length
+      ? [p]
+      : [p, ...p.extraImages.map((src, i) => ({ ...p, id: `${p.id}::angle${i + 1}`, productImage: src }))],
+  )
 }
 
 function getItemName(bankType: BankType, item: BankItem): string {
@@ -54,6 +72,7 @@ export default function BankPicker({
   multiSelect = false,
   onSelectMany,
   tabs,
+  expandProductImages = false,
 }: BankPickerProps) {
   const [search, setSearch] = useState('')
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -84,6 +103,12 @@ export default function BankPicker({
   const voices = useBankStore((s) => s.voices)
   const brolls = useBankStore((s) => s.brolls)
   const styles = useBankStore((s) => s.styles)
+  // In image-picking mode a product with extra angles occupies one tile per
+  // photo; everywhere else the raw bank rows are the pool.
+  const productPool = useMemo(
+    () => (expandProductImages ? expandProducts(products) : products),
+    [products, expandProductImages],
+  )
   const openApp = useAppStore((s) => s.openApp)
   const sendToApp = useAppStore((s) => s.sendToApp)
   const activeApp = useAppStore((s) => s.activeApp)
@@ -93,7 +118,7 @@ export default function BankPicker({
   const accentColor = getAppConfig(activeApp ?? '')?.accent ?? BANK_CONFIG[currentBankType].accent
 
   const items: BankItem[] =
-    currentBankType === 'products' ? products :
+    currentBankType === 'products' ? productPool :
     currentBankType === 'models' ? models :
     currentBankType === 'scripts' ? scripts :
     currentBankType === 'voices' ? voices :
@@ -151,7 +176,7 @@ export default function BankPicker({
       setSort('newest')
       setActiveTab(bankType)
       const initialItems =
-        bankType === 'products' ? products :
+        bankType === 'products' ? productPool :
         bankType === 'models' ? models :
         bankType === 'scripts' ? scripts :
         bankType === 'voices' ? voices :
@@ -181,7 +206,7 @@ export default function BankPicker({
 
   // Resolve a bank type to its full (unfiltered) item array.
   const poolFor = (t: BankType): BankItem[] =>
-    t === 'products' ? products :
+    t === 'products' ? productPool :
     t === 'models' ? models :
     t === 'scripts' ? scripts :
     t === 'voices' ? voices :

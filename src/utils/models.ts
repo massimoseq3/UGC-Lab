@@ -154,10 +154,11 @@ export const TTS_MODEL_ID = 'google/gemini-3-1-flash-tts'
 //   DEFAULT — the app-wide workhorse. Prompt-shaping, storyboards, shot logs:
 //             structured output against heavily-tuned prompts, read by another
 //             model rather than by a person.
-//   STRONG  — ~2.6x the credits, used only where a misread costs the user real
-//             rework. Today: product auto-fill alone (a wrong spec propagates
-//             into every script and ad written off that product). Scripts sat
-//             here for a while and moved back — see the registry note below.
+//   STRONG  — ~2.6x the credits. Today: NOTHING. Scripts and product auto-fill
+//             each sat here and each moved back — the output didn't visibly
+//             improve, and members pay the difference on their own key. Kept as
+//             the named opt-in for a surface where a wrong answer would cost
+//             real rework; check git log before promoting anything back.
 export const CHAT_MODEL_DEFAULT = 'gemini-3-flash'
 export const CHAT_MODEL_STRONG = 'gemini-3-6-flash'
 

@@ -1,6 +1,12 @@
 export interface Product {
   id: string
   productImage: string
+  // Additional shots of the SAME product — the box closed and open, the sachet
+  // beside the tub, the label, what's actually inside. Same `asset://` ref
+  // shape as `productImage`. They give auto-fill more to read, and every
+  // reference picker lists them alongside the hero so a scene that needs the
+  // open box can attach the open box. Absent on rows saved before they existed.
+  extraImages?: string[]
   productName: string
   productDescription: string
   targetMarket: string
