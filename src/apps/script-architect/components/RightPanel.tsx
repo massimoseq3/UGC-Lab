@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Model, ScriptHistoryItem } from '../../../stores/types'
-import type { ScriptMode, WriteFormat, WriteLength } from '../types'
+import type { RemixAngle, ScriptMode, WriteFormat, WriteLength } from '../types'
 import OutputPanel from './OutputPanel'
 import HistoryView from './HistoryView'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -9,6 +9,7 @@ type Tab = 'output' | 'history'
 
 interface RightPanelProps {
   variations: string[]
+  outputAngles?: RemixAngle[] | null
   // Live left-panel mode — drives the empty/loading copy.
   mode: ScriptMode
   // Mode that produced the shown variations — drives the cards' labels.
@@ -35,6 +36,7 @@ interface RightPanelProps {
 
 export default function RightPanel({
   variations,
+  outputAngles,
   mode,
   outputMode,
   writeFormat,
@@ -78,6 +80,7 @@ export default function RightPanel({
         {tab === 'output' ? (
           <OutputPanel
             variations={variations}
+            outputAngles={outputAngles}
             mode={outputMode}
             liveMode={mode}
             writeFormat={writeFormat}

@@ -18,7 +18,19 @@ export function detectSceneBlueprint(source: string): boolean {
   return /^(?:---\s*)?scene\s*\d+\s*[—:–-]/im.test(source)
 }
 
-export type RemixAngle = 'hook-led' | 'pain-point-led' | 'curiosity-led' | 'story-led' | 'proof-led'
+export type RemixAngle =
+  | 'hook-led'
+  | 'pain-point-led'
+  | 'curiosity-led'
+  | 'story-led'
+  | 'proof-led'
+  // Added when the batch size became user-picked — a 10-variation remix needs
+  // ten genuinely different persuasion mechanisms, not five run twice.
+  | 'objection-led'
+  | 'comparison-led'
+  | 'mistake-led'
+  | 'social-proof-led'
+  | 'routine-led'
 
 // ── Write New (from-scratch) mode ──
 export type WriteStyle =
@@ -80,12 +92,21 @@ export type HookCategoryChoice = 'auto' | HookCategory
 
 export const HOOK_COUNT = 10
 
-// How many takes a Script / Scenes / Cinematic / Remix generate returns. Was 5;
-// cut to 3 because five parallel takes off one brief crowd each other — the
-// weakest two were always variations on a stronger one, and five long scripts
-// is more than anyone reads before picking. Three forces genuinely separate
-// angles. Hooks are exempt (HOOK_COUNT) — those are one-liners, not scripts.
-export const SCRIPT_VARIATION_COUNT = 3
+// How many takes a Script / Scenes / Cinematic / Remix generate returns.
+// User-picked, defaulting to 3: five parallel takes off one brief crowded each
+// other, and three long scripts is what most people actually read before
+// picking. 10 is there for when you want a wide net and don't mind the credits.
+// Hooks are exempt (HOOK_COUNT) — those are one-liners, not scripts.
+//
+// Every angle list below is ordered BEST-FIRST and sliced to the chosen count,
+// so picking 3 gives the three strongest angles rather than an arbitrary three.
+export const VARIATION_COUNTS = [3, 5, 10] as const
+export type VariationCount = (typeof VARIATION_COUNTS)[number]
+export const DEFAULT_VARIATION_COUNT: VariationCount = 3
+
+export function isVariationCount(v: unknown): v is VariationCount {
+  return VARIATION_COUNTS.includes(v as VariationCount)
+}
 
 export const HOOK_CATEGORY_META: Record<HookCategoryChoice, { label: string; hint: string }> = {
   auto: { label: 'Best Mix', hint: 'The model picks the strongest angles across all 7 families' },
@@ -158,6 +179,8 @@ export interface GenerateScriptInput {
   writeLength?: WriteLength
   // Hooks format only: which formula family the 10 hooks draw from.
   hookCategory?: HookCategoryChoice
+  // How many takes to return. Omitted → DEFAULT_VARIATION_COUNT.
+  variationCount?: VariationCount
   productId: string | null
   // The raw bank name. What the model is SHOWN is productContext.productName
   // (user-editable in the form); this is the fallback when that's blank — see
@@ -169,6 +192,10 @@ export interface GenerateScriptInput {
 
 export interface GeneratedScript {
   variations: string[]
+  // Remix only: the angles used, in card order. Stamped onto the history row so
+  // a saved session labels its cards from what actually ran rather than from a
+  // list that may have been reordered since.
+  angles?: RemixAngle[]
 }
 
 export const REMIX_ANGLE_LABEL: Record<RemixAngle, string> = {
@@ -177,18 +204,36 @@ export const REMIX_ANGLE_LABEL: Record<RemixAngle, string> = {
   'curiosity-led': 'Curiosity-led',
   'story-led': 'Story-led',
   'proof-led': 'Proof-led',
+  'objection-led': 'Objection-led',
+  'comparison-led': 'Comparison-led',
+  'mistake-led': 'Mistake-led',
+  'social-proof-led': 'Social-proof-led',
+  'routine-led': 'Routine-led',
 }
 
-// The three angles a remix generates, in card order. Three different
-// persuasion mechanisms rather than three flavours of one: feel the problem /
-// need to know / see the result. 'hook-led' is gone because every script
-// already runs the global hook rules, so it wasn't an angle at all; 'story-led'
-// because its narrative pull is reachable from inside pain-point-led.
-export const REMIX_ANGLES: RemixAngle[] = ['pain-point-led', 'curiosity-led', 'proof-led']
+// Remix angles in card order, STRONGEST FIRST — a remix takes the first N.
+// Each is a different persuasion mechanism, not a different flavour of one:
+// feel the problem / need to know / see the result, then the objection, the
+// switch, the mistake, the recommendation, the moment it bites. 'hook-led' sits
+// last because it's the weakest as an *angle* — every script already runs the
+// global hook rules, so on its own it mostly restates the house style.
+export const REMIX_ANGLES: RemixAngle[] = [
+  'pain-point-led',
+  'curiosity-led',
+  'proof-led',
+  'story-led',
+  'objection-led',
+  'comparison-led',
+  'mistake-led',
+  'social-proof-led',
+  'routine-led',
+  'hook-led',
+]
 
-// Pre-cut sessions generated five, and those rows are still in Script History.
-// Keeping the old order lets them keep their angle labels instead of silently
-// degrading to a bare "Variation N".
+// Sessions generated before the count was user-picked always produced five, in
+// a different order to today's first five. Those rows are still in Script
+// History and carry no stamped angle list, so they're matched by shape here
+// rather than mislabelled by slicing the current list.
 const LEGACY_REMIX_ANGLES: RemixAngle[] = [
   'hook-led',
   'pain-point-led',
@@ -197,10 +242,12 @@ const LEGACY_REMIX_ANGLES: RemixAngle[] = [
   'proof-led',
 ]
 
-// Angle list matching a stored variation count, or null when it matches neither
-// (a hand-edited row) — the caller falls back to an unlabelled title.
+// Angle list for a remix row that didn't stamp its own. Only legacy rows land
+// here; anything generated since stamps `remixAngles` and uses that verbatim.
+// Returns null for a count we can't attribute — the caller drops the label
+// rather than guessing, since a wrong angle label is worse than none.
 export function remixAnglesForCount(count: number): RemixAngle[] | null {
-  if (count === REMIX_ANGLES.length) return REMIX_ANGLES
   if (count === LEGACY_REMIX_ANGLES.length) return LEGACY_REMIX_ANGLES
+  if (count > 0 && count <= REMIX_ANGLES.length) return REMIX_ANGLES.slice(0, count)
   return null
 }

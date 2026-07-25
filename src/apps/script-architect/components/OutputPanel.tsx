@@ -4,7 +4,7 @@ import GenerationProgress from '../../../components/GenerationProgress'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import type { CinematicHandoffRef, CinematicVideoPayload, Model } from '../../../stores/types'
-import { REMIX_ANGLE_LABEL, SCRIPT_VARIATION_COUNT, remixAnglesForCount, HOOK_CATEGORY_META, HOOK_COUNT, parseHooks, hooksPlainText, type ParsedHook, type ScriptMode, type WriteFormat, type WriteLength } from '../types'
+import { REMIX_ANGLE_LABEL, remixAnglesForCount, HOOK_CATEGORY_META, HOOK_COUNT, parseHooks, hooksPlainText, type ParsedHook, type RemixAngle, type ScriptMode, type WriteFormat, type WriteLength } from '../types'
 
 // The cinematic handoff lands in Playground on a ref-capable, native-audio
 // model so the @INFLUENCER + @PRODUCT references actually lock and the VO bakes
@@ -14,6 +14,8 @@ const CINEMATIC_MODEL_ID = 'bytedance/seedance-2'
 
 interface OutputPanelProps {
   variations: string[]
+  // Remix only: angles that produced these cards, when the run stamped them.
+  outputAngles?: RemixAngle[] | null
   // Mode that produced the shown variations — drives the card titles, the
   // "spoken vs scenes" send buttons, and the angle labels.
   mode: ScriptMode
@@ -646,7 +648,7 @@ function SceneChunkCard({ chunk }: { chunk: SceneChunk }) {
   )
 }
 
-export default function OutputPanel({ variations, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, linkedProductId, influencer, cinematicDuration, isGenerating, error, onEditVariation }: OutputPanelProps) {
+export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, linkedProductId, influencer, cinematicDuration, isGenerating, error, onEditVariation }: OutputPanelProps) {
   // Resolve the linked product so saved scripts get a meaningful default title
   // ("<Product> — Hook-Led Script") and the cinematic handoff has its image.
   const products = useBankStore((s) => s.products)
@@ -713,12 +715,12 @@ export default function OutputPanel({ variations, mode, liveMode, writeFormat, w
   if (isGenerating) {
     const message = copyMode === 'write'
       ? (writeFormat === 'prompt'
-          ? ['Reading your brief...', `Directing ${SCRIPT_VARIATION_COUNT} cinematic concepts...`, 'Building the world bible...', 'Laying out the timeline...']
+          ? ['Reading your brief...', 'Directing the cinematic concepts...', 'Building the world bible...', 'Laying out the timeline...']
           : writeFormat === 'hooks'
             ? ['Reading your brief...', 'Digging through the hook library...', `Writing ${HOOK_COUNT} hooks...`, 'Cutting the weak ones...']
-            : ['Reading your brief...', `Writing ${SCRIPT_VARIATION_COUNT} takes...`, 'Making it sound human...', 'Tightening the hooks...'])
+            : ['Reading your brief...', 'Writing the takes...', 'Making it sound human...', 'Tightening the hooks...'])
       : copyMode === 'remix'
-        ? [`Building ${SCRIPT_VARIATION_COUNT} angles...`, 'Sending parallel requests...', 'Writing variations...', 'Polishing final drafts...']
+        ? ['Building the angles...', 'Sending parallel requests...', 'Writing variations...', 'Polishing final drafts...']
         : ['Reading scene blueprint...', 'Mapping product into structure...', 'Rewriting scenes...', 'Preserving structure...']
     return (
       <div className="flex h-full flex-col gap-2 p-5">
@@ -742,8 +744,8 @@ export default function OutputPanel({ variations, mode, liveMode, writeFormat, w
         <PenLine className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
         <p className="text-sm text-ink-700">
           {copyMode === 'write'
-            ? (writeFormat === 'prompt' ? `Your ${SCRIPT_VARIATION_COUNT} cinematic concepts will appear here` : writeFormat === 'hooks' ? `Your ${HOOK_COUNT} hooks will appear here` : `Your ${SCRIPT_VARIATION_COUNT} takes will appear here`)
-            : copyMode === 'remix' ? `Your ${SCRIPT_VARIATION_COUNT} script variations will appear here` : 'Your scene prompts will appear here'}
+            ? (writeFormat === 'prompt' ? 'Your cinematic concepts will appear here' : writeFormat === 'hooks' ? `Your ${HOOK_COUNT} hooks will appear here` : 'Your takes will appear here')
+            : copyMode === 'remix' ? 'Your script variations will appear here' : 'Your scene prompts will appear here'}
         </p>
         {error && (
           <div className="mt-2 flex max-w-sm items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
@@ -755,9 +757,11 @@ export default function OutputPanel({ variations, mode, liveMode, writeFormat, w
     )
   }
 
-  // Resolved from the row's own variation count, so a five-variation session
-  // saved before the cut still labels its angles correctly.
-  const angles = remixAnglesForCount(variations.length)
+  // Prefer what the run actually used; fall back to matching by count for rows
+  // saved before the angle list was stamped.
+  const angles = outputAngles?.length === variations.length
+    ? outputAngles
+    : remixAnglesForCount(variations.length)
   const takeUnit = isCinematic ? 'Concept' : mode === 'remix' ? 'Variation' : 'Take'
 
   return (

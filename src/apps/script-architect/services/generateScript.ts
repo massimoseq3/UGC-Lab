@@ -1,5 +1,5 @@
 import type { GenerateScriptInput, GeneratedScript, RemixAngle, EditableProductContext, WriteStyle, WriteLength, HookCategory } from '../types'
-import { HOOK_COUNT, REMIX_ANGLES } from '../types'
+import { HOOK_COUNT, REMIX_ANGLES, DEFAULT_VARIATION_COUNT, isVariationCount } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { kieChatCompletions, type ChatMessage } from '../../../utils/kie'
 import { getChatEndpointPath } from '../../../utils/models'
@@ -222,6 +222,16 @@ const REMIX_ANGLE_INSTRUCTION: Record<RemixAngle, string> = {
     'ANGLE: Lead with a short personal story or moment ("last week I..."). Pull the viewer in with a relatable narrative, then let the product emerge naturally as the turning point.',
   'proof-led':
     'ANGLE: Lead with a concrete result, number, or before/after proof point. Open on the outcome the viewer wants, then reveal how the product delivered it.',
+  'objection-led':
+    'ANGLE: Lead by saying out loud the exact reason someone wouldn\'t buy this — price, effort, "I\'ve tried things like this" — and then dismantle it. Name the doubt before the viewer can.',
+  'comparison-led':
+    'ANGLE: Lead with what the viewer is using right now and why it keeps letting them down, then position this as the switch. Never name a competitor brand — say "the one everyone buys", "the drugstore stuff".',
+  'mistake-led':
+    'ANGLE: Lead with a mistake the viewer is probably making without realising it. Make them recognise themselves in it, then reframe the product as what fixes the misdiagnosis.',
+  'social-proof-led':
+    'ANGLE: Lead with how you came across it — a friend who wouldn\'t shut up about it, a comment section, someone you trust. Let the recommendation carry the credibility before any claim does.',
+  'routine-led':
+    'ANGLE: Lead inside one specific moment in the day when the problem bites — a time, a place, a habit. Ground the whole script in that recurring moment and pay it off there.',
 }
 
 const REVERSE_ENGINEER_SYSTEM = `You are an elite UGC ad creative director. You take a comprehensive scene-by-scene blueprint of a winning ad — where the original character and the original product are described in full identifying detail — and you rewrite it so the SAME ad structure can be regenerated for a NEW product with a NEW character.
@@ -402,12 +412,22 @@ const WRITE_STYLE_INSTRUCTION: Record<WriteStyle, string> = {
 // opening device and a different anchor on each.
 const WRITE_ANGLE_DISCIPLINE = `ANGLE DISCIPLINE: commit to exactly ONE pain point and the ONE benefit that pays it off — chosen from the product details per the anchor below (or inferred from the brief if no product details are given). Every line of the script drives that single idea deeper. Do NOT tour multiple pain points, stack USPs, or list benefits — a script that mentions three benefits sells none. Other product facts may appear only in service of the one idea (a spec as proof, the offer at the CTA).`
 
-// Keep this at SCRIPT_VARIATION_COUNT entries — the batch size is derived from
-// its length, so adding one here adds an LLM call per generate.
+// Ordered STRONGEST FIRST — a generate takes the first N, so picking 3 gets the
+// three best angles rather than an arbitrary three. The first three deliberately
+// span the whole awareness ladder (problem-aware / solution-aware / unaware)
+// with a different opening device and a different anchor on each; everything
+// after widens the net without repeating one of them.
 const WRITE_TAKE_INSTRUCTION: string[] = [
   `THIS TAKE: open with a specific personal confession or moment ("I did X for years before I realized..."). Anchor: the most personal, private-feeling pain point — write for a problem-aware viewer who thinks it's just them.\n${WRITE_ANGLE_DISCIPLINE}`,
   `THIS TAKE: open with a surprising number, stat, or before/after result that reframes the problem. Anchor: the most concrete, measurable benefit — write proof-first for a skeptical, solution-aware viewer.\n${WRITE_ANGLE_DISCIPLINE}`,
   `THIS TAKE: open mid-story, in the middle of a moment or a question, so the viewer is dropped straight into the action. Anchor: the most unexpected benefit or use-moment — write curiosity-first for an unaware viewer who wasn't shopping at all.\n${WRITE_ANGLE_DISCIPLINE}`,
+  `THIS TAKE: open with a bold claim or hot take stated as fact. Anchor: the single strongest USP — write for a solution-aware viewer comparing options.\n${WRITE_ANGLE_DISCIPLINE}`,
+  `THIS TAKE: open by naming the exact reason someone wouldn't buy this, out loud, before defending it. Anchor: the biggest objection (price, effort, "tried something like it") and the one benefit that answers it — write for a skeptic who has already been burned.\n${WRITE_ANGLE_DISCIPLINE}`,
+  `THIS TAKE: open by directly calling out the viewer ("if you [pain point], stop scrolling" energy — in your own words, not that phrase). Anchor: the most widespread everyday pain point — write for a problem-aware viewer who hasn't looked for a fix yet.\n${WRITE_ANGLE_DISCIPLINE}`,
+  `THIS TAKE: open on the thing they're using right now and why it keeps failing them — never name a competitor brand, say "the one everyone buys". Anchor: the single clearest difference (result, time, or price) — write for a viewer who thinks their current fix is fine.\n${WRITE_ANGLE_DISCIPLINE}`,
+  `THIS TAKE: open on a mistake the viewer is probably making without knowing it. Anchor: the pain point that mistake causes, and the benefit that ends it — write for a problem-aware viewer who has misdiagnosed their own problem.\n${WRITE_ANGLE_DISCIPLINE}`,
+  `THIS TAKE: open on how you found it — a friend, a comment section, someone who wouldn't shut up about it. Anchor: the benefit that made it worth passing on — write social-proof-first for an unaware viewer who trusts people over ads.\n${WRITE_ANGLE_DISCIPLINE}`,
+  `THIS TAKE: open inside one specific moment in the day when the problem bites — a time, a place, a routine. Anchor: the benefit felt in exactly that moment — write for a problem-aware viewer who lives that moment daily.\n${WRITE_ANGLE_DISCIPLINE}`,
 ]
 
 // Word budgets assume ~2.4 words/sec on-camera pace, so the read time
@@ -465,14 +485,21 @@ HARD RULES:
 
 // Five parallel concepts per generate — deliberately different cinematic
 // worlds so the cards are real alternatives, not five flavours of one idea.
-// Three worlds, as far apart as the format allows: mythic scale, one quiet
-// human, pure design. The cut pair were modifiers more than worlds — KINETIC
-// was a pacing choice that epic and sleek can both carry, and NATURAL's warmth
-// largely restated intimate. Same length rule as WRITE_TAKE_INSTRUCTION.
+// Strongest first, same as WRITE_TAKE_INSTRUCTION. The leading three are as far
+// apart as the format allows — mythic scale, one quiet human, pure design — so
+// a default generate returns three genuinely different worlds rather than three
+// grades of the same one.
 const WRITE_PROMPT_TAKE_INSTRUCTION: string[] = [
   'THIS CONCEPT — EPIC / GRAND: build a powerful, large-scale, atmospheric world that dramatises the product\'s core benefit as something mythic and larger than life. Wide, awe-driven, cinematic scale.',
   'THIS CONCEPT — INTIMATE / HUMAN: a quiet, real, emotionally-driven moment built around one character. The product appears as a personal ritual or a turning point. Restrained and sincere.',
   'THIS CONCEPT — SLEEK / DESIGN-FORWARD: a stylised, ultra-premium brand-film world — bold colour, striking architecture, or a surreal-but-photoreal setting. Modern, iconic, high-fashion energy.',
+  'THIS CONCEPT — KINETIC / HIGH-ENERGY: a fast-cut, dynamic world full of movement and momentum — sport, motion, speed, or urban energy. Punchy rhythm, athletic camera, adrenaline.',
+  'THIS CONCEPT — NATURAL / ORGANIC: a warm, grounded world rooted in nature, craft, or everyday texture — golden light, real hands, tactile materials. Honest, earthy, effortlessly premium.',
+  'THIS CONCEPT — DOCUMENTARY / VÉRITÉ: shot like real life caught on the day — handheld, available light, unstaged blocking, imperfect framing. The product is used, not presented. Observational and unglamorous on purpose.',
+  'THIS CONCEPT — NOCTURNAL / NEON: an after-dark world lit by practical sources — neon, headlights, screens, wet asphalt reflections. Moody, saturated, cinematic contrast.',
+  'THIS CONCEPT — RETRO / NOSTALGIC: a specific past era rendered with period-true wardrobe, set design and film stock. Warm, grainy, memory-like. The product sits in the era without breaking it.',
+  'THIS CONCEPT — SURREAL / DREAMLIKE: a photoreal world running on dream logic — impossible scale, floating objects, spaces that fold. Every element is rendered realistically; only the physics are wrong.',
+  'THIS CONCEPT — PLAYFUL / ABSURD: a bright, deadpan, comedically over-committed world. One silly premise taken completely seriously, staged with straight-faced production value.',
 ]
 
 // Single-clip beat budgets. The cinematic format renders as one generation, so
@@ -674,6 +701,12 @@ async function runReverseEngineer(input: GenerateScriptInput, apiKey: string, en
   return nameSpokenTokensInDialogue(text, spokenProductName(input))
 }
 
+// The batch size for this generate. Sanitised here rather than trusted, since
+// the value round-trips through a persisted draft and a history row.
+function requestedCount(input: GenerateScriptInput): number {
+  return isVariationCount(input.variationCount) ? input.variationCount : DEFAULT_VARIATION_COUNT
+}
+
 export async function generateScript(input: GenerateScriptInput): Promise<GeneratedScript> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const endpoint = getChatEndpointPath(CHAT_MODEL_ID)
@@ -689,17 +722,19 @@ export async function generateScript(input: GenerateScriptInput): Promise<Genera
       const text = await runHooks(input, apiKey, endpoint)
       return { variations: [text] }
     }
-    // Batch size comes from the instruction list Cinematic vs Script/Scenes
-    // will actually read, so the two can never fall out of step with it.
-    const takeCount = (input.writeFormat === 'prompt' ? WRITE_PROMPT_TAKE_INSTRUCTION : WRITE_TAKE_INSTRUCTION).length
+    // Clamped to the instruction list the chosen format will actually read, so
+    // a count can never index past its angles and repeat one.
+    const pool = input.writeFormat === 'prompt' ? WRITE_PROMPT_TAKE_INSTRUCTION : WRITE_TAKE_INSTRUCTION
+    const takeCount = Math.min(requestedCount(input), pool.length)
     const variations = await Promise.all(
       Array.from({ length: takeCount }, (_, take) => runWrite(input, take, apiKey, endpoint)),
     )
     return { variations }
   }
 
-  const variations = await Promise.all(REMIX_ANGLES.map((angle) => runRemix(input, angle, apiKey, endpoint)))
-  return { variations }
+  const angles = REMIX_ANGLES.slice(0, Math.min(requestedCount(input), REMIX_ANGLES.length))
+  const variations = await Promise.all(angles.map((angle) => runRemix(input, angle, apiKey, endpoint)))
+  return { variations, angles }
 }
 
 // ── Brief enhancement ──

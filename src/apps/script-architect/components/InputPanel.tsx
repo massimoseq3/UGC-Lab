@@ -1,7 +1,7 @@
 import { useState, type ComponentType } from 'react'
 import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Film, UserRound, Sparkles, Undo2, Redo2, Eraser, Shuffle, FishingHook } from 'lucide-react'
 import type { Model, Product, Script } from '../../../stores/types'
-import { WRITE_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNT, SCRIPT_VARIATION_COUNT, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice } from '../types'
+import { WRITE_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNT, VARIATION_COUNTS, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount } from '../types'
 
 // The cinematic 'prompt' format is single-clip-capped, so it only offers the
 // shorter durations a video model can render in one generation.
@@ -55,6 +55,8 @@ interface InputPanelProps {
   onWriteFormatChange: (value: WriteFormat) => void
   writeLength: WriteLength
   onWriteLengthChange: (value: WriteLength) => void
+  variationCount: VariationCount
+  onVariationCountChange: (value: VariationCount) => void
   hookCategory: HookCategoryChoice
   onHookCategoryChange: (value: HookCategoryChoice) => void
   selectedProduct: Product | null
@@ -85,6 +87,8 @@ export default function InputPanel({
   onWriteFormatChange,
   writeLength,
   onWriteLengthChange,
+  variationCount,
+  onVariationCountChange,
   hookCategory,
   onHookCategoryChange,
   selectedProduct,
@@ -330,8 +334,8 @@ export default function InputPanel({
   }
 
   const generateLabel = mode === 'write'
-    ? (writeFormat === 'prompt' ? 'Generate 5 Cinematic Concepts' : writeFormat === 'scenes' ? 'Generate 5 Scene Drafts' : writeFormat === 'hooks' ? `Generate ${HOOK_COUNT} Hooks` : 'Generate 5 Scripts')
-    : blueprintActive ? 'Rewrite Scene Prompts' : 'Generate 5 Script Variations'
+    ? (writeFormat === 'prompt' ? `Generate ${variationCount} Cinematic Concepts` : writeFormat === 'scenes' ? `Generate ${variationCount} Scene Drafts` : writeFormat === 'hooks' ? `Generate ${HOOK_COUNT} Hooks` : `Generate ${variationCount} Scripts`)
+    : blueprintActive ? 'Rewrite Scene Prompts' : `Generate ${variationCount} Script Variations`
 
   // Product picker — step 2 in every mode, but rendered in a different spot
   // for Write New (before the brief) than for the remix modes (after the
@@ -784,7 +788,7 @@ export default function InputPanel({
                 <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-4 py-2">
                   <span className={`flex min-w-0 items-center gap-1.5 truncate text-[11px] font-medium ${blueprintActive ? 'text-fuchsia-300 light:text-fuchsia-700' : 'text-ink-500'}`}>
                     {blueprintActive ? <Clapperboard className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
-                    {blueprintActive ? 'Scene blueprint detected — scenes will be rewritten' : `Remixing as a plain script — ${SCRIPT_VARIATION_COUNT} variations`}
+                    {blueprintActive ? 'Scene blueprint detected — scenes will be rewritten' : `Remixing as a plain script — ${variationCount} variations`}
                   </span>
                   <button
                     type="button"
@@ -878,6 +882,20 @@ export default function InputPanel({
           Opaque bg: backdrop-filter doesn't re-blur inside the already-blurred
           window frame, so any alpha lets content underneath ghost through. */}
       <div className="fixed bottom-0 left-0 right-0 z-30 shrink-0 border-t border-ink/5 bg-surface-0 px-5 py-4 md:static md:left-auto md:right-auto md:z-auto md:bg-transparent">
+        {/* Variations — how many takes this generate returns. Shown for both
+            modes; hidden for Hooks (fixed at HOOK_COUNT) and for the blueprint
+            rewrite, which returns a single rewritten script. */}
+        {!isHooksFormat && !blueprintActive && (
+          <div className="mb-3">
+            <SegmentedToggle<string>
+              className="h-12 !p-1"
+              accent="scripts"
+              value={String(variationCount)}
+              onChange={(v) => onVariationCountChange(Number(v) as VariationCount)}
+              options={VARIATION_COUNTS.map((n) => ({ value: String(n), label: `${n} variations` }))}
+            />
+          </div>
+        )}
         {/* Length — pinned directly above Generate. Hooks are one-liners, so the
             format has no duration and the toggle hides; only Write New offers it. */}
         {mode === 'write' && !isHooksFormat && (
@@ -899,7 +917,7 @@ export default function InputPanel({
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{mode === 'write' ? (writeFormat === 'prompt' ? 'Directing 5 Concepts...' : writeFormat === 'hooks' ? `Writing ${HOOK_COUNT} Hooks...` : 'Writing 5 Takes...') : blueprintActive ? 'Rewriting Scene Prompts...' : 'Generating 5 Script Variations...'}</span>
+              <span>{mode === 'write' ? (writeFormat === 'prompt' ? `Directing ${variationCount} Concepts...` : writeFormat === 'hooks' ? `Writing ${HOOK_COUNT} Hooks...` : `Writing ${variationCount} Takes...`) : blueprintActive ? 'Rewriting Scene Prompts...' : `Generating ${variationCount} Script Variations...`}</span>
             </>
           ) : (
             <>
