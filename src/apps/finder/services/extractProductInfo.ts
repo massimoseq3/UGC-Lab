@@ -1,6 +1,6 @@
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { kieChatCompletions, fileToDataUri, type ChatMessage } from '../../../utils/kie'
-import { getChatEndpointPath } from '../../../utils/models'
+import { getChatEndpointPath, CHAT_MODEL_STRONG } from '../../../utils/models'
 
 export interface ProductExtraction {
   productName: string
@@ -67,7 +67,12 @@ Output ONLY the JSON object. No preamble, no markdown fences, no trailing notes.
 // it becomes the authoritative source for claims, specs, and offer details.
 export async function extractProductInfo(image: File | string, listingText?: string): Promise<ProductExtraction> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  // Runs on the STRONG chat model, not the app default. This is a vision read
+  // whose output the member barely proofreads before it becomes the product
+  // record — and every script, scene and ad written off that product inherits
+  // whatever it got wrong. A misread spec is expensive; the extra credits
+  // aren't.
+  const endpoint = getChatEndpointPath(CHAT_MODEL_STRONG)
 
   const dataUri = typeof image === 'string' ? image : await fileToDataUri(image)
 

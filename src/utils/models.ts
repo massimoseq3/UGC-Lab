@@ -147,6 +147,21 @@ export interface ModelEntry {
 // source consumers (bankStore usage ledger, generateVoice) share.
 export const TTS_MODEL_ID = 'google/gemini-3-1-flash-tts'
 
+// The two chat roles. Services name a role rather than a slug, so swapping a
+// chat model is a one-line edit here — same rule as every other model in the
+// registry.
+//
+//   DEFAULT — the app-wide workhorse. Prompt-shaping, storyboards, shot logs:
+//             structured output against heavily-tuned prompts, read by another
+//             model rather than by a person.
+//   STRONG  — ~2.6x the credits, used only where the model's own output is
+//             what a human reads and judges, or where a misread costs the user
+//             real rework. Today: Scripts (prose is the product) and product
+//             auto-fill (a wrong spec propagates into every script and ad
+//             written off that product).
+export const CHAT_MODEL_DEFAULT = 'gemini-3-flash'
+export const CHAT_MODEL_STRONG = 'gemini-3-6-flash'
+
 // Gemini 3.1 Flash TTS bills by tokens, not characters:
 //   input text:  140 credits / 1M tokens
 //   audio output: 2,800 credits / 1M tokens
@@ -990,7 +1005,7 @@ export function getDefaultModel(appId: string, task: Task, mode?: Mode): ModelEn
 
 // Convenience for chat-using services. Returns the registered chat endpoint
 // path for the configured chat model, throwing if misconfigured.
-export function getChatEndpointPath(modelId: string = 'gemini-3-flash'): string {
+export function getChatEndpointPath(modelId: string = CHAT_MODEL_DEFAULT): string {
   const m = getModel(modelId)
   if (!m?.chatEndpoint) {
     throw new Error(`Chat model ${modelId} is missing a chatEndpoint. Check src/utils/models.ts.`)
