@@ -77,6 +77,23 @@ export interface VoicePreset {
   createdAt: number
 }
 
+// One saved visual style — the look B-Roll's vision pass distilled out of a set
+// of reference frames (or a brief written by hand), kept so the same look can be
+// re-applied to any later storyboard. `brief` IS the style: it's the paragraph
+// that rides outside the editable prompts at generate time, so a saved style
+// carries no subjects, products, or scenes from the frames it came from.
+export interface StylePreset {
+  id: string
+  name: string
+  brief: string
+  // The frames the look was read from, as asset:// refs. Purely the user's
+  // visual memory of what they saved — only `brief` is ever sent to a model.
+  thumbRefs?: string[]
+  // User-pinned favourite. Starred items surface first in the bank pickers.
+  starred?: boolean
+  createdAt: number
+}
+
 export interface BRollVideo {
   url: string
   aspectRatio: string
@@ -255,6 +272,10 @@ export interface BrollHistoryItem {
   // frames) wins over the preset `styleId` when set. Absent on legacy rows.
   styleId?: string
   styleBrief?: string
+  // Display name of the custom style, when it came from a saved Styles-bank
+  // entry. Absent for presets and for a one-off brief that was never named —
+  // the pill falls back to "Custom style".
+  styleName?: string
   inputSummary: string
   productId?: string
   modelId?: string
@@ -339,6 +360,13 @@ export interface UsageDay {
   officialUsd: number
   createdAt: number
 }
+
+// Anything the bank picker can hand back. Declared once here because the same
+// union had drifted into four near-identical local copies, and a picker whose
+// callback is typed on a narrower copy fails to compile the moment a bank is
+// added. Consumers duck-type off it (`'imageUrl' in item`), so widening it is
+// always safe.
+export type AnyBankItem = Product | Model | Script | VoicePreset | BRoll | StylePreset
 
 export interface InterAppPayload {
   targetApp: string

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Product, Model, Script, VoicePreset, BRoll, VoiceHistoryItem, VideoHistoryItem, ImageHistoryItem, MusicHistoryItem, ScriptHistoryItem, BrollHistoryItem, CharacterHistoryItem, AdAnatomyHistoryItem, UsageDay, UsageKind } from './types'
+import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, VoiceHistoryItem, VideoHistoryItem, ImageHistoryItem, MusicHistoryItem, ScriptHistoryItem, BrollHistoryItem, CharacterHistoryItem, AdAnatomyHistoryItem, UsageDay, UsageKind } from './types'
 import { isAssetRef, assetIdFromRef, deleteAsset, saveFromDataUrl } from '../utils/assetStore'
 import { useAuthStore } from './authStore'
 import { isCloudEnabled } from '../lib/supabase'
@@ -21,6 +21,7 @@ interface BankState {
   scripts: Script[]
   voices: VoicePreset[]
   brolls: BRoll[]
+  styles: StylePreset[]
   voiceHistory: VoiceHistoryItem[]
   videoHistory: VideoHistoryItem[]
   imageHistory: ImageHistoryItem[]
@@ -66,7 +67,13 @@ interface BankState {
   deleteBRoll: (id: string) => Promise<BankActionResult>
   getBRollById: (id: string) => BRoll | undefined
 
-  // Star toggle — the four starrable banks share one action. Starred items
+  // Visual style CRUD (B-Roll's saved looks)
+  addStyle: (style: Omit<StylePreset, 'id' | 'createdAt'>) => Promise<string>
+  updateStyle: (id: string, updates: Partial<StylePreset>) => Promise<BankActionResult>
+  deleteStyle: (id: string) => Promise<BankActionResult>
+  getStyleById: (id: string) => StylePreset | undefined
+
+  // Star toggle — the starrable banks share one action. Starred items
   // surface first in the bank pickers.
   toggleStar: (bank: StarrableBank, id: string) => void
 
@@ -119,7 +126,7 @@ interface BankState {
 }
 
 // Banks whose items can be starred (pinned) by the user.
-export type StarrableBank = 'products' | 'models' | 'scripts' | 'brolls'
+export type StarrableBank = 'products' | 'models' | 'scripts' | 'brolls' | 'styles'
 
 export interface UsageEvent {
   kind: UsageKind
@@ -171,7 +178,7 @@ function generateId(): string {
   return crypto.randomUUID()
 }
 
-type BankData = Pick<BankState, 'products' | 'models' | 'scripts' | 'voices' | 'brolls' | 'voiceHistory' | 'videoHistory' | 'imageHistory' | 'musicHistory' | 'scriptHistory' | 'brollHistory' | 'characterHistory' | 'adAnatomyHistory' | 'usageDays'>
+type BankData = Pick<BankState, 'products' | 'models' | 'scripts' | 'voices' | 'brolls' | 'styles' | 'voiceHistory' | 'videoHistory' | 'imageHistory' | 'musicHistory' | 'scriptHistory' | 'brollHistory' | 'characterHistory' | 'adAnatomyHistory' | 'usageDays'>
 
 function migrateVoiceShape<T>(arr: unknown): T[] {
   if (!Array.isArray(arr)) return []
@@ -203,6 +210,7 @@ const EMPTY_BANKS: BankData = {
   scripts: [],
   voices: [],
   brolls: [],
+  styles: [],
   voiceHistory: [],
   videoHistory: [],
   imageHistory: [],
@@ -235,6 +243,7 @@ function loadFromStorage(): BankData {
         scripts: parsed.scripts ?? [],
         voices: migrateVoiceShape<VoicePreset>(parsed.voices),
         brolls: parsed.brolls ?? [],
+        styles: Array.isArray(parsed.styles) ? parsed.styles : [],
         voiceHistory: migrateVoiceShape<VoiceHistoryItem>(parsed.voiceHistory),
         videoHistory: Array.isArray(parsed.videoHistory) ? parsed.videoHistory : [],
         imageHistory: Array.isArray(parsed.imageHistory) ? parsed.imageHistory : [],
@@ -267,6 +276,7 @@ function flushSaveToStorage() {
       scripts: state.scripts,
       voices: state.voices,
       brolls: state.brolls,
+      styles: state.styles,
       voiceHistory: state.voiceHistory,
       videoHistory: state.videoHistory,
       imageHistory: state.imageHistory,
@@ -662,12 +672,60 @@ export const useBankStore = create<BankState>((set, get) => ({
 
   getBRollById: (id) => get().brolls.find((b) => b.id === id),
 
+  // ── Visual styles ────────────────────────────────────────────────
+  // A style row is text (the brief) plus its reference thumbnails. The thumbs
+  // are this bank's own assets — nothing else links them — so delete/replace
+  // purges them outright, no shared-blob check like B-Rolls needs.
+  addStyle: async (style) => {
+    const newStyle: StylePreset = { ...style, id: generateId(), createdAt: Date.now() }
+    set((state) => {
+      const next = { styles: [...state.styles, newStyle] }
+      saveToStorage({ ...state, ...next })
+      return next
+    })
+    pushRow('styles', newStyle)
+    reportSuccess('Saved to Styles bank')
+    return newStyle.id
+  },
+
+  updateStyle: async (id, updates) => {
+    const old = get().styles.find((s) => s.id === id)
+    if (!old) return
+    const updated: StylePreset = { ...old, ...updates }
+    if (updates.thumbRefs) {
+      const kept = new Set(updates.thumbRefs)
+      void cleanupAssets(...(old.thumbRefs ?? []).filter((ref) => !kept.has(ref)))
+    }
+    set((state) => {
+      const next = { styles: state.styles.map((s) => (s.id === id ? updated : s)) }
+      saveToStorage({ ...state, ...next })
+      return next
+    })
+    pushRow('styles', updated)
+    reportSuccess('Style updated')
+  },
+
+  deleteStyle: async (id) => {
+    const item = get().styles.find((s) => s.id === id)
+    if (!item) return
+    set((state) => {
+      const next = { styles: state.styles.filter((s) => s.id !== id) }
+      saveToStorage({ ...state, ...next })
+      return next
+    })
+    dropRow('styles', id)
+    void cleanupAssets(...(item.thumbRefs ?? []))
+    reportSuccess('Style deleted')
+  },
+
+  getStyleById: (id) => get().styles.find((s) => s.id === id),
+
   // ── Star toggle ──────────────────────────────────────────────────
   // Deliberately silent (no toast): starring is a lightweight pin, not a
   // save-worthy event. Same local-first + background-push contract as the
   // update actions; no asset cleanup is ever involved.
   toggleStar: (bank, id) => {
-    const items = get()[bank] as Array<Product | Model | Script | BRoll>
+    const items = get()[bank] as Array<Product | Model | Script | BRoll | StylePreset>
     const old = items.find((item) => item.id === id)
     if (!old) return
     const updated = { ...old, starred: !old.starred }

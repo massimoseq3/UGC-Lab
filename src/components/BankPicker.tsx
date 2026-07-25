@@ -5,7 +5,7 @@ import type { BankType } from '../utils/constants'
 import { BANK_CONFIG, getAppConfig } from '../utils/constants'
 import { useBankStore } from '../stores/bankStore'
 import { useAppStore } from '../stores/appStore'
-import type { Product, Model, Script, VoicePreset, BRoll } from '../stores/types'
+import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, AnyBankItem } from '../stores/types'
 import BankItemCard from './BankItemCard'
 import SegmentedToggle from './SegmentedToggle'
 import { useIsDesktop } from '../hooks/useBreakpoint'
@@ -13,7 +13,7 @@ import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import { sortByOrder, starredFirst, SORT_OPTIONS_WITH_NAME, SORT_OPTIONS_DATE_ONLY, type SortOrder } from '../apps/finder/bankSort'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 
-type BankItem = Product | Model | Script | VoicePreset | BRoll
+type BankItem = AnyBankItem
 
 interface BankPickerProps {
   bankType: BankType
@@ -40,6 +40,7 @@ function getItemName(bankType: BankType, item: BankItem): string {
     case 'scripts': return (item as Script).title
     case 'voices': return (item as VoicePreset).label
     case 'brolls': return (item as BRoll).prompt ?? 'B-Roll'
+    case 'styles': return (item as StylePreset).name
     default: return ''
   }
 }
@@ -81,6 +82,7 @@ export default function BankPicker({
   const scripts = useBankStore((s) => s.scripts)
   const voices = useBankStore((s) => s.voices)
   const brolls = useBankStore((s) => s.brolls)
+  const styles = useBankStore((s) => s.styles)
   const openApp = useAppStore((s) => s.openApp)
   const sendToApp = useAppStore((s) => s.sendToApp)
   const activeApp = useAppStore((s) => s.activeApp)
@@ -94,6 +96,7 @@ export default function BankPicker({
     currentBankType === 'models' ? models :
     currentBankType === 'scripts' ? scripts :
     currentBankType === 'voices' ? voices :
+    currentBankType === 'styles' ? styles :
     brolls
 
   // Apply the per-tab filter (when in tab-mode) ahead of the caller's
@@ -116,7 +119,7 @@ export default function BankPicker({
   // Same sort options as the Bank browser. `sortOptions` is null for banks the
   // Bank doesn't sort (voices) — we then leave the list in its natural order.
   const sortOptions =
-    currentBankType === 'products' || currentBankType === 'models' || currentBankType === 'scripts'
+    currentBankType === 'products' || currentBankType === 'models' || currentBankType === 'scripts' || currentBankType === 'styles'
       ? SORT_OPTIONS_WITH_NAME
       : currentBankType === 'brolls'
       ? SORT_OPTIONS_DATE_ONLY
@@ -127,6 +130,7 @@ export default function BankPicker({
       currentBankType === 'products' ? (it: BankItem) => (it as Product).productName :
       currentBankType === 'models' ? (it: BankItem) => (it as Model).name :
       currentBankType === 'scripts' ? (it: BankItem) => (it as Script).title :
+      currentBankType === 'styles' ? (it: BankItem) => (it as StylePreset).name :
       undefined
     // Starred items float to the top regardless of the chosen sort — the
     // picker is where pinned assets pay off.
@@ -150,6 +154,7 @@ export default function BankPicker({
         bankType === 'models' ? models :
         bankType === 'scripts' ? scripts :
         bankType === 'voices' ? voices :
+        bankType === 'styles' ? styles :
         brolls
       if (initialItems.length > 0) {
         setTimeout(() => searchRef.current?.focus(), 100)
@@ -179,6 +184,7 @@ export default function BankPicker({
     t === 'models' ? models :
     t === 'scripts' ? scripts :
     t === 'voices' ? voices :
+    t === 'styles' ? styles :
     brolls
 
   const handleConfirmMulti = () => {

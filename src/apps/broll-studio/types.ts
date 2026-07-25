@@ -83,6 +83,9 @@ export interface BrollResult {
   // optional so legacy rows fall back to the UGC Realism label.
   styleId?: string
   styleBrief?: string
+  // Display name of a saved custom style, so the Scenes header pill can read
+  // "Warm 90s Camcorder" instead of a generic "Custom style".
+  styleName?: string
   // One shared voice description for the whole ad's dialogue clips. Auto-written
   // in "With Dialogue" delivery and user-editable; appended to every DIALOGUE
   // card's video prompt at fire time so all talking clips share one voice.
@@ -108,6 +111,7 @@ export interface BrollInput {
   // reference frames) overrides the preset `styleId` when present.
   styleId: string
   styleBrief?: string
+  styleName?: string
   // 'silent'   — every variation is silent b-roll (the default; a voiceover is
   //              laid over in the edit).
   // 'dialogue' — one variation per scene is a talking-to-camera DIALOGUE shot

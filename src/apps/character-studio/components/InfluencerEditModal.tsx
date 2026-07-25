@@ -9,7 +9,7 @@ import { getUrl } from '../../../utils/assetStore'
 import { downloadImage } from '../../../utils/downloadImage'
 import { copyToClipboard } from '../../../utils/clipboard'
 import { humanizeError } from '../../../utils/friendlyError'
-import type { CharacterHistoryItem, Product, Model, Script, VoicePreset, BRoll } from '../../../stores/types'
+import type { CharacterHistoryItem, BRoll, AnyBankItem } from '../../../stores/types'
 import {
   getModel,
   getDefaultModel,
@@ -268,7 +268,7 @@ export default function InfluencerEditModal({
   // Add a reference from the bank — pull the image ref + a label off whichever
   // bank item the user picked (product / influencer / b-roll still). hostReference
   // in the service resolves asset:// refs at gen time, so we store the ref as-is.
-  function handlePickFromBank(item: Product | Model | Script | VoicePreset | BRoll) {
+  function handlePickFromBank(item: AnyBankItem) {
     let url: string | undefined
     let name = 'Reference'
     if ('productImage' in item) { url = item.productImage; name = item.productName }

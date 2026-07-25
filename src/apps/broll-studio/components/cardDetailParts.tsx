@@ -12,7 +12,7 @@ import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../co
 import BankPicker from '../../../components/BankPicker'
 import SlotActionMenu from '../../../components/video/SlotActionMenu'
 import type { CardState, ReferenceImage } from '../types'
-import type { Product, Model, Script, VoicePreset, BRoll } from '../../../stores/types'
+import type { BRoll, AnyBankItem } from '../../../stores/types'
 import { useAssetUrlState, useAssetUrl } from '../../../hooks/useAssetUrl'
 import { getUrl } from '../../../utils/assetStore'
 import { getModel } from '../../../utils/models'
@@ -852,7 +852,7 @@ export function ExtraRefsRow({
 
   // Pull the image ref off whichever bank item the user picked. Stored as-is —
   // startImageTask / the video path resolve asset:// refs at generation time.
-  function handleBankPick(item: Product | Model | Script | VoicePreset | BRoll) {
+  function handleBankPick(item: AnyBankItem) {
     let url: string | undefined
     if ('productImage' in item) url = item.productImage
     else if ('characterImage' in item) url = item.sheetImage || item.characterImage

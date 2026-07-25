@@ -1,7 +1,7 @@
 import { isAssetRef, getAsBase64 } from '../../utils/assetStore'
-import type { BRoll, Product, Model, Script, VoicePreset } from '../../stores/types'
+import type { AnyBankItem } from '../../stores/types'
 
-export type BankItem = Product | Model | Script | VoicePreset | BRoll
+export type BankItem = AnyBankItem
 
 // Each bank type stores its image in a different field. Extract whichever one
 // is present so a slot can accept brolls / characters / products in tab-mode.

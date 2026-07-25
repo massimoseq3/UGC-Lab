@@ -252,6 +252,7 @@ export async function generateBroll(input: BrollInput): Promise<BrollResult> {
     realism: styleUsesRealism(input.styleId, !!input.styleBrief?.trim()),
     styleId: input.styleId,
     styleBrief: input.styleBrief?.trim() || undefined,
+    styleName: input.styleBrief?.trim() ? input.styleName?.trim() || undefined : undefined,
     voiceProfile: withDialogue ? extractVoiceProfile(responseText) : undefined,
   }
 }

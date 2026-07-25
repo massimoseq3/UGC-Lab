@@ -25,10 +25,10 @@ import { getSupabase, isCloudEnabled, ensureFreshSession } from './supabase'
 import { existingRemoteAssetIds, uploadAssetToR2 } from './r2'
 import { isAssetRef, assetIdFromRef, getBlob } from '../utils/assetStore'
 import { findOrphanAssets, purgeOrphans } from '../utils/orphanCleanup'
-import type { Product, Model, Script, VoicePreset, BRoll, VoiceHistoryItem, VideoHistoryItem, ImageHistoryItem, MusicHistoryItem, ScriptHistoryItem, BrollHistoryItem, CharacterHistoryItem, AdAnatomyHistoryItem, UsageDay } from '../stores/types'
+import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, VoiceHistoryItem, VideoHistoryItem, ImageHistoryItem, MusicHistoryItem, ScriptHistoryItem, BrollHistoryItem, CharacterHistoryItem, AdAnatomyHistoryItem, UsageDay } from '../stores/types'
 
 export type BankKey =
-  | 'products' | 'models' | 'scripts' | 'voices' | 'brolls'
+  | 'products' | 'models' | 'scripts' | 'voices' | 'brolls' | 'styles'
   | 'voiceHistory' | 'videoHistory' | 'imageHistory' | 'musicHistory'
   | 'scriptHistory' | 'brollHistory' | 'characterHistory' | 'adAnatomyHistory'
   | 'usageDays'
@@ -39,6 +39,7 @@ const BANK_TO_TABLE: Record<BankKey, string> = {
   scripts: 'scripts',
   voices: 'voices',
   brolls: 'brolls',
+  styles: 'styles',
   voiceHistory: 'voice_history',
   videoHistory: 'video_history',
   imageHistory: 'image_history',
@@ -50,7 +51,7 @@ const BANK_TO_TABLE: Record<BankKey, string> = {
   usageDays: 'usage_days',
 }
 
-const BANK_KEYS: BankKey[] = ['products', 'models', 'scripts', 'voices', 'brolls', 'voiceHistory', 'videoHistory', 'imageHistory', 'musicHistory', 'scriptHistory', 'brollHistory', 'characterHistory', 'adAnatomyHistory', 'usageDays']
+const BANK_KEYS: BankKey[] = ['products', 'models', 'scripts', 'voices', 'brolls', 'styles', 'voiceHistory', 'videoHistory', 'imageHistory', 'musicHistory', 'scriptHistory', 'brollHistory', 'characterHistory', 'adAnatomyHistory', 'usageDays']
 
 function reportError(context: string, err: unknown) {
   const msg = err instanceof Error ? err.message : (typeof err === 'string' ? err : JSON.stringify(err))
@@ -432,6 +433,7 @@ async function hydrateFromCloud(userId: string): Promise<boolean> {
     scripts: (next.scripts as Script[]) ?? [],
     voices: (next.voices as VoicePreset[]) ?? [],
     brolls: (next.brolls as BRoll[]) ?? [],
+    styles: (next.styles as StylePreset[]) ?? [],
     voiceHistory: (next.voiceHistory as VoiceHistoryItem[]) ?? [],
     videoHistory: (next.videoHistory as VideoHistoryItem[]) ?? [],
     imageHistory: (next.imageHistory as ImageHistoryItem[]) ?? [],
@@ -447,7 +449,7 @@ async function hydrateFromCloud(userId: string): Promise<boolean> {
     const s = useBankStore.getState()
     localStorage.setItem('ai-ugc-lab-banks', JSON.stringify({
       products: s.products, models: s.models,
-      scripts: s.scripts, voices: s.voices, brolls: s.brolls,
+      scripts: s.scripts, voices: s.voices, brolls: s.brolls, styles: s.styles,
       voiceHistory: s.voiceHistory, videoHistory: s.videoHistory,
       imageHistory: s.imageHistory, musicHistory: s.musicHistory,
       scriptHistory: s.scriptHistory, brollHistory: s.brollHistory,

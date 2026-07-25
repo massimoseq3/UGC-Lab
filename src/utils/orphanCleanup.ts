@@ -21,7 +21,7 @@ import { assetIdFromRef, deleteAsset, isAssetRef } from './assetStore'
 // BankKey is added without listing it here, so the list can't drift again. A
 // type-only import of BankKey keeps this free of the cloudSync import cycle.
 const BANK_KEYS = Object.keys({
-  products: true, models: true, scripts: true, voices: true, brolls: true,
+  products: true, models: true, scripts: true, voices: true, brolls: true, styles: true,
   voiceHistory: true, videoHistory: true, imageHistory: true, musicHistory: true,
   scriptHistory: true, brollHistory: true, characterHistory: true, adAnatomyHistory: true,
   usageDays: true,
