@@ -14,6 +14,7 @@ import SlotActionMenu from '../../../components/video/SlotActionMenu'
 import type { CardState, ReferenceImage } from '../types'
 import type { BRoll, AnyBankItem } from '../../../stores/types'
 import { useAssetUrlState, useAssetUrl } from '../../../hooks/useAssetUrl'
+import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { getUrl } from '../../../utils/assetStore'
 import { getModel } from '../../../utils/models'
 import { startOfDay, sectionLabel } from '../../../utils/history'
@@ -345,43 +346,17 @@ function VideoTile({
   onSendToPlayground: () => void
 }) {
   const url = useAssetUrl(videoRef)
-  const videoElRef = useRef<HTMLVideoElement>(null)
-  const [hovering, setHovering] = useState(false)
-  const [playing, setPlaying] = useState(false)
-  // Hover-autoplay must stay muted (browsers block unmuted autoplay), but an
-  // explicit Play click is a user gesture and should play with sound.
-  const [unmuted, setUnmuted] = useState(false)
+  // Hover autoplays muted (browsers block unmuted autoplay); the Play button
+  // is a user gesture, so it plays with sound — and only one clip in the app
+  // plays at a time.
+  const inline = useInlineVideo()
+  const { hovering, unmuted, togglePlay, toggleMute } = inline
   const ratio = aspectStyle(aspectRatio)
   const modelLabel = getModel(modelId)?.displayName ?? modelId
 
-  const togglePlay = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const v = videoElRef.current
-    if (!v) return
-    if (v.paused) {
-      // Explicit play → unmute so the generated clip is audible.
-      setUnmuted(true)
-      v.muted = false
-      v.play().catch(() => {})
-    } else {
-      v.pause()
-    }
-  }
-
-  const toggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const v = videoElRef.current
-    setUnmuted((prev) => {
-      const next = !prev
-      if (v) v.muted = !next
-      return next
-    })
-  }
-
   return (
     <div
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
+      {...inline.hoverProps}
       onClick={onClick}
       className={`group relative cursor-pointer overflow-hidden rounded-lg border bg-black light:bg-zinc-200 transition-colors ${
         selected
@@ -391,44 +366,24 @@ function VideoTile({
       style={ratio}
     >
       {url ? (
-        <video
-          ref={videoElRef}
-          src={url}
-          muted={!unmuted}
-          loop
-          playsInline
-          autoPlay={hovering}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          className="h-full w-full object-cover"
-        />
+        <video {...inline.videoProps} src={url} className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
           <Loader2 className="h-5 w-5 animate-spin text-ink-500" />
         </div>
       )}
-      {/* Clickable play / pause overlay. Hidden while playing — autoplay on
-          hover means most of the time the user never has to click it. The
+      {/* Play / pause — always on the tile, so a clip playing with sound can
+          still be stopped once the pointer has wandered off it. The
           stopPropagation lets the user toggle playback without selecting the
           tile as the cover. */}
-      {url && !playing && (
+      {url && (
         <button
           type="button"
-          title="Play"
+          title={inline.watching ? 'Pause' : 'Play with sound'}
           onClick={togglePlay}
           className="pointer-events-auto absolute left-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur transition-colors hover:bg-black/85"
         >
-          <Play className="h-3 w-3 fill-white text-white" />
-        </button>
-      )}
-      {url && playing && hovering && (
-        <button
-          type="button"
-          title="Pause"
-          onClick={togglePlay}
-          className="pointer-events-auto absolute left-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white backdrop-blur transition-colors hover:bg-black/85"
-        >
-          <Pause className="h-3 w-3 fill-white text-white" />
+          {inline.watching ? <Pause className="h-3 w-3 fill-white text-white" /> : <Play className="h-3 w-3 fill-white text-white" />}
         </button>
       )}
       {url && (hovering || unmuted) && (
@@ -450,8 +405,8 @@ function VideoTile({
       )}
       {/* Hover action stack — top-right vertical column, app-wide standard
           order: download · copy · send-to-Playground · delete (video has no
-          save-to-bank). */}
-      <TileActionStack>
+          save-to-bank). Steps aside while the clip plays with sound. */}
+      <TileActionStack hidden={inline.watching}>
         <TileActionButton
           title="Download"
           onClick={async (e) => {
@@ -513,50 +468,33 @@ export function PendingMediaTile(props: GeneratingMediaProps & { aspectRatio?: s
 export function ModalVideoPlayer({
   url,
   children,
+  actions,
   className = 'border-ink/10',
   onClick,
 }: {
   url: string | null | undefined
   children?: React.ReactNode
+  // The hover action column. Split out from `children` because it's the part
+  // that steps aside while the clip plays with sound — badges stay.
+  actions?: React.ReactNode
   // Border/ring classes only — the frame's own layout classes are fixed. Used
   // by the Continuous take gallery to mark the picked cover.
   className?: string
   onClick?: () => void
 }) {
-  const videoElRef = useRef<HTMLVideoElement>(null)
-  const [hovering, setHovering] = useState(false)
-  const [playing, setPlaying] = useState(false)
-  const [unmuted, setUnmuted] = useState(false)
-  const togglePlay = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const v = videoElRef.current
-    if (!v) return
-    if (v.paused) { setUnmuted(true); v.muted = false; v.play().catch(() => {}) }
-    else v.pause()
-  }
-  const toggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const v = videoElRef.current
-    setUnmuted((prev) => { const next = !prev; if (v) v.muted = !next; return next })
-  }
+  const inline = useInlineVideo()
+  const { hovering, unmuted, togglePlay, toggleMute } = inline
   return (
     <div
-      onMouseEnter={() => setHovering(true)}
-      onMouseLeave={() => setHovering(false)}
+      {...inline.hoverProps}
       onClick={onClick}
       className={`group relative overflow-hidden rounded-2xl border bg-black ${onClick ? 'cursor-pointer' : ''} ${className}`}
     >
       {url ? (
         <video
-          ref={videoElRef}
+          {...inline.videoProps}
           src={url}
-          muted={!unmuted}
-          loop
-          playsInline
-          autoPlay={hovering}
           preload="metadata"
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
           className="aspect-[9/16] w-full object-cover"
         />
       ) : (
@@ -565,11 +503,11 @@ export function ModalVideoPlayer({
       {url && (
         <button
           type="button"
-          title={playing ? 'Pause' : 'Play with sound'}
+          title={inline.watching ? 'Pause' : 'Play with sound'}
           onClick={togglePlay}
           className="absolute left-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80"
         >
-          {playing ? <Pause className="h-3 w-3 fill-white" /> : <Play className="h-3 w-3 fill-white" />}
+          {inline.watching ? <Pause className="h-3 w-3 fill-white" /> : <Play className="h-3 w-3 fill-white" />}
         </button>
       )}
       {url && (hovering || unmuted) && (
@@ -582,6 +520,7 @@ export function ModalVideoPlayer({
           {unmuted ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
         </button>
       )}
+      {!inline.watching && actions}
       {children}
     </div>
   )

@@ -17,7 +17,9 @@ import { Loader2, Star, Trash2 } from 'lucide-react'
 // largest galleries already used, and it clears the 24px minimum touch target
 // that h-7 did not.
 
-const STACK_POSITION = 'absolute right-1.5 top-1.5 z-10 flex flex-col items-end gap-1'
+// Display is applied separately (see `hidden` below) — never both `flex` and
+// `hidden` in one class list, where the winner is CSS source order, not ours.
+const STACK_POSITION = 'absolute right-1.5 top-1.5 z-10 flex-col items-end gap-1'
 
 // Each button fades itself rather than the column fading as a whole, because
 // the star has to stay visible once set while its neighbours stay hidden.
@@ -30,21 +32,28 @@ const FADE = 'opacity-0 transition-opacity group-hover:opacity-100'
  * flight) so the whole column stays put instead of vanishing out from under
  * the pointer.
  *
+ * Pass `hidden` while the tile's clip is playing with sound: the media is the
+ * point then, so the column steps aside and only play/pause + mute stay on it.
+ * It drops out entirely rather than fading — the buttons fade themselves, and
+ * their `group-hover:opacity-100` outranks anything the column could set.
+ *
  * Expects a `group` ancestor — the tile root — for the hover reveal.
  */
 export function TileActionStack({
   children,
   forceVisible = false,
+  hidden = false,
   className = '',
 }: {
   children: React.ReactNode
   forceVisible?: boolean
+  hidden?: boolean
   className?: string
 }) {
   return (
     <div
       onClick={(e) => e.stopPropagation()}
-      className={`${STACK_POSITION} ${forceVisible ? '[&>*]:opacity-100' : ''} ${className}`}
+      className={`${hidden ? 'hidden' : 'flex'} ${STACK_POSITION} ${forceVisible ? '[&>*]:opacity-100' : ''} ${className}`}
     >
       {children}
     </div>

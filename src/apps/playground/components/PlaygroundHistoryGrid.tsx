@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   Loader2, Download, Bookmark, Check, Film, Image as ImageIcon,
   Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy,
@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState, useAssetUrl } from '../../../hooks/useAssetUrl'
+import { useInlineVideo, useExclusiveVideo } from '../../../hooks/useInlineVideo'
 import { useAppStore } from '../../../stores/appStore'
 import { getUrl, saveAsset } from '../../../utils/assetStore'
 import { extractVideoFrame } from '../../../utils/videoFrames'
@@ -334,6 +335,8 @@ function HistoryListRow({
     entry.kind === 'image' ? entry.data.imageUrl : entry.kind === 'video' ? entry.data.videoUrl : null,
   )
   const audioUrl = useAssetUrl(entry.kind === 'music' ? entry.data.audioRef : null)
+  // Native controls here, but the same one-clip-at-a-time rule as the tiles.
+  const rowVideo = useExclusiveVideo()
   const modelLabel = getModel(entry.data.modelId)?.displayName ?? entry.data.modelId
   const prompt = entry.data.prompt
   const isSaved = entry.kind === 'image' ? !!entry.data.linkedBRollId : false
@@ -368,7 +371,7 @@ function HistoryListRow({
           </div>
         ) : status === 'ready' && url ? (
           entry.kind === 'video' ? (
-            <video src={url} controls playsInline preload="metadata" className="absolute inset-0 h-full w-full object-contain" />
+            <video {...rowVideo} src={url} controls playsInline preload="metadata" className="absolute inset-0 h-full w-full object-contain" />
           ) : (
             <img
               src={url}
@@ -580,60 +583,24 @@ function VideoTile({
   onCopyPrompt: () => void
 }) {
   const { url, status } = useAssetUrlState(item.videoUrl)
-  const videoElRef = useRef<HTMLVideoElement>(null)
-  const [hovering, setHovering] = useState(false)
-  const [playing, setPlaying] = useState(false)
   // Hover-autoplay must stay muted (browsers block unmuted autoplay), but an
-  // explicit Play click is a user gesture and should play in place with sound.
-  const [unmuted, setUnmuted] = useState(false)
+  // explicit Play click is a user gesture and plays in place with sound — and
+  // stops whatever clip was playing elsewhere in the app.
+  const inline = useInlineVideo()
+  const { hovering, unmuted, togglePlay, toggleMute } = inline
   const ratio = aspectStyle(item.aspectRatio)
   const modelLabel = getModel(item.modelId)?.displayName ?? item.modelId
-
-  const togglePlay = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const v = videoElRef.current
-    if (!v) return
-    if (v.paused) {
-      // Explicit play → unmute so the clip is watchable right here in the grid.
-      setUnmuted(true)
-      v.muted = false
-      v.play().catch(() => {})
-    } else {
-      v.pause()
-    }
-  }
-
-  const toggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const v = videoElRef.current
-    setUnmuted((prev) => {
-      const next = !prev
-      if (v) v.muted = !next
-      return next
-    })
-  }
 
   return (
     <div>
       <div
-        onMouseEnter={() => setHovering(true)}
-        onMouseLeave={() => setHovering(false)}
+        {...inline.hoverProps}
         onClick={onClick}
         className="group relative cursor-pointer overflow-hidden rounded-lg border border-ink/10 light:border-ink/5 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 light:hover:border-ink/10 hover:-translate-y-px card-soft-shadow"
         style={ratio}
       >
         {status === 'ready' && url ? (
-          <video
-            ref={videoElRef}
-            src={url}
-            muted={!unmuted}
-            loop
-            playsInline
-            autoPlay={hovering}
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            className="h-full w-full object-cover"
-          />
+          <video {...inline.videoProps} src={url} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             {status === 'loading'
@@ -642,27 +609,18 @@ function VideoTile({
           </div>
         )}
 
-        {/* Click-to-play overlay (top-left). Play shows when paused; Pause shows
-            while playing + hovering. stopPropagation lets the user watch the clip
-            in place without opening the lightbox. */}
-        {url && !playing && (
+        {/* Click-to-play overlay (top-left) — always on the tile, so a clip
+            playing with sound can still be paused once the pointer has moved
+            off it. stopPropagation lets the user watch the clip in place
+            without opening the lightbox. */}
+        {url && (
           <button
             type="button"
-            title="Play"
+            title={inline.watching ? 'Pause' : 'Play with sound'}
             onClick={togglePlay}
             className="absolute left-1.5 top-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition-colors hover:bg-black/80"
           >
-            <Play className="h-3.5 w-3.5 fill-white text-white" />
-          </button>
-        )}
-        {url && playing && hovering && (
-          <button
-            type="button"
-            title="Pause"
-            onClick={togglePlay}
-            className="absolute left-1.5 top-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition-colors hover:bg-black/80"
-          >
-            <Pause className="h-3.5 w-3.5 fill-white text-white" />
+            {inline.watching ? <Pause className="h-3.5 w-3.5 fill-white text-white" /> : <Play className="h-3.5 w-3.5 fill-white text-white" />}
           </button>
         )}
         {url && (hovering || unmuted) && (
@@ -677,8 +635,9 @@ function VideoTile({
         )}
 
         {/* Hover action stack — top-right vertical column, app-wide standard
-            order: download · copy · delete (video has no save-to-bank). */}
-        <TileActionStack>
+            order: download · copy · delete (video has no save-to-bank). Steps
+            aside while the clip plays with sound. */}
+        <TileActionStack hidden={inline.watching}>
           <TileActionButton
             title="Download"
             onClick={async (e) => {
@@ -800,6 +759,7 @@ function PreviewModal({
   // Video previews lay out side-by-side (clip left, prompt + actions + frames
   // in a column to the right); images stay stacked.
   const isVideo = entry.kind === 'video' && !!videoUrl
+  const lightboxVideo = useExclusiveVideo()
   // Already-saved entries link a B-Roll id; show a tick instead of the bookmark.
   const linked =
     entry.kind === 'image'
@@ -872,7 +832,10 @@ function PreviewModal({
         )}
         {entry.kind === 'video' && videoUrl && (
           <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+            {/* Autoplays with sound, so it claims the app-wide playback slot
+                — opening the lightbox stops whatever tile was playing. */}
             <video
+              {...lightboxVideo}
               src={videoUrl}
               controls
               autoPlay
