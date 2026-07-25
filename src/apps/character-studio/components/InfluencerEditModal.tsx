@@ -25,6 +25,7 @@ import SegmentedToggle from '../../../components/SegmentedToggle'
 import ModelWaitNotice from '../../../components/ModelWaitNotice'
 import BankPicker from '../../../components/BankPicker'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
+import { TileActionStack, TileActionButton } from '../../../components/tileActions'
 import {
   buildJsonPrompt,
   buildImagePrompt,
@@ -325,22 +326,10 @@ export default function InfluencerEditModal({
     if (url) setRefs((prev) => (prev.length >= MAX_REFS ? prev : [...prev, { url: url as string, name }]))
   }
 
-  // A finished gen becomes the new cover, the way it did when this modal owned
-  // the generation itself. The row arrives through the store (CharacterStudio
-  // writes it), so we watch the head of the strip and select anything new. The
-  // first run only records what was already there — opening the editor must not
-  // hijack the tile the user clicked.
-  const newestSeenRef = useRef<string | null>(null)
-  useEffect(() => {
-    const newest = outputs[0]?.id
-    if (!newest) return
-    if (newestSeenRef.current === null) { newestSeenRef.current = newest; return }
-    if (newest !== newestSeenRef.current) {
-      newestSeenRef.current = newest
-      setSelectedId(newest)
-    }
-  }, [outputs])
-
+  // A finished gen does NOT become the new cover. It lands at the head of the
+  // strip and the source stays whatever the user picked — edits are iterations
+  // off one chosen image, so auto-promoting the newest result silently moved
+  // the base out from under the next instruction.
   // Push a committed value onto the prompt history (truncating any redo tail).
   function pushPromptHistory(next: string, base = promptHistory, baseIndex = promptIndex) {
     const nextHistory = [...base.slice(0, baseIndex + 1), next]
@@ -838,13 +827,13 @@ export default function InfluencerEditModal({
             </div>
           </div>
 
-          {/* RIGHT — outputs gallery: portraits pack 2-up (bigger source preview);
-              landscapes span the row. */}
+          {/* RIGHT — outputs gallery: portraits pack 3-up; landscapes span the
+              row. */}
           <div className="col-span-1 flex min-h-0 flex-col overflow-y-auto">
             <div className="px-4 py-4">
-              <div className="grid grid-cols-2 gap-2 [grid-auto-flow:dense]">
+              <div className="grid grid-cols-3 gap-2 [grid-auto-flow:dense]">
                 {lineageInFlight.map((gen) => (
-                  <div key={gen.id} className={gen.aspectRatio.includes('16:9') ? 'col-span-2' : ''}>
+                  <div key={gen.id} className={gen.aspectRatio.includes('16:9') ? 'col-span-3' : ''}>
                     <GeneratingTile
                       modelId={gen.modelId}
                       kind={gen.kind}
@@ -987,13 +976,13 @@ function OutputTile({
     }
   }
   // Landscape outputs (sheets / 16:9 portraits) span the full row; portraits
-  // pack two to a row.
+  // pack three to a row.
   const isWide = output.aspectRatio.includes('16:9')
   return (
     <div
       onClick={onSelect}
       className={`group relative cursor-pointer overflow-hidden rounded-lg bg-black light:bg-zinc-200 transition-all card-soft-shadow ${
-        isWide ? 'col-span-2' : ''
+        isWide ? 'col-span-3' : ''
       } ${
         selected ? 'ring-2 ring-influencers-500/60' : 'hover:-translate-y-px'
       }`}
@@ -1009,41 +998,44 @@ function OutputTile({
         </span>
       )}
 
-      {selected && (
-        <span className="pointer-events-none absolute right-1.5 top-1.5 rounded-full bg-influencers-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
+      {/* Source badge sits at the BOTTOM-left: the hover stack owns the top-right
+          corner now, and the top-left is the sheet badge's. Hidden while naming,
+          which takes over the bottom edge. */}
+      {selected && nameDraft === null && (
+        <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded-full bg-influencers-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
           Source
         </span>
       )}
 
-      {/* Bottom-left: view full screen. Hidden while naming so the input owns
-          the bottom edge. */}
-      <div className={`absolute bottom-1.5 left-1.5 flex items-center gap-1 transition-opacity ${nameDraft !== null ? 'pointer-events-none opacity-0' : 'opacity-0 group-hover:opacity-100'}`}>
-        <TileButton title="View full screen" onClick={(e) => { e.stopPropagation(); setLightboxOpen(true) }}>
-          <Maximize2 className="h-4 w-4" />
-        </TileButton>
-      </div>
-
-      {/* Hover actions: Copy Prompt · Save to Bank · Download. Hidden while
-          naming so the input owns the bottom edge. */}
-      <div className={`absolute bottom-1.5 right-1.5 flex items-center gap-1 transition-opacity ${nameDraft !== null ? 'pointer-events-none opacity-0' : 'opacity-0 group-hover:opacity-100'}`}>
-        <TileButton
-          title={copied ? 'Prompt copied' : 'Copy Prompt'}
-          tone={copied ? 'saved' : 'default'}
-          onClick={(e) => { e.stopPropagation(); void handleCopyPrompt() }}
-        >
-          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-        </TileButton>
-        <TileButton
-          title={saved ? 'Saved — click to remove from Bank' : saving ? 'Saving…' : 'Save to Bank'}
-          tone={saved ? 'saved' : 'default'}
-          onClick={handleSaveClick}
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-        </TileButton>
-        <TileButton title="Download image" onClick={(e) => { e.stopPropagation(); onDownload() }}>
-          <Download className="h-4 w-4" />
-        </TileButton>
-      </div>
+      {/* Hover actions — the shared tile stack (components/tileActions): a
+          vertical column in the top-right, same as the main gallery's cards.
+          App-wide order, minus the delete this editor doesn't have:
+          Download · Save · Copy · extras (view full screen). Hidden while
+          naming so the input owns the tile. */}
+      {nameDraft === null && (
+        <TileActionStack forceVisible={saving}>
+          <TileActionButton title="Download image" onClick={() => onDownload()}>
+            <Download className="h-4 w-4" />
+          </TileActionButton>
+          <TileActionButton
+            title={saved ? 'Saved — click to remove from Bank' : saving ? 'Saving…' : 'Save to Bank'}
+            tone={saved ? 'saved' : 'default'}
+            onClick={handleSaveClick}
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+          </TileActionButton>
+          <TileActionButton
+            title={copied ? 'Prompt copied' : 'Copy prompt'}
+            tone={copied ? 'saved' : 'default'}
+            onClick={() => { void handleCopyPrompt() }}
+          >
+            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+          </TileActionButton>
+          <TileActionButton title="View full screen" onClick={() => setLightboxOpen(true)}>
+            <Maximize2 className="h-4 w-4" />
+          </TileActionButton>
+        </TileActionStack>
+      )}
 
       {/* Inline name input — takes over the bottom edge while naming a save
           (mirrors the main gallery tile). */}
@@ -1095,31 +1087,5 @@ function OutputTile({
         />
       )}
     </div>
-  )
-}
-
-function TileButton({
-  children,
-  onClick,
-  title,
-  tone = 'default',
-}: {
-  children: React.ReactNode
-  onClick: (e: React.MouseEvent) => void
-  title: string
-  tone?: 'default' | 'saved'
-}) {
-  const toneClass = tone === 'saved'
-    ? 'border-emerald-400/50 bg-emerald-500/45 text-emerald-100'
-    : 'border-white/20 bg-black/55 text-white hover:bg-black/70'
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={`flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${toneClass}`}
-    >
-      {children}
-    </button>
   )
 }

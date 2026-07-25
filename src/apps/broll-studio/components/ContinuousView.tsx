@@ -82,7 +82,7 @@ import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
 import { getModel, getDefaultModel, snapVideoDurationUp, estimateCredits, formatCredits, officialSavingsPercent, type VideoMode, type ImageResolution } from '../../../utils/models'
 import { humanizeError } from '../../../utils/friendlyError'
 import { downloadImage } from '../../../utils/downloadImage'
-import { downloadAssetsZip } from '../../../utils/downloadZip'
+import ClipDownloadModal, { type ClipDownloadEntry } from './ClipDownloadModal'
 import { copyToClipboard } from '../../../utils/clipboard'
 import { sendClipToPlayground } from '../services/sendClipToPlayground'
 import type { ContinuousStoryboardOp } from '../continuousEdits'
@@ -166,7 +166,7 @@ export default function ContinuousView({
   // Frames branch only: opt into regenerating frames that already have a picked
   // keyframe (mirrors Line-by-Line's "also regenerate" toggle).
   const [includeExisting, setIncludeExisting] = useState(false)
-  const [downloadingAll, setDownloadingAll] = useState(false)
+  const [downloadOpen, setDownloadOpen] = useState(false)
   // Video-model slide-in panel opened from inside the batch-generate dialog.
   const [confirmModelPanelOpen, setConfirmModelPanelOpen] = useState(false)
   const balance = useCreditsStore((s) => s.balance)
@@ -1049,28 +1049,25 @@ export default function ContinuousView({
       outboundMotion: clipStates[clipKey(frameIndex)]?.editablePrompt,
     })
 
-  // Every generated clip across all rows, in scene order, for "Download all".
-  const allClipEntries = result.scenes.flatMap((s) => {
+  // Every generated clip across all rows, in scene order, for the download
+  // picker. Each clip's COVER take (what its card face plays) is flagged so the
+  // picker opens with one clip per scene ticked and the alternate takes left
+  // out — zipping every take was the old behaviour and it buried the keepers.
+  const allClipEntries: ClipDownloadEntry[] = result.scenes.flatMap((s) => {
     const cs = clipStates[clipKey(s.index)]
     const vids = cs?.videos ?? []
+    const cover = Math.min(cs?.currentVideoIndex ?? 0, Math.max(0, vids.length - 1))
+    const scene = String(s.index).padStart(2, '0')
     return vids.map((v, i) => ({
+      id: `${s.index}:${i}`,
       ref: v.url,
-      name: vids.length > 1 ? `clip-${String(s.index).padStart(2, '0')}-take${i + 1}` : `clip-${String(s.index).padStart(2, '0')}`,
+      name: vids.length > 1 ? `clip-${scene}-take${i + 1}` : `clip-${scene}`,
+      label: `Clip ${s.index}`,
+      takeLabel: vids.length > 1 ? `Take ${i + 1} of ${vids.length}` : undefined,
+      isCover: i === cover,
+      aspectRatio: v.aspectRatio,
     }))
   })
-
-  const downloadAll = async () => {
-    if (downloadingAll || allClipEntries.length === 0) return
-    setDownloadingAll(true)
-    try {
-      const n = await downloadAssetsZip(allClipEntries, 'continuous-clips')
-      useAppStore.getState().addToast(`Downloading ${n} clip${n === 1 ? '' : 's'} as a zip`, 'success')
-    } catch (err) {
-      useAppStore.getState().addToast(humanizeError(err, 'Could not download the clips.'), 'error')
-    } finally {
-      setDownloadingAll(false)
-    }
-  }
 
   // Bookmark a keyframe still to the B-Rolls bank (reusable as a start frame),
   // mirroring the Line-by-Line card's save action. Product/model ids come from
@@ -1238,13 +1235,12 @@ export default function ContinuousView({
           {allClipEntries.length > 0 && (
             <button
               type="button"
-              onClick={() => void downloadAll()}
-              disabled={downloadingAll}
-              title="Download every generated clip as a single zip"
-              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => setDownloadOpen(true)}
+              title="Pick which clips to download as a zip"
+              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
             >
-              {downloadingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-              {downloadingAll ? 'Zipping…' : `Download all (${allClipEntries.length})`}
+              <Download className="h-3.5 w-3.5" />
+              {`Download clips (${allClipEntries.length})`}
             </button>
           )}
         </div>
@@ -1574,6 +1570,7 @@ export default function ContinuousView({
             motionContextFor(openScene.index),
           )}
           onRegenerateMotion={() => regenerateMotionFromFrame(openScene.index)}
+          onSelectVideo={(i) => updateClip(openClipKey, () => ({ currentVideoIndex: i }))}
           onDeleteVideo={(i) => updateClip(openClipKey, (prev) => {
             const videos = prev.videos.filter((_, idx) => idx !== i)
             return { videos, currentVideoIndex: Math.max(0, Math.min(prev.currentVideoIndex, videos.length - 1)) }
@@ -1583,6 +1580,14 @@ export default function ContinuousView({
             void runClipVideo(openScene.index)
           }}
           onDismissInFlight={(id) => updateClip(openClipKey, (prev) => ({ inFlightVideos: prev.inFlightVideos.filter((e) => e.id !== id) }))}
+        />
+      )}
+
+      {downloadOpen && (
+        <ClipDownloadModal
+          entries={allClipEntries}
+          zipBasename="continuous-clips"
+          onClose={() => setDownloadOpen(false)}
         />
       )}
     </div>
@@ -2101,8 +2106,12 @@ function FrameConceptCard({
         )}
 
         {/* Hover action stack — top-right, app-wide order: download · save ·
-            copy. Stills only (keyframes), so no send-to-Playground; no trash
-            (structural card). Shown once an image exists. */}
+            copy · regenerate. Stills only (keyframes), so no send-to-Playground;
+            no trash (structural card). Shown once an image exists. Regenerate
+            lives HERE rather than in the bottom row it used to share with "Use
+            as keyframe" — a 32px icon in the stack isn't in the way of the pick,
+            and it appends a new image (the keyframe pick is pinned by index, so
+            it survives). */}
         {hasImage && (
           <TileActionStack>
             <TileActionButton
@@ -2124,14 +2133,21 @@ function FrameConceptCard({
             >
               {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
             </TileActionButton>
+            <TileActionButton
+              title="Generate another image for this concept"
+              onClick={() => onGenerate()}
+            >
+              <RefreshCw className="h-4 w-4" />
+            </TileActionButton>
           </TileActionStack>
         )}
 
         {/* Hover action row. Before any image → Generate. Once an image exists →
-            "Use as keyframe" (select) only; the regenerate button was removed
-            here because a stray click over an existing keyframe wiped it —
-            regenerating now lives inside the card's detail modal, one deliberate
-            step away. The chosen keyframe shows nothing (its badge marks it). */}
+            "Use as keyframe" (select) only — the full-width regenerate button
+            that used to sit here was removed because a stray click over an
+            existing keyframe cost credits; re-rendering is the stack icon above
+            (and the card's detail modal). The chosen keyframe shows nothing
+            (its badge marks it). */}
         <div className="absolute inset-x-2 bottom-2 z-10 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
           {!hasImage ? (
             <button

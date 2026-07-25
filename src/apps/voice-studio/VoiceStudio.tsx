@@ -244,7 +244,9 @@ export default function VoiceStudio() {
   }
 
   const handleRestoreSettings = (next: Partial<VoiceSettings>) => {
-    setSettings((prev) => ({ ...prev, ...next }))
+    // Restored history settings aren't a preset, so any loaded preset's stamp
+    // goes with them — otherwise the panel keeps naming a preset it no longer holds.
+    setSettings((prev) => ({ ...prev, ...next, presetId: undefined, presetLabel: undefined }))
     setDetailsItem(null)
   }
 

@@ -242,6 +242,13 @@ export interface CardState {
   // field via refsToToggles(), then preserved across regenerates.
   refsCharacter: boolean
   refsProduct: boolean
+  // DIALOGUE cards only (the "With Dialogue" talking-to-camera variation).
+  // When on — the default — the card's image gen attaches the previous scene's
+  // chosen dialogue still as its FIRST reference, so every talking clip is the
+  // same person in the same place at the same camera position and the ad reads
+  // as one piece to camera cut into pieces. Silent b-roll cards ignore it: their
+  // whole job is to look different from each other.
+  chainLink: boolean
   // Video gen state for this card. The card produces at most one video at a time.
   videoStatus: 'idle' | 'generating' | 'error'
   videoUrl: string | null

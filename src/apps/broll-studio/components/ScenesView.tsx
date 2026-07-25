@@ -1,6 +1,6 @@
-import { memo, useCallback, useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Film, AlertCircle, Plus, Images, X, Palette, Download, Loader2 } from 'lucide-react'
+import { Film, AlertCircle, Plus, Images, X, Palette, Download } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage } from '../types'
 import type { Product, Model } from '../../../stores/types'
@@ -21,7 +21,7 @@ import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
 import VariationCard from './VariationCard'
 import { humanizeError } from '../../../utils/friendlyError'
-import { downloadAssetsZip } from '../../../utils/downloadZip'
+import ClipDownloadModal, { type ClipDownloadEntry } from './ClipDownloadModal'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 
@@ -50,6 +50,15 @@ interface ScenesViewProps {
   // while Scenes is hidden.
   cardStates: Record<string, CardState>
   setCardStates: React.Dispatch<React.SetStateAction<Record<string, CardState>>>
+}
+
+// The still a card is currently showing — the user's pick if they made one,
+// otherwise the one on the card face. Used to resolve what the next dialogue
+// card chains from.
+function coverImageRef(card?: CardState): string | undefined {
+  if (!card || card.images.length === 0) return undefined
+  const picked = card.selected?.kind === 'image' ? card.images[card.selected.index] : undefined
+  return (picked ?? card.images[card.currentImageIndex] ?? card.images[card.images.length - 1])?.imageUrl
 }
 
 export default function ScenesView({
@@ -98,6 +107,29 @@ export default function ScenesView({
     [setCardStates],
   )
 
+  // ─── Dialogue chain ────────────────────────────────────────────────────
+  // In "With Dialogue" delivery each scene carries one talking-to-camera card,
+  // and those cards chain: card N generates with card N-1's chosen still
+  // attached, so the whole ad reads as one continuous piece to camera cut into
+  // pieces rather than a new setup every line. Resolved here (the parent owns
+  // every card's state) and handed down per card.
+  const dialogueKeys = (result?.scenes ?? []).flatMap((s) => {
+    const i = s.variations.findIndex((v) => v.tag === 'DIALOGUE')
+    return i === -1 ? [] : [`${s.number}-${i}`]
+  })
+  // Each dialogue card chains from the nearest EARLIER dialogue card that
+  // actually has an image — so generating out of order (or after one failed)
+  // still finds an anchor instead of silently dropping the chain.
+  const dialogueChainRefs: Record<string, string> = {}
+  {
+    let previous: string | undefined
+    for (const key of dialogueKeys) {
+      if (previous) dialogueChainRefs[key] = previous
+      const own = coverImageRef(cardStates[key])
+      if (own) previous = own
+    }
+  }
+
   // ─── Batch image generation ────────────────────────────────────────────
   // Fire image gen for many cards at once. Rather than lift the gen logic out
   // of VariationCard (it reads the latest card state at fire time), we bump a
@@ -110,6 +142,14 @@ export default function ScenesView({
     useSettingsStore((s) => s.perAppModel['broll-studio:image:text-to-image']) ??
     getDefaultModel('broll-studio', 'image', 'text-to-image')?.id
   const [batchTokens, setBatchTokens] = useState<Record<string, number>>({})
+  // Chained dialogue cards can't all fire at once — card N needs card N-1's
+  // still to exist first. So a batch splits: everything else goes in parallel,
+  // and the chained dialogue cards run as a queue, one armed each time the
+  // previous one settles. `dialogueHead` is the card currently rendering, with
+  // the image count it started at (that count is how "landed" is told apart
+  // from "hasn't started yet").
+  const [dialogueQueue, setDialogueQueue] = useState<string[]>([])
+  const dialogueHead = useRef<{ key: string; startImages: number } | null>(null)
   // `fresh` = prompt-ready cards with no image yet; `done` = cards already
   // generated. Kept apart so a second press doesn't silently re-bill work the
   // user already paid for and picked through — see includeExisting.
@@ -117,7 +157,7 @@ export default function ScenesView({
     { fresh: string[]; done: string[]; scope: string } | null
   >(null)
   const [includeExisting, setIncludeExisting] = useState(false)
-  const [downloadingAll, setDownloadingAll] = useState(false)
+  const [downloadOpen, setDownloadOpen] = useState(false)
   // The confirm dialog portals to document.body, so it would outlive an app
   // switch — dismiss it when the user docks away.
   useCloseOnAppSwitch(!!batchConfirm, () => setBatchConfirm(null))
@@ -190,19 +230,57 @@ export default function ScenesView({
   const confirmBatch = () => {
     if (!batchConfirm || batchTargets.length === 0) return
     setBatchImageOverride({ aspectRatio: effectiveBatchAspect ?? '9:16', resolution: effectiveBatchRes })
+    // Chained dialogue cards run one at a time, in scene order — each waits for
+    // the still it chains from. A dialogue card with its chain toggled off has
+    // nothing to wait for, so it joins the parallel group.
+    const chained = dialogueKeys.filter(
+      (k) => batchTargets.includes(k) && cardStates[k]?.chainLink !== false,
+    )
+    const parallel = batchTargets.filter((k) => !chained.includes(k))
+    const [firstChained, ...restChained] = chained
     setBatchTokens((prev) => {
       const next = { ...prev }
-      for (const k of batchTargets) next[k] = (next[k] ?? 0) + 1
+      for (const k of parallel) next[k] = (next[k] ?? 0) + 1
+      if (firstChained) next[firstChained] = (next[firstChained] ?? 0) + 1
       return next
     })
+    dialogueHead.current = firstChained
+      ? { key: firstChained, startImages: cardStates[firstChained]?.images.length ?? 0 }
+      : null
+    setDialogueQueue(restChained)
     setBatchConfirm(null)
   }
+
+  // Arm the next chained dialogue card once the current one has settled — an
+  // image landed, or the generation errored (in which case the next card falls
+  // back to the nearest earlier still rather than stalling the queue).
+  useEffect(() => {
+    const head = dialogueHead.current
+    if (!head || dialogueQueue.length === 0) return
+    const card = cardStates[head.key]
+    if (!card) {
+      // The session was rebuilt under us — drop the queue rather than wait on a
+      // card that no longer exists.
+      dialogueHead.current = null
+      setDialogueQueue([])
+      return
+    }
+    if (card.images.length <= head.startImages && !card.inFlightImages.some((e) => e.error)) return
+    const [next, ...rest] = dialogueQueue
+    dialogueHead.current = { key: next, startImages: cardStates[next]?.images.length ?? 0 }
+    setDialogueQueue(rest)
+    setBatchTokens((prev) => ({ ...prev, [next]: (prev[next] ?? 0) + 1 }))
+  }, [cardStates, dialogueQueue])
 
   // Rebuild card states from the current result. Carries existing state
   // forward when prompts match (same generation, re-render); drops orphaned
   // slots when a fresh Generate produces a shorter script.
   useEffect(() => {
     if (!result) return
+    // A new storyboard invalidates any chained dialogue run still in flight —
+    // its keys point at the old scene list.
+    dialogueHead.current = null
+    setDialogueQueue([])
     setCardStates((prev) => {
       const next: Record<string, CardState> = {}
       for (const scene of result.scenes) {
@@ -443,32 +521,33 @@ export default function ScenesView({
 
   const allKeys = result.scenes.flatMap((s) => s.variations.map((_, i) => `${s.number}-${i}`))
 
-  // Every rendered clip across every scene, for "Download all" — parity with
-  // Continuous. This is the mode that produces the most clips and
-  // where videos are download-only, so bulk export matters most here; without
-  // it the only way out was opening each card in turn.
-  const allClipEntries = result.scenes.flatMap((s) =>
+  // Every rendered clip across every scene, for the download picker — parity
+  // with Continuous. This is the mode that produces the most clips and where
+  // videos are download-only, so bulk export matters most here; without it the
+  // only way out was opening each card in turn. Each card's COVER take (the
+  // one its face plays — `selected` when the user picked one, else the newest)
+  // opens ticked, so the zip is one clip per card unless the member says
+  // otherwise.
+  const allClipEntries: ClipDownloadEntry[] = result.scenes.flatMap((s) =>
     s.variations.flatMap((_, i) => {
-      const vids = cardStates[`${s.number}-${i}`]?.videos ?? []
+      const card = cardStates[`${s.number}-${i}`]
+      const vids = card?.videos ?? []
+      const cover = Math.min(
+        card?.selected?.kind === 'video' ? card.selected.index : card?.currentVideoIndex ?? 0,
+        Math.max(0, vids.length - 1),
+      )
       const scene = String(s.number).padStart(2, '0')
       return vids.map((v, vi) => ({
+        id: `${s.number}-${i}:${vi}`,
         ref: v.url,
         name: `scene${scene}-option${i + 1}${vids.length > 1 ? `-take${vi + 1}` : ''}`,
+        label: `Scene ${s.number} · Option ${i + 1}`,
+        takeLabel: vids.length > 1 ? `Take ${vi + 1} of ${vids.length}` : undefined,
+        isCover: vi === cover,
+        aspectRatio: v.aspectRatio,
       }))
     }),
   )
-  const downloadAll = async () => {
-    if (downloadingAll || allClipEntries.length === 0) return
-    setDownloadingAll(true)
-    try {
-      const n = await downloadAssetsZip(allClipEntries, 'broll-clips')
-      useAppStore.getState().addToast(`Downloading ${n} clip${n === 1 ? '' : 's'} as a zip`, 'success')
-    } catch (err) {
-      useAppStore.getState().addToast(humanizeError(err, 'Could not download the clips.'), 'error')
-    } finally {
-      setDownloadingAll(false)
-    }
-  }
 
   return (
     <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -488,13 +567,12 @@ export default function ScenesView({
           {allClipEntries.length > 0 && (
             <button
               type="button"
-              onClick={() => void downloadAll()}
-              disabled={downloadingAll}
-              title="Download every generated clip as a single zip"
-              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => setDownloadOpen(true)}
+              title="Pick which clips to download as a zip"
+              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
             >
-              {downloadingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-              {downloadingAll ? 'Zipping…' : `Download all (${allClipEntries.length})`}
+              <Download className="h-3.5 w-3.5" />
+              {`Download clips (${allClipEntries.length})`}
             </button>
           )}
           <button
@@ -531,6 +609,7 @@ export default function ScenesView({
             onOpenProductPicker={onOpenProductPicker}
             batchTokens={batchTokens}
             batchImageOverride={batchImageOverride}
+            dialogueChainRefs={dialogueChainRefs}
             onGenerateScene={() =>
               requestBatch(
                 scene.variations.map((_, i) => `${scene.number}-${i}`),
@@ -666,6 +745,14 @@ export default function ScenesView({
         </div>,
         document.body,
       )}
+
+      {downloadOpen && (
+        <ClipDownloadModal
+          entries={allClipEntries}
+          zipBasename="broll-clips"
+          onClose={() => setDownloadOpen(false)}
+        />
+      )}
     </div>
   )
 }
@@ -698,6 +785,7 @@ const VariationCardRow = memo(function VariationCardRow({
   onOpenProductPicker,
   generateImageToken,
   batchImageOverride,
+  chainImageRef,
   resultStyle,
   resultRealism,
   resultVoiceProfile,
@@ -724,6 +812,7 @@ const VariationCardRow = memo(function VariationCardRow({
   onOpenProductPicker?: () => void
   generateImageToken?: number
   batchImageOverride?: { aspectRatio: string; resolution?: ImageResolution } | null
+  chainImageRef?: string
   resultStyle?: string
   resultRealism?: boolean
   resultVoiceProfile?: string
@@ -764,6 +853,7 @@ const VariationCardRow = memo(function VariationCardRow({
       onOpenProductPicker={onOpenProductPicker}
       generateImageToken={generateImageToken}
       batchImageOverride={batchImageOverride}
+      chainImageRef={chainImageRef}
       resultStyle={resultStyle}
       resultRealism={resultRealism}
       voiceProfile={resultVoiceProfile}
@@ -792,6 +882,7 @@ function SceneSection({
   onOpenProductPicker,
   batchTokens,
   batchImageOverride,
+  dialogueChainRefs,
   onGenerateScene,
   resultStyle,
   resultRealism,
@@ -817,6 +908,9 @@ function SceneSection({
   onOpenProductPicker?: () => void
   batchTokens: Record<string, number>
   batchImageOverride?: { aspectRatio: string; resolution?: ImageResolution } | null
+  // Card key → the still that card's talking-head shot chains from. Only
+  // DIALOGUE cards have an entry, and only from the second one onward.
+  dialogueChainRefs: Record<string, string>
   onGenerateScene: () => void
   resultStyle?: string
   resultRealism?: boolean
@@ -895,6 +989,7 @@ function SceneSection({
               onOpenProductPicker={onOpenProductPicker}
               generateImageToken={batchTokens[key]}
               batchImageOverride={batchImageOverride}
+              chainImageRef={dialogueChainRefs[key]}
               resultStyle={resultStyle}
               resultRealism={resultRealism}
               resultVoiceProfile={resultVoiceProfile}

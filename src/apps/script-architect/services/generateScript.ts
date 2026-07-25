@@ -2,15 +2,13 @@ import type { GenerateScriptInput, GeneratedScript, RemixAngle, EditableProductC
 import { HOOK_COUNT, REMIX_ANGLES, DEFAULT_VARIATION_COUNT, isVariationCount } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { kieChatCompletions, type ChatMessage } from '../../../utils/kie'
-import { getChatEndpointPath, CHAT_MODEL_STRONG } from '../../../utils/models'
+import { getChatEndpointPath, CHAT_MODEL_DEFAULT } from '../../../utils/models'
 
-// Scripts is the one app that does NOT use the app-wide chat model. Everything
-// else runs on Gemini 3 Flash; script writing stays on 3.6 Flash even at ~2.6×
-// the credits. The rest of the app's chat calls shape prompts for an image or
-// video model to execute — 3 Flash is plenty for that. Here the model's prose
-// IS the product: a human reads these takes and decides whether they sound like
-// a person. That's exactly where the stronger writer is worth paying for.
-const CHAT_MODEL_ID = CHAT_MODEL_STRONG
+// Scripts runs on the app-wide chat model. It spent a stint on the STRONG tier
+// (3.6 Flash) on the theory that prose a human reads is worth ~2.6× the
+// credits — the takes didn't come back visibly better, and members pay for
+// every one on their own key. Back on Gemini 3 Flash.
+const CHAT_MODEL_ID = CHAT_MODEL_DEFAULT
 
 // ── Shared writing DNA ──
 //

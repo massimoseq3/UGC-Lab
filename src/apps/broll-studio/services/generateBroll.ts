@@ -58,7 +58,7 @@ const MAX_PARSED_VARIATIONS = 4
  */
 // Shared readable-paragraph rules — no silence clause, so both the silent b-roll
 // format and the "With Dialogue" talking-card format can build on it.
-const PROMPT_FORMAT_CORE = `Every prompt is ONE flowing paragraph — usually 40-80 words, longer when the idea needs it. Plain, concrete, readable — no labels, no field names, no line breaks, no "Style:" trailer.
+const PROMPT_FORMAT_CORE = `Every prompt is ONE flowing paragraph. There is NO word limit and no target length — write as long as it takes to see the shot through, and never drop a detail to keep it short. Vagueness is the only failure; length is not. Plain, concrete, readable — no labels, no field names, no line breaks, no "Style:" trailer.
 
 Write it like you're describing a clip you already filmed: what's in frame, what the character physically does (the exact gesture, gaze, micro-expression), where the light comes from, and — only when it matters — where the camera sits, always as a position ("framed from chest height an arm's length away", "from directly above"), never as a device.`
 
@@ -68,7 +68,9 @@ The footage is SILENT: no one speaks, mouths words, or addresses the viewer. A v
 
 // The talking-card format for "With Dialogue" delivery — the character speaks
 // the scene's line to camera. Used by the DIALOGUE regen/enhance paths.
-const PROMPT_FORMAT_DIALOGUE = `${PROMPT_FORMAT_CORE} The character looks into the lens and SPEAKS the scene's line — embed the exact words verbatim (the character … says: "…"). Audio is on: just them talking, no background music, no extra voiceover.`
+const PROMPT_FORMAT_DIALOGUE = `${PROMPT_FORMAT_CORE} The character looks into the lens and SPEAKS the scene's line — embed the exact words verbatim (the character … says: "…"). Audio is on: just them talking, no background music, no extra voiceover.
+
+Every dialogue shot in this ad is ONE continuous take cut into pieces: the same room, the same spot in it, the same wardrobe and hair, the same light, the same camera distance and lens height as every other dialogue shot. Keep that setup exactly; only the moment changes — expression, gesture, head and hand position, posture.`
 
 const SYSTEM_INSTRUCTION = `# ROLE
 
@@ -214,6 +216,7 @@ VAR_1 rules, every scene:
 - <TAG>DIALOGUE</TAG> and <REFS>character</REFS>.
 - The character is on camera, looking into the lens, and SPEAKS the scene's exact <LINE> word-for-word. Write ONE flowing paragraph that embeds the line verbatim, e.g.: "the character, [expression/gesture], looks into the lens and says: \\"<the exact line>\\"". A real person talking to their phone — natural, not a news anchor.
 - Describe the delivery, expression, gesture, setting, and where the light comes from. This is the ONE variation that is NOT silent — the character speaks and audio is on. The "footage is SILENT / no one speaks" rule in the PROMPT FORMAT and SHOW-DON'T-TELL sections governs VAR_2 and VAR_3 only — it does NOT apply to VAR_1.
+- ONE CONTINUOUS TAKE, CUT UP. Every dialogue shot in this ad is the same person filming themselves in ONE sitting: the same room, the same spot in that room, the same wardrobe and hair, the same time of day and light, and the same distance and lens height. Decide that setup once, on VAR_1 of scene 1, and describe the SAME setup in every later scene's VAR_1 — never move them to another room, another outfit, or another part of the day between lines. What changes line to line is only the moment: the expression, the gesture, the head and hand position, a shift in posture. The app attaches the previous scene's dialogue still when it renders each of these, so a prompt that relocates the character fights the reference and produces a jump cut.
 - Still obey every other rule: camera is a viewpoint not a prop (never name the filming device), gender-neutral language ("the character", "they/them"), UGC realism, after-not-before.
 
 # VOICE PROFILE (emit ONCE, after the last scene)
@@ -240,7 +243,7 @@ export function buildBrollUserPrompt(input: BrollInput): string {
     ? `For EACH scene emit exactly three variations: VAR_1 is a DIALOGUE shot where the character speaks the exact line to camera (<TAG>DIALOGUE</TAG>, <REFS>character</REFS>), and VAR_2–VAR_3 are two genuinely DIFFERENT silent b-roll ideas for showing what the line SAYS. Pick two distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF) for VAR_2–VAR_3, declared in each <TAG> field.`
     : `For EACH scene emit exactly three variations: three genuinely DIFFERENT ideas for showing what that line SAYS — make metaphors literal, show the act, the feeling, the proof. Pick three distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF), declared in each <TAG> field. Every shot is silent — no one speaks (a voiceover is added later). Three slots only, so every one has to earn its place — no filler fourth idea.`
 
-  let prompt = `Break this script into B-Roll scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph (usually 40-80 words, longer when the idea needs it). Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation, erring toward attaching references whenever they could plausibly help — only the VISIBILITY=no product exclusion is a hard rule.\n\nScript:\n${input.scriptText}`
+  let prompt = `Break this script into B-Roll scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph, as long as the idea needs — no word limit, and never trim a detail to hit a length. Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation, erring toward attaching references whenever they could plausibly help — only the VISIBILITY=no product exclusion is a hard rule.\n\nScript:\n${input.scriptText}`
 
   if (input.productContext) {
     prompt += `\n\n${input.productContext}`
@@ -481,6 +484,27 @@ export function buildReferencePreamble(refs: ReferenceImage[]): string {
   return `REFERENCE USAGE — The attached image(s) are appearance references only. ${matchClause}Do NOT copy the reference's framing, crop, pose, camera angle, distance, or background — the composition is defined entirely by the scene description below. Build a new shot from scratch.`
 }
 
+// The DIALOGUE chain preamble. A talking-to-camera card generates with the
+// PREVIOUS scene's chosen dialogue still attached first, and unlike every other
+// reference here that image IS the composition: the ad should read as one
+// continuous piece to camera cut into pieces, so the character, the room, the
+// wardrobe, the light and the camera position all carry over and only the
+// delivery changes. Hence the inverse of buildReferencePreamble — "copy the
+// staging, change the moment" rather than "identity only, build a fresh shot".
+//
+// It still asks for a different CUT rather than an identical frame: an image
+// model handed "recreate this exactly" returns the reference, and a cut that
+// lands on a frame indistinguishable from the last one reads as a stutter.
+export function buildDialogueChainPreamble(refs: ReferenceImage[]): string {
+  const hasProduct = refs.some((r) => r.label === 'product')
+  const productClause = hasProduct
+    ? " Match the product's shape, label text, and colours exactly to the product reference image."
+    : ''
+  return `REFERENCE USAGE — The FIRST attached image is the PREVIOUS talking-to-camera shot from this same ad, filmed moments earlier in one continuous take. Recreate its world exactly: the same character with the same face, hair, make-up and wardrobe, the same room and the same background objects in the same places, the same time of day and the same light from the same direction, and the same camera position, height, distance and framing. Nothing has been restaged between the two shots — the character has not changed clothes, moved house, or relocated within the room.
+
+What DOES change is the moment: this is the NEXT CUT of that take, so the character is now doing and saying what the scene below describes — a new expression, a new gesture, a new head and hand position, a natural shift in posture. Render that moment, not a copy of the attached frame; the two shots should look like two seconds picked out of the same recording, never the identical still twice.${productClause} Any remaining attached images are appearance references for the character and props only — never for composition.`
+}
+
 // The STATIC anchor card is the one shot that SHOULD inherit the reference: its
 // job is "the character, exactly as they already are, just talking". So it gets
 // the inverse of the identity-only preamble above. Falls back to the normal one
@@ -597,7 +621,7 @@ export async function finishImageTask(taskId: string, modelId: string, resolutio
 const TAG_BRIEFS: Record<VariationTag, string> = {
   // DIALOGUE is the "With Dialogue" talking card: the character looks into the
   // lens and speaks the scene's exact line. STATIC stays a legacy silent anchor.
-  DIALOGUE: 'A talking-to-camera shot: the character looks into the lens and SPEAKS the scene\'s exact script line word-for-word, natural like a real person talking to their phone. Audio is on. Embed the line verbatim (the character ... says: "…").',
+  DIALOGUE: 'A talking-to-camera shot: the character looks into the lens and SPEAKS the scene\'s exact script line word-for-word, natural like a real person talking to their phone. Audio is on. Embed the line verbatim (the character ... says: "…"). Every dialogue shot in the ad is the same continuous take cut into pieces — same room, same spot, same wardrobe, same light, same camera distance and height — so only the moment changes: expression, gesture, posture.',
   STATIC: 'A silent shot of the character in their own space, present and natural but NOT speaking — lips closed, no words mouthed. A voiceover is added later.',
   ACTION: "Act out the line's strongest image, literally — if the line has a metaphor or comparison, make it real on screen (\"tasted like cardboard\" → the character deadpan biting actual cardboard). Silent.",
   EMOTIONAL: 'The feeling of the line landing on the character inside a real moment — a slump against the fridge, a slow exhale over the sink. Silent, never a face in a void.',
@@ -722,7 +746,7 @@ Scene ${scene.number} — LINE: "${scene.scriptLine}"
 Variation tag: ${variation.tag}${variation.label ? `\nShot label: ${variation.label}` : ''}
 ${productContext ? `\n${productContext}\n` : ''}${modelContext ? `\n${modelContext}\nIMPORTANT: never describe the character's physical appearance in detail. Refer to them as "the character".\n` : ''}
 Rules:
-- Return ONE flowing paragraph — usually 40-80 words, longer when the idea needs it. No labels, no field names, no line breaks, no "Style:" trailer. If the draft is a labelled multi-line block (SETTING: / CAMERA: / ...), that is exactly what you are here to fix: fold it into one readable paragraph, keeping the idea.
+- Return ONE flowing paragraph with NO word limit — as long as the shot needs. No labels, no field names, no line breaks, no "Style:" trailer. If the draft is a labelled multi-line block (SETTING: / CAMERA: / ...), that is exactly what you are here to fix: fold it into one readable paragraph, keeping the idea.
 - SHOW, DON'T TELL — the shot must visualize what the script line says, so a viewer could guess the line from the footage. Sharpen the draft's idea toward that; if it's a person passively existing, give them the line's image to act out.
 - Be specific — the exact prop, the exact gesture, the exact micro-expression, the real light source.
 - Enhance means ADD DETAIL, not rephrase: the prompt comes back richer than it went in, never shorter than the draft.

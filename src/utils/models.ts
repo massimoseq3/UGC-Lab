@@ -154,11 +154,11 @@ export const TTS_MODEL_ID = 'google/gemini-3-1-flash-tts'
 //   DEFAULT — the app-wide workhorse. Prompt-shaping, storyboards, shot logs:
 //             structured output against heavily-tuned prompts, read by another
 //             model rather than by a person.
-//   STRONG  — ~2.6x the credits, used only where the model's own output is
-//             what a human reads and judges, or where a misread costs the user
-//             real rework. Today: Scripts (prose is the product) and product
-//             auto-fill (a wrong spec propagates into every script and ad
-//             written off that product).
+//   STRONG  — ~2.6x the credits. Today: NOTHING. Scripts and product auto-fill
+//             each sat here and each moved back — the output didn't visibly
+//             improve, and members pay the difference on their own key. Kept as
+//             the named opt-in for a surface where a wrong answer would cost
+//             real rework; check git log before promoting anything back.
 export const CHAT_MODEL_DEFAULT = 'gemini-3-flash'
 export const CHAT_MODEL_STRONG = 'gemini-3-6-flash'
 
@@ -193,13 +193,14 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 
   // Chat runs on TWO models, split by what the output is worth:
   //
-  //   Gemini 3 Flash   — everywhere by default. Prompt-shaping, vision
-  //                      extraction, storyboards, the Ad Analyzer. These are
-  //                      structured calls against heavily-tuned prompts, and
-  //                      3.6 didn't visibly beat 3 on them at ~2.6× the price.
-  //   Gemini 3.6 Flash — Scripts only (see script-architect/generateScript.ts).
-  //                      That output is prose a human reads and judges, so the
-  //                      stronger writer earns its cost there.
+  //   Gemini 3 Flash   — everywhere. Prompt-shaping, vision extraction,
+  //                      storyboards, the Ad Analyzer, and Scripts. 3.6 didn't
+  //                      visibly beat 3 on any of them at ~2.6× the price —
+  //                      including on script prose, which was the last surface
+  //                      to move back.
+  //   Gemini 3.6 Flash — product auto-fill only (finder/extractProductInfo).
+  //                      A misread spec propagates into every script and ad
+  //                      written off that product, so it's worth the credits.
   //
   // Still no picker — the split is a product decision, not a user setting.
   // Order matters: Gemini 3 Flash is FIRST so it stays getDefaultModel's
@@ -214,7 +215,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // 0.030 cr/1k), output $0.90/M tokens (180 cr/M = 0.180 cr/1k). We use a
     // blended 0.10 since most chat calls in this app skew toward output.
     pricing: { unit: 'per-1k-tokens', credits: 0.1 },
-    defaultFor: ['ad-anatomy', 'character-studio', 'broll-studio'],
+    defaultFor: ['ad-anatomy', 'character-studio', 'broll-studio', 'script-architect'],
     chatEndpoint: '/gemini-3-flash/v1/chat/completions',
   },
 
@@ -228,7 +229,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // 0.090 cr/1k), output $2.25/M tokens (450 cr/M = 0.450 cr/1k). Blended 0.26
     // using the same input/output weighting as the Gemini 3 entry above.
     pricing: { unit: 'per-1k-tokens', credits: 0.26 },
-    defaultFor: ['script-architect'],
     // OpenAI-compatible variant slug on kie.ai (native 3.6 uses Google's own
     // generateContent shape; our transport speaks OpenAI chat/completions).
     chatEndpoint: '/gemini-3-6-flash-openai/v1/chat/completions',

@@ -61,6 +61,8 @@ export function createDefaultCardState(variation: PromptVariation): CardState {
     pendingStartedAt: null,
     refsCharacter,
     refsProduct,
+    // Only read by DIALOGUE cards — see CardState.chainLink.
+    chainLink: true,
     cardImageAspectRatio: '9:16',
     cardImageResolution: '1K',
     cardVideoAspectRatio: '9:16',
@@ -151,6 +153,7 @@ export function backfillCardState(card: Partial<CardState> & Record<string, unkn
     pendingStartedAt: (card.pendingStartedAt as number | null) ?? null,
     refsCharacter: card.refsCharacter !== false,
     refsProduct: card.refsProduct !== false,
+    chainLink: card.chainLink !== false,
     cardImageAspectRatio: (card.cardImageAspectRatio as string) ?? '9:16',
     cardImageResolution: (card.cardImageResolution as ImageResolution) ?? '1K',
     cardVideoAspectRatio: (card.cardVideoAspectRatio as string) ?? '9:16',
@@ -223,15 +226,11 @@ export function createDefaultContinuousFrameState(
     images: [],
     currentImageIndex: 0,
     inFlightImages: [],
-    // Chaining to the previous keyframe is OFF by default. It was on, and it
-    // cost more than it bought: all three of a frame's concepts anchor to the
-    // same previous image and come back as three near-copies of it, which is
-    // the one thing this mode's pick-a-concept step exists to avoid. The look is
-    // already held by the storyboard-wide STYLE block plus the character and
-    // product references, and the clip is a frames-to-video interpolation — it
-    // morphs between two unrelated frames perfectly well, guided by the scene's
-    // TRANSITION anchor. Chaining stays available per frame (the row toggle) for
-    // the case it's genuinely good at: coming back to the same room.
+    // Chaining to the previous keyframe is ON by default. It shipped off for a
+    // while — all three of a frame's concepts anchor to the same previous image
+    // and come back looking alike, which weakens the pick-a-concept step — but
+    // this is continuous mode, and in practice the continuity is worth more than
+    // the spread. Off per frame via the row's Chained/Unchained pill.
     chainLink: true,
     ...toggles,
     aspectRatio: '9:16',
@@ -299,10 +298,9 @@ export function backfillContinuousFrameState(raw: Partial<ContinuousFrameCardSta
       ? Math.max(0, Math.min(raw.currentImageIndex, Math.max(0, images.length - 1)))
       : Math.max(0, images.length - 1),
     inFlightImages: inFlight.filter((e) => Date.now() - (e.startedAt ?? 0) < STALE_MS),
-    // Opt-in, matching the fresh-card default: only an explicitly stored `true`
-    // chains. A row persisted before the field existed reads as off, so a
-    // reopened session behaves like a new one rather than quietly re-chaining
-    // the next frame the user regenerates.
+    // On unless the row explicitly stored `false` — matching the fresh-card
+    // default, so a legacy row that predates the field behaves like a new one
+    // and a frame the user unchained stays unchained.
     chainLink: raw.chainLink !== false,
     refsCharacter: raw.refsCharacter !== false,
     refsProduct: raw.refsProduct !== false,

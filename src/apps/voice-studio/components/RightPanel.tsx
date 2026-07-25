@@ -60,6 +60,10 @@ export default function RightPanel({
       voiceId: voice.id,
       voiceName: voice.name,
       gender: voice.gender,
+      // Picking a different voice by hand means these settings are no longer
+      // the loaded preset — drop its stamp (same rule as every other control).
+      presetId: undefined,
+      presetLabel: undefined,
     })
     closePicker()
   }
