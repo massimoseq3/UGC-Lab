@@ -143,12 +143,17 @@ No text, no labels, no logos, no watermarks. Panels separated only by the plain 
 // form. The photorealism style string still applies so the sheet matches the
 // look of the portraits it will be used alongside. The layout swaps with
 // orientation — horizontal turnaround strip vs stacked rows.
-export function buildSheetPrompt(profile: CharacterProfile, aspect = '16:9'): string {
+// `direction` is free-text carried over from the editor — the typed instruction
+// and/or a picked visual style. It lands LAST so it reads as the final word,
+// and it can override the photoreal `style` above it (a claymation sheet is a
+// legitimate ask). Absent for a plain sheet built straight off the form.
+export function buildSheetPrompt(profile: CharacterProfile, aspect = '16:9', direction?: string): string {
   const layout = aspect.includes('9:16') ? SHEET_LAYOUT_VERTICAL : SHEET_LAYOUT_HORIZONTAL
   return toJsonPrompt({
     layout,
     ...buildIdentityJson(profile),
     style: has(profile.cameraDevice) ? profile.cameraDevice : undefined,
+    direction: direction?.trim() || undefined,
   })
 }
 
@@ -198,6 +203,10 @@ export async function startCharacterTask(
   kind: GenerationKind = 'portrait',
   sheetAspect = '16:9',
   referenceUrl?: string,
+  // Extras carried over from the edit modal, where the same refs / style /
+  // instruction panel drives both output kinds. Grouped into an options object
+  // rather than trailing more positional args onto an already-long signature.
+  extras?: { direction?: string; extraReferenceUrls?: string[] },
 ): Promise<{ taskId: string; modelId: string }> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
 
@@ -210,17 +219,22 @@ export async function startCharacterTask(
   // the prompt layout follows the same axis. Portraits tolerate both legacy
   // verbose values ('Landscape (16:9)') and raw ratios.
   const sheetIsVertical = sheetAspect.includes('9:16')
-  let prompt = kind === 'sheet' ? buildSheetPrompt(profile, sheetAspect) : buildImagePrompt(profile)
+  let prompt = kind === 'sheet'
+    ? buildSheetPrompt(profile, sheetAspect, extras?.direction)
+    : buildImagePrompt(profile)
   const ar = profile.aspectRatio ?? ''
   const aspectRatio: AspectRatio = kind === 'sheet' ? (sheetIsVertical ? '9:16' : '16:9')
     : ar.includes('16:9') ? '16:9' : ar.includes('1:1') ? '1:1' : '9:16'
 
   // Image-to-image off a reference portrait: swap to an i2i-capable model,
   // host the reference, and lead the prompt with an identity-lock directive.
+  // The source portrait goes FIRST; any extra references the user attached
+  // follow, matching the ordering startCharacterEditTask uses.
   let inputUrls: string[] | undefined
   if (referenceUrl) {
     modelId = resolveImageToImageModel(modelId)
-    inputUrls = [await hostReference(apiKey, referenceUrl)]
+    const extraRefs = extras?.extraReferenceUrls ?? []
+    inputUrls = await Promise.all([referenceUrl, ...extraRefs].map((r) => hostReference(apiKey, r)))
     prompt = `Use the person in the provided reference image as the exact subject — preserve their facial identity, bone structure, hair, and skin precisely across every panel.\n\n${prompt}`
   }
 

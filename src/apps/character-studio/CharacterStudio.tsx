@@ -268,7 +268,7 @@ export default function CharacterStudio() {
             resolution: opts.resolution,
             signal: controller.signal,
           })
-        : await startCharacterTask(opts.profile, undefined, opts.resolution, controller.signal, opts.kind, opts.aspect, opts.referenceUrl)
+        : await startCharacterTask(opts.profile, undefined, opts.resolution, controller.signal, opts.kind, opts.aspect, opts.referenceUrl, { direction: opts.direction, extraReferenceUrls: opts.extraReferenceUrls })
     } catch (err) {
       abortersRef.current.delete(id)
       setInFlight((prev) => prev.filter((g) => g.id !== id))

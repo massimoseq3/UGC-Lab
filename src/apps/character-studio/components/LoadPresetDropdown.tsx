@@ -1,6 +1,8 @@
-import { useState } from 'react'
-import { ChevronRight, UserRound, Sparkles } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ChevronRight, ChevronDown, UserRound, Sparkles } from 'lucide-react'
 import type { CharacterProfile } from '../types'
+import { sortByOrder, starredFirst, SORT_OPTIONS_WITH_NAME, type SortOrder } from '../../finder/bankSort'
+import { usePersistedState } from '../../../hooks/usePersistedState'
 import {
   createEmptyProfile,
   PRESET_MARIE,
@@ -101,6 +103,16 @@ export function PresetPickerSlideOver({
 }) {
   const bankModels = useBankStore((s) => s.models)
 
+  // Bank recipes were rendering in raw insertion order, so the newest character
+  // you saved was buried at the bottom. Same control and helpers as the bank
+  // pickers, and persisted so the choice sticks between opens. Starters are
+  // built-in and stay in their authored order.
+  const [sort, setSort] = usePersistedState<SortOrder>('character-studio:presetSort', 'newest')
+  const bankPresets = useMemo(() => {
+    const withProfile = bankModels.filter((m) => m.jsonProfile)
+    return starredFirst(sortByOrder(withProfile, sort, (m) => m.name))
+  }, [bankModels, sort])
+
   const pick = (incoming: CharacterProfile | Record<string, string>) => {
     onPick(incoming)
     onClose()
@@ -117,14 +129,28 @@ export function PresetPickerSlideOver({
             <PresetCard key={p.id} name={p.name} imageUrl={p.image} onClick={() => pick(p.profile)} />
           ))}
         </div>
-        {bankModels.filter((m) => m.jsonProfile).length > 0 && (
+        {bankPresets.length > 0 && (
           <>
             <div className="mx-1 mt-4 border-t border-ink/10" />
-            <div className="px-1 pb-2 pt-3 text-[9px] font-semibold uppercase tracking-widest text-ink-500">
-              Bank
+            {/* Bank header + sort. The label keeps the Starters eyebrow style;
+                the select mirrors the bank pickers' own sort control. */}
+            <div className="flex items-center justify-between gap-2 px-1 pb-2 pt-3">
+              <span className="text-[9px] font-semibold uppercase tracking-widest text-ink-500">Bank</span>
+              <div className="relative shrink-0">
+                <select
+                  value={sort}
+                  onChange={(e) => setSort(e.target.value as SortOrder)}
+                  className="h-7 appearance-none rounded-full border border-ink/10 bg-surface-1 pl-2.5 pr-7 text-[11px] text-ink-300 outline-none transition-colors hover:border-ink/20 focus:border-ink/20"
+                >
+                  {SORT_OPTIONS_WITH_NAME.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-ink-500" />
+              </div>
             </div>
             <div className="grid grid-cols-3 gap-2">
-              {bankModels.filter((m) => m.jsonProfile).map((m: Model) => (
+              {bankPresets.map((m: Model) => (
                 <PresetCard
                   key={m.id}
                   imageRef={m.characterImage}
