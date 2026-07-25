@@ -4,6 +4,14 @@ import { useSettingsStore } from '../../../stores/settingsStore'
 import { kieChatCompletions, type ChatMessage } from '../../../utils/kie'
 import { getChatEndpointPath } from '../../../utils/models'
 
+// Scripts is the one app that does NOT use the app-wide chat model. Everything
+// else runs on Gemini 3 Flash; script writing stays on 3.6 Flash even at ~2.6×
+// the credits. The rest of the app's chat calls shape prompts for an image or
+// video model to execute — 3 Flash is plenty for that. Here the model's prose
+// IS the product: a human reads these takes and decides whether they sound like
+// a person. That's exactly where the stronger writer is worth paying for.
+const CHAT_MODEL_ID = 'gemini-3-6-flash'
+
 // ── Shared writing DNA ──
 //
 // Every mode (write / scenes / cinematic / remix / reverse-engineer) sits on
@@ -658,7 +666,7 @@ async function runReverseEngineer(input: GenerateScriptInput, apiKey: string, en
 
 export async function generateScript(input: GenerateScriptInput): Promise<GeneratedScript> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  const endpoint = getChatEndpointPath(CHAT_MODEL_ID)
 
   if (input.mode === 'reverse-engineer') {
     const text = await runReverseEngineer(input, apiKey, endpoint)
@@ -688,7 +696,7 @@ const ENHANCE_BRIEF_SYSTEM = `You are a senior UGC ad strategist. You rewrite a 
 
 export async function enhanceBrief(draft: string): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  const endpoint = getChatEndpointPath(CHAT_MODEL_ID)
 
   const userMessage = `Rewrite the rough video brief below into a sharper brief for writing a short-form UGC ad script. Keep the creator's intent and angle; make the target audience, tone, key talking points and call-to-action concrete.
 
