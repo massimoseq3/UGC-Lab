@@ -163,7 +163,6 @@ export default function OneShotDetailModal({
     audio: cardState.audio,
   }))
   const audioTogglable = oneShotModelId !== 'gemini-omni-video' && (constraints?.supportsAudio ?? false)
-  const isBusy = cardState.inFlightVideos.some((e) => !e.error)
 
   // ── Blueprint prompt history (Enhance / Regenerate / Undo / Redo) ──
   const history = cardState.promptHistory.length > 0 ? cardState.promptHistory : [cardState.editablePrompt]
@@ -515,12 +514,15 @@ export default function OneShotDetailModal({
               </div>
               <button
                 onClick={onGenerate}
-                disabled={!cardState.editablePrompt.trim() || isBusy}
+                // Never gated on a render already in flight — clips queue in
+                // parallel (Line-by-Line's Generate works the same way), and the
+                // in-flight tiles in the gallery are the progress feedback.
+                disabled={!cardState.editablePrompt.trim()}
                 className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <VideoIcon className="h-4 w-4" />}
+                <VideoIcon className="h-4 w-4" />
                 Generate Video
-                {credits && !isBusy && (
+                {credits && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                     <Coins className="h-3 w-3" strokeWidth={2} />
                     {credits}

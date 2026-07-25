@@ -5,9 +5,20 @@ import type { VoiceHistoryItem } from '../../../stores/types'
 import { getUrl } from '../../../utils/assetStore'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
 import { seedColor } from './seedColor'
+import { GeneratingChip, GeneratingPulseRing } from '../../../components/GeneratingChip'
+
+// A voiceover that's been fired but hasn't landed yet. Rendered as a row at the
+// top of History so a queued batch reads as a queue — several can run at once.
+export interface PendingVoice {
+  id: string
+  voiceId: string
+  voiceName: string
+  scriptPreview: string
+}
 
 interface HistoryViewProps {
   items: VoiceHistoryItem[]
+  pending: PendingVoice[]
   activeId: string | null
   onSelect: (item: VoiceHistoryItem) => void
   onDelete: (id: string) => void
@@ -23,7 +34,7 @@ async function resolveAudioUrl(ref: string): Promise<string> {
   return ref
 }
 
-export default function HistoryView({ items, activeId, onSelect, onDelete, onShowDetails }: HistoryViewProps) {
+export default function HistoryView({ items, pending, activeId, onSelect, onDelete, onShowDetails }: HistoryViewProps) {
   const [query, setQuery] = useState('')
   const [saveFormId, setSaveFormId] = useState<string | null>(null)
   const [saveLabel, setSaveLabel] = useState('')
@@ -107,7 +118,7 @@ export default function HistoryView({ items, activeId, onSelect, onDelete, onSho
     setTimeout(() => setSavedId(null), 3000)
   }
 
-  if (items.length === 0) {
+  if (items.length === 0 && pending.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6">
         <Volume2 className="h-10 w-10 text-ink-800" strokeWidth={1.5} />
@@ -134,10 +145,44 @@ export default function HistoryView({ items, activeId, onSelect, onDelete, onSho
 
       {/* List */}
       <div className="flex-1 overflow-y-auto">
-        {groups.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-6 text-center">
-            <span className="text-sm text-ink-500">No matches.</span>
+        {/* Queue — in-flight voiceovers, above the finished ones. Not filtered by
+            the search box: a pending row has no content to match on yet, and
+            hiding the thing you just fired is the opposite of a queue. */}
+        {pending.length > 0 && (
+          <div className="flex flex-col gap-0.5 px-2 pt-2">
+            <div className="my-2 flex items-center justify-center">
+              <span className="rounded-full bg-ink/[0.06] px-3 py-1 text-[11px] font-medium text-ink-300">
+                {pending.length === 1 ? 'In progress' : `In progress · ${pending.length}`}
+              </span>
+            </div>
+            {pending.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 rounded-full px-4 py-3">
+                <span className="relative h-9 w-9 shrink-0">
+                  <span
+                    className="block h-full w-full rounded-full opacity-60"
+                    style={{ background: seedColor(p.voiceId) }}
+                  />
+                  <GeneratingPulseRing family="voice" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-2 text-sm leading-snug text-ink-300">{p.scriptPreview}</p>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-500">
+                    <span className="text-ink-300">{p.voiceName}</span>
+                    <span>·</span>
+                    <GeneratingChip family="voice" label="Generating…" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
+        )}
+
+        {groups.length === 0 ? (
+          pending.length === 0 && (
+            <div className="flex h-full items-center justify-center px-6 text-center">
+              <span className="text-sm text-ink-500">No matches.</span>
+            </div>
+          )
         ) : (
           <div className="flex flex-col gap-1 p-2">
             {groups.map(([dayTs, dayItems]) => (

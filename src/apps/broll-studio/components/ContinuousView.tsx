@@ -24,7 +24,8 @@ import {
   Star,
 } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
-import GeneratingBackdrop from '../../../components/GeneratingBackdrop'
+import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
+import { KEYFRAME_MESSAGES, INTERPOLATE_MESSAGES } from '../../../components/generatingMessages'
 import ModelPicker from '../../../components/ModelPicker'
 import ModelSidePanel from '../../../components/ModelSidePanel'
 import ProviderLogo from '../../../components/ProviderLogo'
@@ -880,7 +881,7 @@ export default function ContinuousView({
           </div>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
             {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="aspect-[9/16] animate-pulse rounded-2xl border border-ink/5 bg-ink/[0.03]" />
+              <div key={i} className="skeleton skeleton-card aspect-[9/16]" />
             ))}
           </div>
         </div>
@@ -908,8 +909,6 @@ export default function ContinuousView({
   const totalSeconds = result.scenes.reduce((s, sc) => s + (clipStates[clipKey(sc.index)]?.durationSeconds ?? sc.durationSeconds), 0)
   const finalFrame = result.frames[result.frames.length - 1]
   const framesPicked = result.frames.filter((f) => selections[String(f.index)]).length
-  const anyClipInFlight = Object.values(clipStates).some((c) => c.inFlightVideos.some((e) => !e.error))
-  const anyFrameInFlight = Object.values(frameStates).some((c) => c.inFlightImages.some((e) => !e.error))
 
   const readyClipIndices = result.scenes
     .map((s) => s.index)
@@ -1084,7 +1083,9 @@ export default function ContinuousView({
           <button
             type="button"
             onClick={() => requestFrames()}
-            disabled={chainRunning || anyFrameInFlight}
+            // Only a chain walk already underway blocks this — a single frame
+            // card rendering on its own doesn't, so the two can overlap.
+            disabled={chainRunning}
             title="Generate a keyframe image for every frame that doesn't have one yet, chained in order for consistency"
             className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -1096,7 +1097,9 @@ export default function ContinuousView({
           <button
             type="button"
             onClick={() => requestClips(readyClipIndices, 'Every ready clip')}
-            disabled={anyClipInFlight || readyClipIndices.length === 0}
+            // Clips render in parallel — one already in flight is no reason to
+            // stop the member firing the rest.
+            disabled={readyClipIndices.length === 0}
             title="Generate every clip whose two keyframes are picked"
             className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -1664,9 +1667,14 @@ function FrameConceptCard({
   const displayIndex = keyframeImageIndex ?? Math.max(0, (cardState?.images.length ?? 1) - 1)
   const image = cardState?.images[Math.min(displayIndex, Math.max(0, (cardState?.images.length ?? 1) - 1))]
   const imageUrl = useAssetUrl(image?.imageUrl ?? '')
-  const inFlight = cardState?.inFlightImages.some((e) => !e.error) ?? false
+  const activeInFlight = cardState?.inFlightImages.find((e) => !e.error)
+  const inFlight = !!activeInFlight
   const errored = cardState?.inFlightImages.some((e) => e.error) ?? false
   const hasImage = (cardState?.images.length ?? 0) > 0
+  // Keyframe entries only learn their model once createTask returns; name the
+  // configured one until then so the label doesn't pop in late.
+  const persistedFrameModel = useSettingsStore((s) => s.getAppModel('broll-studio:image:text-to-image'))
+  const frameImageModelId = persistedFrameModel ?? getDefaultModel('broll-studio', 'image', 'text-to-image')?.id
 
   // Card-face quick actions — mirror the Line-by-Line image card's hover stack
   // (download · save · copy). Keyframe stills are reusable start frames, so
@@ -1708,18 +1716,12 @@ function FrameConceptCard({
         }`}
       >
         {inFlight ? (
-          <>
-            <GeneratingBackdrop family="broll" />
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 text-center">
-              <GenerationProgress
-                isActive
-                color="bg-broll-500"
-                showHelper={false}
-                messages={['Sending request...', 'Painting the keyframe...', 'Locking the style...', 'Almost there...']}
-                className="max-w-[180px]"
-              />
-            </div>
-          </>
+          <GeneratingMediaFill
+            kind="image"
+            modelId={activeInFlight?.modelId ?? frameImageModelId}
+            prompt={cardState?.editablePrompt}
+            messages={KEYFRAME_MESSAGES}
+          />
         ) : image && imageUrl ? (
           <>
             <img src={imageUrl} alt={label} className="absolute inset-0 h-full w-full object-cover" />
@@ -1805,19 +1807,19 @@ function FrameConceptCard({
               type="button"
               onClick={(e) => { e.stopPropagation(); onGenerate() }}
               title="Generate an image for this concept"
-              className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/50 text-[10px] font-medium text-white backdrop-blur transition-colors hover:bg-black/70"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
             >
-              <ImageIcon className="h-3 w-3" />
-              Generate
+              <ImageIcon className="h-3.5 w-3.5" />
+              Generate image
             </button>
           ) : !isKeyframe ? (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onSelect() }}
               title="Use this image as the keyframe"
-              className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-broll-500/80 text-[10px] font-medium text-white backdrop-blur transition-colors hover:bg-broll-500"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-broll-500/85 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-400"
             >
-              <Check className="h-3 w-3" />
+              <Check className="h-3.5 w-3.5" />
               Use as keyframe
             </button>
           ) : null}
@@ -1853,7 +1855,8 @@ function ClipCard({
     : undefined
   const videoUrl = useAssetUrl(currentVideo?.url ?? '')
   const startUrl = useAssetUrl(startRef ?? '')
-  const inFlight = clipState?.inFlightVideos.some((e) => !e.error) ?? false
+  const activeClipInFlight = clipState?.inFlightVideos.find((e) => !e.error)
+  const inFlight = !!activeClipInFlight
   const errored = clipState?.inFlightVideos.some((e) => e.error) ?? false
   const ready = startPicked && endPicked
 
@@ -1894,18 +1897,12 @@ function ClipCard({
         className="relative aspect-[9/16] cursor-pointer overflow-hidden rounded-xl border-2 border-broll-500/80 bg-broll-500/[0.06] transition-all hover:border-broll-500 hover:-translate-y-px card-soft-shadow"
       >
         {inFlight ? (
-          <>
-            <GeneratingBackdrop family="broll" />
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 text-center">
-              <GenerationProgress
-                isActive
-                color="bg-broll-500"
-                showHelper={false}
-                messages={['Sending request...', 'Interpolating frames...', 'Rendering motion...', 'Finalizing the clip...']}
-                className="max-w-[180px]"
-              />
-            </div>
-          </>
+          <GeneratingMediaFill
+            kind="video"
+            modelId={activeClipInFlight?.modelId}
+            prompt={clipState?.editablePrompt}
+            messages={INTERPOLATE_MESSAGES}
+          />
         ) : currentVideo && videoUrl ? (
           <>
             <video
@@ -2010,9 +2007,9 @@ function ClipCard({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onOpen() }}
-            className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/50 text-[10px] font-medium text-white backdrop-blur transition-colors hover:bg-black/70"
+            className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
           >
-            <VideoIcon className="h-3 w-3" />
+            <VideoIcon className="h-3.5 w-3.5" />
             {currentVideo ? 'Open' : 'Set up & generate'}
           </button>
         </div>

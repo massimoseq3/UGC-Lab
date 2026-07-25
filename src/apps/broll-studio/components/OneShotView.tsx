@@ -20,7 +20,7 @@ import {
   Film,
 } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
-import GeneratingBackdrop from '../../../components/GeneratingBackdrop'
+import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
 import OneShotDetailModal from './OneShotDetailModal'
 import type { OneShotResult, OneShotConcept, OneShotSegment, OneShotCardState, ReferenceImage, GeneratedVideo } from '../types'
 import type { Product, Model, VideoHistoryItem } from '../../../stores/types'
@@ -474,7 +474,7 @@ export default function OneShotView({
           </div>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="aspect-[9/16] animate-pulse rounded-2xl border border-ink/5 bg-ink/[0.03]" />
+              <div key={i} className="skeleton skeleton-card aspect-[9/16]" />
             ))}
           </div>
         </div>
@@ -517,9 +517,9 @@ export default function OneShotView({
   // splits into sequential clips (Clip 1, Clip 2…) that cut together — still
   // one concept, one row. Different rows = different styles. Card keying is
   // `${conceptId}:${segmentIndex}`.
-  // Only *active* (non-errored) in-flight gens disable Generate-all — a card
-  // left with a Failed entry must not lock the buttons forever.
-  const anyInFlight = Object.values(cardStates).some((c) => c.inFlightVideos.some((e) => !e.error))
+  // Generate-all stays clickable while clips are rendering — gens are per-card
+  // and run in parallel, so a run in flight is no reason to lock the button.
+  // `startingRef` in runSegmentVideo is what stops the same clip firing twice.
   // Open the cost-confirm popup for a set of clips (never fire straight away).
   // Clips with an empty blueprint are dropped here rather than firing a paid
   // gen on an empty prompt — the modal's own Generate guards the same way.
@@ -638,7 +638,6 @@ export default function OneShotView({
           <button
             type="button"
             onClick={() => requestGenerate(allKeys, 'Every variation')}
-            disabled={anyInFlight}
             title="Generate the video for every variation"
             className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -802,7 +801,6 @@ function ConceptRow({
   onGenerateConcept: () => void
 }) {
   const multiClip = concept.segments.length > 1
-  const anyInFlight = concept.segments.some((s) => cardStates[cardKey(concept.id, s.index)]?.inFlightVideos.some((e) => !e.error) ?? false)
   return (
     <div className="-m-4 p-4" style={{ contentVisibility: 'auto', containIntrinsicSize: '700px' }}>
       <div className="mb-5 flex items-center justify-between gap-4">
@@ -831,7 +829,6 @@ function ConceptRow({
         <button
           type="button"
           onClick={onGenerateConcept}
-          disabled={anyInFlight}
           title={multiClip ? 'Generate every clip in this concept' : 'Generate this concept'}
           className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -875,7 +872,8 @@ function OSVariationCard({
     ? cardState.videos[Math.min(cardState.currentVideoIndex, cardState.videos.length - 1)]
     : undefined
   const videoUrl = useAssetUrl(currentVideo?.url ?? '')
-  const inFlight = cardState?.inFlightVideos.some((e) => !e.error) ?? false
+  const activeInFlight = cardState?.inFlightVideos.find((e) => !e.error)
+  const inFlight = !!activeInFlight
   const errored = cardState?.inFlightVideos.some((e) => e.error) ?? false
   const duration = cardState?.durationSeconds ?? segment.durationSeconds
 
@@ -918,18 +916,11 @@ function OSVariationCard({
         className="relative aspect-[9/16] cursor-pointer overflow-hidden rounded-xl border border-ink/[0.08] bg-ink/[0.02] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
       >
         {inFlight ? (
-          <>
-            <GeneratingBackdrop family="broll" />
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 text-center">
-              <GenerationProgress
-                isActive
-                color="bg-broll-500"
-                showHelper={false}
-                messages={['Sending request...', 'Storyboarding frames...', 'Rendering motion...', 'Finalizing the clip...']}
-                className="max-w-[180px]"
-              />
-            </div>
-          </>
+          <GeneratingMediaFill
+            kind="video"
+            modelId={activeInFlight?.modelId}
+            prompt={cardState?.editablePrompt ?? segment.prompt}
+          />
         ) : currentVideo && videoUrl ? (
           <>
             <video
@@ -1034,9 +1025,9 @@ function OSVariationCard({
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onOpen() }}
-            className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/50 text-[10px] font-medium text-white backdrop-blur transition-colors hover:bg-black/70"
+            className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
           >
-            <VideoIcon className="h-3 w-3" />
+            <VideoIcon className="h-3.5 w-3.5" />
             {currentVideo ? 'Open' : 'Set up & generate'}
           </button>
         </div>

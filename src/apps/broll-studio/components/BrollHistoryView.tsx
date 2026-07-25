@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Film, ArrowDownUp, Check, ChevronDown } from 'lucide-react'
+import { Search, Film, ArrowDownUp, Check, ChevronDown, AlertCircle } from 'lucide-react'
+import { GeneratingChip, GeneratingPulseRing } from '../../../components/GeneratingChip'
 import type { BrollHistoryItem } from '../../../stores/types'
 import type {
   BrollResult,
@@ -66,6 +67,58 @@ function historyThumb(item: BrollHistoryItem): { imageRef?: string; videoRef?: s
 
 function sceneCount(result: BrollResult | null): number {
   return result?.scenes?.length ?? 0
+}
+
+// ── Live activity on a row ───────────────────────────────────────────────
+// A session's card states are snapshotted into its history row verbatim, and
+// those states carry the in-flight queues — so a row already knows what it has
+// rendering. That's what turns the History tab into the queue view: fire a batch
+// in one session, switch away, and the row keeps reporting progress.
+//
+// Same TTL the views use to sweep dead entries: an entry older than this is
+// almost certainly gone (a tab closed mid-poll), so it must not leave a row
+// pulsing "Generating…" forever.
+const ACTIVITY_TTL_MS = 30 * 60 * 1000
+
+interface InFlightish { startedAt?: number; error?: string | null }
+interface CardStateish { inFlightImages?: InFlightish[]; inFlightVideos?: InFlightish[] }
+
+interface RowActivity { images: number; videos: number; generating: number; failed: number }
+
+function tallyStates(states: Record<string, CardStateish> | undefined, now: number, out: RowActivity) {
+  if (!states) return
+  for (const k in states) {
+    for (const [arr, kind] of [
+      [states[k].inFlightImages, 'images'],
+      [states[k].inFlightVideos, 'videos'],
+    ] as const) {
+      for (const e of arr ?? []) {
+        if (e.error) out.failed += 1
+        else if (now - (e.startedAt ?? 0) <= ACTIVITY_TTL_MS) {
+          out[kind] += 1
+          out.generating += 1
+        }
+      }
+    }
+  }
+}
+
+// Counts across every mode's card states — a row is one session, and a session
+// can hold work in more than one mode.
+function rowActivity(item: BrollHistoryItem, now: number): RowActivity {
+  const out: RowActivity = { images: 0, videos: 0, generating: 0, failed: 0 }
+  tallyStates(item.cardStates as Record<string, CardStateish> | undefined, now, out)
+  tallyStates(item.oneShotCardStates as Record<string, CardStateish> | undefined, now, out)
+  tallyStates(item.continuousFrameStates as Record<string, CardStateish> | undefined, now, out)
+  tallyStates(item.continuousClipStates as Record<string, CardStateish> | undefined, now, out)
+  return out
+}
+
+// Name what's actually rendering — a Continuous session mid-keyframe-chain is
+// making images, not clips.
+function activityLabel(a: RowActivity): string {
+  const noun = a.videos === 0 ? 'image' : a.images === 0 ? 'clip' : 'output'
+  return `Generating ${a.generating} ${noun}${a.generating === 1 ? '' : 's'}…`
 }
 
 // A session accumulates results across modes (state isn't cleared on a mode
@@ -182,6 +235,25 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
     return map
   }, [items, products, models, scripts])
 
+  // Re-tick while anything is rendering so a row's "Generating…" chip ages out
+  // on its own (the bank write that would otherwise re-render the list stops
+  // arriving the moment the generation dies). Idle histories run no timer.
+  const [now, setNow] = useState(() => Date.now())
+  const activity = useMemo(() => {
+    const map = new Map<string, RowActivity>()
+    for (const it of items) map.set(it.id, rowActivity(it, now))
+    return map
+  }, [items, now])
+  const generatingRows = useMemo(
+    () => Array.from(activity.values()).filter((a) => a.generating > 0).length,
+    [activity],
+  )
+  useEffect(() => {
+    if (generatingRows === 0) return
+    const id = setInterval(() => setNow(Date.now()), 30_000)
+    return () => clearInterval(id)
+  }, [generatingRows])
+
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
     const filtered = items
@@ -226,9 +298,18 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
         </div>
 
         {/* Mode filter pills (left) + sort dropdown (right). The sort control is
-            always shown; the mode pills only when more than one mode is present. */}
+            always shown; the mode pills only when more than one mode is present.
+            A live "N sessions rendering" chip leads the row whenever anything is
+            in flight, so the queue is visible without scanning every row. */}
         <div className="mt-3 flex items-start justify-between gap-2">
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {generatingRows > 0 && (
+              <span className="flex items-center rounded-full border border-broll-500/30 bg-broll-500/10 px-2.5 py-1 text-[11px]">
+                <GeneratingChip
+                  label={`${generatingRows} session${generatingRows === 1 ? '' : 's'} rendering`}
+                />
+              </span>
+            )}
             {showModeFilters &&
               MODE_FILTERS.map((f) => {
                 const active = activeModeFilter === f.id
@@ -305,6 +386,7 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
                     item={item}
                     displayTs={sortTs(item, sort)}
                     title={titles.get(item.id) ?? 'B-Roll session'}
+                    activity={activity.get(item.id)}
                     isActive={activeId === item.id}
                     onSelect={() => onSelect(item)}
                     onDelete={() => onDelete(item.id)}
@@ -323,6 +405,7 @@ function HistoryRow({
   item,
   displayTs,
   title,
+  activity,
   isActive,
   onSelect,
   onDelete,
@@ -333,6 +416,8 @@ function HistoryRow({
   // parent (one lookup pass for the whole list, and the same string search
   // matches against).
   title: string
+  // In-flight / failed counts for this session, tallied by the parent.
+  activity?: RowActivity
   isActive: boolean
   onSelect: () => void
   onDelete: () => void
@@ -354,6 +439,8 @@ function HistoryRow({
     ? `concept${count === 1 ? '' : 's'}`
     : `scene${count === 1 ? '' : 's'}`
   const styleLabel = historyStyleLabel(item, mode)
+  const generating = activity?.generating ?? 0
+  const failed = activity?.failed ?? 0
 
   return (
     <div
@@ -362,40 +449,58 @@ function HistoryRow({
         isActive ? 'bg-broll-500/15 ring-1 ring-broll-500/20' : 'hover:bg-ink/[0.04]'
       }`}
     >
-      {thumbUrl && imageRef ? (
-        <img
-          src={thumbUrl}
-          alt=""
-          className="h-10 w-10 shrink-0 rounded-full border border-ink/10 object-cover"
-        />
-      ) : thumbUrl && videoRef ? (
-        // Video-only session (One-Shot / Continuous clips): the <video> element
-        // paints its first frame as the poster. The `#t=0.1` fragment nudges the
-        // browser to decode+show that frame instead of a blank element.
-        <video
-          src={`${thumbUrl}#t=0.1`}
-          muted
-          playsInline
-          preload="metadata"
-          className="h-10 w-10 shrink-0 rounded-full border border-ink/10 object-cover"
-        />
-      ) : (
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink/[0.04] text-broll-300/70">
-          <Film className="h-5 w-5" />
-        </span>
-      )}
+      <div className="relative h-10 w-10 shrink-0">
+        {thumbUrl && imageRef ? (
+          <img
+            src={thumbUrl}
+            alt=""
+            className="h-full w-full rounded-full border border-ink/10 object-cover"
+          />
+        ) : thumbUrl && videoRef ? (
+          // Video-only session (One-Shot / Continuous clips): the <video> element
+          // paints its first frame as the poster. The `#t=0.1` fragment nudges the
+          // browser to decode+show that frame instead of a blank element.
+          <video
+            src={`${thumbUrl}#t=0.1`}
+            muted
+            playsInline
+            preload="metadata"
+            className="h-full w-full rounded-full border border-ink/10 object-cover"
+          />
+        ) : (
+          <span className="flex h-full w-full items-center justify-center rounded-full bg-ink/[0.04] text-broll-300/70">
+            <Film className="h-5 w-5" />
+          </span>
+        )}
+        {generating > 0 && <GeneratingPulseRing family="broll" />}
+      </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium leading-snug text-ink-100">{title}</p>
         <div className="mt-1 flex items-center gap-1.5 overflow-hidden text-[11px] text-ink-500">
-          <span className="shrink-0 rounded-full bg-broll-500/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-broll-300">
-            {MODE_BADGE[mode]}
-          </span>
-          {styleLabel && (
-            <span className="min-w-0 truncate rounded-full bg-ink/[0.06] px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-ink-300">
-              {styleLabel}
+          {/* While a session has work in flight, the live count replaces the
+              static meta — that's the answer the member is looking for when they
+              open History mid-render. */}
+          {generating > 0 ? (
+            <GeneratingChip family="broll" label={activityLabel(activity!)} />
+          ) : (
+            <>
+              <span className="shrink-0 rounded-full bg-broll-500/10 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-broll-300">
+                {MODE_BADGE[mode]}
+              </span>
+              {styleLabel && (
+                <span className="min-w-0 truncate rounded-full bg-ink/[0.06] px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-ink-300">
+                  {styleLabel}
+                </span>
+              )}
+              <span className="shrink-0">{count} {countLabel}</span>
+            </>
+          )}
+          {failed > 0 && (
+            <span className="flex shrink-0 items-center gap-1 text-red-400 light:text-red-600">
+              <AlertCircle className="h-2.5 w-2.5" />
+              {failed} failed
             </span>
           )}
-          <span className="shrink-0">{count} {countLabel}</span>
           <span className="shrink-0">·</span>
           <span className="shrink-0">{formatRelative(displayTs)}</span>
         </div>

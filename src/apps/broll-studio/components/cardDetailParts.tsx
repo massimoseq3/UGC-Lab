@@ -4,10 +4,10 @@
 // modal's orchestration (state + handlers). These all communicate via props.
 import { useState, useEffect, useRef } from 'react'
 import {
-  ImageIcon, Video as VideoIcon, Film, Loader2, Check, Download, Bookmark, Volume2, VolumeX, Play, Pause, Copy, Circle, AlertCircle, RefreshCw, X, ImagePlus,
+  ImageIcon, Film, Loader2, Check, Download, Bookmark, Volume2, VolumeX, Play, Pause, Copy, Circle, AlertCircle, RefreshCw, X, ImagePlus,
 } from 'lucide-react'
-import GenerationProgress from '../../../components/GenerationProgress'
-import GeneratingBackdrop from '../../../components/GeneratingBackdrop'
+import { GeneratingMediaFill, PendingMedia, type GeneratingMediaProps } from '../../../components/GeneratingMedia'
+import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import BankPicker from '../../../components/BankPicker'
 import SlotActionMenu from '../../../components/video/SlotActionMenu'
@@ -481,114 +481,27 @@ function InFlightTile({ entry }: { entry: ModalEntry }) {
   if (entry.kind !== 'in-flight-image' && entry.kind !== 'in-flight-video') return null
   const isVideo = entry.kind === 'in-flight-video'
   const isAnimating = entry.kind === 'in-flight-video' && entry.mode === 'animating'
-  const Icon = isVideo ? VideoIcon : ImageIcon
-  const modelLabel = entry.modelId ? getModel(entry.modelId)?.displayName ?? entry.modelId : null
   return (
     <div
-      className="relative overflow-hidden rounded-lg border border-broll-500/20"
+      className="relative overflow-hidden rounded-xl border border-broll-500/20"
       style={aspectStyle(entry.aspectRatio)}
     >
-      <GeneratingBackdrop family="broll" />
-      {/* Mode glyph, top-left — mirrors the Playground / Influencers in-flight framing. */}
-      <div className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/25 text-broll-100 backdrop-blur-sm">
-        <Icon className="h-4 w-4" />
-      </div>
-      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 text-center">
-        {modelLabel && <p className="text-[10px] font-medium text-broll-100">{modelLabel}</p>}
-        <GenerationProgress
-          isActive
-          color="bg-broll-500"
-          showHelper={false}
-          messages={
-            isVideo
-              ? (isAnimating
-                  ? ['Sending request...', 'Animating still...', 'Rendering motion...', 'Finalizing the clip...']
-                  : ['Sending request...', 'Storyboarding frames...', 'Rendering motion...', 'Finalizing the clip...'])
-              : ['Sending request...', 'Composing the scene...', 'Rendering details...', 'Finalizing the frame...']
-          }
-          className="max-w-[160px]"
-        />
-      </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-6">
-        <p className="line-clamp-2 text-[10px] text-zinc-300">{entry.prompt}</p>
-      </div>
+      <GeneratingMediaFill
+        kind={isVideo ? 'video' : 'image'}
+        modelId={entry.modelId}
+        prompt={entry.prompt}
+        messages={isAnimating ? ANIMATE_MESSAGES : undefined}
+      />
     </div>
   )
 }
 
-// A standalone 9:16 in-flight placeholder tile, shaped like the Line-by-Line
-// InFlightTile above but driven by plain props instead of a ModalEntry. The
-// Continuous frame/clip and One-Shot modals import this so a generating
-// keyframe or clip reads as a real card in the gallery grid — the animated
-// backdrop + rotating progress — rather than a flat text row.
-export function PendingMediaTile({
-  kind,
-  prompt,
-  modelId,
-  aspectRatio = '9:16',
-  messages,
-  onDismiss,
-}: {
-  kind: 'image' | 'video'
-  prompt?: string
-  modelId?: string | null
-  aspectRatio?: string
-  messages?: string[]
-  // Give up on this entry. A generation that died before kie returned a task id
-  // (a refresh mid-createTask, say) has nothing to resume, and the in-flight
-  // entry blocks every Generate button until a 30-minute sweep clears it — with
-  // no way out, since only errored entries get a Retry/Dismiss row.
-  onDismiss?: () => void
-}) {
-  const isVideo = kind === 'video'
-  const Icon = isVideo ? VideoIcon : ImageIcon
-  const modelLabel = modelId ? getModel(modelId)?.displayName ?? modelId : null
-  return (
-    <div
-      className="relative overflow-hidden rounded-2xl border border-broll-500/20"
-      style={aspectStyle(aspectRatio)}
-    >
-      <GeneratingBackdrop family="broll" />
-      <div className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/25 text-broll-100 backdrop-blur-sm">
-        <Icon className="h-4 w-4" />
-      </div>
-      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 text-center">
-        {modelLabel && <p className="text-[10px] font-medium text-broll-100">{modelLabel}</p>}
-        <GenerationProgress
-          isActive
-          color="bg-broll-500"
-          showHelper={false}
-          messages={
-            messages ??
-            (isVideo
-              ? ['Sending request...', 'Rendering motion...', 'Adding detail...', 'Finalizing the clip...']
-              : ['Sending request...', 'Composing the scene...', 'Rendering details...', 'Finalizing the frame...'])
-          }
-          className="max-w-[160px]"
-        />
-      </div>
-      {prompt && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/70 to-transparent px-2 pb-1.5 pt-6">
-          <p className="line-clamp-2 text-[10px] text-zinc-300">{prompt}</p>
-        </div>
-      )}
-      <div className="absolute right-2 top-2 z-10 flex items-center gap-1.5">
-        <span className="pointer-events-none rounded-full bg-black/40 px-2 py-0.5 text-[9px] font-medium text-broll-100 backdrop-blur-sm">
-          Survives refresh
-        </span>
-        {onDismiss && (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onDismiss() }}
-            title="Stop tracking this generation"
-            className="flex h-5 w-5 items-center justify-center rounded-full bg-black/40 text-broll-100 backdrop-blur-sm transition-colors hover:bg-black/60 hover:text-white"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        )}
-      </div>
-    </div>
-  )
+// A standalone 9:16 in-flight placeholder tile — the same face as the card the
+// generation was fired from (see components/GeneratingMedia). The Continuous
+// frame/clip and One-Shot modals import this so a generating keyframe or clip
+// reads as a real card in the gallery grid rather than a flat text row.
+export function PendingMediaTile(props: GeneratingMediaProps & { aspectRatio?: string }) {
+  return <PendingMedia {...props} />
 }
 
 // Shared modal video player — the Line-by-Line playback behaviour (hover

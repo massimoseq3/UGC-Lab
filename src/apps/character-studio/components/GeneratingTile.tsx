@@ -65,11 +65,12 @@ export default function GeneratingTile({
         </button>
       )}
       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 text-center">
-        <p className="text-[10px] font-medium text-influencers-100">{modelLabel}</p>
+        <p className="text-[11px] font-medium text-influencers-100">{modelLabel}</p>
         <GenerationProgress
           isActive
           color="bg-influencers-500"
           showHelper={false}
+          messageClassName="text-[11px] font-medium text-influencers-100"
           messages={isSheet ? SHEET_MESSAGES : PORTRAIT_MESSAGES}
           className="max-w-[180px]"
         />
