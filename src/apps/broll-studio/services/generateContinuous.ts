@@ -68,7 +68,16 @@ export function sceneDuration(scriptLine: string, modelId: string): number {
 export interface ContinuousStyle {
   id: string
   label: string
+  // Short blurb for the picker card and the left-panel row. UI only — never
+  // sent to a model.
   hint: string
+  // The style direction itself: one dense paragraph covering the same five
+  // axes as STYLE_ANALYSIS_SYSTEM (medium & render / forms / palette / light /
+  // camera & finish). This is what `styleBriefFor` returns, so it's appended
+  // verbatim to every Line-by-Line and One-Shot prompt and seeds Continuous'
+  // <STYLE> block. It must stay product-agnostic — it rides prompts for every
+  // script, so it describes how things look, never what is in frame.
+  brief: string
   // True only for the live-action UGC style: it KEEPS the app's deterministic
   // iPhone-realism stack switched on. Every stylized style bypasses it.
   realism?: boolean
@@ -80,33 +89,45 @@ export const CONTINUOUS_STYLES: ContinuousStyle[] = [
   {
     id: 'ugc',
     label: 'UGC Realism',
-    hint: 'Real, unpolished creator footage shot on a modern phone: casual unstaged framing, natural available light from a real source, zero bokeh and sharp focus across the frame, no colour grade and no commercial gloss. The look of a phone camera, never the sight of one — never name or show a phone, camera, tripod, or ring light anywhere in frame, and never stage a mirror selfie. People look like they just decided to film this.',
+    hint: 'Real, unpolished creator footage shot handheld on a modern phone.',
+    brief:
+      'Real, unpolished creator footage shot handheld on a modern phone — video, not photography: mild sensor noise in the shadows, slight rolling-shutter wobble on movement, and the flat wide-lens rendering of a phone’s main camera. People and their surroundings are ordinary and unretouched, with real skin texture, stray hair, and clothes that wrinkle and sit wrong. Colour is straight out of camera: no grade, no teal-and-orange, mixed white balance from whatever actually lights the room — daylight through a window, a warm bulb, a cool overhead. Light is soft, available, and directional from a real source, with open shadows and the occasional blown highlight. Framing is casual and slightly off-centre, focus is sharp edge to edge with effectively no bokeh, and there is no vignette, halation, or commercial gloss. The look of a phone camera, never the sight of one — never name or show a phone, camera, tripod, or ring light anywhere in frame, and never stage a mirror selfie. People look like they just decided to film this.',
     realism: true,
   },
   {
     id: 'zack-3d',
     label: '3D Animated',
-    hint: 'Glossy stylized 3D render in the viral explainer register: soft rounded character shapes with slightly exaggerated proportions, vivid saturated colors, clean smooth surfaces, soft volumetric lighting with gentle rim light, high-detail render like a premium animated short. Never photoreal, never live-action.',
+    hint: 'Glossy stylized 3D render in the viral explainer register.',
+    brief:
+      'Glossy stylized 3D animation in the viral-explainer register, rendered at premium animated-short quality rather than photoreal: soft rounded forms built from clean bevelled geometry with no hard edges, gently exaggerated proportions, large readable features, and smooth subsurface-scattering skin over impeccably smooth surfaces that still carry fine tactile texture — brushed metal, matte plastic, woven fabric. The palette is vivid and high-chroma, with one dominant saturated accent carried through the whole sequence against warm, clean, uncluttered environments. Lighting is soft and volumetric: a broad key, gentle fill, and a crisp rim light separating every subject from its background, plus subtle bloom around bright sources and shallow atmospheric haze in the deep field. The virtual camera holds sharp focus with only mild depth falloff and clean, vibrant clarity across the entire frame. No film grain. Never photoreal, never live-action.',
   },
   {
     id: 'clay',
     label: 'Claymation',
-    hint: 'Handcrafted stop-motion claymation: visible fingerprints and tool marks in the clay, slightly imperfect handmade shapes, miniature-set depth, warm practical lighting on a physical diorama.',
+    hint: 'Handcrafted stop-motion claymation on a physical miniature set.',
+    brief:
+      'Handcrafted stop-motion claymation shot one frame at a time on a physical miniature set: every surface is modelling clay with visible fingerprints, thumb dents, and tool marks, and shapes are charmingly imperfect — slightly asymmetric, a little lumpy, sculpted rather than modelled. Proportions are squat and chunky with oversized heads and simple mitten hands; edges are soft and hand-smoothed, and armature seams occasionally show through. The palette is warm and earthy — putty, terracotta, ochre, moss, cream — in matte, low-saturation blocks of solid colour, broken by the occasional bright clay accent. Light comes from small practical fixtures rigged just off the diorama: a warm, soft-but-directional key with visible falloff onto the set walls and gentle shadows at tabletop scale. The camera sits close with macro-ish depth of field and true miniature parallax, a faint stop-motion judder in movement, and no digital gloss anywhere.',
   },
   {
     id: 'paper',
     label: 'Papercraft',
-    hint: 'Layered paper-cutout diorama: crisp cut edges, subtle drop shadows between paper layers, flat colors with visible paper texture, everything staged like a handmade pop-up book scene.',
+    hint: 'Layered paper-cutout diorama staged like a pop-up book.',
+    brief:
+      'Layered paper-cutout diorama, everything built from real cut and folded card and photographed as a physical set: crisp scissor and craft-knife edges, visible paper fibre and tooth, faint fold creases, and distinct stacked planes that each cast a small soft drop shadow onto the layer behind. Forms are flat and graphic — simplified silhouettes with no rounding or volume beyond what the layering implies, details punched or scored rather than drawn. The palette is flat matte colour in confident blocks, slightly desaturated like coloured stock, with pale cut edges showing where the paper opens. Light is soft and frontal-diagonal, raking just enough to separate the layers and reveal texture, with no specular highlights anywhere. The camera holds a straight-on or gently angled view with even sharpness across the frame and shallow overall depth, staged like a handmade pop-up book page.',
   },
   {
     id: 'anime',
     label: 'Anime',
-    hint: 'Clean 2D anime cel style: bold linework, flat cel shading with two-tone shadows, expressive faces, painterly backgrounds with soft light bloom.',
+    hint: 'Clean 2D anime cel animation with painterly backgrounds.',
+    brief:
+      'Clean 2D anime cel animation in a modern TV-series register, drawn and composited rather than rendered: confident tapering linework of even weight, flat cel shading in two hard-edged tones per surface, and almost no gradients outside the sky. Figures carry lightly stylized proportions, large expressive eyes with specular catchlights, simplified hands, and hair drawn as sculpted clumps rather than strands. The palette is clean and saturated, with a clear separation between warm character tones and cooler background washes. Backgrounds are painterly and softer than the characters — brushed texture, atmospheric depth, visible paint edges — so the cel-shaded figures read as a distinct layer on top. Light is graphic: one defined key direction, hard-edged shadow shapes, and generous soft bloom, lens flare, and light-shaft overlays added in the composite. Camera work is limited-animation — held frames, sliding pans, speed lines — with no photographic grain.',
   },
   {
     id: 'cinematic',
     label: 'Cinematic',
-    hint: 'Photoreal cinematic live-action: filmic color grade, shallow-but-controlled depth, deliberate camera language, commercial-grade art direction. Polished on purpose — the one style where gloss is the goal.',
+    hint: 'Photoreal commercial-grade live action, polished on purpose.',
+    brief:
+      'Photoreal cinematic live action shot on large-format digital with prime lenses and finished like a high-end commercial: true-to-life texture and skin, deliberate art direction in every frame, nothing accidental in shot. Compositions are considered — clean symmetry or confident rule-of-thirds, negative space used on purpose. Depth of field is shallow but controlled: the subject critically sharp, backgrounds falling into smooth creamy bokeh without losing legibility. The grade is filmic and low-contrast in the shadows — lifted, slightly desaturated blacks, rich midtones, gently rolled-off highlights, and a coherent warm-key against cool-fill separation. Light is motivated and sculpted: a soft large key, deep controlled shadow, practical sources visible in frame, and subtle haze catching the backlight. Camera movement is slow and intentional — locked off, a measured dolly, or a gentle push-in, never handheld chaos. Finish carries fine organic grain, mild halation on highlights, and a soft vignette. Polished on purpose — the one style where gloss is the goal.',
   },
 ]
 
@@ -339,7 +360,7 @@ export interface ContinuousInput {
   scriptText: string
   styleId: string
   // Style paragraph distilled from the user's reference images. When present it
-  // replaces the preset hint entirely.
+  // replaces the preset brief entirely.
   styleBrief?: string
   modelId: string
   productContext: string
@@ -348,10 +369,13 @@ export interface ContinuousInput {
 }
 
 // The style paragraph a mode fires with: the reverse-engineered reference brief
-// when the user supplied one, otherwise the selected preset's hint. Shared by
+// when the user supplied one, otherwise the selected preset's brief. Shared by
 // all three modes (structural type so each mode's own input satisfies it).
+// Always `brief`, never `hint` — Line-by-Line and One-Shot append this verbatim
+// with no LLM expansion step, so a preset shipping the picker's one-line blurb
+// gave those two modes a fraction of the direction a custom style gets.
 export function styleBriefFor(input: { styleId: string; styleBrief?: string }): string {
-  return input.styleBrief?.trim() || getContinuousStyle(input.styleId).hint
+  return input.styleBrief?.trim() || getContinuousStyle(input.styleId).brief
 }
 
 function buildUserPrompt(input: ContinuousInput): string {
