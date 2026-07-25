@@ -74,7 +74,15 @@ export interface ContinuousStyle {
   realism?: boolean
 }
 
+// Display order — this array IS the order of the picker's Presets grid. Live
+// action leads because it's what most ads are; the stylized looks follow.
 export const CONTINUOUS_STYLES: ContinuousStyle[] = [
+  {
+    id: 'ugc',
+    label: 'UGC Realism',
+    hint: 'Real, unpolished creator footage shot on a modern phone: casual unstaged framing, natural available light from a real source, zero bokeh and sharp focus across the frame, no colour grade and no commercial gloss. The look of a phone camera, never the sight of one — never name or show a phone, camera, tripod, or ring light anywhere in frame, and never stage a mirror selfie. People look like they just decided to film this.',
+    realism: true,
+  },
   {
     id: 'zack-3d',
     label: '3D Animated',
@@ -100,16 +108,15 @@ export const CONTINUOUS_STYLES: ContinuousStyle[] = [
     label: 'Cinematic',
     hint: 'Photoreal cinematic live-action: filmic color grade, shallow-but-controlled depth, deliberate camera language, commercial-grade art direction. Polished on purpose — the one style where gloss is the goal.',
   },
-  {
-    id: 'ugc',
-    label: 'UGC Realism',
-    hint: 'Real, unpolished creator footage shot on a modern phone: casual unstaged framing, natural available light from a real source, zero bokeh and sharp focus across the frame, no colour grade and no commercial gloss. The look of a phone camera, never the sight of one — never name or show a phone, camera, tripod, or ring light anywhere in frame, and never stage a mirror selfie. People look like they just decided to film this.',
-    realism: true,
-  },
 ]
 
+// Fallback is pinned by id, not by position: the array's order is a display
+// choice, and reordering it must never silently change what an unknown or
+// legacy style id resolves to (it also decides `realism`).
+const FALLBACK_STYLE = CONTINUOUS_STYLES.find((s) => s.id === 'zack-3d')!
+
 export function getContinuousStyle(id: string): ContinuousStyle {
-  return CONTINUOUS_STYLES.find((s) => s.id === id) ?? CONTINUOUS_STYLES[0]
+  return CONTINUOUS_STYLES.find((s) => s.id === id) ?? FALLBACK_STYLE
 }
 
 // Whether this storyboard keeps the app-wide iPhone-realism suffix. A style

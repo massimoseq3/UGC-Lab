@@ -708,12 +708,27 @@ export default function BrollStudio() {
     setContinuousStyleBrief(brief)
     setContinuousStyleName(name)
     setContinuousStyleBankId(bankId)
+    // A custom brief only exists because the user built or picked one — that's
+    // as explicit a choice as tapping a preset.
+    setStyleChosen(true)
   }
+
+  const handleClearStyle = () => {
+    setStyleChosen(false)
+    setContinuousStyleBrief(null)
+    setContinuousStyleBankId(null)
+    setContinuousStyleName(null)
+  }
+
+  // Whether a look has actually been chosen. A persisted custom brief counts on
+  // its own so sessions saved before `styleChosen` existed don't read as empty.
+  const styleIsPicked = styleChosen || !!continuousStyleBrief?.trim()
 
   // What the left panel's style row shows.
   const styleLabel = continuousStyleBrief?.trim()
     ? continuousStyleName?.trim() || 'Custom style'
     : getContinuousStyle(resolvedStyleId).label
+  const styleHint = continuousStyleBrief?.trim() || getContinuousStyle(resolvedStyleId).hint
 
   // Add one blank concept box to a single keyframe (the frame row's "Add
   // concept" card). Mirrors Line-by-Line's "Add option": it drops an empty
@@ -906,9 +921,12 @@ export default function BrollStudio() {
           oneShotDelivery={oneShotDelivery}
           onOneShotDeliveryChange={setOneShotDelivery}
           oneShotModelId={oneShotModelId}
+          styleChosen={styleIsPicked}
           styleLabel={styleLabel}
+          styleHint={styleHint}
           styleIsCustom={!!continuousStyleBrief?.trim()}
           onOpenStyle={() => setStyleModalOpen(true)}
+          onClearStyle={handleClearStyle}
         />
       </div>
 
@@ -994,7 +1012,9 @@ export default function BrollStudio() {
         key={styleModalOpen ? 'open' : 'closed'}
         open={styleModalOpen}
         onClose={() => setStyleModalOpen(false)}
-        styleId={resolvedStyleId}
+        // Empty until a look is actually chosen, so nothing in the picker reads
+        // as selected while the left panel is still asking for one.
+        styleId={styleIsPicked ? resolvedStyleId : ''}
         styleBrief={continuousStyleBrief}
         styleBankId={continuousStyleBankId}
         onPickPreset={handlePickPresetStyle}
