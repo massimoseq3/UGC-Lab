@@ -510,7 +510,19 @@ export function PendingMediaTile(props: GeneratingMediaProps & { aspectRatio?: s
 // Line-by-Line gallery tiles. Children are overlaid (action stack, duration
 // badge). Used by the Continuous clip modal so its video playback matches
 // Line-by-Line.
-export function ModalVideoPlayer({ url, children }: { url: string | null | undefined; children?: React.ReactNode }) {
+export function ModalVideoPlayer({
+  url,
+  children,
+  className = 'border-ink/10',
+  onClick,
+}: {
+  url: string | null | undefined
+  children?: React.ReactNode
+  // Border/ring classes only — the frame's own layout classes are fixed. Used
+  // by the Continuous take gallery to mark the picked cover.
+  className?: string
+  onClick?: () => void
+}) {
   const videoElRef = useRef<HTMLVideoElement>(null)
   const [hovering, setHovering] = useState(false)
   const [playing, setPlaying] = useState(false)
@@ -531,7 +543,8 @@ export function ModalVideoPlayer({ url, children }: { url: string | null | undef
     <div
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
-      className="group relative overflow-hidden rounded-2xl border border-ink/10 bg-black"
+      onClick={onClick}
+      className={`group relative overflow-hidden rounded-2xl border bg-black ${onClick ? 'cursor-pointer' : ''} ${className}`}
     >
       {url ? (
         <video

@@ -819,6 +819,9 @@ interface ContinuousClipModalProps {
   // writes fresh motion from the ACTUAL rendered keyframes (vision, both ends).
   onEnhanceMotion: () => Promise<string>
   onRegenerateMotion: () => Promise<string>
+  // Make a take the clip's cover — what the card face plays and what the
+  // download picker pre-ticks for this clip.
+  onSelectVideo: (index: number) => void
   onDeleteVideo: (index: number) => void
   onRetryInFlight: (id: string) => void
   onDismissInFlight: (id: string) => void
@@ -838,6 +841,7 @@ export function ContinuousClipModal({
   onGenerate,
   onEnhanceMotion,
   onRegenerateMotion,
+  onSelectVideo,
   onDeleteVideo,
   onRetryInFlight,
   onDismissInFlight,
@@ -1182,7 +1186,13 @@ export function ContinuousClipModal({
                     />
                   ))}
                   {cardState.videos.map((video, i) => (
-                    <ClipVideoTile key={`${video.url}-${i}`} video={video} onDelete={() => onDeleteVideo(i)} />
+                    <ClipVideoTile
+                      key={`${video.url}-${i}`}
+                      video={video}
+                      selected={i === Math.min(cardState.currentVideoIndex, cardState.videos.length - 1)}
+                      onSelect={() => onSelectVideo(i)}
+                      onDelete={() => onDeleteVideo(i)}
+                    />
                   ))}
                 </div>
               </div>
@@ -1223,25 +1233,50 @@ function EndpointThumb({ label, imageRef }: { label: string; imageRef?: string }
   )
 }
 
-function ClipVideoTile({ video, onDelete }: { video: GeneratedVideo; onDelete: () => void }) {
+// One take in the clip's gallery. Clicking it makes that take the clip's COVER
+// — what the card face plays, what the card's Download button saves, and what
+// the download picker pre-ticks. Parity with Line-by-Line's VideoTile, which
+// has had cover selection all along.
+function ClipVideoTile({
+  video,
+  selected,
+  onSelect,
+  onDelete,
+}: {
+  video: GeneratedVideo
+  selected: boolean
+  onSelect: () => void
+  onDelete: () => void
+}) {
   const url = useAssetUrl(video.url)
   const [copied, setCopied] = useState(false)
-  const handleDownload = async () => {
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation()
     const resolved = await getUrl(video.url)
     if (!resolved) { useAppStore.getState().addToast('Could not load the video.', 'error'); return }
     await downloadImage(resolved, 'continuous-clip', 'mp4')
   }
-  const handleCopy = async () => {
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation()
     if (await copyToClipboard(video.prompt)) { setCopied(true); window.setTimeout(() => setCopied(false), 1600) }
   }
   return (
-    <ModalVideoPlayer url={url}>
+    <ModalVideoPlayer
+      url={url}
+      onClick={onSelect}
+      className={selected ? 'border-broll-500/70 ring-2 ring-broll-500/40' : 'border-ink/10 hover:border-ink/30'}
+    >
       <div className="pointer-events-none absolute right-1.5 top-1.5 flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
         <button type="button" title="Download" onClick={handleDownload} className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm hover:bg-black/80"><Download className="h-3.5 w-3.5" /></button>
         <button type="button" title="Copy prompt" onClick={handleCopy} className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm hover:bg-black/80">{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</button>
-        <button type="button" title="Delete" onClick={onDelete} className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm hover:bg-red-500/80"><Trash2 className="h-3.5 w-3.5" /></button>
+        <button type="button" title="Delete" onClick={(e) => { e.stopPropagation(); onDelete() }} className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm hover:bg-red-500/80"><Trash2 className="h-3.5 w-3.5" /></button>
       </div>
-      <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-medium tabular-nums text-white backdrop-blur-sm">{video.durationSeconds}s</span>
+      <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-medium tabular-nums text-white backdrop-blur-sm">{video.durationSeconds}s</span>
+      {selected && (
+        <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded-full bg-broll-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
+          Cover
+        </span>
+      )}
     </ModalVideoPlayer>
   )
 }
