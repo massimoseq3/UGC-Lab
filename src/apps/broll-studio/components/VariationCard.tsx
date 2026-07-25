@@ -19,7 +19,7 @@ import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
 import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
 import type { PromptVariation, CardState, GeneratedImage, ReferenceImage } from '../types'
 import type { VideoHistoryItem, Product, Model, BRoll } from '../../../stores/types'
-import { enhanceVariationPrompt, generateNewVariation, startImageTask, finishImageTask } from '../services/generateBroll'
+import { enhanceVariationPrompt, generateNewVariation, startImageTask, finishImageTask, buildDialogueChainPreamble } from '../services/generateBroll'
 import { applyStyleToPrompt } from '../services/generateContinuous'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
 import { claimTask, releaseTask } from '../services/taskRegistry'
@@ -75,6 +75,11 @@ interface VariationCardProps {
   // clip shares one voice. Editing it (via the modal) updates the shared value.
   voiceProfile?: string
   onUpdateVoiceProfile?: (text: string) => void
+  // DIALOGUE cards only: the previous scene's chosen talking-head still (asset
+  // ref). Attached first when `cardState.chainLink` is on, so every talking cut
+  // holds the same character, room and camera setup. Undefined on the ad's first
+  // dialogue card and on any card generated before an earlier one has an image.
+  chainImageRef?: string
 }
 
 export default function VariationCard(props: VariationCardProps) {
@@ -103,7 +108,17 @@ export default function VariationCard(props: VariationCardProps) {
     resultRealism,
     voiceProfile,
     onUpdateVoiceProfile,
+    chainImageRef,
   } = props
+
+  // Is this card chaining off the previous scene's talking-head still? Only a
+  // DIALOGUE card ever does — a b-roll card that inherited a previous shot's
+  // staging would defeat the point of three different lenses.
+  const isDialogue = variation.tag === 'DIALOGUE'
+  const chainRef: ReferenceImage | null =
+    isDialogue && chainImageRef && cardState.chainLink !== false
+      ? { dataUrl: chainImageRef, label: 'previous-cut' }
+      : null
 
   const hasImages = cardState.images.length > 0
   const hasVideos = cardState.videos.length > 0
@@ -335,9 +350,14 @@ export default function VariationCard(props: VariationCardProps) {
         style: resultStyle,
         realism: resultRealism,
       })
-      const started = await startImageTask(styledPrompt, refs, imageAspectRatio, imageResolution, {
+      // A chained DIALOGUE card leads with the previous scene's talking-head
+      // still and swaps in the preamble that tells the model to KEEP its staging
+      // — the opposite of the identity-only scoping every other card gets.
+      const finalRefs = chainRef ? [chainRef, ...refs] : refs
+      const started = await startImageTask(styledPrompt, finalRefs, imageAspectRatio, imageResolution, {
         inheritReference: variation.tag === 'STATIC',
         noRealism,
+        ...(chainRef ? { preambleOverride: buildDialogueChainPreamble(finalRefs) } : {}),
       })
       taskId = started.taskId
       modelId = started.modelId
@@ -1054,6 +1074,7 @@ export default function VariationCard(props: VariationCardProps) {
           handleDismissInFlight={handleDismissInFlight}
           voiceProfile={voiceProfile}
           onUpdateVoiceProfile={onUpdateVoiceProfile}
+          chainImageRef={isDialogue ? chainImageRef : undefined}
         />
       )}
     </>

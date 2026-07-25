@@ -190,12 +190,21 @@ And the subject stays SAFELY IN FRAME: held in the middle band of the picture �
 //
 // One flowing paragraph each, matching Line-by-Line: the labelled
 // multi-field structure these used to carry read disjointed and crowded out the
-// actual idea. Keyframes keep one extra requirement the clip modes don't need —
-// an explicit safe-zone note, because 9:16 platform UI overlays the frame edges.
-// That note is a CROP rule only: written as "centre the subject" it quietly
-// turned every keyframe into a centred medium shot.
+// actual idea. Keyframes keep two extra requirements the clip modes don't need —
+// an explicit safe-zone note, because 9:16 platform UI overlays the frame edges
+// (a CROP rule only: written as "centre the subject" it quietly turned every
+// keyframe into a centred medium shot), and the START-FRAME rule below.
+//
+// The start-frame rule exists because "an ACTION, caught mid-motion" was read as
+// "draw the action at its peak" — frames came back with the bite already taken
+// and the powder already poured, which is the END of the beat. The clip then has
+// nowhere to travel: the model either holds the frame still or races past it and
+// freezes. A keyframe is frame ONE of the clip, so it has to hold the action
+// back at its first instant with the whole move still ahead of it.
 
-const KEYFRAME_FORMAT = `Every keyframe prompt is ONE flowing paragraph — usually 50-90 words, longer when the idea needs it. Plain, concrete, readable — no labels, no field names, no line breaks, no "Style:" trailer.
+const KEYFRAME_FORMAT = `Every keyframe prompt is ONE flowing paragraph. There is NO word limit and no target length — write as long as it takes to pin the image down completely, and never drop a detail to keep it short. Vagueness is the only failure; length is not. Plain, concrete, readable — no labels, no field names, no line breaks, no "Style:" trailer.
+
+THIS IS A START FRAME. Each keyframe is the FIRST frame of the clip that follows it, and a video model animates forward from it. So describe the action at its OPENING INSTANT — the moment it has only just begun, with nearly all of it still to come: weight shifted but the step not landed, the wrapper gripped and the tear an inch long, the scoop tipped just past level with the first grains leaving the edge, teeth touching the surface but not yet through it, the mouth beginning to open on the reaction. NEVER the middle of the action and never its aftermath — a frame that already shows the bite taken, the powder poured, the door shut, or the expression fully landed leaves the clip nothing to perform. Before you finish a frame, ask: is there a whole action still left to play out from here? If not, wind it back to its first instant.
 
 Write it like you're describing a still you're looking at right now: what's in frame and in what state (the exact pose, hand position, gaze, and the expression as a real muscle action — "brows drawn together, jaw set", never "looking sad"), the actual space and the two or three specific props that sell it, where the light comes from and its colour, and the materials and textures that make it feel rendered rather than sketched. If there's no character, the hero object and its exact orientation carry the frame.
 
@@ -218,9 +227,9 @@ function motionFormat(durationSeconds?: number): string {
   const pacing = durationSeconds
     ? `The clip runs ${durationSeconds} seconds — spread the movement across all of it.`
     : 'Spread the movement across the whole clip (roughly as long as the line takes to speak, never under three seconds).'
-  return `Describe the motion, simply and clearly, in ONE short paragraph of about 30-60 words. No labels, no field names.
+  return `Describe the motion, simply and clearly, in ONE paragraph. No labels, no field names, no word limit — say everything the movement needs, and nothing it doesn't.
 
-Say what starts moving in the frame and in which direction, and how the camera moves — push in, pull back, orbit, tilt, track alongside, or hold steady. Keep it physical and specific to this staging. ${pacing}
+The clip opens on a frame where the action has only just begun, so this is where that action actually plays out. Say what starts moving in the frame and in which direction, and how the camera moves — push in, pull back, orbit, tilt, track alongside, or hold steady. Keep it physical and specific to this staging. ${pacing}
 
 Write the MOVEMENT, not a description of the end frame: "the push-in slows as the hand eases to a stop" is right, painting the final pose as a picture is not. Never name an edit — no "cut to", "dissolve to", "then we see".
 
@@ -243,7 +252,7 @@ Turn the user's script into a STORYBOARD:
 
 1. Take the script's lines as the SCENES, one per line, verbatim — see SCENES below. Never split or merge them.
 2. For every scene, decide VISIBILITY: whether the advertised product is allowed on screen for that beat — see WHOSE PRODUCT IS ON SCREEN below.
-3. For every scene, design its START keyframe. After the last scene, design one FINAL keyframe (the end state the last clip lands on). So there is always exactly ONE more frame than there are scenes.
+3. For every scene, design its START keyframe — literally the first frame of that scene's clip, so its action must be caught at the instant it BEGINS with the whole move still to come. After the last scene, design one FINAL keyframe (the end state the last clip lands on). So there is always exactly ONE more frame than there are scenes.
 4. Give every keyframe ${CONCEPTS_PER_FRAME} distinct visual CONCEPTS — ${CONCEPTS_PER_FRAME} different ideas for showing that line, each declaring its shot size and the REFERENCE IMAGES it needs.
 5. For every CONCEPT of every non-final keyframe, write the MOTION that animates THAT staging into the next beat. Motion belongs to the staging, not the scene — two different ideas for the same beat travel differently —. Final-frame concepts get NO motion (nothing leaves the last frame).
 
@@ -282,21 +291,21 @@ Each narration line will be HEARD over the footage. The frames must SHOW what th
 
 When the script points at the product itself, the product IS the visual. When the script attacks the category, the generic stand-in is the visual — never the product. A viewer watching with the sound off should be able to guess the narration.
 
-# THE ONE RULE — AN ACTION THAT SHOWS THE LINE
+# THE ONE RULE — AN ACTION THAT SHOWS THE LINE, CAUGHT AT ITS FIRST INSTANT
 
-If you remember one thing: every keyframe is an ACTION that shows what its line SAYS, and each scene gets ${CONCEPTS_PER_FRAME} different ways to do it.
+If you remember one thing: every keyframe is an ACTION that shows what its line SAYS, frozen at the moment that action BEGINS, and each scene gets ${CONCEPTS_PER_FRAME} different ways to do it.
 
-- ACTION, not a state. Something is physically happening, caught mid-motion: cardboard slabs toppling off the counter, a wrapper tearing open, a bar snapping in half, powder spilling, a thumb pressing into dough. "The character holds the bar" is not an action. "Their teeth sink into the cardboard, fibres peeling away" is.
+- ACTION, not a state. Something is physically happening: cardboard slabs going over the edge of the counter, a wrapper tearing, a bar bending toward the snap, powder starting to spill, a thumb pressing into dough. "The character holds the bar" is not an action.
+- CAUGHT AT ITS FIRST INSTANT. This frame is the clip's FIRST frame, so the action must still be almost entirely ahead of it: the slabs have just tipped and not yet fallen, the tear is an inch long, the bar is bowed with the first crack showing, the teeth are touching the cardboard but haven't gone through. If the frame shows the action finished — bite taken, powder poured, reaction fully landed — the clip has nowhere to go and the video model either holds still or jumps. Write the beginning, never the peak or the aftermath.
 - It SHOWS THE LINE. The one test that matters: someone watching with the sound off should be able to guess the narration from the picture. If the frame does not visibly say what the line says, nothing else about it can save it.
 - ${CONCEPTS_PER_FRAME} DIFFERENT ways. The concepts of a frame are genuinely different ideas for showing that same line — a different action, a different object, a different way of picturing it — not one idea shot from ${CONCEPTS_PER_FRAME} angles. The user is choosing between real alternatives.
 - Keep it READABLE. This is a scrolling viewer with no sound; the frame has to land instantly. One clear subject, one clear action, no puzzle. Clarity beats cleverness every time.
-- The action is also what the clip animates, so a static frame leaves the motion nothing to continue.
 
-The FINAL frame is the exception — it is an end state the last clip settles onto, so it may rest.
+The FINAL frame is the only exception — it is an end state the last clip settles onto, nothing animates out of it, so it may rest and it may show an action completed.
 
 # SPECIFICITY
 
-Vague direction renders as generic footage. Every frame names the exact prop, the exact body and hand position, the exact expression, the real light source, and the actual material. Write each keyframe the way you'd describe a still you're looking at, not the way you'd pitch it. If a prompt could describe two visually different images, it isn't finished — add specificity, never another scene. Keep each paragraph tight and readable.
+Vague direction renders as generic footage. Every frame names the exact prop, the exact body and hand position, the exact expression, the real light source, and the actual material. Write each keyframe the way you'd describe a still you're looking at, not the way you'd pitch it. If a prompt could describe two visually different images, it isn't finished — add specificity, never another scene. Take all the words you need: nothing here is scored on brevity, and a detail cut for length is a detail the model invents for you.
 
 Banned everywhere: "beautiful", "stunning", "modern", "clean", "minimalist", "high quality", "professional", "cinematic vibe", "looking happy/sad/frustrated" (name what the face is actually doing), "using the product" (name the actual action).
 
@@ -314,6 +323,8 @@ Banned everywhere: "beautiful", "stunning", "modern", "clean", "minimalist", "hi
 # CONSECUTIVE FRAMES HAVE TO CONNECT
 
 Every clip is generated by a model handed frame N as its fixed first image and frame N+1 as its fixed last image, and it has to invent the movement between them. So frame N+1 must be a state frame N could plausibly move or morph into — a later moment of the same situation, not an unrelated picture. Two frames that share nothing leave no path between them, and the model animates for a second and then hard-cuts onto the last image.
+
+This is also why every frame holds its action back to the first instant. Frame N opens scene N's action and frame N+1 opens scene N+1's, so scene N's clip is exactly the span where scene N's action plays out. A frame drawn at the peak of its action has already spent the clip that was supposed to perform it.
 
 Beyond that, keep it simple: same character, same look, and a change the eye can follow.
 
@@ -347,8 +358,8 @@ Wrap your answer in this exact XML envelope. No text outside the tags, no markdo
 <LABEL>2-4 word slug naming the camera, e.g. ACROSS THE ISLAND</LABEL>
 <SHOT>one size off the ladder</SHOT>
 <REFS>character|product|both|none</REFS>
-<PROMPT>one flowing paragraph — an action that shows what this line says, caught mid-motion</PROMPT>
-<MOTION>one short paragraph: what moves and in which direction, how the camera moves, and one sound direction. Movement, never a picture of the end frame.</MOTION>
+<PROMPT>one flowing paragraph, as long as it needs — an action that shows what this line says, caught at the instant it begins</PROMPT>
+<MOTION>one paragraph: what moves and in which direction, how the camera moves, and one sound direction. Movement, never a picture of the end frame.</MOTION>
 </CONCEPT_1>
 <CONCEPT_2>a DIFFERENT idea for showing the same line, same depth, with its OWN SHOT, REFS and matched MOTION</CONCEPT_2>
 <CONCEPT_3>a third DIFFERENT idea for the same line, same depth, with its OWN SHOT, REFS and matched MOTION</CONCEPT_3>
@@ -360,7 +371,7 @@ Wrap your answer in this exact XML envelope. No text outside the tags, no markdo
 <LABEL>2-4 word slug</LABEL>
 <SHOT>one size off the ladder</SHOT>
 <REFS>character|product|both|none</REFS>
-<PROMPT>one flowing paragraph — the still, described (NO motion; nothing leaves the final frame)</PROMPT>
+<PROMPT>one flowing paragraph, as long as it needs — the still, described (NO motion; nothing leaves the final frame, so this one may rest)</PROMPT>
 </CONCEPT_1>
 <CONCEPT_2>...</CONCEPT_2>
 <CONCEPT_3>...</CONCEPT_3>
@@ -405,9 +416,10 @@ export function buildContinuousUserPrompt(input: ContinuousInput): string {
 
 Before you answer, run this check and rewrite anything that fails:
 1. Does every keyframe show an ACTION — something physically happening — that visibly says what its line says? Sound off, could a viewer guess the narration?
-2. Are the ${CONCEPTS_PER_FRAME} concepts of each frame ${CONCEPTS_PER_FRAME} genuinely different ideas, not one idea at three distances?
-3. Is every shot medium by default, no wider than medium-wide, with the subject held in the middle band of the frame and clear margin all round? No chest-up portrait square to the lens.
-4. Is there exactly one scene per script line, with each <LINE> verbatim and nothing split or merged?`
+2. Is every keyframe (except the final one) caught at the FIRST INSTANT of that action, with the whole move still ahead of it? Any frame showing the action finished — bite taken, powder poured, reaction landed — must be wound back to its opening moment.
+3. Are the ${CONCEPTS_PER_FRAME} concepts of each frame ${CONCEPTS_PER_FRAME} genuinely different ideas, not one idea at three distances?
+4. Is every shot medium by default, no wider than medium-wide, with the subject held in the middle band of the frame and clear margin all round? No chest-up portrait square to the lens.
+5. Is there exactly one scene per script line, with each <LINE> verbatim and nothing split or merged?`
   return prompt
 }
 
@@ -643,8 +655,8 @@ function frameBriefBlock(ctx: FrameContext, frameIndex: number): string {
     ? '\nThis is the OPENING keyframe of the ad.\n'
     : `\nThe motion ARRIVING at this frame (from the previous keyframe):\n${ctx.inboundMotion || '(not specified)'}\n`
   out += ctx.isFinal
-    ? 'This is the FINAL keyframe — the end state the last clip lands on.\n'
-    : `The narration line this frame opens: "${ctx.scriptLine}"\nThe motion LEAVING this frame (into the next keyframe):\n${ctx.outboundMotion || '(not specified)'}\n`
+    ? 'This is the FINAL keyframe — the end state the last clip lands on. Nothing animates out of it, so this is the one frame that may rest or show an action completed.\n'
+    : `The narration line this frame opens: "${ctx.scriptLine}"\nThe motion LEAVING this frame (into the next keyframe):\n${ctx.outboundMotion || '(not specified)'}\nTHIS IS A START FRAME — the first frame of that clip. Catch its action at the instant it BEGINS, with the whole move still ahead of it. Never the peak of the action and never its aftermath; a frame that shows the action already done leaves the clip nothing to perform.\n`
   if (ctx.productContext) {
     out += `\n${ctx.productContext}\n`
     out += ctx.productVisible === false
@@ -672,7 +684,7 @@ Current prompt:
 ${draft}
 """
 
-Return ONE flowing paragraph, usually 50-90 words, keeping the safe-zone note as a crop constraint (nothing essential in the top or bottom eighth) — never rewrite it into "the subject is centred". If the draft is a labelled multi-line block (SUBJECT: / SETTING: / ...), that is exactly what you are here to fix: fold it into one readable paragraph, keeping the idea.
+Return ONE flowing paragraph with NO word limit — enhance means the prompt comes back richer and longer than it went in, never trimmed to a length. Keep the safe-zone note as a crop constraint (nothing essential in the top or bottom eighth) — never rewrite it into "the subject is centred". If the draft is a labelled multi-line block (SUBJECT: / SETTING: / ...), that is exactly what you are here to fix: fold it into one readable paragraph, keeping the idea.
 
 ${FRAME_ENVELOPE_NOTE}
 <PROMPT>
@@ -697,7 +709,7 @@ ${frameBriefBlock(ctx, frameIndex)}
 ${ctx.existingLabels.length ? `\nStagings already used on this frame: ${ctx.existingLabels.join(' · ')}\n` : ''}
 A fresh idea means a new subject, a new metaphor, or a new camera position — it does NOT mean a new shot size if this card has a shot class above. Keep the class and find a different picture inside it. If this card has no shot class, pick something well away from a centred medium shot of the character.
 
-Return ONE flowing paragraph, usually 50-90 words, including the safe-zone crop note.
+Return ONE flowing paragraph with NO word limit — as long as it takes to pin the image down — including the safe-zone crop note.
 
 ${FRAME_ENVELOPE_NOTE}
 <PROMPT>
