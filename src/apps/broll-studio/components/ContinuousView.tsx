@@ -1108,11 +1108,12 @@ export default function ContinuousView({
   // Rewrite context for the open frame, grounded in the motions actually on the
   // clips either side (the picked concept's, or the user's hand-edit) rather
   // than the storyboard's first-concept fallback.
-  const openFrameContext = (frameIndex: number, conceptLabel: string) =>
+  const openFrameContext = (frameIndex: number, conceptLabel: string, conceptShot?: string) =>
     frameContextFor(result, frameIndex, {
       productContext,
       modelContext,
       conceptLabel,
+      conceptShot,
       inboundMotion: clipStates[clipKey(frameIndex - 1)]?.editablePrompt,
       outboundMotion: clipStates[clipKey(frameIndex)]?.editablePrompt,
     })
@@ -1575,6 +1576,7 @@ export default function ContinuousView({
           frameLabel={openFrame.index === result.frames.length ? 'Final Frame' : `Frame ${openFrame.index}`}
           frameNumber={openFrame.index}
           conceptLabel={openConcept.label}
+          conceptShot={openConcept.shot}
           scriptLine={result.scenes.find((s) => s.index === openFrame.index)?.scriptLine ?? ''}
           style={result.style}
           cardState={openFrameCard}
@@ -1600,11 +1602,11 @@ export default function ContinuousView({
           onGenerate={() => void runFrameImage(openFrameKey)}
           onEnhancePrompt={() => enhanceContinuousFrame(
             frameStates[openFrameKey]?.editablePrompt ?? '',
-            openFrameContext(openFrame.index, openConcept.label),
+            openFrameContext(openFrame.index, openConcept.label, openConcept.shot),
             openFrame.index,
           )}
           onRegeneratePrompt={() => regenerateContinuousFrame(
-            openFrameContext(openFrame.index, openConcept.label),
+            openFrameContext(openFrame.index, openConcept.label, openConcept.shot),
             openFrame.index,
           )}
           onRetryInFlight={(id) => {
@@ -1914,6 +1916,7 @@ function SceneRow({
                 key={concept.id}
                 optionNumber={i + 1}
                 label={concept.label}
+                shot={concept.shot}
                 cardState={frameStates[frameKey(frame.index, concept.id)]}
                 isKeyframe={selection?.conceptId === concept.id}
                 keyframeImageIndex={selection?.conceptId === concept.id ? selection.imageIndex : undefined}
@@ -2018,6 +2021,7 @@ function FinalFrameRow({
             key={concept.id}
             optionNumber={i + 1}
             label={concept.label}
+            shot={concept.shot}
             cardState={frameStates[frameKey(frame.index, concept.id)]}
             isKeyframe={selection?.conceptId === concept.id}
             keyframeImageIndex={selection?.conceptId === concept.id ? selection.imageIndex : undefined}
@@ -2040,6 +2044,7 @@ function FinalFrameRow({
 function FrameConceptCard({
   optionNumber,
   label,
+  shot,
   cardState,
   isKeyframe,
   keyframeImageIndex,
@@ -2050,6 +2055,7 @@ function FrameConceptCard({
 }: {
   optionNumber: number
   label: string
+  shot?: string
   cardState?: ContinuousFrameCardState
   isKeyframe: boolean
   keyframeImageIndex?: number
@@ -2225,9 +2231,19 @@ function FrameConceptCard({
         </div>
       </div>
 
-      <p className="truncate text-center text-[10px] font-medium tracking-wider text-ink-500" title={label}>
-        {label}
-      </p>
+      {/* Idea slug, plus the concept's assigned shot class. The chip is how the
+          user sees at a glance that a frame really does offer a wide, a macro
+          and a character-scale option rather than three near-identical crops. */}
+      <div className="flex items-center justify-center gap-1.5">
+        {shot && (
+          <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.04] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-400">
+            {shot}
+          </span>
+        )}
+        <p className="truncate text-[10px] font-medium tracking-wider text-ink-500" title={label}>
+          {label}
+        </p>
+      </div>
     </div>
   )
 }

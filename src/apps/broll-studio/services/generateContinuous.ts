@@ -126,7 +126,14 @@ export function buildContinuousPreamble(opts: {
     )
   }
   if (opts.character) {
-    parts.push("Match the character's face, hair, and wardrobe to the character reference image, translated faithfully into the sequence's art style.")
+    // The character reference is almost always a chest-up portrait, and an image
+    // model handed a portrait returns the portrait's crop unless it is told not
+    // to. Every other reference class here already carries an anti-composition
+    // clause; this one didn't, which is why every keyframe came back a centred
+    // medium shot of the character no matter what shot the prompt asked for.
+    parts.push(
+      "Match the character's face, hair, and wardrobe to the character reference image, translated faithfully into the sequence's art style. That image is an IDENTITY card, not a shot: ignore its crop, camera distance, lens height, angle, eyeline, pose, and background completely. The framing comes ONLY from the description below — if it asks for a wide shot, an aerial, a low angle, an over-the-shoulder view, a body part with no face, or the character small inside a large space, render exactly that. Never fall back to a chest-up portrait facing the lens.",
+    )
   }
   if (opts.product) {
     parts.push("Match the product's shape, label text, and colours exactly to the product reference image, translated into the sequence's art style.")
@@ -143,19 +150,86 @@ export function buildContinuousPreamble(opts: {
   return `REFERENCE USAGE — ${parts.join(' ')}`
 }
 
+// ── Shot design ────────────────────────────────────────────────
+//
+// The failure this exists to fix: every concept of every frame came back a
+// centred medium or close-up of the character. Four causes stacked, and all
+// four had to go:
+//   1. the character reference is a chest-up portrait and the preamble never
+//      told the image model to ignore its crop (fixed above);
+//   2. the safe-zone rule read as a COMPOSITION rule — "the subject is centred
+//      with comfortable margins" — and for a person the cheapest way to satisfy
+//      that is a centred medium shot;
+//   3. the anchor rule demanded every concept of a frame carry the anchor "at
+//      the same screen position AND the same scale", which forces all three
+//      concepts to one shot size. The model resolved the contradiction with
+//      "different metaphor, identical framing";
+//   4. "three genuinely different concepts" left scale free, and a free choice
+//      collapses to the mode — which for a UGC script is a talking-head medium.
+//
+// So scale variety is now STRUCTURAL, not requested: each concept slot is
+// ASSIGNED a shot class. Every frame ships one wide, one macro detail, and one
+// character-scale staging, and the creativity lives inside the slot. This is
+// also what guarantees the user always has an un-cropped option to pick.
+const SHOT_LADDER = 'aerial · vast wide · wide · medium-wide · medium · close-up · macro'
+
+export interface ShotSlot {
+  key: string
+  /** Chip text on the concept card. */
+  label: string
+  /** The slot's mandate, written into the storyboard prompt. */
+  brief: string
+}
+
+export const SHOT_SLOTS: ShotSlot[] = [
+  {
+    key: 'wide',
+    label: 'Wide',
+    brief:
+      'THE WIDE — the world at scale. Aerial, vast wide, or wide: the SPACE is the subject. Show where this beat happens, how big it is, and what surrounds it. If a person is in it at all they occupy less than a third of the frame height and read as a figure in an environment, not a portrait. Never a person filling the frame.',
+  },
+  {
+    key: 'detail',
+    label: 'Detail',
+    brief:
+      'THE DETAIL — one thing at extreme range. Macro or tight insert: a surface, a texture, hands mid-action, an object turning, a substance moving, or the view from INSIDE something. No face and no full body — the whole frame is one small thing made enormous.',
+  },
+  {
+    key: 'character',
+    label: 'Character',
+    brief:
+      'THE CHARACTER — a person at story scale, but with a real camera position: from below looking up, from behind over the shoulder, from across the room, in hard profile, half-turned away, small in one corner of a big frame, framed through a doorway or a gap, or seen as a reflection. Never centred and square to the lens, never a chest-up portrait staring down the barrel — that exact shot is what this slot exists to avoid. If the beat genuinely has no person in it, this slot becomes THE CLOSE instead: a close-up or medium-close on the hero object from a distinct camera position, still a different scale from the other two concepts.',
+  },
+]
+
+/** The shot class assigned to concept slot `index` (0-based); cycles if CONCEPTS_PER_FRAME grows. */
+export function shotSlotFor(index: number): ShotSlot {
+  return SHOT_SLOTS[index % SHOT_SLOTS.length]
+}
+
+const SHOT_SLOT_BLOCK = Array.from({ length: CONCEPTS_PER_FRAME }, (_, i) => {
+  const slot = shotSlotFor(i)
+  return `CONCEPT_${i + 1} → <SHOT>${slot.label}</SHOT>. ${slot.brief}`
+}).join('\n\n')
+
+const SHOT_SLOT_KEYS = SHOT_SLOTS.map((s) => s.label).join(' / ')
+
 // ── Prompt formats ─────────────────────────────────────────────
 //
 // One flowing paragraph each, matching Line-by-Line and One-Shot: the labelled
 // multi-field structure these used to carry read disjointed and crowded out the
 // actual idea. Keyframes keep one extra requirement the clip modes don't need —
-// an explicit safe-zone framing note, because 9:16 platform UI overlays the
-// frame edges and a keyframe that crops is unusable as a chain anchor.
+// an explicit safe-zone note, because 9:16 platform UI overlays the frame edges.
+// That note is a CROP rule only: written as "centre the subject" it quietly
+// turned every keyframe into a centred medium shot.
 
 const KEYFRAME_FORMAT = `Every keyframe prompt is ONE flowing paragraph — usually 50-90 words, longer when the idea needs it. Plain, concrete, readable — no labels, no field names, no line breaks, no "Style:" trailer.
 
 Write it like you're describing a still you're looking at right now: what's in frame and in what state (the exact pose, hand position, gaze, and the expression as a real muscle action — "brows drawn together, jaw set", never "looking sad"), the actual space and the two or three specific props that sell it, where the light comes from and its colour, and the materials and textures that make it feel rendered rather than sketched. If there's no character, the hero object and its exact orientation carry the frame.
 
-Always state the framing: the shot size (macro / close-up / medium / wide / overhead / aerial), roughly where the camera sits, and — this one is non-negotiable — that the subject is centred with comfortable margins so nothing crucial touches the frame edge. Platform UI overlays the edges of a vertical 9:16 video.
+Always state the framing as three separate things: the SHOT SIZE, taken off this ladder (${SHOT_LADDER}) and matching the concept's assigned <SHOT> class; the CAMERA POSITION as pure geometry — lens height relative to the subject, distance from it, and angle ("from knee height about four metres back, angled up") — and WHERE IN THE FRAME the subject sits. The camera is a viewpoint, never a prop: never name the filming device (no phone, iPhone, smartphone, front camera, tripod, ring light), not in a hand, not on a table, not in a reflection, and never a mirror selfie.
+
+SAFE ZONE — a crop rule, NOT a centring rule. Platform UI overlays roughly the top and bottom eighth of a vertical 9:16 frame, so keep anything essential — a face, a readable label, the boundary anchor — out of those two bands and clear of the side edges. That is the entire requirement. Off-centre, asymmetric, edge-weighted, low-angle, over-the-shoulder, foreground-obstructed, and subject-tiny-in-a-huge-space framings are all actively wanted. "Centred with comfortable margins" is NOT the goal — it is how this format goes generic, and writing it into every frame is a failure.
 
 Never name the art style, medium, or render technique — the style block is appended separately to every prompt. No captions, subtitles, watermarks, on-screen text, logos, or UI of any kind.`
 
@@ -208,7 +282,7 @@ Turn the user's script into a STORYBOARD:
 2. For every scene, decide VISIBILITY: whether the advertised product is allowed on screen for that beat — see WHOSE PRODUCT IS ON SCREEN below.
 3. For every scene, design its START keyframe. After the last scene, design one FINAL keyframe (the end state the last clip lands on). So there is always exactly ONE more frame than there are scenes.
 4. For every scene, declare the TRANSITION that carries its keyframe into the next one — see THE CHAIN below. Design both frames around it.
-5. Give every keyframe ${CONCEPTS_PER_FRAME} distinct visual CONCEPTS, each declaring the REFERENCE IMAGES it needs.
+5. Give every keyframe ${CONCEPTS_PER_FRAME} distinct visual CONCEPTS — each in its ASSIGNED shot class (see CONCEPT VARIATIONS), each declaring the REFERENCE IMAGES it needs.
 6. For every CONCEPT of every non-final keyframe, write the MOTION that animates THAT specific staging across into the next beat. Motion belongs to the staging, not the scene — a wide aerial and a macro close-up of the same beat travel differently, so each concept gets its own motion, and each one has to execute the scene's transition. Final-frame concepts get NO motion (nothing leaves the last frame).
 
 # SEGMENTATION — ONE SCENE, ONE IDEA
@@ -234,6 +308,7 @@ When VISIBILITY is no but the line still needs a category object on screen (the 
 Each concept declares REFS: character / product / both / none.
 
 - Attach the CHARACTER reference whenever a person could appear, even just their hands. When unsure, attach it — a missing character reference loses the face.
+- The reference is a portrait, so a frame that shows only a body part has to say so: write "only the hands are in frame, no face" (or shoulders, or a silhouette) explicitly. Otherwise the model answers the attached portrait and puts a face back in your macro shot.
 - Attach the PRODUCT reference only when the advertised product is actually in the frame. It is a hard exclusion, not a preference: when VISIBILITY is no, REFS may NEVER include product. A generic stand-in gets NO product reference — that is the whole point.
 - Use "none" for frames with neither a person nor the product (a bare environment, an abstract insert, a pure metaphor).
 
@@ -257,7 +332,8 @@ Banned everywhere: "beautiful", "stunning", "modern", "clean", "minimalist", "hi
 # KEYFRAME RULES
 
 - Each keyframe is a single striking image: one clear subject, one readable idea. If a frame needs a sentence of explanation to work, simplify the idea — then describe the simpler idea in full detail.
-- SAFE FRAMING: vertical 9:16 with platform UI overlaying the edges — keep the subject centred with comfortable margins, never so zoomed that crucial elements touch the frame edge.
+- SAFE ZONE: vertical 9:16 with platform UI over roughly the top and bottom eighth — keep faces, readable labels and the boundary anchor out of those bands and clear of the side edges. That is a crop constraint, not a composition one: it never means "centre the subject", and it never argues for a tighter shot.
+- THE CAMERA IS A VIEWPOINT, NOT A PROP. Never name the filming device — no phone, iPhone, smartphone, front camera, tripod or ring light; nothing held, propped, or reflected; never a mirror selfie. State camera position as geometry instead: lens height, distance, angle.
 - CONTINUITY IS EVERYTHING: consecutive keyframes must read as two moments of the same world. Same character design, same palette, same environment unless the story moves. Frame N+1 must be a state that frame N can physically morph or move into, and it must carry the boundary's anchor.
 - Refer to the on-screen person as "the character" and the advertised product as "the product" — reference images fix their exact look. Never describe the character's identity (gender, age, ethnicity, hair colour, skin tone); pose, expression, gesture, and body language ARE required.
 - The words "the product" mean the ADVERTISED product and nothing else. Never use them for a generic stand-in — describe that one physically instead ("a plain unmarked bar in a blank grey wrapper").
@@ -271,9 +347,11 @@ This is the single most important constraint in the storyboard. Every clip is ge
 So every scene declares a TRANSITION, which is two things in one line:
 
 - The DEVICE that carries the shot across: a match cut on a shared shape, the camera pushing through an object into the next space, one form morphing into another, an object sweeping across the lens as a wipe, a pull-back that reveals the next frame's space around this one, a whip pan that lands in the new place.
-- The ANCHOR: one concrete element that is on screen in BOTH frames, at roughly the same position in frame and roughly the same scale, so the model has something to hold while everything else changes. A circular glow that becomes a lamp. A hand that stays in the lower third. A vertical column of light that becomes a doorway. Same shape, same place, new meaning.
+- The ANCHOR: one concrete element that is on screen in BOTH frames, in roughly the same region of the frame, so the model has something to hold while everything else changes. A circular glow that becomes a lamp. A hand that stays in the lower third. A vertical column of light that becomes a doorway. Same shape, same place, new meaning.
 
-The anchor belongs to the BOUNDARY, not to one staging: every one of frame N's ${CONCEPTS_PER_FRAME} concepts and every one of frame N+1's ${CONCEPTS_PER_FRAME} concepts must carry that same anchor, in that same screen position and scale. That is what lets the user pick any concept on either side and still get a seamless clip. Write the anchor into the prompt text of every concept on both sides of the boundary — never leave it implied.
+The anchor belongs to the BOUNDARY, not to one staging: every one of frame N's ${CONCEPTS_PER_FRAME} concepts and every one of frame N+1's ${CONCEPTS_PER_FRAME} concepts must carry that same anchor, in that same region of frame. That is what lets the user pick any concept on either side and still get a seamless clip. Write the anchor into the prompt text of every concept on both sides of the boundary — never leave it implied.
+
+The anchor's SHAPE and POSITION hold; its SCALE does not have to. The anchor may be a small bright dot in a vast wide and fill half the frame in a macro — a push-in or a pull-back is exactly how a clip crosses that difference, and the concept's own motion is where you say so. The anchor is never a reason to keep two concepts at the same shot size: if you catch yourself matching scale to protect the anchor, match the shape and let the motion carry the scale.
 
 Frames may change scale, place, and subject freely as long as the anchor survives the change. That is the trick the style runs on: the anchor holds, everything around it transforms.
 
@@ -281,11 +359,25 @@ Frames may change scale, place, and subject freely as long as the anchor survive
 
 ${KEYFRAME_FORMAT}
 
-# CONCEPT VARIATIONS
+# CONCEPT VARIATIONS — ONE ASSIGNED SHOT CLASS PER SLOT
 
-The ${CONCEPTS_PER_FRAME} concepts for one keyframe are ${CONCEPTS_PER_FRAME} genuinely DIFFERENT ideas for picturing that same story state — a different visual metaphor, a different subject, a different scale — not one idea framed three ways. A macro close-up, a wide aerial, and an inside-the-object view of the same beat.
+The ${CONCEPTS_PER_FRAME} concepts for one keyframe are ${CONCEPTS_PER_FRAME} genuinely DIFFERENT pictures of the same story state — a different subject, a different metaphor, and above all a different SCALE. Left free, that collapses: the metaphor changes and the framing stays a medium shot of a person. So the scale is assigned, not chosen. Each slot has a fixed shot class and you must obey it:
 
-The variety is in the idea; the anchors are NOT negotiable. Every concept of a frame carries the incoming boundary's anchor and the outgoing boundary's anchor, in the stated screen position and scale — that is what keeps any combination of picks connectable. Each concept carries its OWN motion, matched to its staging and executing its scene's transition. Every concept gets the same depth on both the frame and its motion; a thinner alternative is a failure.
+${SHOT_SLOT_BLOCK}
+
+These are hard slots. Declare the class in <SHOT> and write a frame that genuinely IS that shot. Three concepts of one frame may never share a shot size. If a beat seems to resist a slot, that is the interesting problem — solve it (what does this line look like from the far side of the room? what part of it can fill a macro frame?) rather than quietly returning another medium shot.
+
+The variety is in the idea and the scale; the anchors are NOT negotiable. Every concept of a frame carries the incoming boundary's anchor and the outgoing boundary's anchor, in the stated region of frame — at whatever size that concept's scale implies. Each concept carries its OWN motion, matched to its staging and executing its scene's transition, and a concept whose scale differs sharply from its neighbour says so in the motion (the push-in, the pull-back, the travel through). Every concept gets the same depth on both the frame and its motion; a thinner alternative is a failure.
+
+# SHOT RHYTHM ACROSS THE SEQUENCE
+
+The register is built on scale whiplash — vast, then intimate, then enormous-detail — and on the fact that most frames are WORLDS AND OBJECTS, not a person delivering a line. Hold the whole storyboard to this:
+
+- Consecutive keyframes change shot size by at least one full step on the ladder. Never three frames in a row at the same scale.
+- The narration is HEARD, never seen being spoken. Nobody is ever framed as a talking head, and no frame exists just because a person says the line.
+- The character is not the default subject. Across the sequence, no more than about half the keyframes should be character-led at all; the rest are environments, objects, substances, and metaphors made literal. A line with a person in it can still be told entirely through what their hands are doing, what they are looking at, or the space around them.
+- Open on scale or on a detail — a vast wide, an aerial, or a macro. Never open on a centred medium shot of the character; that is the single most-skipped opening in this format.
+- At least one keyframe in every sequence is a true wide where any person present occupies less than a third of the frame height. If the sequence has none, it is not finished.
 
 # MOTION PROMPT FORMAT (EVERY SCENE)
 
@@ -300,22 +392,24 @@ Wrap your answer in this exact XML envelope. No text outside the tags, no markdo
 <SCENE_1>
 <LINE>exact narration slice, one visual idea, in the script's own words</LINE>
 <VISIBILITY>yes|no</VISIBILITY>
-<TRANSITION>one line: the device carrying this keyframe into the next one, plus the anchor element every concept on BOTH sides must show in the same screen position and scale — e.g. "match cut on the circular glow: the temple light becomes the factory's central lamp, same size, centred, same warm amber"</TRANSITION>
+<TRANSITION>one line: the device carrying this keyframe into the next one, plus the anchor element every concept on BOTH sides must show, in the same region of frame — e.g. "match cut on the circular glow: the temple light becomes the factory's central lamp, held centre-frame, same warm amber, at whatever size each shot implies"</TRANSITION>
 <FRAME>
 <CONCEPT_1>
 <LABEL>2-4 word slug naming the actual idea, e.g. INSIDE THE BOTTLE</LABEL>
+<SHOT>${SHOT_SLOTS[0].label}</SHOT>
 <REFS>character|product|both|none</REFS>
-<PROMPT>one flowing paragraph — the still, described, with the boundary anchors written in</PROMPT>
+<PROMPT>one flowing paragraph — the still, described, in this slot's shot class, with the boundary anchors written in</PROMPT>
 <MOTION>one paragraph: how THIS staging travels across — departure vector and camera move, the crossing mechanism that executes the transition, then the settle. Arrival as movement, never as a picture of the end frame.</MOTION>
 </CONCEPT_1>
-<CONCEPT_2>a DIFFERENT idea for the same story state, carrying the same anchors, same depth, with its OWN REFS and its OWN matched MOTION</CONCEPT_2>
-<CONCEPT_3>a DIFFERENT idea again, carrying the same anchors, same depth, with its OWN REFS and its OWN matched MOTION</CONCEPT_3>
+<CONCEPT_2>a DIFFERENT idea for the same story state, in the ${SHOT_SLOTS[1] ? SHOT_SLOTS[1].label : ''} slot's shot class, carrying the same anchors, same depth, with its OWN SHOT, REFS and matched MOTION</CONCEPT_2>
+<CONCEPT_3>a DIFFERENT idea again, in the ${SHOT_SLOTS[2] ? SHOT_SLOTS[2].label : ''} slot's shot class, carrying the same anchors, same depth, with its OWN SHOT, REFS and matched MOTION</CONCEPT_3>
 </FRAME>
 </SCENE_1>
 (repeat <SCENE_N> for every scene, in script order)
 <FINAL_FRAME>
 <CONCEPT_1>
 <LABEL>2-4 word slug</LABEL>
+<SHOT>${SHOT_SLOTS[0].label}</SHOT>
 <REFS>character|product|both|none</REFS>
 <PROMPT>one flowing paragraph — the still, described, carrying the last boundary's anchor (NO motion; nothing leaves the final frame)</PROMPT>
 </CONCEPT_1>
@@ -348,7 +442,9 @@ function buildUserPrompt(input: ContinuousInput): string {
     prompt += `\n${input.modelContext}\nIMPORTANT: never describe the character's physical appearance — say "the character"; a reference image fixes their look.\n`
   }
   if (input.additionalContext) prompt += `\nAdditional context and instructions:\n${input.additionalContext}\n`
-  prompt += `\nWrite the full <STORYBOARD> now. Split any line that carries two visual ideas into two scenes. Every keyframe concept gets the same depth — no thinning out on the later scenes.`
+  prompt += `\nWrite the full <STORYBOARD> now. Split any line that carries two visual ideas into two scenes. Every keyframe concept gets the same depth — no thinning out on the later scenes.
+
+Before you finish, check the framing: every frame's ${CONCEPTS_PER_FRAME} concepts sit in their assigned shot slots (${SHOT_SLOT_KEYS}) and no two share a shot size; consecutive keyframes change scale; at most about half the keyframes are character-led; the opening frame is not a centred medium shot of the character; and at least one frame in the sequence is a true wide. If any of that fails, rewrite it before answering.`
   return prompt
 }
 
@@ -365,8 +461,9 @@ function cleanPromptBody(text: string): string {
   return text
     .replace(/<LABEL>[\s\S]*?<\/LABEL>/gi, '')
     .replace(/<REFS>[\s\S]*?<\/REFS>/gi, '')
+    .replace(/<SHOT>[\s\S]*?<\/SHOT>/gi, '')
     .replace(/<VISIBILITY>[\s\S]*?<\/VISIBILITY>/gi, '')
-    .replace(/<\/?(STORYBOARD|SCENE_\d+|CONCEPT_\d+|FINAL_FRAME|FRAME|PROMPT|LABEL|REFS|VISIBILITY|LINE|MOTION|TRANSITION|STYLE)>/gi, '')
+    .replace(/<\/?(STORYBOARD|SCENE_\d+|CONCEPT_\d+|FINAL_FRAME|FRAME|PROMPT|LABEL|REFS|SHOT|VISIBILITY|LINE|MOTION|TRANSITION|STYLE)>/gi, '')
     .trim()
 }
 
@@ -376,6 +473,21 @@ function cleanPromptBody(text: string): string {
 function parseConceptRefs(raw: string | null): VariationRefs | undefined {
   const v = raw?.trim().toLowerCase()
   return v === 'character' || v === 'product' || v === 'both' || v === 'none' ? v : undefined
+}
+
+// The concept's shot class. Slots are assigned by position, so the slot's own
+// label is the fallback whenever the model omits or garbles <SHOT> — the chip
+// then reports what the slot was SUPPOSED to be, which is also what a
+// Regenerate of that card will be held to.
+function parseConceptShot(raw: string | null, slotIndex: number): string {
+  const v = raw?.trim()
+  const slot = shotSlotFor(slotIndex)
+  if (!v) return slot.label
+  const matched = SHOT_SLOTS.find((s) => v.toLowerCase().includes(s.key))
+  if (matched) return matched.label
+  // An off-menu answer ("vast wide", "aerial") is still useful direction — keep
+  // it, trimmed to something that fits a chip.
+  return v.split(/\s+/).slice(0, 3).join(' ')
 }
 
 let idCounter = 0
@@ -408,6 +520,7 @@ function parseConcepts(frameBlock: string, productVisible: boolean | undefined):
     concepts.push({
       id: nextConceptId(),
       label: extractTag(block, 'LABEL') ?? `Option ${concepts.length + 1}`,
+      shot: parseConceptShot(extractTag(block, 'SHOT'), concepts.length),
       prompt,
       ...(refs ? { refs } : {}),
       ...(motion ? { motionPrompt: motion } : {}),
@@ -500,6 +613,10 @@ export async function generateContinuous(input: ContinuousInput): Promise<Contin
 export interface FrameContext {
   style: string
   conceptLabel?: string
+  // The concept's assigned shot class. Rides into Enhance and Regenerate so a
+  // rewrite stays in its slot instead of sliding back to a medium shot of the
+  // character — the collapse this whole slot system exists to stop.
+  conceptShot?: string
   scriptLine: string
   inboundMotion?: string
   outboundMotion?: string
@@ -525,6 +642,7 @@ export function frameContextFor(
     productContext?: string
     modelContext?: string
     conceptLabel?: string
+    conceptShot?: string
     // The motions actually in play on the clips either side of this frame —
     // the picked concept's motion, or whatever the user hand-edited. Pass them
     // whenever they're known: `scene.motionPrompt` is only ever the FIRST
@@ -540,6 +658,7 @@ export function frameContextFor(
   return {
     style: result.style,
     conceptLabel: ctx.conceptLabel,
+    conceptShot: ctx.conceptShot,
     scriptLine: outbound?.scriptLine ?? '',
     inboundMotion: ctx.inboundMotion?.trim() || inbound?.motionPrompt,
     outboundMotion: ctx.outboundMotion?.trim() || outbound?.motionPrompt,
@@ -554,19 +673,32 @@ export function frameContextFor(
   }
 }
 
+// The slot mandate for a stored shot label, so a single-card rewrite is held to
+// the same shot class the storyboard assigned it.
+function shotBriefBlock(shot?: string): string {
+  const label = shot?.trim()
+  if (!label) return ''
+  const slot = SHOT_SLOTS.find((s) => s.label.toLowerCase() === label.toLowerCase())
+  const mandate = slot
+    ? slot.brief
+    : `Stay at this shot size — do not tighten toward a medium shot or a portrait.`
+  return `\nTHIS CONCEPT'S SHOT CLASS — non-negotiable, keep it: ${label}. ${mandate}\nState the shot size, the camera position as geometry (lens height, distance, angle), and where the subject sits in the frame. Off-centre and asymmetric framing is wanted; the safe zone is only a crop rule (nothing essential in the top or bottom eighth), never an instruction to centre the subject.\n`
+}
+
 function frameBriefBlock(ctx: FrameContext, frameIndex: number): string {
   let out = `STYLE (fixed for the sequence — never restate it inside the prompt): ${ctx.style}\n`
+  out += shotBriefBlock(ctx.conceptShot)
   out += ctx.isOpening
     ? '\nThis is the OPENING keyframe of the ad.\n'
     : `\nThe motion ARRIVING at this frame (from the previous keyframe):\n${ctx.inboundMotion || '(not specified)'}\n`
   if (ctx.inboundTransition?.trim()) {
-    out += `The transition INTO this frame — the anchor named here must be visible in this frame, in the stated position and scale:\n${ctx.inboundTransition.trim()}\n`
+    out += `The transition INTO this frame — the anchor named here must be visible in this frame, in the stated region of frame (at whatever size this concept's shot class implies):\n${ctx.inboundTransition.trim()}\n`
   }
   out += ctx.isFinal
     ? 'This is the FINAL keyframe — the end state the last clip lands on.\n'
     : `The narration line this frame opens: "${ctx.scriptLine}"\nThe motion LEAVING this frame (into the next keyframe):\n${ctx.outboundMotion || '(not specified)'}\n`
   if (!ctx.isFinal && ctx.outboundTransition?.trim()) {
-    out += `The transition OUT of this frame — its anchor must also be visible here, in the stated position and scale:\n${ctx.outboundTransition.trim()}\n`
+    out += `The transition OUT of this frame — its anchor must also be visible here, in the stated region of frame (at whatever size this concept's shot class implies):\n${ctx.outboundTransition.trim()}\n`
   }
   if (ctx.productContext) {
     out += `\n${ctx.productContext}\n`
@@ -595,7 +727,7 @@ Current prompt:
 ${draft}
 """
 
-Return ONE flowing paragraph, usually 50-90 words, keeping the safe-zone framing note. If the draft is a labelled multi-line block (SUBJECT: / SETTING: / ...), that is exactly what you are here to fix: fold it into one readable paragraph, keeping the idea.
+Return ONE flowing paragraph, usually 50-90 words, keeping the safe-zone note as a crop constraint (nothing essential in the top or bottom eighth) — never rewrite it into "the subject is centred". If the draft is a labelled multi-line block (SUBJECT: / SETTING: / ...), that is exactly what you are here to fix: fold it into one readable paragraph, keeping the idea.
 
 ${FRAME_ENVELOPE_NOTE}
 <PROMPT>
@@ -618,7 +750,9 @@ export async function regenerateContinuousFrame(ctx: FrameContext, frameIndex: n
 
 ${frameBriefBlock(ctx, frameIndex)}
 ${ctx.existingLabels.length ? `\nStagings already used on this frame: ${ctx.existingLabels.join(' · ')}\n` : ''}
-Return ONE flowing paragraph, usually 50-90 words, including the safe-zone framing note.
+A fresh idea means a new subject, a new metaphor, or a new camera position — it does NOT mean a new shot size if this card has a shot class above. Keep the class and find a different picture inside it. If this card has no shot class, pick something well away from a centred medium shot of the character.
+
+Return ONE flowing paragraph, usually 50-90 words, including the safe-zone crop note.
 
 ${FRAME_ENVELOPE_NOTE}
 <PROMPT>
@@ -728,7 +862,7 @@ one flowing paragraph
 // real depth, so the preview doesn't undersell the output.
 
 interface DemoFrameSpec {
-  concepts: { label: string; prompt: string }[]
+  concepts: { label: string; shot: string; prompt: string }[]
 }
 
 const DEMO_STYLE =
@@ -759,15 +893,18 @@ const DEMO_FRAMES: DemoFrameSpec[] = [
     concepts: [
       {
         label: 'MOONLIT BEDROOM',
-        prompt: 'A small lived-in bedroom at night seen from just outside the window, the character asleep on their side under a thick quilted duvet, one arm folded beside the pillow, lips slightly parted, brow completely smooth. A single warm point of light glows at their temple, pooling gold on the pillow beneath while cool blue moonlight rakes across the quilting from the upper left. A paperback lies face-down on the nightstand beside a sweating glass of water. Medium-wide from just above the sleeping figure, angled down through the window frame, the character centred with generous headroom and clear side margins so nothing crucial touches the edge.',
-      },
-      {
-        label: 'OVERHEAD SLEEPER',
-        prompt: 'Straight down onto the bed from directly above: the character flat on their back, arms relaxed at their sides on top of the duvet, palms open and upward, head turned a few degrees on the pillow. The duvet folds radiate outward from the body like still ripples on water, deep and soft with visible weave. Flat cool blue light fills the room evenly with almost no hard shadow, and a soft amber halo around the head is the only warm accent, glowing faintly into the pillow. The figure runs vertically up the centre of the frame with comfortable margin at head and foot.',
+        shot: 'Wide',
+        prompt: 'A small lived-in bedroom at night seen from outside through the window: the character asleep on their side under a thick quilted duvet, one arm folded beside the pillow, brow completely smooth, the whole bed reading small against the dark room around it. A single warm point of light glows at their temple, pooling gold on the pillow while cool blue moonlight rakes across the quilting from the upper left and picks out a paperback face-down on the nightstand. Wide from second-storey height about four metres back, angled down through the window frame, the bed sitting low and left of centre with the empty room stacked above it.',
       },
       {
         label: 'TEMPLE GLOW MACRO',
-        prompt: 'Very close on the sleeping character\'s face resting on the pillow, three-quarter profile, eyes gently closed with lashes clearly defined, mouth relaxed, one hand curled loosely near the chin. A single warm point of light pulses at the temple just above the cheekbone — it is the key light, wrapping the near cheek in soft amber and falling off fast, while cool moonlight rims the back of the head and separates it from the dark. Pillow fibres catch the glow; the room behind falls away into unlit depth. Framed from pillow height, the face centred and slightly low with clear room above.',
+        shot: 'Detail',
+        prompt: 'Macro on the temple alone — only skin, hair and pillow in frame, no full face and no eyes. A single warm point of light pulses just above the cheekbone, the key source, wrapping the near skin in soft amber and falling off fast across fine hairs while cool moonlight rims the edge behind and separates it from the dark. Individual pillow fibres catch the glow and throw tiny shadows. Framed from pillow height a hand-span away, the glow sitting in the upper right third with the pillow weave filling the rest.',
+      },
+      {
+        label: 'OVERHEAD SLEEPER',
+        shot: 'Character',
+        prompt: 'Straight down onto the bed from directly above, two metres up: the character flat on their back, arms relaxed at their sides on top of the duvet, palms open and upward, head turned a few degrees on the pillow. The duvet folds radiate outward from the body like still ripples on water, deep and soft with visible weave. Flat cool blue light fills the room evenly with almost no hard shadow, and a soft amber halo at the temple is the only warm accent, glowing faintly into the pillow. The figure lies diagonally across frame, head in the upper left, the bare floor entering bottom right.',
       },
     ],
   },
@@ -775,47 +912,56 @@ const DEMO_FRAMES: DemoFrameSpec[] = [
     concepts: [
       {
         label: 'NEURAL FACTORY',
-        prompt: 'The inside of the brain staged as a vast working factory hall: translucent neural pathways running through it as glass tubes carrying streams of small amber orbs, arched walkways branching overhead, a wide central floor. A handful of rounded cleanup drones sweep grey dust from the gantries with soft brushes, their matte shells catching the light. Warm amber travels through the tubes and underlights everything from within while cool blue ambient falls from above, so the warm streams read bright against a cold room. Wide establishing shot from walkway height looking down the hall, the central channel running up the middle with clear headroom above the arches.',
+        shot: 'Wide',
+        prompt: 'The inside of the brain staged as a vast working factory hall: translucent neural pathways running through it as glass tubes carrying streams of small amber orbs, arched walkways branching overhead, a wide floor falling away into haze. Rounded cleanup drones sweep grey dust from the gantries with soft brushes, tiny against the architecture. Warm amber travels through the tubes and underlights everything from within while cool blue ambient falls from above, so the warm streams read bright against a cold room. Vast wide from high on an upper gantry looking down the hall, the lit central channel running from bottom left toward the far arches with the roof structure filling the upper frame.',
       },
       {
         label: 'RIVER OF LIGHT',
-        prompt: 'A luminous river of amber particles winding through a deep blue cavern, carrying loose grey motes away downstream — the river itself is the subject, no figure anywhere. The cavern walls are formed from soft neuron trees with branching rounded canopies, reeds of light lining the near bank, the water rippling and throwing dancing reflections up onto the underside of the canopy. Mist hangs just above the surface. Framed low from barely above the water looking upstream so the current flows toward and past the lens, the river running up the centre of the frame with the banks holding comfortable margin on both sides.',
+        shot: 'Detail',
+        prompt: 'Macro at the surface of a luminous river of amber particles, close enough that individual grains separate and drift — loose grey motes tumbling among them and being carried away, the current filling the whole frame. Reeds of light break the surface at the near edge, refracting and throwing dancing reflections; thin mist sits just above the water and softens the far grains into bloom. No figure anywhere. Framed from a few centimetres above the surface looking downstream, the bright current running diagonally from upper left to lower right with a dark bank cutting into the top corner.',
       },
       {
         label: 'CONTROL ROOM',
-        prompt: 'A cosy mission-control room built inside the head, all rounded consoles and padded surfaces. A small rounded robot operator stands at the console, both hands on a large lever pulled fully down, posture leaning into the pull, its single soft-glowing eye fixed on three curved screens showing tidy streams of light flowing outward. Chunky dials and glossy buttons fill the foreground; a porthole looks out into deep blue behind, its cool backlight rimming the robot\'s shoulders while warm amber from the screens washes its front. Medium shot from slightly below the robot\'s eye line, angled up, the robot centred with clear margin around the console edges.',
+        shot: 'Character',
+        prompt: 'A cosy mission-control room built inside the head, all rounded consoles and padded surfaces. A small rounded robot operator seen from behind and slightly to one side, both hands on a large lever pulled fully down, shoulders leaning into the pull, its single soft-glowing eye reflected in three curved screens showing tidy streams of light flowing outward. Chunky dials and glossy buttons fill the near foreground out of focus; a porthole looks into deep blue beyond, its cool backlight rimming the robot while warm screen amber washes the console. From just above shoulder height a metre behind, the robot low and right of frame with the screens filling the space above.',
       },
     ],
   },
   {
     concepts: [
       {
-        label: 'HERO JAR RISE',
-        prompt: 'The product standing upright and centred on a bedside table in the blue night bedroom, lid off beside it, a gentle spiral of glowing powder rising from the open mouth and curling toward the top of frame. A warm amber glow climbs from inside the container and underlights the spiral from below, while cool moonlight from the window rims its left edge and catches a sweating glass of water behind. The bed and the sleeping figure read as a soft silhouette in the deeper background. Framed from just below the product\'s shoulder height, angled slightly up so it reads heroic, with clear margin on every side.',
+        label: 'GLOW HANDOFF',
+        shot: 'Wide',
+        prompt: 'The whole bedroom from the far corner: the character\'s hand setting the product down on the nightstand, fingers still resting on the lid, while a ribbon of warm light arcs the length of the room from the product to their head on the pillow, physically connecting the two across the frame. The ribbon is the key source, glowing along its whole length with soft translucent edges, spilling onto the duvet and the back of the hand, while cool moonlight fills everything it does not touch. Faint particles drift along the arc. Wide from standing height three metres back, the bed running away to the right, the product small and low left.',
       },
       {
         label: 'SCOOP POUR',
-        prompt: 'Macro on a rounded scoop tipping slowly, releasing a stream of glowing powder into a glass of water below, the grains separating in the fall and the water already spiralling with amber light where the stream has entered. Tiny bubbles rise; light bends and refracts through the glass, throwing a small warm caustic onto the tabletop beside it. The product stands tall just behind with its lid resting alongside, the bedroom reduced to dark blue shapes. Framed at glass height, very close, three-quarter from the left, the glass centred and low with the scoop entering from the upper right, both well inside the edges.',
+        shot: 'Detail',
+        prompt: 'Macro on a rounded scoop tipping slowly, releasing a stream of glowing powder into a glass of water below, the grains separating in the fall and the water already spiralling with amber light where the stream has entered. Tiny bubbles climb the inside of the glass; light bends and refracts through it, throwing a small warm caustic onto the tabletop. Only glass, scoop and powder in frame, the bedroom behind reduced to unfocused dark blue. Framed at glass height a hand-span away, three-quarter from the left, the glass low and left with the scoop entering top right.',
       },
       {
-        label: 'GLOW HANDOFF',
-        prompt: 'The character\'s hand setting the product down on the nightstand, fingers still resting on the lid, while a ribbon of warm light arcs from the product across the frame to their head on the pillow, physically connecting the two. The ribbon is the key source, glowing along its whole length with soft translucent edges, spilling onto the duvet beneath and the back of the hand, while cool moonlight fills everything it does not touch. Faint particles drift along the arc. Wide from table height angled along the length of the bed, the ribbon running diagonally with the product low-left and the head upper-right, both held inside the safe margin.',
+        label: 'HERO JAR RISE',
+        shot: 'Close',
+        prompt: 'Close on the product standing upright on the bedside table in the blue night bedroom, lid off beside it, a gentle spiral of glowing powder rising from the open mouth and curling out of the top of frame. A warm amber glow climbs from inside the container and underlights the spiral from below, while cool moonlight from the window rims its left edge and catches a sweating glass of water just behind. The bed and the sleeping figure read as a soft silhouette in the deeper background. From just below the product\'s shoulder height half a metre away, angled up so it reads heroic, the product standing right of centre.',
       },
     ],
   },
   {
     concepts: [
       {
-        label: 'RESTORED MORNING',
-        prompt: 'The same bedroom at sunrise, the character sitting up in bed mid-stretch with both arms raised and elbows bent, back slightly arched, eyes open and face bright with an easy unforced smile. The duvet has fallen to their waist in crisp creases. Warm golden light streams in from the window camera-right, wrapping their face and shoulders, rimming the hair, throwing a long soft shadow across the bed and catching a specular highlight on the product\'s curve on the nightstand beside the now-empty glass. Dust drifts in the sunbeam. Medium shot from just below eye level, straight on, with clear headroom above the raised arms.',
-      },
-      {
         label: 'AURA WIDE',
-        prompt: 'The character asleep and completely still, now wrapped head to toe in an even calm amber aura that follows the contour of their body under the duvet, face smooth and untroubled. The aura is the dominant source, glowing outward and lifting the nearby bedding, floor and nightstand out of the dark with a soft graduated falloff at its outer edge and a gentle bloom over the whole frame. The window behind is warming toward dawn, its cool-to-warm gradient meeting the aura halfway across the room. Wide from slightly above the bed angled gently down, the figure running across the middle with generous space above and below.',
+        shot: 'Wide',
+        prompt: 'The whole bedroom at dawn seen from the far wall, the character asleep and completely still, small in the frame, wrapped head to toe in an even calm amber aura that follows the contour of their body under the duvet. The aura is the dominant source, lifting the nearby bedding, floor and nightstand out of the dark with a soft graduated falloff and a gentle bloom across the whole room. The window behind is warming toward dawn, its cool-to-warm gradient meeting the aura halfway across the floor. Vast wide from ceiling height four metres back, angled gently down, the bed low in frame with the room open above it.',
       },
       {
         label: 'BRAIN AT PEACE',
-        prompt: 'The factory hall from before, now spotless and dim: the cleanup drones parked in a neat row along the left wall with their brushes stowed, one last amber orb drifting slowly upward through the centre trailing a soft bloom. The arched pathways are clear of dust and glow a steady even amber that washes the whole hall in warm light, the earlier cold blue faded to a faint edge along the far arches. Surfaces read clean and reflective, shadows shallow and soft. Wide from walkway height looking down the hall — deliberately the same geometry as the earlier factory frame — the rising orb centred with clear headroom above.',
+        shot: 'Detail',
+        prompt: 'Macro on one last amber orb drifting slowly upward, filling the frame, its translucent shell trailing a soft bloom and its interior showing faint moving light. Behind it the factory hall reads only as clean out-of-focus shapes glowing steady even amber — the cleanup drones parked and stowed, no dust anywhere, the earlier cold blue gone to a faint edge. Surfaces catch shallow soft reflections. Framed at orb height a few centimetres away as it rises, the orb held left of centre with the blurred arches falling away to the right.',
+      },
+      {
+        label: 'RESTORED MORNING',
+        shot: 'Character',
+        prompt: 'The same bedroom at sunrise, the character sitting up in bed mid-stretch with both arms raised and elbows bent, back arched, eyes open and face bright with an easy unforced smile, seen in three-quarter profile from across the room. The duvet has fallen to their waist in crisp creases. Warm golden light streams in from the window behind them, rimming hair and shoulders, throwing a long soft shadow across the bed and catching a specular highlight on the product\'s curve on the nightstand beside the now-empty glass. Dust drifts in the sunbeam. From knee height two metres away, angled up, the figure sitting right of frame with the window filling the left.',
       },
     ],
   },
@@ -839,7 +985,7 @@ export function buildDemoContinuousResult(modelId: string, styleId: string): Con
     })),
     frames: DEMO_FRAMES.map((f, i) => ({
       index: i + 1,
-      concepts: f.concepts.map((c) => ({ id: `demo-cont-${++stamp}`, label: c.label, prompt: c.prompt })),
+      concepts: f.concepts.map((c) => ({ id: `demo-cont-${++stamp}`, label: c.label, shot: c.shot, prompt: c.prompt })),
     })),
   }
 }

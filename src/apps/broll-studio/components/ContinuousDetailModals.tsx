@@ -121,6 +121,7 @@ interface ContinuousFrameModalProps {
   frameLabel: string    // "Frame 3" / "Final Frame"
   frameNumber: number   // the frame index, shown as a serif "01" in the header
   conceptLabel: string  // the concept's staging slug
+  conceptShot?: string  // its assigned shot class ("Wide" / "Detail" / "Character")
   scriptLine: string    // the narration line this frame opens ('' for final)
   style: string
   cardState: ContinuousFrameCardState
@@ -162,6 +163,7 @@ export function ContinuousFrameModal({
   frameLabel,
   frameNumber,
   conceptLabel,
+  conceptShot,
   scriptLine,
   style,
   cardState,
@@ -614,9 +616,22 @@ export function ContinuousFrameModal({
               </span>
               <div className="h-8 w-px shrink-0 bg-ink/10" />
               <div className="flex min-w-0 flex-col gap-1">
-                <span className="inline-flex w-fit rounded-full border border-ink/10 bg-ink/[0.03] px-2.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wider text-ink-400">
-                  {conceptLabel}
-                </span>
+                {/* Identity pill, plus the concept's shot class — Enhance and
+                    Regenerate are both held to it, so it belongs on screen
+                    while the prompt is being edited. */}
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="inline-flex w-fit shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-2.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wider text-ink-400">
+                    {conceptLabel}
+                  </span>
+                  {conceptShot && (
+                    <span
+                      className="inline-flex w-fit shrink-0 rounded-full border border-broll-500/20 bg-broll-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wider text-broll-400"
+                      title="This concept's shot class — Enhance and Regenerate keep it"
+                    >
+                      {conceptShot}
+                    </span>
+                  )}
+                </div>
                 <span
                   className="min-w-0 truncate text-[15px] leading-tight text-ink-300"
                   style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}

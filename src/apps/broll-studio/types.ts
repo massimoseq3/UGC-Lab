@@ -363,6 +363,13 @@ export interface OneShotCardState {
 export interface ContinuousConcept {
   id: string
   label: string
+  // The concept's assigned shot class ('Wide' / 'Detail' / 'Character' — see
+  // SHOT_SLOTS). Scale variety across a frame's concepts is structural, not
+  // requested: each slot is handed a shot class the storyboard must obey, so
+  // every frame ships one un-cropped option. Shown as a chip on the card and
+  // fed back into Regenerate so a fresh take can't drift to a medium shot.
+  // Absent on legacy sessions and on hand-added concepts.
+  shot?: string
   prompt: string
   // Which reference images this staging should attach, as decided by the
   // storyboard. Mirrors PromptVariation.refs — the card turns it into the two
