@@ -205,6 +205,13 @@ export interface ScriptHistoryItem {
   writeLength?: number
   // Hooks format only: the formula-family choice ('auto' or a category slug).
   hookCategory?: string
+  // How many takes this run asked for. Absent on rows saved before the count
+  // became pickable (those always produced five).
+  variationCount?: number
+  // Remix only: the angles used, in card order. Absent on pre-pickable rows,
+  // which OutputPanel matches by variation count instead. Plain strings so the
+  // store doesn't import an app-level union.
+  remixAngles?: string[]
   createdAt: number
 }
 

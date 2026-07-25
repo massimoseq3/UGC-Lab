@@ -7,10 +7,10 @@ import {
   fileToDataUri,
   type ChatMessage,
 } from '../../../utils/kie'
-import { getChatEndpointPath } from '../../../utils/models'
+import { getChatEndpointPath, CHAT_MODEL_DEFAULT } from '../../../utils/models'
 import { formatKeyframeTimestamp, type Keyframe } from '../utils/extractKeyframes'
 
-const CHAT_MODEL_ID = 'gemini-3-flash'
+const CHAT_MODEL_ID = CHAT_MODEL_DEFAULT
 // Streaming fallback timeout — kept generous since chat completions don't
 // have intermediate progress signals like the task-based flow.
 const STREAM_TIMEOUT_MS = 300_000

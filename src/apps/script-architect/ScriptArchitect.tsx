@@ -7,7 +7,7 @@ import InputPanel from './components/InputPanel'
 import RightPanel from './components/RightPanel'
 import { generateScript } from './services/generateScript'
 import { humanizeError } from '../../utils/friendlyError'
-import { WRITE_STYLE_META, HOOK_CATEGORY_META, detectSceneBlueprint, isWriteStyle, isHookCategoryChoice, parseHooks, type ScriptMode, type ScriptUiMode, type EditableProductContext, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice } from './types'
+import { WRITE_STYLE_META, HOOK_CATEGORY_META, detectSceneBlueprint, isWriteStyle, isHookCategoryChoice, isVariationCount, parseHooks, DEFAULT_VARIATION_COUNT, type ScriptMode, type ScriptUiMode, type EditableProductContext, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount, type RemixAngle } from './types'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 
 interface ReverseEngineerPayload {
@@ -43,7 +43,7 @@ export default function ScriptArchitect() {
   })
   const [source, setSource] = usePersistedState(`${baseKey}:source`, readLegacySource(baseKey))
   // Override for the blueprint auto-detect: remix the pasted blueprint as a
-  // plain script (5 variations) instead of rewriting its scene prompts.
+  // plain script (a batch of variations) instead of rewriting its scene prompts.
   const [forceTranscript, setForceTranscript] = useState(false)
   const [brief, setBrief] = usePersistedState(`${baseKey}:brief`, '')
   const [writeStyle, setWriteStyle] = usePersistedState<WriteStyle>(`${baseKey}:writeStyle`, 'pas', {
@@ -51,6 +51,10 @@ export default function ScriptArchitect() {
   })
   const [writeFormat, setWriteFormat] = usePersistedState<WriteFormat>(`${baseKey}:writeFormat`, 'script')
   const [writeLength, setWriteLength] = usePersistedState<WriteLength>(`${baseKey}:writeLength`, 15)
+  // How many takes a generate returns. Applies to both modes; Hooks ignores it.
+  const [variationCount, setVariationCount] = usePersistedState<VariationCount>(`${baseKey}:variationCount`, DEFAULT_VARIATION_COUNT, {
+    sanitize: (v) => (isVariationCount(v) ? v : DEFAULT_VARIATION_COUNT),
+  })
   // Hooks format: which formula family the pack draws from ('auto' = mixed).
   const [hookCategory, setHookCategory] = usePersistedState<HookCategoryChoice>(`${baseKey}:hookCategory`, 'auto', {
     sanitize: (v) => (isHookCategoryChoice(v) ? v : 'auto'),
@@ -86,6 +90,10 @@ export default function ScriptArchitect() {
   // prompt — not whatever the live left-panel toggles read now.
   const [outputFormat, setOutputFormat] = usePersistedState<WriteFormat>(`${baseKey}:outputFormat`, 'script')
   const [outputLength, setOutputLength] = usePersistedState<WriteLength>(`${baseKey}:outputLength`, 15)
+  // Remix only: the angle list that produced the *currently shown* cards, so
+  // labels come from what actually ran rather than from re-deriving off a list
+  // that may have been reordered or resized since.
+  const [outputAngles, setOutputAngles] = usePersistedState<RemixAngle[] | null>(`${baseKey}:outputAngles`, null)
   const [outputHookCategory, setOutputHookCategory] = usePersistedState<HookCategoryChoice>(`${baseKey}:outputHookCategory`, 'auto', {
     sanitize: (v) => (isHookCategoryChoice(v) ? v : 'auto'),
   })
@@ -192,12 +200,14 @@ export default function ScriptArchitect() {
         writeFormat,
         writeLength,
         hookCategory,
+        variationCount,
         productId: selectedProduct.id,
         productName: selectedProduct.productName,
         productContext,
         additionalContext,
       })
       setVariations(result.variations)
+      setOutputAngles(result.angles ?? null)
 
       const inputSource = mode === 'write' ? brief : source
       const item: ScriptHistoryItem = {
@@ -215,16 +225,21 @@ export default function ScriptArchitect() {
         writeFormat,
         writeLength,
         hookCategory,
+        variationCount,
+        remixAngles: result.angles,
         createdAt: Date.now(),
       }
       addScriptHistory(item)
       setActiveHistoryId(item.id)
 
       const hookCount = writeFormat === 'hooks' ? parseHooks(result.variations[0] ?? '').length : 0
+      // Count what actually came back rather than the configured batch size, so
+      // the toast stays honest if a take fails or the count changes again.
+      const n = result.variations.length
       useAppStore.getState().addToast(
         resolvedMode === 'write'
-          ? (writeFormat === 'hooks' ? `${hookCount || 'Your'} hooks generated` : writeFormat === 'prompt' ? '5 cinematic concepts generated' : writeFormat === 'scenes' ? '5 scene drafts generated' : '5 scripts generated')
-          : resolvedMode === 'remix' ? '5 script variations generated' : 'Script rewritten',
+          ? (writeFormat === 'hooks' ? `${hookCount || 'Your'} hooks generated` : writeFormat === 'prompt' ? `${n} cinematic concepts generated` : writeFormat === 'scenes' ? `${n} scene drafts generated` : `${n} scripts generated`)
+          : resolvedMode === 'remix' ? `${n} script variations generated` : 'Script rewritten',
         'success',
       )
     } catch (err) {
@@ -247,6 +262,10 @@ export default function ScriptArchitect() {
     setOutputFormat(item.writeFormat ?? 'script')
     setOutputLength(item.writeLength === 10 || item.writeLength === 15 || item.writeLength === 30 || item.writeLength === 60 ? item.writeLength : 15)
     setOutputHookCategory(isHookCategoryChoice(item.hookCategory) ? item.hookCategory : 'auto')
+    // Rows saved before the count was pickable carry no angle list; OutputPanel
+    // falls back to matching them by variation count.
+    setOutputAngles((item.remixAngles as RemixAngle[] | undefined) ?? null)
+    if (isVariationCount(item.variationCount)) setVariationCount(item.variationCount)
     // Restore the left-panel inputs too. Older rows (saved before these
     // fields existed) fall back to the inputSummary slice for the source so
     // something sensible reappears.
@@ -304,6 +323,8 @@ export default function ScriptArchitect() {
           onWriteFormatChange={setWriteFormat}
           writeLength={writeLength}
           onWriteLengthChange={setWriteLength}
+          variationCount={variationCount}
+          onVariationCountChange={setVariationCount}
           hookCategory={hookCategory}
           onHookCategoryChange={setHookCategory}
           selectedProduct={selectedProduct}
@@ -322,6 +343,7 @@ export default function ScriptArchitect() {
         <RightPanel
           variations={variations}
           mode={resolvedMode}
+          outputAngles={outputAngles}
           outputMode={outputMode}
           writeFormat={outputFormat}
           writeStyleLabel={WRITE_STYLE_META[outputStyle].label}
