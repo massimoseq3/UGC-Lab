@@ -81,6 +81,20 @@ export default function ActivityHeatmap({ days }: { days: UsageDay[] }) {
       })
       out.push({ monthLabel, days: daysInWeek })
     }
+
+    // Labels are absolutely narrow (11px column, ~18px of text), so two month
+    // starts within a couple of columns render as one smudge — the grid's
+    // first column is the usual culprit, since it's labelled even when the
+    // month turns over a week later ("JanFeb"). Drop the earlier of any two
+    // labels closer than MIN_LABEL_GAP columns; the later one wins because it
+    // marks the month that actually owns most of the grid.
+    const MIN_LABEL_GAP = 3
+    let lastLabelled = -MIN_LABEL_GAP
+    for (let w = 0; w < out.length; w++) {
+      if (!out[w].monthLabel) continue
+      if (w - lastLabelled < MIN_LABEL_GAP) out[lastLabelled].monthLabel = null
+      lastLabelled = w
+    }
     return out
   }, [days, now])
 
