@@ -11,12 +11,15 @@ interface SlideOverProps {
   children: React.ReactNode
   // Optional pinned footer (e.g. action buttons) below the scroll area.
   footer?: React.ReactNode
+  // 'wide' matches BankPicker's 560px panel — for card grids where 380px
+  // squeezes the tiles too small to read.
+  size?: 'default' | 'wide'
 }
 
 // Right-edge slide-over panel — the same chrome as BankPicker (portal at
-// document root, backdrop, 380px panel) so pickers and preset browsers read
-// as one pattern across the app.
-export default function SlideOver({ open, onClose, title, subtitle, children, footer }: SlideOverProps) {
+// document root, backdrop, 380px panel — or 560px on `size='wide'`, matching
+// BankPicker exactly) so pickers and preset browsers read as one pattern.
+export default function SlideOver({ open, onClose, title, subtitle, children, footer, size = 'default' }: SlideOverProps) {
   useCloseOnAppSwitch(open, onClose)
 
   useCloseOnEscape(open, onClose)
@@ -33,7 +36,9 @@ export default function SlideOver({ open, onClose, title, subtitle, children, fo
         onClick={onClose}
       />
       <div
-        className={`fixed bottom-0 right-0 top-0 z-[80] flex w-[380px] max-w-full flex-col border-l border-ink/5 bg-surface-1/95 backdrop-blur-2xl transition-transform duration-300 ease-out ${
+        className={`fixed bottom-0 right-0 top-0 z-[80] flex ${
+          size === 'wide' ? 'w-[560px]' : 'w-[380px]'
+        } max-w-full flex-col border-l border-ink/5 bg-surface-1/95 backdrop-blur-2xl transition-transform duration-300 ease-out ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >

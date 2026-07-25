@@ -838,8 +838,9 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
           onClose={() => setPresetOpen(false)}
           title="UGC Prompt Presets"
           subtitle="Pick a format to prefill the prompt + aspect ratio"
+          size="wide"
         >
-          <div className="grid grid-cols-3 gap-2 p-3">
+          <div className="grid grid-cols-3 gap-2 px-4 py-3">
             {(state.mode === 'image' ? IMAGE_PRESETS : VIDEO_PRESETS).map((preset) => (
               <PresetCard
                 key={preset.id}
