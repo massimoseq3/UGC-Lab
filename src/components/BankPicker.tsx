@@ -63,8 +63,9 @@ export default function BankPicker({
   // When `tabs` is provided, the active bank is local state initialised to
   // the caller's `bankType`. Otherwise the active bank is just `bankType`.
   const [activeTab, setActiveTab] = useState<BankType>(bankType)
-  // Ids of landscape (16:9) b-roll stills, detected on image load — they span
-  // the full masonry width instead of being squeezed into one narrow column.
+  // Ids of landscape (16:9) images, detected on load — b-roll stills span the
+  // full masonry width, and wide character sheets span both grid columns,
+  // instead of being squeezed into one narrow column.
   const [landscapeIds, setLandscapeIds] = useState<Set<string>>(new Set())
   const panelRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -338,19 +339,19 @@ export default function BankPicker({
             >
               {sorted.map((item) => {
                 const isSelected = multiSelect && selectedIds.includes(item.id)
-                // Character sheets (16:9 turnaround entries — stamped with the
-                // same ref as both characterImage and sheetImage) span the full
-                // row so the wide sheet is readable instead of squeezed into a
-                // single portrait-width column.
-                const isSheet =
-                  currentBankType === 'models' &&
-                  !!(item as Model).sheetImage &&
-                  (item as Model).sheetImage === (item as Model).characterImage
-                const isLandscapeBroll = currentBankType === 'brolls' && landscapeIds.has(item.id)
+                // A character sheet spans the full row only when it is actually
+                // wide (a 16:9 turnaround, unreadable squeezed into one
+                // portrait-width column). Sheets render in whatever aspect the
+                // character was generated at, so a 9:16 sheet stays a normal
+                // one-column tile like every other card — measured on load
+                // rather than assumed from the sheetImage stamp.
+                const isLandscape = landscapeIds.has(item.id)
+                const isLandscapeBroll = currentBankType === 'brolls' && isLandscape
+                const isWideSheet = currentBankType === 'models' && isLandscape
                 const wrapperClass =
                   currentBankType === 'brolls'
                     ? 'relative mb-3.5 break-inside-avoid'
-                    : `relative ${isSheet ? 'col-span-2' : ''}`
+                    : `relative ${isWideSheet ? 'col-span-2' : ''}`
                 return (
                   <div
                     key={item.id}
@@ -367,7 +368,7 @@ export default function BankPicker({
                       selected={isSelected}
                       accentColor={accentColor}
                       onLandscape={
-                        currentBankType === 'brolls'
+                        currentBankType === 'brolls' || currentBankType === 'models'
                           ? (landscape) =>
                               setLandscapeIds((prev) => {
                                 if (prev.has(item.id) === landscape) return prev

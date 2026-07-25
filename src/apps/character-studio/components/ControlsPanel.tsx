@@ -104,8 +104,6 @@ interface ControlsPanelProps {
   onResolutionChange: (value: ImageResolution) => void
   sheetMode: boolean
   onSheetModeChange: (value: boolean) => void
-  sheetAspect: string
-  onSheetAspectChange: (value: string) => void
   inFlightCount: number
 }
 
@@ -127,8 +125,6 @@ export default function ControlsPanel({
   onResolutionChange,
   sheetMode,
   onSheetModeChange,
-  sheetAspect,
-  onSheetAspectChange,
   inFlightCount,
 }: ControlsPanelProps) {
   const setField = (key: string, value: string) => {
@@ -339,8 +335,6 @@ export default function ControlsPanel({
         onResolutionChange={onResolutionChange}
         sheetMode={sheetMode}
         onSheetModeChange={onSheetModeChange}
-        sheetAspect={sheetAspect}
-        onSheetAspectChange={onSheetAspectChange}
         inFlightCount={inFlightCount}
       />
 

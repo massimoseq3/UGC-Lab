@@ -264,19 +264,16 @@ export default function InfluencerEditModal({
   // A sheet only makes sense in a turnaround (16:9) or stacked (9:16) layout.
   const sheetAspectOptions: string[] = aspectOptions.filter((a) => a === '16:9' || a === '9:16')
 
-  // Resolution is shared across modes; flipping to Sheet bumps to a crisp tier
-  // (sheets pack many panels into one frame) and flipping back restores it. The
-  // sheet tier mirrors the main form — 4K when the model offers it, else its
-  // highest available resolution.
+  // Resolution and aspect are SHARED by both modes and seeded from the image
+  // being edited — flipping Edit ↔ Sheet changes what gets generated, never the
+  // output settings. (Sheet mode used to bump resolution to 4K and force 16:9,
+  // which quietly overrode a deliberate pick and multiplied the credit cost.)
   const itemResolution = (item.resolution as ImageResolution) ?? '1K'
-  const sheetResolution = (resolutionOptions.includes('4K')
-    ? '4K'
-    : resolutionOptions[resolutionOptions.length - 1] ?? '4K') as ImageResolution
-  const [resolution, setResolution] = useState<ImageResolution>(initialMode === 'sheet' ? sheetResolution : itemResolution)
-  const [preSheetResolution, setPreSheetResolution] = useState<ImageResolution>(itemResolution)
-  // Aspect is per-mode: edits keep the source framing; sheets pick an orientation.
-  const [editAspect, setEditAspect] = useState<string>(coerceAspect(item.aspectRatio))
-  const [sheetAspect, setSheetAspect] = useState<string>('16:9')
+  const [resolution, setResolution] = useState<ImageResolution>(itemResolution)
+  const [aspect, setAspect] = useState<string>(coerceAspect(item.aspectRatio))
+  // A sheet's panel grid needs a long axis, so a 1:1 pick renders vertically.
+  // The stored aspect is left alone — flipping back to Edit still reads 1:1.
+  const sheetAspect = aspect.includes('16:9') ? '16:9' : '9:16'
 
   // Clamp the per-mode settings to whatever the chosen model supports when the
   // user swaps models (mirrors the B-Roll card editor).
@@ -285,25 +282,11 @@ export default function InfluencerEditModal({
     if (resolutionOptions.length > 0 && !resolutionOptions.includes(resolution)) {
       setResolution(resolutionOptions[0] as ImageResolution)
     }
-    if (aspectOptions.length > 0 && !aspectOptions.includes(editAspect)) {
-      setEditAspect(aspectOptions[0])
-    }
-    if (sheetAspectOptions.length > 0 && !sheetAspectOptions.includes(sheetAspect)) {
-      setSheetAspect(sheetAspectOptions[0])
+    if (aspectOptions.length > 0 && !aspectOptions.includes(aspect)) {
+      setAspect(aspectOptions[0])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageModelId])
-
-  function handleModeChange(next: Mode) {
-    if (next === mode) return
-    if (next === 'sheet') {
-      setPreSheetResolution(resolution)
-      setResolution(sheetResolution)
-    } else {
-      setResolution(preSheetResolution)
-    }
-    setMode(next)
-  }
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
@@ -416,7 +399,7 @@ export default function InfluencerEditModal({
       profile: item.profile,
       resolution,
       kind: 'portrait',
-      aspect: coerceAspect(editAspect),
+      aspect: coerceAspect(aspect),
       lineageId: lineageKey,
       edit: {
         instruction,
@@ -737,7 +720,7 @@ export default function InfluencerEditModal({
                 <SegmentedToggle<Mode>
                   className="h-12 !p-1"
                   value={mode}
-                  onChange={handleModeChange}
+                  onChange={setMode}
                   accent="influencers"
                   options={[
                     { value: 'edit', label: 'Edit Character', icon: Pencil },
@@ -783,8 +766,8 @@ export default function InfluencerEditModal({
                         size="lg"
                         openDirection="up"
                         options={aspectOptions}
-                        value={editAspect}
-                        onChange={setEditAspect}
+                        value={aspect}
+                        onChange={setAspect}
                         render={(v) => (
                           <span className="flex items-center gap-1.5">
                             <AspectIcon ratio={v} />
@@ -800,7 +783,7 @@ export default function InfluencerEditModal({
                         openDirection="up"
                         options={sheetAspectOptions}
                         value={sheetAspect}
-                        onChange={setSheetAspect}
+                        onChange={setAspect}
                         render={(v) => (
                           <span className="flex items-center gap-1.5">
                             <AspectIcon ratio={v} />
