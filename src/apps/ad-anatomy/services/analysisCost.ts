@@ -5,10 +5,10 @@
 // unpriced, not to be an invoice. Analysis IS the app's priciest call (it ships
 // the whole video), so the estimate leans generous rather than optimistic.
 
-import { estimateCredits } from '../../../utils/models'
+import { estimateCredits, CHAT_MODEL_DEFAULT } from '../../../utils/models'
 
 // The analysis passes run on Gemini 3 Flash (see analyzeAd.ts CHAT_MODEL_ID).
-const CHAT_MODEL_ID = 'gemini-3-flash'
+const CHAT_MODEL_ID = CHAT_MODEL_DEFAULT
 
 // Per second of video: Gemini samples the inline clip at ~1 fps (each frame
 // billed like an image, ~258 tokens) plus ~32 audio tokens/sec. Rounded to 300
