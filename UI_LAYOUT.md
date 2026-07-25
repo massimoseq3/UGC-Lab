@@ -377,6 +377,13 @@ Three-way `SegmentedToggle`, left→right: **Line-by-Line** (rows) ·
 **Continuous** (box) · **One-Shot** (clapperboard). All three Generate buttons
 carry an estimated-credits pill.
 
+The **References** eyebrow row below it ends in a pair of matching grey pills,
+left→right: **Import prompts** · **+ New** (`ClearAllButton`). Import prompts
+opens `ImportPromptsModal` — a centred popup: *1 · Copy the brief* (Copy brief /
+Download as file) over *2 · Paste what it gives you back* (mono textarea +
+Upload a file + drop target), a live parse summary underneath, then
+Cancel · **Import prompts** in the footer.
+
 One-Shot swaps the right panel for concept rows (see `OneShotView.tsx`).
 **Continuous** is the keyframe-chain mode (`ContinuousView.tsx`): the left panel
 adds a **Visual Style** chip row (3D Animated / Claymation / Papercraft / Anime

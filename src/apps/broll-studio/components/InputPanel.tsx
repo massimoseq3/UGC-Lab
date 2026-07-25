@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Clapperboard, AlertTriangle, Rows3, Star, Box, Sparkles, Coins, Palette, Pencil } from 'lucide-react'
+import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Clapperboard, AlertTriangle, Rows3, Star, Box, Sparkles, Coins, Palette, Pencil, FileInput } from 'lucide-react'
 import type { Product, Model, Script } from '../../../stores/types'
 import type { BrollMode, OneShotDelivery } from '../types'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
@@ -32,6 +32,9 @@ interface InputPanelProps {
   // scene, clip and history row stays exactly where it is.
   onClearInputs: () => void
   onGenerate: () => void
+  // Opens the Import-prompts popup — paste in a storyboard written outside the
+  // app instead of paying for the prompt-writing call. Works in all three modes.
+  onImportPrompts: () => void
   isGenerating: boolean
   highlightField?: string | null
   // Line by Line vs One Shot. One Shot swaps the right panel for concept
@@ -225,6 +228,7 @@ export default function InputPanel({
   onAdditionalContextChange,
   onClearInputs,
   onGenerate,
+  onImportPrompts,
   isGenerating,
   highlightField,
   mode,
@@ -293,7 +297,22 @@ export default function InputPanel({
             fills that row in this narrow (25%) pane. */}
         <div className="mb-2.5 flex items-center justify-between gap-2">
           <span className="text-[11px] font-medium uppercase tracking-wider text-ink-600">References</span>
-          <ClearAllButton onClear={onClearInputs} label="New" className="shrink-0" />
+          <div className="flex shrink-0 items-center gap-1.5">
+            {/* Bring your own prompts — write them in Claude (or anywhere) and
+                paste them in, instead of paying for the prompt-writing call.
+                Sized and styled as ClearAllButton's twin so the two read as one
+                pair of panel-level utilities. */}
+            <button
+              type="button"
+              onClick={onImportPrompts}
+              title="Paste in prompts written outside the app instead of generating them here"
+              className="flex items-center gap-1 rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-300"
+            >
+              <FileInput className="h-2.5 w-2.5" strokeWidth={2.5} />
+              Import prompts
+            </button>
+            <ClearAllButton onClear={onClearInputs} label="New" />
+          </div>
         </div>
         <div className="flex grow flex-col gap-2.5">
           {/* Product */}
