@@ -647,7 +647,7 @@ function ModelsList({ items, onEdit, onDelete, sort }: { items: Model[]; onEdit:
 function ScriptsList({ items, onEdit, onDelete, sort }: { items: Script[]; onEdit: (id: string) => void; onDelete: (id: string) => void; sort: SortOrder }) {
   const sorted = useMemo(() => sortByOrder(items, sort, (s) => s.title), [items, sort])
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
       {sorted.map((s) => (
         <ScriptCard key={s.id} item={s} onEdit={() => onEdit(s.id)} onDelete={() => onDelete(s.id)} />
       ))}
