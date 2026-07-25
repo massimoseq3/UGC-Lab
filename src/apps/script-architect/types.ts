@@ -33,7 +33,20 @@ export type RemixAngle =
   | 'routine-led'
 
 // ── Write New (from-scratch) mode ──
+//
+// Two kinds of style share one picker. A STRUCTURE is the persuasion mechanic
+// the script runs on (how the argument is built). A FORMAT is the kind of
+// organic content the ad is disguised as — a podcast clip, a street interview,
+// a comment reply — which decides how it's staged as much as what it says.
+// Formats are the higher-converting half in practice: the ad reads as content
+// the viewer already watches, so the sell lands before the scroll reflex does.
+// Both flow into the same style instruction, but only formats carry scene
+// staging (see WRITE_STYLE_SCENE_DIRECTION in the service), because a
+// structure leaves the shots free while a format IS the shots.
+export type WriteStyleGroup = 'structure' | 'format'
+
 export type WriteStyle =
+  // Structures
   | 'pas'
   | 'story'
   | 'listicle'
@@ -42,6 +55,16 @@ export type WriteStyle =
   | 'before-after'
   | 'demo'
   | 'comparison'
+  | 'objection'
+  | 'founder'
+  // Formats
+  | 'podcast'
+  | 'interview'
+  | 'green-screen'
+  | 'reply'
+  | 'expert'
+  | 'tutorial'
+  | 'grwm'
 
 // 'script' → spoken words only (→ Voiceovers). 'hooks' → a pack of 10
 // standalone opening lines built on the 7 viral-hook formula families (each
@@ -56,16 +79,35 @@ export type WriteFormat = 'script' | 'hooks' | 'scenes' | 'prompt'
 export type WriteLength = 10 | 15 | 30 | 60
 export const WRITE_LENGTHS: WriteLength[] = [10, 15, 30, 60]
 
-export const WRITE_STYLE_META: Record<WriteStyle, { label: string; hint: string }> = {
-  pas: { label: 'Problem–Agitate–Solution', hint: 'Name the pain, twist it, product as relief' },
-  story: { label: 'Story / Testimonial', hint: '"I almost returned this..." storytime' },
-  listicle: { label: '3 Reasons', hint: 'Fast numbered list, strongest reason last' },
-  callout: { label: 'Negative / Callout', hint: '"Stop buying X" pattern interrupt' },
-  curiosity: { label: 'Curiosity Hook', hint: '"Why is nobody talking about this"' },
-  'before-after': { label: 'Before & After', hint: 'Transformation with a real timeframe' },
-  demo: { label: 'Unboxing / Demo', hint: 'First-impressions reaction energy' },
-  comparison: { label: 'Us vs Them', hint: 'The usual stuff vs this one' },
+export const WRITE_STYLE_GROUP_META: Record<WriteStyleGroup, { label: string; hint: string }> = {
+  structure: { label: 'Structures', hint: 'How the argument is built' },
+  format: { label: 'Formats', hint: 'The kind of content the ad is disguised as' },
 }
+
+export const WRITE_STYLE_META: Record<WriteStyle, { label: string; hint: string; group: WriteStyleGroup }> = {
+  pas: { label: 'Problem–Agitate–Solution', hint: 'Name the pain, twist it, product as relief', group: 'structure' },
+  story: { label: 'Story / Testimonial', hint: '"I almost returned this..." storytime', group: 'structure' },
+  listicle: { label: '3 Reasons', hint: 'Fast numbered list, strongest reason last', group: 'structure' },
+  callout: { label: 'Negative / Callout', hint: '"Stop buying X" pattern interrupt', group: 'structure' },
+  curiosity: { label: 'Curiosity Hook', hint: '"Why is nobody talking about this"', group: 'structure' },
+  'before-after': { label: 'Before & After', hint: 'Transformation with a real timeframe', group: 'structure' },
+  demo: { label: 'Unboxing / Demo', hint: 'First-impressions reaction energy', group: 'structure' },
+  comparison: { label: 'Us vs Them', hint: 'The usual stuff vs this one', group: 'structure' },
+  objection: { label: 'Objection Crusher', hint: '"$40 for this? okay, hear me out"', group: 'structure' },
+  founder: { label: 'Founder Story', hint: '"I made this because nothing worked"', group: 'structure' },
+  podcast: { label: 'Podcast Clip', hint: 'Mid-answer at the mic, cut from an episode', group: 'format' },
+  interview: { label: 'Street Interview', hint: 'Mic in frame, one question, real answer', group: 'format' },
+  'green-screen': { label: 'Green Screen Reaction', hint: 'Reacting to a review, comment or headline', group: 'format' },
+  reply: { label: 'Comment Reply', hint: '"Someone asked me why I switched..."', group: 'format' },
+  expert: { label: 'Expert Explainer', hint: '"I do this for a living, so listen"', group: 'format' },
+  tutorial: { label: 'How-To / Tutorial', hint: 'Teach the steps, product is step two', group: 'format' },
+  grwm: { label: 'GRWM / Routine', hint: 'Inside a real routine, sold on the way past', group: 'format' },
+}
+
+// Picker order within a section. Object key order IS the order, so a style
+// moves by moving its entry above.
+export const writeStylesInGroup = (group: WriteStyleGroup): WriteStyle[] =>
+  (Object.keys(WRITE_STYLE_META) as WriteStyle[]).filter((s) => WRITE_STYLE_META[s].group === group)
 
 // Guards persisted / handed-off style slugs: styles get trimmed over time
 // (see #211), so a value read from localStorage or history may no longer be a
