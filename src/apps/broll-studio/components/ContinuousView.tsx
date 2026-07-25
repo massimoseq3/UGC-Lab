@@ -1807,9 +1807,13 @@ function FrameConceptCard({
               type="button"
               onClick={(e) => { e.stopPropagation(); onGenerate() }}
               title="Generate an image for this concept"
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
+              // Scripts' "Send to B-Roll" aesthetic — tinted accent fill, accent
+              // text, soft accent border. It only ever sits on an empty card
+              // face (no image yet), so the translucent fill stays readable;
+              // buttons that overlay real media keep the black/60 chrome.
+              className="flex h-9 flex-1 items-center justify-center gap-2 rounded-full border border-broll-500/20 bg-broll-500/10 text-[12px] font-medium tracking-tight text-broll-400 backdrop-blur transition-colors hover:bg-broll-500/20"
             >
-              <ImageIcon className="h-3.5 w-3.5" />
+              <ImageIcon className="h-4 w-4" strokeWidth={1.75} />
               Generate image
             </button>
           ) : !isKeyframe ? (
@@ -2002,17 +2006,22 @@ function ClipCard({
           </TileActionStack>
         )}
 
-        {/* Bottom shortcut into the workspace. */}
-        <div className="absolute inset-x-2 bottom-2 z-10 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onOpen() }}
-            className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
-          >
-            <VideoIcon className="h-3.5 w-3.5" />
-            {currentVideo ? 'Open' : 'Set up & generate'}
-          </button>
-        </div>
+        {/* Bottom shortcut into the workspace — only once there's a clip to
+            open. Before that the card is covered by its own copy ("Pick
+            keyframes for Frame N" / "Keyframes ready") and the whole face is
+            already clickable, so a button just crowded it. */}
+        {currentVideo && (
+          <div className="absolute inset-x-2 bottom-2 z-10 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onOpen() }}
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
+            >
+              <VideoIcon className="h-3.5 w-3.5" />
+              Open
+            </button>
+          </div>
+        )}
       </div>
 
       <p className="text-center text-[10px] font-medium tracking-wider text-ink-500">
