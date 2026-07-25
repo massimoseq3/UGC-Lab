@@ -1,14 +1,14 @@
 import { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Palette, Sparkles, Loader2, Check, ChevronLeft, ImagePlus, Package, Bookmark, Trash2 } from 'lucide-react'
-import type { StylePreset } from '../../../stores/types'
-import { useBankStore } from '../../../stores/bankStore'
-import { useAppStore } from '../../../stores/appStore'
-import { useAssetUrl } from '../../../hooks/useAssetUrl'
-import { saveFromDataUrl } from '../../../utils/assetStore'
-import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
-import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
-import { CONTINUOUS_STYLES } from '../services/generateContinuous'
+import type { StylePreset } from '../stores/types'
+import { useBankStore } from '../stores/bankStore'
+import { useAppStore } from '../stores/appStore'
+import { useAssetUrl } from '../hooks/useAssetUrl'
+import { saveFromDataUrl } from '../utils/assetStore'
+import useCloseOnEscape from '../hooks/useCloseOnEscape'
+import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
+import { CONTINUOUS_STYLES } from '../utils/visualStyle'
 
 // How many reference frames one style can be read from. Matches the cap the
 // parent enforces when adding refs.
@@ -20,6 +20,50 @@ export interface StyleSelection {
   // bank. A one-off analysed brief has none and reads as "Custom style".
   name: string | null
   bankId: string | null
+}
+
+// Per-app accent classes. Tailwind can't build class names at runtime (the JIT
+// only sees literal strings), so each host passes its family's classes whole
+// rather than an accent name this file interpolates.
+export interface StyleModalAccent {
+  /** Selected card: border + fill. */
+  card: string
+  /** Solid accent chip/badge (the Check bubble). */
+  solid: string
+  /** Solid accent button, with its hover. */
+  button: string
+  /** Icon bubble on a selected card. */
+  iconOn: string
+  /** Selected card's title text. */
+  titleOn: string
+  /** "Custom style in use" banner: border + fill. */
+  banner: string
+  /** That banner's eyebrow label. */
+  bannerLabel: string
+  /** Dashed drop-zone in its active state. */
+  dropActive: string
+}
+
+export const BROLL_STYLE_ACCENT: StyleModalAccent = {
+  card: 'border-broll-500/40 bg-broll-500/10',
+  solid: 'bg-broll-500',
+  button: 'bg-broll-500 hover:bg-broll-400',
+  iconOn: 'bg-broll-500/20 text-broll-300',
+  titleOn: 'text-broll-200',
+  banner: 'border-broll-500/25 bg-broll-500/10',
+  bannerLabel: 'text-broll-300',
+  dropActive: 'border-broll-500/50 bg-broll-500/10',
+}
+
+export const INFLUENCERS_STYLE_ACCENT: StyleModalAccent = {
+  card: 'border-influencers-500/40 bg-influencers-500/10',
+  solid: 'bg-influencers-500',
+  button: 'bg-influencers-500 hover:bg-influencers-400',
+  iconOn: 'bg-influencers-500/20 text-influencers-300',
+  titleOn: 'text-influencers-200',
+  banner: 'border-influencers-500/25 bg-influencers-500/10',
+  bannerLabel: 'text-influencers-300',
+  dropActive: 'border-influencers-500/50 bg-influencers-500/10',
 }
 
 interface StyleModalProps {
@@ -38,12 +82,19 @@ interface StyleModalProps {
   onAddStyleRefs: (files: File[]) => void
   onRemoveStyleRef: (index: number) => void
   onClearStyleRefs: () => void
-  onPickStyleRefsFromBank: () => void
+  // Route to the host's own bank picker for reference frames. Optional: a host
+  // with no suitable bank (Characters) omits it and the button doesn't render,
+  // leaving the file uploader as the only way in.
+  onPickStyleRefsFromBank?: () => void
   // Runs the vision pass and hands back the style paragraph (null on failure —
   // the parent has already toasted). The modal, not the parent, decides what
   // to do with it, so nothing is applied until the user picks Use or Save.
   onAnalyze: () => Promise<string | null>
   isAnalyzing: boolean
+  // Host app's accent classes — see StyleModalAccent.
+  accent: StyleModalAccent
+  // What the style applies to in this host ("every clip" / "every character").
+  subjectLabel?: string
 }
 
 // One saved style's reference mosaic (up to four frames).
@@ -55,10 +106,12 @@ function SavedThumb({ refId }: { refId: string }) {
 function StyleCardShell({
   active,
   onClick,
+  accent,
   children,
 }: {
   active: boolean
   onClick: () => void
+  accent: StyleModalAccent
   children: React.ReactNode
 }) {
   return (
@@ -67,12 +120,12 @@ function StyleCardShell({
       onClick={onClick}
       className={`relative flex w-full flex-col overflow-hidden rounded-2xl border p-3.5 text-left transition-colors ${
         active
-          ? 'border-broll-500/40 bg-broll-500/10'
+          ? accent.card
           : 'border-ink/5 bg-ink/[0.03] hover:border-ink/15 hover:bg-ink/[0.06]'
       }`}
     >
       {active && (
-        <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-broll-500 text-white">
+        <span className={`absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full text-white ${accent.solid}`}>
           <Check className="h-3 w-3" strokeWidth={3} />
         </span>
       )}
@@ -96,6 +149,8 @@ export default function StyleModal({
   onPickStyleRefsFromBank,
   onAnalyze,
   isAnalyzing,
+  accent,
+  subjectLabel = 'clip',
 }: StyleModalProps) {
   const savedStyles = useBankStore((s) => s.styles)
   const addStyle = useBankStore((s) => s.addStyle)
@@ -210,7 +265,7 @@ export default function StyleModal({
             <p className="truncate text-[11px] text-ink-500">
               {view === 'create'
                 ? 'The look is read from these frames — never their subjects'
-                : 'The look every clip is rendered in'}
+                : `The look every ${subjectLabel} is rendered in`}
             </p>
           </div>
           <button
@@ -228,9 +283,9 @@ export default function StyleModal({
             {/* A one-off analysed brief isn't in the bank, so no card can carry
                 its selected state — surface it here with a way back out. */}
             {usingCustom && !styleBankId && (
-              <div className="mb-4 rounded-2xl border border-broll-500/25 bg-broll-500/10 px-4 py-3">
+              <div className={`mb-4 rounded-2xl border px-4 py-3 ${accent.banner}`}>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-broll-300">Custom style in use</span>
+                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${accent.bannerLabel}`}>Custom style in use</span>
                   <button
                     type="button"
                     onClick={() => { setDraftBrief(styleBrief ?? ''); setDraftName(''); setView('create') }}
@@ -248,11 +303,11 @@ export default function StyleModal({
               {CONTINUOUS_STYLES.map((s) => {
                 const active = !usingCustom && s.id === styleId
                 return (
-                  <StyleCardShell key={s.id} active={active} onClick={() => { onPickPreset(s.id); onClose() }}>
-                    <span className={`flex h-8 w-8 items-center justify-center rounded-full ${active ? 'bg-broll-500/20 text-broll-300' : 'bg-ink/5 text-ink-500'}`}>
+                  <StyleCardShell key={s.id} active={active} accent={accent} onClick={() => { onPickPreset(s.id); onClose() }}>
+                    <span className={`flex h-8 w-8 items-center justify-center rounded-full ${active ? accent.iconOn : 'bg-ink/5 text-ink-500'}`}>
                       <Palette className="h-4 w-4" strokeWidth={1.75} />
                     </span>
-                    <span className={`mt-2.5 text-[13px] font-semibold tracking-tight ${active ? 'text-broll-200' : 'text-ink-100'}`}>{s.label}</span>
+                    <span className={`mt-2.5 text-[13px] font-semibold tracking-tight ${active ? accent.titleOn : 'text-ink-100'}`}>{s.label}</span>
                     <span className="mt-1 line-clamp-3 text-[11px] leading-snug text-ink-500">{s.hint}</span>
                   </StyleCardShell>
                 )
@@ -266,6 +321,7 @@ export default function StyleModal({
                   key={s.id}
                   item={s}
                   active={usingCustom && styleBankId === s.id}
+                  accent={accent}
                   onUse={() => { onUseCustom({ brief: s.brief, name: s.name, bankId: s.id }); onClose() }}
                   onDelete={() => void deleteStyle(s.id)}
                 />
@@ -309,7 +365,7 @@ export default function StyleModal({
             <div
               className={`rounded-2xl border p-4 transition-colors ${
                 dragging
-                  ? 'border-dashed border-broll-500/50 bg-broll-500/10'
+                  ? `border-dashed ${accent.dropActive}`
                   : styleRefs.length === 0
                     ? 'border-dashed border-ink/10 bg-ink/[0.02]'
                     : 'border-ink/[0.07] bg-ink/[0.02]'
@@ -338,14 +394,16 @@ export default function StyleModal({
                         }}
                       />
                     </label>
-                    <button
-                      type="button"
-                      onClick={onPickStyleRefsFromBank}
-                      className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.04] px-4 py-2 text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.08]"
-                    >
-                      <Package className="h-3.5 w-3.5" />
-                      Choose from Bank
-                    </button>
+                    {onPickStyleRefsFromBank && (
+                      <button
+                        type="button"
+                        onClick={onPickStyleRefsFromBank}
+                        className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.04] px-4 py-2 text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.08]"
+                      >
+                        <Package className="h-3.5 w-3.5" />
+                        Choose from Bank
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -358,14 +416,18 @@ export default function StyleModal({
                       Reference frames · {styleRefs.length} of {MAX_REFS}
                     </span>
                     <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={onPickStyleRefsFromBank}
-                        className="rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-200"
-                      >
-                        Choose from Bank
-                      </button>
-                      <span className="h-3 w-px bg-ink/10" />
+                      {onPickStyleRefsFromBank && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={onPickStyleRefsFromBank}
+                            className="rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-200"
+                          >
+                            Choose from Bank
+                          </button>
+                          <span className="h-3 w-px bg-ink/10" />
+                        </>
+                      )}
                       <button
                         type="button"
                         onClick={onClearStyleRefs}
@@ -411,7 +473,7 @@ export default function StyleModal({
                       type="button"
                       onClick={() => void handleAnalyze()}
                       disabled={isAnalyzing}
-                      className="flex w-full items-center justify-center gap-2 rounded-full bg-broll-500 px-4 py-2.5 text-[12px] font-semibold tracking-tight text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      className={`flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[12px] font-semibold tracking-tight text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${accent.button}`}
                     >
                       {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                       {isAnalyzing ? 'Reading the style…' : draftBrief ? 'Re-read the style' : `Read the style from ${styleRefs.length} image${styleRefs.length === 1 ? '' : 's'}`}
@@ -462,7 +524,7 @@ export default function StyleModal({
               onClick={() => void handleSaveAndUse()}
               disabled={!draftName.trim() || saving}
               title={draftName.trim() ? undefined : 'Name the style to save it'}
-              className="flex items-center gap-1.5 rounded-full bg-broll-500 px-4 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+              className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${accent.button}`}
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bookmark className="h-3.5 w-3.5" />}
               Save to bank & use
@@ -478,11 +540,13 @@ export default function StyleModal({
 function SavedStyleCard({
   item,
   active,
+  accent,
   onUse,
   onDelete,
 }: {
   item: StylePreset
   active: boolean
+  accent: StyleModalAccent
   onUse: () => void
   onDelete: () => void
 }) {
@@ -491,7 +555,7 @@ function SavedStyleCard({
 
   return (
     <div className="group/style relative">
-      <StyleCardShell active={active} onClick={onUse}>
+      <StyleCardShell active={active} accent={accent} onClick={onUse}>
         {thumbs.length > 0 ? (
           <div className="flex gap-1">
             {thumbs.map((ref) => (
@@ -501,11 +565,11 @@ function SavedStyleCard({
             ))}
           </div>
         ) : (
-          <span className={`flex h-8 w-8 items-center justify-center rounded-full ${active ? 'bg-broll-500/20 text-broll-300' : 'bg-ink/5 text-ink-500'}`}>
+          <span className={`flex h-8 w-8 items-center justify-center rounded-full ${active ? accent.iconOn : 'bg-ink/5 text-ink-500'}`}>
             <Palette className="h-4 w-4" strokeWidth={1.75} />
           </span>
         )}
-        <span className={`mt-2.5 truncate pr-6 text-[13px] font-semibold tracking-tight ${active ? 'text-broll-200' : 'text-ink-100'}`}>{item.name}</span>
+        <span className={`mt-2.5 truncate pr-6 text-[13px] font-semibold tracking-tight ${active ? accent.titleOn : 'text-ink-100'}`}>{item.name}</span>
         <span className="mt-1 line-clamp-3 text-[11px] leading-snug text-ink-500">{item.brief}</span>
       </StyleCardShell>
       {/* Two-click delete, matching the app-wide tile idiom: the first click

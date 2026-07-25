@@ -8,7 +8,7 @@ import { generateBroll } from './services/generateBroll'
 import { generateOneShot, generateOneShotVariation, buildDemoOneShotResult, ONE_SHOT_DEFAULT_MODEL_ID } from './services/generateOneShot'
 import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
 import InputPanel from './components/InputPanel'
-import StyleModal, { type StyleSelection } from './components/StyleModal'
+import StyleModal, { BROLL_STYLE_ACCENT, type StyleSelection } from '../../components/StyleModal'
 import RightPanel from './components/RightPanel'
 import { brollHistoryMode } from './components/BrollHistoryView'
 import { backfillCardState, backfillOneShotCardState, backfillContinuousFrameState, backfillContinuousClipState } from './cardState'
@@ -1026,6 +1026,7 @@ export default function BrollStudio() {
         onPickStyleRefsFromBank={() => setPickerMode('styleRefs')}
         onAnalyze={handleAnalyzeStyleRefs}
         isAnalyzing={isAnalyzingStyle}
+        accent={BROLL_STYLE_ACCENT}
       />
     </div>
   )
