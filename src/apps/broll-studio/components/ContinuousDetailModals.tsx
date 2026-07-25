@@ -200,7 +200,6 @@ export function ContinuousFrameModal({
     setDraft(cardState.editablePrompt)
   }
 
-  const isBusy = cardState.inFlightImages.some((e) => !e.error)
 
   // Image vs standalone-Animate tab. Animate image-to-video's this frame's
   // current still on its own using the storyboard's continuous video model.
@@ -212,7 +211,6 @@ export function ContinuousFrameModal({
   const animateCredits = animateModel
     ? formatCredits(estimateCredits(animateModelId, { durationSeconds: cardState.videoDurationSeconds, resolution: cardState.videoResolution, audio: cardState.videoAudio }))
     : null
-  const animateBusy = cardState.inFlightVideos.some((e) => !e.error)
   const animateCapable = (animateModel?.modes ?? []).some((m) => m === 'image-to-video' || m === 'reference-to-video')
 
   // Image model is the app-wide B-Roll pick (same ModelPicker as the
@@ -488,9 +486,9 @@ export function ContinuousFrameModal({
                   disabled={!cardState.editablePrompt.trim()}
                   className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageIcon className="h-4 w-4" />}
+                  <ImageIcon className="h-4 w-4" />
                   Generate Image
-                  {credits && !isBusy && (
+                  {credits && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                       <Coins className="h-3 w-3" strokeWidth={2} />
                       {credits}
@@ -582,13 +580,15 @@ export function ContinuousFrameModal({
                 </div>
                 <button
                   onClick={onAnimate}
-                  disabled={!startImageUrl || animateBusy || !animateCapable}
+                  // Not gated on a render in flight — animations queue in
+                  // parallel like every other B-Roll generation.
+                  disabled={!startImageUrl || !animateCapable}
                   title={!startImageUrl ? 'Generate an image first, then animate it' : !animateCapable ? 'This model can’t animate a single still — pick another' : undefined}
                   className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {animateBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Film className="h-4 w-4" />}
+                  <Film className="h-4 w-4" />
                   Animate
-                  {animateCredits && !animateBusy && (
+                  {animateCredits && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                       <Coins className="h-3 w-3" strokeWidth={2} />
                       {animateCredits}
@@ -884,7 +884,6 @@ export function ContinuousClipModal({
 
   const model = getModel(modelId)
   const constraints = model?.videoConstraints
-  const isBusy = cardState.inFlightVideos.some((e) => !e.error)
   const framesReady = !!startImageRef && !!endImageRef
   const credits = formatCredits(estimateCredits(modelId, {
     durationSeconds: cardState.durationSeconds,
@@ -1090,12 +1089,13 @@ export function ContinuousClipModal({
             </div>
             <button
               onClick={onGenerate}
-              disabled={!framesReady || !cardState.editablePrompt.trim() || isBusy}
+              // Not gated on a render in flight — clips queue in parallel.
+              disabled={!framesReady || !cardState.editablePrompt.trim()}
               className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <VideoIcon className="h-4 w-4" />}
+              <VideoIcon className="h-4 w-4" />
               Generate Video
-              {credits && !isBusy && (
+              {credits && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                   <Coins className="h-3 w-3" strokeWidth={2} />
                   {credits}

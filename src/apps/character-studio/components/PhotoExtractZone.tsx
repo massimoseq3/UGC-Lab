@@ -67,7 +67,7 @@ export default function PhotoExtractZone({
             isActive={true}
             color="bg-green-500"
             showHelper={false}
-            messageClassName="text-xs truncate"
+            messageClassName="text-xs truncate text-ink-300"
             messages={['Preparing image...', 'Sending request...', 'Extracting visual DNA...', 'Finalizing analysis...']}
           />
         </div>

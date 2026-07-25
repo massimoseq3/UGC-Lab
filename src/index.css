@@ -335,21 +335,44 @@ textarea,
   background-color: color-mix(in srgb, var(--color-ink) 45%, transparent);
 }
 
-/* Skeleton shimmer animation */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+/* Skeleton shimmer. The sweep is a transform on an overlay pseudo-element, NOT
+   an animated `background-position` — background-position repaints the whole
+   element every frame, which visibly stuttered on the B-Roll loading panes
+   (dozens of skeletons, several of them full 9:16 cards). A transform stays on
+   the compositor and costs nothing to animate. */
+@keyframes skeleton-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
 }
 .skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--color-ink) 4%, transparent);
+  border-radius: 8px;
+}
+/* Card-sized skeleton (a 9:16 media placeholder rather than a text line) —
+   needs the card radius, and `.skeleton`'s own rule outranks a Tailwind
+   `rounded-*` utility, so it gets its own paired class. */
+.skeleton.skeleton-card { border-radius: 0.75rem; }
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--color-ink) 3%, transparent) 0%,
-    color-mix(in srgb, var(--color-ink) 6%, transparent) 50%,
-    color-mix(in srgb, var(--color-ink) 3%, transparent) 100%
+    transparent 0%,
+    color-mix(in srgb, var(--color-ink) 7%, transparent) 50%,
+    transparent 100%
   );
-  background-size: 200% 100%;
-  animation: shimmer 1.8s ease-in-out infinite;
-  border-radius: 8px;
+  border-radius: inherit;
+  transform: translateX(-100%);
+  animation: skeleton-sweep 1.6s ease-in-out infinite;
+  /* No `will-change` on purpose — a loading pane renders a dozen-plus of these
+     and pre-promoting every one is worse than letting the compositor promote
+     the running transform itself. */
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; }
 }
 
 /* Send-to field highlight flash */

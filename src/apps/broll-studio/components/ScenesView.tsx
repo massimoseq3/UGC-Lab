@@ -944,7 +944,7 @@ function SkeletonScene() {
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="rounded-xl border border-ink/[0.06] bg-ink/[0.02] aspect-[9/16]" />
+          <div key={i} className="skeleton skeleton-card aspect-[9/16]" />
         ))}
       </div>
     </div>

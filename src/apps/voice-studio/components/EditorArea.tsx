@@ -124,7 +124,9 @@ export default function EditorArea({
             <button
               type="button"
               onClick={onEnhance}
-              disabled={isEnhancing || isGenerating}
+              // A running gen snapshotted its script at fire time, so editing
+              // the box (via Enhance or by hand) can't affect it.
+              disabled={isEnhancing}
               title="Add expression tags (e.g. [warmly], [excited]) for a more emotive read"
               className="flex items-center gap-1.5 rounded-full border border-voice-500/30 bg-voice-500/10 px-3 py-1.5 text-xs font-semibold text-voice-300 transition-colors hover:bg-voice-500/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -187,26 +189,19 @@ export default function EditorArea({
           </div>
           <button
             onClick={onGenerate}
-            disabled={!canGenerate || isGenerating || overLimit}
+            // Stays live while a voiceover renders — a second click queues
+            // another one alongside it. The progress bar above is the feedback.
+            disabled={!canGenerate || overLimit}
             className="flex items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-10 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
-          {isGenerating ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Generating...</span>
-            </>
-          ) : (
-            <>
-              <Mic className="h-4 w-4" strokeWidth={2.5} />
-              <span>Generate Voiceover</span>
-              {creditsLabel && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
-                  <Coins className="h-3 w-3" strokeWidth={2} />
-                  {creditsLabel}
-                </span>
-              )}
-            </>
-          )}
+            <Mic className="h-4 w-4" strokeWidth={2.5} />
+            <span>Generate Voiceover</span>
+            {creditsLabel && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
+                <Coins className="h-3 w-3" strokeWidth={2} />
+                {creditsLabel}
+              </span>
+            )}
           </button>
         </div>
       </div>

@@ -14,9 +14,9 @@ import {
   Download,
   Film,
 } from 'lucide-react'
-import GenerationProgress from '../../../components/GenerationProgress'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
-import GeneratingBackdrop from '../../../components/GeneratingBackdrop'
+import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
+import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
 import type { PromptVariation, CardState, GeneratedImage, ReferenceImage } from '../types'
 import type { VideoHistoryItem, Product, Model, BRoll } from '../../../stores/types'
 import { enhanceVariationPrompt, generateNewVariation, startImageTask, finishImageTask } from '../services/generateBroll'
@@ -29,7 +29,8 @@ import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
-import { getModel, type VideoMode, type ImageResolution } from '../../../utils/models'
+import { getModel, getDefaultModel, type VideoMode, type ImageResolution } from '../../../utils/models'
+import { useSettingsStore } from '../../../stores/settingsStore'
 import CardDetailModal, { type Tab as DetailTab } from './CardDetailModal'
 import { humanizeError } from '../../../utils/friendlyError'
 import { rollTypeForTag, tagLabel, tagChipStyle } from './variationTags'
@@ -182,7 +183,13 @@ export default function VariationCard(props: VariationCardProps) {
   const isAnimating = isGeneratingVideo && generatingVideoMode === 'image-to-video'
   const hasFailedInFlight =
     cardState.inFlightImages.some((e) => e.error) || cardState.inFlightVideos.some((e) => e.error)
-  const isGeneratingImageInFlight = cardState.inFlightImages.some((e) => !e.error)
+  const activeInFlightImages = cardState.inFlightImages.filter((e) => !e.error)
+  const isGeneratingImageInFlight = activeInFlightImages.length > 0
+  // An image entry only learns its model once createTask returns, so name the
+  // configured one until then — otherwise the label pops in a beat late and the
+  // generating face jumps.
+  const persistedImageModel = useSettingsStore((s) => s.getAppModel('broll-studio:image:text-to-image'))
+  const imageModelId = persistedImageModel ?? getDefaultModel('broll-studio', 'image', 'text-to-image')?.id
 
   // ────────────────────────────────────────────────────────────────────────
   // Action handlers — owned here so both the modal (rendered as a child)
@@ -772,48 +779,18 @@ export default function VariationCard(props: VariationCardProps) {
           className="relative aspect-[9/16] cursor-pointer overflow-hidden rounded-xl border border-ink/[0.08] bg-ink/[0.02] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
         >
           {cardState.isGeneratingImage || isGeneratingImageInFlight ? (
-            <>
-              <GeneratingBackdrop family="broll" />
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 text-center">
-                <GenerationProgress
-                  isActive
-                  color="bg-broll-500"
-                  showHelper={false}
-                  messages={[
-                    'Sending request...',
-                    'Composing the scene...',
-                    'Rendering details...',
-                    'Finalizing the frame...',
-                  ]}
-                  className="max-w-[180px]"
-                />
-              </div>
-            </>
+            <GeneratingMediaFill
+              kind="image"
+              modelId={activeInFlightImages[0]?.modelId ?? imageModelId}
+              prompt={cardState.editablePrompt}
+            />
           ) : isGeneratingVideo ? (
-            <>
-              <GeneratingBackdrop family="broll" />
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 text-center">
-                <GenerationProgress
-                  isActive
-                  color="bg-broll-500"
-                  showHelper={false}
-                  messages={isAnimating
-                    ? [
-                        'Sending request...',
-                        'Animating still...',
-                        'Rendering motion...',
-                        'Finalizing the clip...',
-                      ]
-                    : [
-                        'Sending request...',
-                        'Storyboarding frames...',
-                        'Rendering motion...',
-                        'Finalizing the clip...',
-                      ]}
-                  className="max-w-[180px]"
-                />
-              </div>
-            </>
+            <GeneratingMediaFill
+              kind="video"
+              modelId={activeInFlightVideos[0]?.modelId}
+              prompt={cardState.editablePrompt}
+              messages={isAnimating ? ANIMATE_MESSAGES : undefined}
+            />
           ) : coverKind === 'video' && resolvedVideoUrl ? (
             <>
               <video
@@ -1010,27 +987,27 @@ export default function VariationCard(props: VariationCardProps) {
               type="button"
               title="Open this card on the Image tab"
               onClick={(e) => { e.stopPropagation(); openDetail('image') }}
-              className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/50 text-[10px] font-medium text-white backdrop-blur transition-colors hover:bg-black/70"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
             >
-              <ImageIcon className="h-3 w-3" />
+              <ImageIcon className="h-3.5 w-3.5" />
               Image
             </button>
             <button
               type="button"
               title="Open this card on the Video tab"
               onClick={(e) => { e.stopPropagation(); openDetail('video') }}
-              className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/50 text-[10px] font-medium text-white backdrop-blur transition-colors hover:bg-black/70"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
             >
-              <VideoIcon className="h-3 w-3" />
+              <VideoIcon className="h-3.5 w-3.5" />
               Video
             </button>
             <button
               type="button"
               title="Open this card on the Animate tab"
               onClick={(e) => { e.stopPropagation(); openDetail('animate') }}
-              className="flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/50 text-[10px] font-medium text-white backdrop-blur transition-colors hover:bg-black/70"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
             >
-              <Film className="h-3 w-3" />
+              <Film className="h-3.5 w-3.5" />
               Animate
             </button>
           </div>

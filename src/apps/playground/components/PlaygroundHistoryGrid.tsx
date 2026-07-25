@@ -451,7 +451,7 @@ function InFlightRow({ gen, mediaAspect }: { gen: InFlightGen; mediaAspect: numb
             isActive
             color="bg-playground-500"
             showHelper={false}
-            messageClassName="text-[11px]"
+            messageClassName="text-[11px] font-medium text-playground-100"
             messages={['Sending request...', 'Working on it...', 'Almost there...']}
             className="max-w-[220px]"
           />
@@ -731,12 +731,12 @@ function InFlightTile({ gen }: { gen: InFlightGen }) {
         <Icon className="h-4 w-4" />
       </div>
       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 text-center">
-        <p className="text-[10px] font-medium text-playground-100">{modelLabel}</p>
+        <p className="text-[11px] font-medium text-playground-100">{modelLabel}</p>
         <GenerationProgress
           isActive
           color="bg-playground-500"
           showHelper={false}
-          messageClassName="text-[10px]"
+          messageClassName="text-[11px] font-medium text-playground-100"
           messages={
             gen.mode === 'image'
               ? [

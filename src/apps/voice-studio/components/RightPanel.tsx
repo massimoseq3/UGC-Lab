@@ -3,7 +3,7 @@ import type { VoiceSettings } from '../types'
 import type { VoiceHistoryItem } from '../../../stores/types'
 import SettingsView from './SettingsView'
 import VoicePickerView from './VoicePickerView'
-import HistoryView from './HistoryView'
+import HistoryView, { type PendingVoice } from './HistoryView'
 import HistoryDetailsView from './HistoryDetailsView'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 
@@ -13,6 +13,9 @@ interface RightPanelProps {
   settings: VoiceSettings
   onSettingsChange: (next: VoiceSettings) => void
   history: VoiceHistoryItem[]
+  // Voiceovers still rendering — shown as pending rows at the top of History so
+  // a queued batch is visible while it works.
+  pending: PendingVoice[]
   activeHistoryId: string | null
   detailsItem: VoiceHistoryItem | null
   onSelectHistory: (item: VoiceHistoryItem) => void
@@ -27,6 +30,7 @@ export default function RightPanel({
   settings,
   onSettingsChange,
   history,
+  pending,
   activeHistoryId,
   detailsItem,
   onSelectHistory,
@@ -81,7 +85,7 @@ export default function RightPanel({
             onChange={setTab}
             options={[
               { value: 'settings', label: 'Settings' },
-              { value: 'history', label: 'History', badge: history.length > 0 ? history.length : undefined },
+              { value: 'history', label: 'History', badge: history.length + pending.length > 0 ? history.length + pending.length : undefined },
             ]}
           />
         </div>
@@ -99,6 +103,7 @@ export default function RightPanel({
         ) : (
           <HistoryView
             items={history}
+            pending={pending}
             activeId={activeHistoryId}
             onSelect={onSelectHistory}
             onDelete={onDeleteHistory}
