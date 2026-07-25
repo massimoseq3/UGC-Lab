@@ -294,7 +294,7 @@ export function createDefaultContinuousFrameState(
     // morphs between two unrelated frames perfectly well, guided by the scene's
     // TRANSITION anchor. Chaining stays available per frame (the row toggle) for
     // the case it's genuinely good at: coming back to the same room.
-    chainLink: false,
+    chainLink: true,
     ...toggles,
     aspectRatio: '9:16',
     resolution: '1K',
@@ -365,7 +365,7 @@ export function backfillContinuousFrameState(raw: Partial<ContinuousFrameCardSta
     // chains. A row persisted before the field existed reads as off, so a
     // reopened session behaves like a new one rather than quietly re-chaining
     // the next frame the user regenerates.
-    chainLink: raw.chainLink === true,
+    chainLink: raw.chainLink !== false,
     refsCharacter: raw.refsCharacter !== false,
     refsProduct: raw.refsProduct !== false,
     aspectRatio: (raw.aspectRatio as string) ?? '9:16',
@@ -404,11 +404,6 @@ export function backfillContinuousClipState(raw: Partial<ContinuousClipCardState
     // Older rows had no auto-sync; treat them as edited so a hydrate never
     // rewrites motion the user may have already tuned.
     motionEdited: raw.motionEdited !== false,
-    ...(typeof raw.linkedPair === 'string' ? { linkedPair: raw.linkedPair } : {}),
-    // A pair-link that was mid-flight when the tab closed is simply gone —
-    // clear the flag so the card doesn't render as permanently linking (the
-    // effect re-fires on mount if the pair still needs one).
-    linking: false,
     videos,
     currentVideoIndex: typeof raw.currentVideoIndex === 'number'
       ? Math.max(0, Math.min(raw.currentVideoIndex, Math.max(0, videos.length - 1)))

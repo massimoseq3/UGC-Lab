@@ -214,7 +214,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['text-to-image', 'image-to-image', 'image-edit'],
     tags: ['recommended', 'new'],
     supportsReferenceImages: true,
-    defaultFor: ['broll-studio'],
     pricing: {
       unit: 'per-image',
       credits: 8,
@@ -238,9 +237,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     task: 'image',
     modes: ['text-to-image'],
     tags: ['recommended'],
-    // Influencers default to GPT Image 2 for portrait/sheet generation
-    // (text-to-image); other apps fall back to Nano Banana 2 (first in the list).
-    defaultFor: ['character-studio'],
+    // Influencers and B-Roll both default to GPT Image 2: better results in
+    // practice and cheaper than Nano Banana 2 at every tier (6 vs 8 credits at
+    // 1K). It's text-to-image only, so a B-Roll gen with references resolves to
+    // its i2i sibling — same price — via resolveImageModelId. Other apps fall
+    // back to Nano Banana 2 (first in the list).
+    defaultFor: ['character-studio', 'broll-studio'],
     // kie.ai defaults to GPT Image 2's higher-quality tier on the
     // /text-to-image endpoint — verified by real billing (2K = 10 credits).
     // Source: https://kie.ai/gpt-image-2.
@@ -268,6 +270,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['image-to-image', 'image-edit'],
     tags: ['recommended'],
     supportsReferenceImages: true,
+    // B-Roll's i2i default, matching its t2i default above. Both are needed:
+    // resolveImageModelId falls through to the i2i registry default when the
+    // user has never touched the picker, and a B-Roll gen almost always has
+    // references — so leaving this on Nano Banana 2 would have the picker
+    // showing GPT Image 2 while a different model actually billed.
+    defaultFor: ['broll-studio'],
     pricing: {
       unit: 'per-image',
       credits: 6,

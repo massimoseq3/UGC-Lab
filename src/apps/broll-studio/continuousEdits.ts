@@ -15,7 +15,7 @@
 // third.
 //
 // Reordering is deliberately absent. Every scene's TRANSITION names an anchor
-// shared with its specific neighbours; moving a beat invalidates the transitions
+// shared with its specific neighbours; moving a beat invalidates the framing
 // on both sides of both its old and new positions, which is a rewrite, not a
 // move.
 
@@ -76,7 +76,7 @@ function remapIndexedState(
 }
 
 // A structural edit changes which two keyframes a clip spans, so its motion —
-// written for the old pair — is stale. Dropping `linkedPair` and `motionEdited`
+// written for the old pair — is stale. Dropping `motionEdited`
 // re-arms the two-image vision pass, which rewrites the motion from the actual
 // endpoints as soon as both are picked again.
 function relinkClips(
@@ -86,7 +86,7 @@ function relinkClips(
   const next = { ...clipStates }
   for (const i of sceneIndices) {
     const existing = next[`c${i}`]
-    if (existing) next[`c${i}`] = { ...existing, linkedPair: undefined, motionEdited: false }
+    if (existing) next[`c${i}`] = { ...existing, motionEdited: false }
   }
   return next
 }
@@ -102,7 +102,7 @@ function renumber(result: ContinuousResult, scenes: ContinuousScene[], frames: C
 function blankFrame(): ContinuousFrame {
   // Index is set by renumber(). A blank concept mirrors the "Add concept" card:
   // no LLM call up front — the user writes the prompt or hits Regenerate, which
-  // reads the motions and transitions either side so the new frame still chains.
+  // reads the motions either side so the new frame still chains.
   return { index: 0, concepts: [{ id: `cont-${crypto.randomUUID()}`, label: 'Custom', prompt: '' }] }
 }
 
@@ -136,7 +136,7 @@ export function editSceneLine(bundle: ContinuousBundle, sceneIndex: number, line
 // between them for the user to write or regenerate.
 //
 // The old boundary belonged to the end of the original line, so the new second
-// half inherits its transition, motion and sfx; scene N's own transition is
+// half inherits its motion and sfx; scene N's own motion is
 // cleared because its destination — the new frame — doesn't exist yet.
 export function splitScene(bundle: ContinuousBundle, sceneIndex: number, at: number): ContinuousBundle | null {
   const { result } = bundle
@@ -149,7 +149,6 @@ export function splitScene(bundle: ContinuousBundle, sceneIndex: number, at: num
   const first: ContinuousScene = {
     ...scene,
     scriptLine: head,
-    transition: '',
     motionPrompt: '',
     sfx: '',
     durationSeconds: sceneDuration(head, result.modelId),
@@ -192,7 +191,6 @@ export function mergeSceneWithNext(bundle: ContinuousBundle, sceneIndex: number)
     scriptLine: line,
     // The merged beat now ends where the second one ended, so it takes the
     // second's outbound boundary wholesale.
-    transition: next.transition,
     motionPrompt: next.motionPrompt,
     sfx: next.sfx,
     durationSeconds: sceneDuration(line, result.modelId),
