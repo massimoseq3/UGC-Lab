@@ -384,6 +384,11 @@ export function backfillContinuousClipState(raw: Partial<ContinuousClipCardState
     // Older rows had no auto-sync; treat them as edited so a hydrate never
     // rewrites motion the user may have already tuned.
     motionEdited: raw.motionEdited !== false,
+    ...(typeof raw.linkedPair === 'string' ? { linkedPair: raw.linkedPair } : {}),
+    // A pair-link that was mid-flight when the tab closed is simply gone —
+    // clear the flag so the card doesn't render as permanently linking (the
+    // effect re-fires on mount if the pair still needs one).
+    linking: false,
     videos,
     currentVideoIndex: typeof raw.currentVideoIndex === 'number'
       ? Math.max(0, Math.min(raw.currentVideoIndex, Math.max(0, videos.length - 1)))
