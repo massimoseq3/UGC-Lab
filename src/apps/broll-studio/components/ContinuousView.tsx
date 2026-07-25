@@ -76,6 +76,7 @@ import { useAppStore } from '../../../stores/appStore'
 import { useCreditsStore } from '../../../stores/creditsStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
+import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { TileActionStack, TileActionButton } from '../../../components/tileActions'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
@@ -2223,22 +2224,12 @@ function ClipCard({
 
   // Inline playback on the card face — mirrors Line-by-Line's VariationCard.
   // Hover autoplays muted; an explicit Play click is a user gesture, so it
-  // plays with sound and keeps playing after the mouse leaves.
-  const videoElRef = useRef<HTMLVideoElement>(null)
-  const [playing, setPlaying] = useState(false)
-  const [unmuted, setUnmuted] = useState(false)
+  // plays with sound and keeps playing after the mouse leaves. One clip plays
+  // app-wide, so starting this one stops whatever was running.
+  const inline = useInlineVideo()
+  const { playing, unmuted } = inline
   const [copied, setCopied] = useState(false)
   const controlsExpanded = playing || unmuted
-  const togglePlay = () => {
-    const v = videoElRef.current
-    if (!v) return
-    if (v.paused) { setUnmuted(true); v.muted = false; v.play().catch(() => {}) }
-    else v.pause()
-  }
-  const toggleMute = () => {
-    const v = videoElRef.current
-    setUnmuted((prev) => { const next = !prev; if (v) v.muted = !next; return next })
-  }
   const handleDownload = async () => {
     if (!currentVideo) return
     const resolved = await getUrl(currentVideo.url)
@@ -2255,6 +2246,7 @@ function ClipCard({
     <div className="group flex flex-col gap-1.5">
       <div
         onClick={onOpen}
+        {...inline.hoverProps}
         className="relative aspect-[9/16] cursor-pointer overflow-hidden rounded-xl border-2 border-broll-500/80 bg-broll-500/[0.06] transition-all hover:border-broll-500 hover:-translate-y-px card-soft-shadow"
       >
         {inFlight ? (
@@ -2267,33 +2259,26 @@ function ClipCard({
         ) : currentVideo && videoUrl ? (
           <>
             <video
-              ref={videoElRef}
+              {...inline.videoProps}
               src={videoUrl}
-              muted={!unmuted}
-              loop
-              playsInline
               className="absolute inset-0 h-full w-full object-cover"
-              onPlay={() => setPlaying(true)}
-              onPause={() => setPlaying(false)}
-              onMouseEnter={(e) => { if (!unmuted) (e.currentTarget as HTMLVideoElement).play().catch(() => {}) }}
-              onMouseLeave={(e) => { if (!unmuted) { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0 } }}
             />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 to-transparent" />
             {/* Always-visible play/pause — top-left. On click, plays with audio
                 in place (stopPropagation keeps the detail modal from opening). */}
             <button
               type="button"
-              title={playing ? 'Pause' : 'Play with sound'}
-              onClick={(e) => { e.stopPropagation(); togglePlay() }}
+              title={inline.watching ? 'Pause' : 'Play with sound'}
+              onClick={inline.togglePlay}
               className="absolute left-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white backdrop-blur transition-colors hover:bg-black/70"
             >
-              {playing ? <Pause className="h-3.5 w-3.5 fill-white" /> : <Play className="h-3.5 w-3.5 fill-white" />}
+              {inline.watching ? <Pause className="h-3.5 w-3.5 fill-white" /> : <Play className="h-3.5 w-3.5 fill-white" />}
             </button>
             {controlsExpanded && (
               <button
                 type="button"
                 title={unmuted ? 'Mute' : 'Unmute'}
-                onClick={(e) => { e.stopPropagation(); toggleMute() }}
+                onClick={inline.toggleMute}
                 className="absolute left-11 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white backdrop-blur transition-colors hover:bg-black/70"
               >
                 {unmuted ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
@@ -2341,7 +2326,7 @@ function ClipCard({
         {/* Hover action stack — top-right, app-wide order: download · copy ·
             send-to-Playground. No save (video) and no trash (structural card). */}
         {currentVideo && (
-          <TileActionStack>
+          <TileActionStack hidden={inline.watching}>
             <TileActionButton
               title="Download video"
               onClick={() => { void handleDownload() }}
@@ -2367,7 +2352,7 @@ function ClipCard({
             open. Before that the card is covered by its own copy ("Pick
             keyframes for Frame N" / "Keyframes ready") and the whole face is
             already clickable, so a button just crowded it. */}
-        {currentVideo && (
+        {currentVideo && !inline.watching && (
           <div className="absolute inset-x-2 bottom-2 z-10 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
             <button
               type="button"

@@ -15,6 +15,7 @@ import {
   Film,
 } from 'lucide-react'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
+import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
 import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
 import type { PromptVariation, CardState, GeneratedImage, ReferenceImage } from '../types'
@@ -161,31 +162,11 @@ export default function VariationCard(props: VariationCardProps) {
   const [savingCover, setSavingCover] = useState(false)
   const [savedCover, setSavedCover] = useState(false)
   const [copiedPrompt, setCopiedPrompt] = useState(false)
-  // Inline video playback on the card face. Hover autoplay stays muted (browser
-  // policy); an explicit Play click is a user gesture, so it plays with sound.
-  const cardVideoRef = useRef<HTMLVideoElement>(null)
-  const [cardVideoPlaying, setCardVideoPlaying] = useState(false)
-  const [cardVideoUnmuted, setCardVideoUnmuted] = useState(false)
-
-  const toggleCardVideoPlay = () => {
-    const v = cardVideoRef.current
-    if (!v) return
-    if (v.paused) {
-      setCardVideoUnmuted(true)
-      v.muted = false
-      v.play().catch(() => {})
-    } else {
-      v.pause()
-    }
-  }
-  const toggleCardVideoMute = () => {
-    const v = cardVideoRef.current
-    setCardVideoUnmuted((prev) => {
-      const next = !prev
-      if (v) v.muted = !next
-      return next
-    })
-  }
+  // Inline video playback on the card face — one clip plays app-wide, so
+  // starting this one stops whatever was running (see useInlineVideo).
+  const cardVideo = useInlineVideo()
+  const cardVideoPlaying = cardVideo.playing
+  const cardVideoUnmuted = cardVideo.unmuted
 
   // Drive the in-flight indicator off the parallel-queue array — the legacy
   // single-slot `videoStatus` field is no longer written by runVideoTask so
@@ -796,6 +777,7 @@ export default function VariationCard(props: VariationCardProps) {
       <div className="group flex flex-col gap-1.5">
         <div
           onClick={() => setDetailOpen(true)}
+          {...cardVideo.hoverProps}
           className="relative aspect-[9/16] cursor-pointer overflow-hidden rounded-xl border border-ink/[0.08] bg-ink/[0.02] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
         >
           {cardState.isGeneratingImage || isGeneratingImageInFlight ? (
@@ -813,19 +795,13 @@ export default function VariationCard(props: VariationCardProps) {
             />
           ) : coverKind === 'video' && resolvedVideoUrl ? (
             <>
+              {/* Hover (on the frame, not the element — the buttons sit on top
+                  of it) autoplays muted; the play button takes over with sound
+                  and isn't reset when the mouse leaves. */}
               <video
-                ref={cardVideoRef}
+                {...cardVideo.videoProps}
                 src={resolvedVideoUrl}
-                muted={!cardVideoUnmuted}
-                loop
-                playsInline
                 className="absolute inset-0 h-full w-full object-cover"
-                onPlay={() => setCardVideoPlaying(true)}
-                onPause={() => setCardVideoPlaying(false)}
-                // Muted hover-preview only — an explicit Play click (below) takes
-                // over with sound and shouldn't be reset when the mouse leaves.
-                onMouseEnter={(e) => { if (!cardVideoUnmuted) (e.currentTarget as HTMLVideoElement).play().catch(() => {}) }}
-                onMouseLeave={(e) => { if (!cardVideoUnmuted) { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0 } }}
               />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 to-transparent" />
               {/* Always-visible play/pause — top-left, the corner the type chip
@@ -833,17 +809,17 @@ export default function VariationCard(props: VariationCardProps) {
                   place (stopPropagation keeps the detail modal from opening). */}
               <button
                 type="button"
-                title={cardVideoPlaying ? 'Pause' : 'Play with sound'}
-                onClick={(e) => { e.stopPropagation(); toggleCardVideoPlay() }}
+                title={cardVideo.watching ? 'Pause' : 'Play with sound'}
+                onClick={cardVideo.togglePlay}
                 className="absolute left-2 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white backdrop-blur transition-colors hover:bg-black/70"
               >
-                {cardVideoPlaying ? <Pause className="h-3.5 w-3.5 fill-white" /> : <Play className="h-3.5 w-3.5 fill-white" />}
+                {cardVideo.watching ? <Pause className="h-3.5 w-3.5 fill-white" /> : <Play className="h-3.5 w-3.5 fill-white" />}
               </button>
               {(cardVideoPlaying || cardVideoUnmuted) && (
                 <button
                   type="button"
                   title={cardVideoUnmuted ? 'Mute' : 'Unmute'}
-                  onClick={(e) => { e.stopPropagation(); toggleCardVideoMute() }}
+                  onClick={cardVideo.toggleMute}
                   className="absolute left-11 top-2 z-20 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/50 text-white backdrop-blur transition-colors hover:bg-black/70"
                 >
                   {cardVideoUnmuted ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
@@ -943,7 +919,7 @@ export default function VariationCard(props: VariationCardProps) {
               standard order: download · save (stills only) · copy · send-to-
               Playground (videos only) · delete. The card body stays clickable
               to open the detail modal. */}
-          <TileActionStack forceVisible={confirmingDelete}>
+          <TileActionStack forceVisible={confirmingDelete} hidden={cardVideo.watching}>
             {coverKind && (
               <>
                 <TileActionButton
@@ -997,11 +973,12 @@ export default function VariationCard(props: VariationCardProps) {
               rather than covering it, since hover is exactly when that needs to
               stay readable. Video play/mute used to force the same dodge; they
               live top-left now, so a video cover keeps the row at its usual
-              height. */}
+              height. Suppressed while the clip plays with sound — watching it
+              is the task then, and only play/pause + mute stay on the face. */}
           <div
-            className={`absolute inset-x-2 z-10 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 ${
-              showImageError ? 'bottom-14' : 'bottom-2'
-            }`}
+            className={`absolute inset-x-2 z-10 items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 ${
+              cardVideo.watching ? 'hidden' : 'flex'
+            } ${showImageError ? 'bottom-14' : 'bottom-2'}`}
           >
             <button
               type="button"

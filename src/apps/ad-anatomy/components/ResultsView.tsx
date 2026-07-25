@@ -14,6 +14,7 @@ import type { AnalysisResult, Scene } from '../types'
 import { useAppStore } from '../../../stores/appStore'
 import { useBankStore } from '../../../stores/bankStore'
 import SegmentedToggle from '../../../components/SegmentedToggle'
+import { useExclusiveVideo } from '../../../hooks/useInlineVideo'
 
 interface ResultsViewProps {
   result: AnalysisResult
@@ -469,6 +470,8 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
   // still is available (e.g. restored from a history row whose thumbnail
   // capture had failed). Results panels then take the full width.
   const hasMedia = !!videoSrc || !!restoredThumbUrl
+  // Native controls, but the same app-wide rule: one clip plays at a time.
+  const sourceVideo = useExclusiveVideo()
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const breakdownRef = useRef<HTMLDivElement>(null)
@@ -518,6 +521,7 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
           <div className="flex flex-1 min-h-0 w-full items-center justify-center">
             {videoSrc ? (
               <video
+                {...sourceVideo}
                 src={videoSrc}
                 className="block max-h-full max-w-full rounded-xl border border-ink/10 transition-all hover:-translate-y-px card-soft-shadow"
                 controls
