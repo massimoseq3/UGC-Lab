@@ -26,7 +26,6 @@ import {
   Redo2,
   ChevronRight,
   Star,
-  MapPin,
 } from 'lucide-react'
 import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
@@ -98,40 +97,21 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
 
 // The storyboard-wide style block — shown read-only so the user knows what
 // rides along with every prompt without being able to fork it per-frame.
-function StyleNote({ style, world }: { style: string; world?: string }) {
+function StyleNote({ style }: { style: string }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="flex flex-col gap-1.5">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-start gap-2 rounded-2xl border border-ink/10 bg-ink/[0.02] px-3.5 py-2.5 text-left transition-colors hover:bg-ink/[0.04]"
-        title={open ? 'Collapse' : 'Show the full style block'}
-      >
-        <Palette className="mt-0.5 h-3.5 w-3.5 shrink-0 text-broll-300" />
-        <span className={`min-w-0 flex-1 text-[11px] leading-relaxed text-ink-500 ${open ? '' : 'line-clamp-2'}`}>
-          <span className="font-semibold text-ink-400">Style (applied automatically): </span>
-          {style}
-        </span>
-      </button>
-      {/* The location every frame of the ad shares. Read-only for the same
-          reason as the style: both are appended at fire time and must not fork
-          per-frame, or the clip has to interpolate between two different sets. */}
-      {world?.trim() && (
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          className="flex w-full items-start gap-2 rounded-2xl border border-ink/10 bg-ink/[0.02] px-3.5 py-2.5 text-left transition-colors hover:bg-ink/[0.04]"
-          title={open ? 'Collapse' : 'Show the full world block'}
-        >
-          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-broll-300" />
-          <span className={`min-w-0 flex-1 text-[11px] leading-relaxed text-ink-500 ${open ? '' : 'line-clamp-2'}`}>
-            <span className="font-semibold text-ink-400">World (every frame is in here): </span>
-            {world}
-          </span>
-        </button>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={() => setOpen((v) => !v)}
+      className="flex w-full items-start gap-2 rounded-2xl border border-ink/10 bg-ink/[0.02] px-3.5 py-2.5 text-left transition-colors hover:bg-ink/[0.04]"
+      title={open ? 'Collapse' : 'Show the full style block'}
+    >
+      <Palette className="mt-0.5 h-3.5 w-3.5 shrink-0 text-broll-300" />
+      <span className={`min-w-0 flex-1 text-[11px] leading-relaxed text-ink-500 ${open ? '' : 'line-clamp-2'}`}>
+        <span className="font-semibold text-ink-400">Style (applied automatically): </span>
+        {style}
+      </span>
+    </button>
   )
 }
 
@@ -144,8 +124,6 @@ interface ContinuousFrameModalProps {
   conceptShot?: string  // its shot size off SHOT_LADDER, shown as a chip
   scriptLine: string    // the narration line this frame opens ('' for final)
   style: string
-  // The one location the ad happens in, shown read-only beside the style.
-  world?: string
   cardState: ContinuousFrameCardState
   // The previous frame's chosen keyframe (chain reference), if picked.
   chainImageRef?: string
@@ -188,7 +166,6 @@ export function ContinuousFrameModal({
   conceptShot,
   scriptLine,
   style,
-  world,
   cardState,
   chainImageRef,
   characterRef,
@@ -314,7 +291,7 @@ export function ContinuousFrameModal({
               <div className="-mx-5 -mt-1 border-b border-ink/5" />
 
               {frameTab === 'image' && (<>
-              <StyleNote style={style} world={world} />
+              <StyleNote style={style} />
 
               {/* Reference toggles — the chain ref (previous keyframe) is the
                   continuity lock; character/product fix identity. */}
@@ -831,12 +808,6 @@ interface ContinuousClipModalProps {
   sceneNumber: number   // the scene index, shown as a serif "01" in the header
   scriptLine: string
   style: string
-  // The one location the ad happens in, shown read-only beside the style.
-  world?: string
-  // The storyboard's plan for this boundary: the connective device plus the
-  // anchor element both keyframes carry. Shown read-only — it's what the motion
-  // below is supposed to execute.
-  transition?: string
   cardState: ContinuousClipCardState
   modelId: string
   startImageRef?: string
@@ -858,8 +829,6 @@ export function ContinuousClipModal({
   sceneNumber,
   scriptLine,
   style,
-  world,
-  transition,
   cardState,
   modelId,
   startImageRef,
@@ -986,37 +955,20 @@ export function ContinuousClipModal({
                 </p>
               )}
 
-              <StyleNote style={style} world={world} />
+              <StyleNote style={style} />
 
-              {/* The boundary's planned device + anchor. Read-only: it's the
-                  storyboard's plan for how these two frames connect, and the
-                  motion below is what executes it. */}
-              {transition?.trim() && (
-                <div className="rounded-2xl border border-ink/10 bg-ink/[0.03] px-3.5 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-ink-500">Transition</p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-ink-400">{transition.trim()}</p>
-                </div>
-              )}
-
-              {/* Motion prompt — the path between the two fixed frames: what
-                  leaves the start, what carries the shot across, how it settles.
-                  Auto-filled from the picked keyframe's own motion, then
-                  rewritten against BOTH rendered frames once the pair is set.
-                  Enhance sharpens it; Regenerate re-reads the frames. */}
+              {/* Motion prompt — how the shot animates from the first frame to
+                  the last. Auto-filled from the picked keyframe's own motion.
+                  Enhance sharpens it; Regenerate re-reads both rendered frames
+                  and rewrites it — on demand, not on every keyframe change. */}
               <div className="flex grow flex-col">
-                {cardState.linking && (
-                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] text-broll-300">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Writing the transition from both keyframes…
-                  </p>
-                )}
                 <div className="relative flex grow flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
                   <textarea
                     value={draft}
                     onChange={(e) => { setDraft(e.target.value); onUpdate(() => ({ editablePrompt: e.target.value, motionEdited: true })) }}
                     onBlur={commitDraft}
                     rows={8}
-                    placeholder="Describe the path between the two frames — what leaves the start, what carries the shot across, how it settles, and one sound…"
+                    placeholder="Describe the animation — what moves, how the camera moves, how it comes to rest, and one sound…"
                     className="relative min-h-[160px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                   />
                   <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
@@ -1038,7 +990,7 @@ export function ContinuousClipModal({
                             ? 'Pick a start keyframe first'
                             : framesReady
                               ? 'Rewrite the motion by reading both chosen keyframes'
-                              : 'Rewrite the motion from the chosen start keyframe (pick an end keyframe for a full transition)'
+                              : 'Rewrite the motion from the chosen start keyframe (pick an end keyframe to read both)'
                         }
                         onClick={() => void runPromptTool(onRegenerateMotion, 'Regenerate')}
                         disabled={promptWorking || !startImageRef}

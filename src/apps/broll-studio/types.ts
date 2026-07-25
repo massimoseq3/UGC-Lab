@@ -363,12 +363,12 @@ export interface OneShotCardState {
 export interface ContinuousConcept {
   id: string
   label: string
-  // The concept's shot size, off SHOT_LADDER ('Wide' / 'Macro' / 'Close-up'…).
-  // Chosen per beat by the storyboard, not assigned by slot — but the three
-  // concepts of a frame must sit at three different sizes, with at least one
-  // medium-wide or wider, so there is always an un-cropped option. Shown as a
-  // chip on the card and fed back into Enhance/Regenerate so a rewrite can't
-  // drift to a medium shot. Absent on legacy sessions and hand-added concepts.
+  // The concept's shot size, off SHOT_LADDER (medium-wide / medium / close-up /
+  // macro). Medium is the default: a keyframe's job is to make the spoken line
+  // instantly readable, and anything wider costs the viewer that. No scale
+  // mandate across a frame's concepts — they differ by IDEA. Shown as a chip on
+  // the card and fed into Enhance/Regenerate so a rewrite holds its size.
+  // Absent on legacy sessions and hand-added concepts.
   shot?: string
   prompt: string
   // Which reference images this staging should attach, as decided by the
@@ -405,19 +405,6 @@ export interface ContinuousScene {
   // model renders the user's own packaging as the thing being criticised.
   // Absent on legacy sessions, which are treated as visible (the old behaviour).
   productVisible?: boolean
-  // The boundary between this frame and the next one, as planned by the
-  // storyboard: the connective device plus the ANCHOR element every concept on
-  // both sides carries. A pair with no shared anchor can't be interpolated —
-  // the video model hard-cuts onto the end frame. Rides into every motion and
-  // frame rewrite so a regenerated prompt still executes the planned link.
-  // Absent on legacy sessions written before transitions existed.
-  transition?: string
-  // The one physical thing happening in this beat, as a verb in progress. Every
-  // scene gets its own, distinct from every other scene's, and all of a frame's
-  // concepts show THAT action from different cameras — so a beat reads as an
-  // event rather than a person or object simply being present. Rides into every
-  // frame rewrite. Absent on legacy sessions.
-  action?: string
   sfx: string
   // Planned clip length — spoken seconds snapped UP onto the plan model's grid.
   durationSeconds: number
@@ -427,12 +414,6 @@ export interface ContinuousResult {
   // The storyboard-wide style block, appended to every image/video prompt at
   // fire time (never shown inside the editable per-frame prompt).
   style: string
-  // The ONE physical location the whole ad happens in, appended to every frame
-  // prompt at fire time next to the style. Told to the storyboard once, the
-  // location drifted frame to frame — scene 1 in a sunlit kitchen, scene 2 in a
-  // void, a chrome surface and a gym — and a clip cannot interpolate between two
-  // different sets. Absent on legacy sessions, where nothing is appended.
-  world?: string
   styleId: string
   // True only for the UGC Realism style — the one look that keeps the app's
   // iPhone-realism suffix on. Every stylized storyboard bypasses it. Optional
@@ -469,6 +450,10 @@ export interface ContinuousFrameCardState {
   inFlightImages: InFlightImage[]
   // Which references attach on generate. Chain = the previous frame's chosen
   // keyframe as a style/continuity reference (the character-lock protocol).
+  // Defaults ON: this is continuous mode, and chaining is what makes the frames
+  // feel like one story. It shipped off for a while because all of a frame's
+  // concepts then anchor to one image and come back similar, but in practice the
+  // continuity is worth more than the spread, and the per-frame pill turns it off.
   chainLink: boolean
   refsCharacter: boolean
   refsProduct: boolean
@@ -498,14 +483,6 @@ export interface ContinuousClipCardState {
   // auto-syncs to its start frame's picked concept; once true, picks stop
   // clobbering the user's text.
   motionEdited: boolean
-  // Which endpoint pair the current motion was written against — `start|end`
-  // keyframe asset refs. Set when the pair-aware vision pass rewrites the
-  // motion from the two ACTUAL rendered frames; a re-pick on either end changes
-  // the key and re-links. Absent while the motion is still the storyboard's
-  // start-frame seed.
-  linkedPair?: string
-  // True while that vision pass is in flight (transient; a hydrate clears it).
-  linking?: boolean
   videos: GeneratedVideo[]
   currentVideoIndex: number
   inFlightVideos: InFlightVideo[]
