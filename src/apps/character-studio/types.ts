@@ -40,6 +40,12 @@ export interface LaunchGenOptions {
   aspect: string
   referenceUrl?: string
   lineageId?: string
+  // Sheet generations started from the edit modal carry that panel's own
+  // inputs: `direction` is the typed instruction and/or picked visual style,
+  // `extraReferenceUrls` the attached reference images. Unset for a sheet
+  // built straight off the form.
+  direction?: string
+  extraReferenceUrls?: string[]
   edit?: {
     instruction: string
     baseImageRef: string

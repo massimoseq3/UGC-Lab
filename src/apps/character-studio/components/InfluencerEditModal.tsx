@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Loader2, Download, Bookmark, Check, ImagePlus, Wand2, LayoutGrid, Pencil, Upload, FolderOpen, Copy, Maximize2, Coins, Sparkles, Undo2, Redo2 } from 'lucide-react'
+import { X, Loader2, Download, Bookmark, Check, ImagePlus, Wand2, LayoutGrid, Pencil, Upload, FolderOpen, Copy, Maximize2, Coins, Sparkles, Undo2, Redo2, Palette, ChevronRight } from 'lucide-react'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import { useSettingsStore } from '../../../stores/settingsStore'
@@ -34,21 +34,29 @@ import {
 import type { InFlightCharacterGen, LaunchGenOptions } from '../types'
 import { pickInfluencerName, sheetNameFrom } from './nameGenerator'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
+import StyleModal, { INFLUENCERS_STYLE_ACCENT, type StyleSelection } from '../../../components/StyleModal'
+import { analyzeStyleReferences, getContinuousStyle, styleBriefForStill } from '../../../utils/visualStyle'
+import { fileToDataUri } from '../../../utils/kie'
+import { usePersistedState } from '../../../hooks/usePersistedState'
 import GeneratingTile from './GeneratingTile'
 import InfluencerLightbox from './InfluencerLightbox'
 
 // A B-Roll-style editor for an influencer image. Clicking a portrait opens this:
-// the left column mirrors the B-Roll card editor — a segmented mode toggle,
-// an Image Model picker + constraint chips, references / prompt, and a single
-// accent Generate pill. The right column is the per-influencer outputs gallery;
-// the highlighted tile is the "cover" every edit / sheet is built from.
+// the left column mirrors the B-Roll card editor — references, visual style and
+// an instruction over a pinned footer (mode, Image Model picker, constraint
+// chips, and a single accent Generate pill). The right column is the
+// per-influencer outputs gallery; the highlighted tile is the "cover" every
+// edit / sheet is built from.
 //
-// Two modes:
-//   • Edit Influencer — attach square reference slots + type an edit instruction,
-//     re-generate image-to-image off the cover.
-//   • Influencer Sheet — image-model options only; builds a reference sheet
-//     (turnaround + expressions) from the cover via image-to-image, same face.
-// New outputs persist to characterHistory so nothing is lost on close.
+// The footer's mode toggle picks the OUTPUT KIND only — it does not swap the
+// panel:
+//   • Edit Character — a new portrait, image-to-image off the cover.
+//   • Character Sheet — a reference sheet (turnaround + expressions) off the
+//     same cover, same face.
+// Both read the same references / visual style / instruction, so flipping the
+// toggle re-renders what you already set up in the other form rather than
+// throwing it away. New outputs persist to characterHistory so nothing is lost
+// on close.
 
 type Mode = 'edit' | 'sheet'
 
@@ -162,6 +170,60 @@ export default function InfluencerEditModal({
   const canUndoPrompt = promptIndex > 0
   const canRedoPrompt = promptIndex < promptHistory.length - 1
   const [refs, setRefs] = useState<UploadedRef[]>([])
+
+  // ── Visual style ───────────────────────────────────────────────
+  // An optional restyle applied on top of the typed instruction: pick a look and
+  // the edit re-renders the character in it. Characters are GENERATED as UGC
+  // Realism (the form has no style control on purpose — see CLAUDE.md); this is
+  // where you take a finished portrait somewhere else, the same way the
+  // Playground's preset row reshapes a prompt.
+  //
+  // Persisted app-wide, not per character, so a run of restyles keeps the look.
+  const [styleId, setStyleId] = usePersistedState<string>('character-studio:editStyle', 'ugc')
+  const [styleBrief, setStyleBrief] = usePersistedState<string | null>('character-studio:editStyleBrief', null)
+  const [styleBankId, setStyleBankId] = usePersistedState<string | null>('character-studio:editStyleBankId', null)
+  const [styleName, setStyleName] = usePersistedState<string | null>('character-studio:editStyleName', null)
+  const [styleRefs, setStyleRefs] = useState<string[]>([])
+  const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false)
+  const [styleModalOpen, setStyleModalOpen] = useState(false)
+
+  // null when the pick is UGC Realism — the look characters are already in, so
+  // there is nothing to add to the instruction.
+  const styleDirective = styleBriefForStill({ styleId, styleBrief: styleBrief ?? undefined })
+  const styleActive = !!styleDirective
+  const styleLabel = styleBrief ? (styleName ?? 'Custom style') : getContinuousStyle(styleId).label
+
+  const handlePickPresetStyle = (id: string) => {
+    setStyleId(id); setStyleBrief(null); setStyleBankId(null); setStyleName(null)
+  }
+  const handleUseCustomStyle = (sel: StyleSelection) => {
+    setStyleBrief(sel.brief); setStyleName(sel.name); setStyleBankId(sel.bankId)
+  }
+  const handleClearStyle = () => {
+    setStyleId('ugc'); setStyleBrief(null); setStyleBankId(null); setStyleName(null)
+  }
+  const handleAddStyleRefs = async (files: File[]) => {
+    const room = 4 - styleRefs.length
+    if (room <= 0) return
+    const dataUris = await Promise.all(files.slice(0, room).map((f) => fileToDataUri(f)))
+    setStyleRefs((prev) => [...prev, ...dataUris].slice(0, 4))
+  }
+  const handleAnalyzeStyleRefs = async (): Promise<string | null> => {
+    if (styleRefs.length === 0 || isAnalyzingStyle) return null
+    if (!useSettingsStore.getState().kieApiKey) {
+      useAppStore.getState().addToast('Add your kie.ai key in Settings to analyze a reference style', 'info')
+      return null
+    }
+    setIsAnalyzingStyle(true)
+    try {
+      return await analyzeStyleReferences(styleRefs)
+    } catch (err) {
+      useAppStore.getState().addToast(humanizeError(err, 'Could not read the style from those images.'), 'error')
+      return null
+    } finally {
+      setIsAnalyzingStyle(false)
+    }
+  }
   // In-flight gens started from this editor. Derived from the app-level list, so
   // reopening the modal mid-generation shows the tile again instead of losing it.
   const lineageInFlight = useMemo(
@@ -174,9 +236,8 @@ export default function InfluencerEditModal({
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const selected = outputs.find((o) => o.id === selectedId) ?? outputs[0]
-  const selectedUrl = useAssetUrl(selected?.imageRef)
 
-  // The influencer's display name for the sheet-mode reference card. Prefer the
+  // The influencer's display name used when saving a sheet. Prefer the
   // bank name when this generation is saved; otherwise a stable generated one
   // (matches how the gallery names an influencer at save time).
   const linkedModelName = item.linkedModelId ? models.find((m) => m.id === item.linkedModelId)?.name : undefined
@@ -336,8 +397,17 @@ export default function InfluencerEditModal({
   }
 
   function handleEdit() {
-    const instruction = prompt.trim()
-    if (!instruction || generating || !selected) return
+    const typed = prompt.trim()
+    // A visual style is an instruction in its own right — picking one and
+    // hitting Generate is a valid "restyle this, change nothing else", so the
+    // typed box may be empty as long as one of the two is present.
+    if ((!typed && !styleDirective) || generating || !selected) return
+    // Style goes LAST so it reads as the final directive, and stands alone as
+    // the whole instruction when nothing was typed.
+    const instruction = styleDirective
+      ? [typed && `${typed}\n`, `Re-render this character in the following visual style, keeping the same person — same face, hair, and build:\n\n${styleDirective}`]
+          .filter(Boolean).join('\n')
+      : typed
     onLaunchGen({
       profile: item.profile,
       resolution,
@@ -362,6 +432,10 @@ export default function InfluencerEditModal({
     if (generating || !selected) return
     // Image-to-image off the cover so the sheet keeps the exact same person —
     // startCharacterTask swaps to an i2i model and leads with an identity lock.
+    // The panel doesn't change between modes, so whatever is set up there rides
+    // along: the typed instruction, the visual style, and the extra references.
+    const typed = prompt.trim()
+    const direction = [typed, styleDirective].filter(Boolean).join('\n\n') || undefined
     onLaunchGen({
       profile: item.profile,
       resolution,
@@ -369,6 +443,8 @@ export default function InfluencerEditModal({
       aspect: sheetAspect,
       referenceUrl: selected.imageRef,
       lineageId: lineageKey,
+      direction,
+      extraReferenceUrls: refs.map((r) => r.url),
     })
   }
 
@@ -464,24 +540,11 @@ export default function InfluencerEditModal({
           <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 md:border-b-0 md:border-r">
             {/* Scrollable body */}
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            {/* One body for BOTH output kinds. The footer toggle picks what
+                gets generated — an edited portrait or a character sheet — it
+                does not swap the panel, so the references, visual style, and
+                instruction you set up carry across either way. */}
             <div className="flex grow flex-col gap-3 px-5 pb-6 pt-5">
-              {/* Edit Influencer / Influencer Sheet — full-width segmented
-                  toggle. Slim (h-10 !p-1) to match the Playground mode toggle. */}
-              <SegmentedToggle<Mode>
-                className="h-10 !p-1"
-                value={mode}
-                onChange={handleModeChange}
-                accent="influencers"
-                options={[
-                  { value: 'edit', label: 'Edit Character', icon: Pencil },
-                  { value: 'sheet', label: 'Character Sheet', icon: LayoutGrid },
-                ]}
-              />
-
-              {/* Separator between the toggle and the controls below. */}
-              <div className="-mt-1 border-b border-ink/5" />
-
-              {mode === 'edit' ? (
                 <>
                   {/* Reference images — Playground-style: picked thumbnails in a
                       four-up strip above a full-width dashed add card (Optional
@@ -557,6 +620,53 @@ export default function InfluencerEditModal({
                       box, matching the Playground prompt field. */}
                   <div className="flex grow flex-col">
                     <div className="relative flex grow flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
+                      {/* Visual Style — a header row inside the prompt box,
+                          mirroring the Playground's UGC Prompt Preset row. It
+                          rides ON TOP of whatever is typed below, so it reads
+                          as part of the instruction rather than a separate
+                          setting. Neutral until a look other than the default
+                          is picked. */}
+                      <button
+                        type="button"
+                        onClick={() => setStyleModalOpen(true)}
+                        className={`flex w-full shrink-0 items-center gap-3 border-b border-dashed px-3.5 py-3 text-left transition-colors ${
+                          styleActive
+                            ? 'border-influencers-500/30 bg-influencers-500/10 hover:bg-influencers-500/[0.16]'
+                            : 'border-ink/10 hover:bg-ink/[0.04]'
+                        }`}
+                      >
+                        <span
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+                            styleActive ? 'bg-influencers-500/20 text-influencers-300' : 'bg-influencers-500/10 text-influencers-400'
+                          }`}
+                        >
+                          <Palette className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className={`truncate text-[13px] font-medium ${styleActive ? 'text-influencers-200' : 'text-ink-100'}`}>
+                            {styleActive ? styleLabel : 'Visual Style'}
+                          </p>
+                          <p className="truncate text-[11px] text-ink-500">
+                            {styleActive
+                              ? 'Applied on top of your instruction below'
+                              : 'Re-render this character in a different look'}
+                          </p>
+                        </div>
+                        {styleActive ? (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            title="Remove the visual style"
+                            onClick={(e) => { e.stopPropagation(); handleClearStyle() }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); handleClearStyle() } }}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/10 hover:text-ink-200"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </span>
+                        ) : (
+                          <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
+                        )}
+                      </button>
                       <textarea
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
@@ -604,26 +714,6 @@ export default function InfluencerEditModal({
                     </div>
                   </div>
                 </>
-              ) : (
-                /* Sheet mode — no prompt; the sheet is built from the source. */
-                <div className="flex grow flex-col">
-                  <span className="text-sm font-medium text-ink-200">Reference character</span>
-                  <div className="mt-2 flex items-center gap-3 rounded-full border border-ink/10 bg-ink/[0.02] px-3 py-2">
-                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-ink/10 bg-black">
-                      {selectedUrl
-                        ? <img src={selectedUrl} alt="" className="h-full w-full object-cover" />
-                        : <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-ink-500" /></div>}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-[13px] font-medium text-ink-100">{influencerName}</p>
-                      <p className="text-[11px] text-ink-500">Character</p>
-                    </div>
-                  </div>
-                  <p className="mt-2 text-[11px] leading-relaxed text-ink-500">
-                    Builds a turnaround + expressions sheet from this character — same face, neutral studio background. Pick a different output on the right to change the source.
-                  </p>
-                </div>
-              )}
 
             </div>
             </div>
@@ -632,6 +722,25 @@ export default function InfluencerEditModal({
                 the Generate button, separated by a hairline. Matches the
                 Playground panel's sticky footer; chips open upward. */}
             <div className="shrink-0 border-t border-ink/5 px-5 py-4">
+              {/* Edit Character / Character Sheet — what this generation will
+                  BE, so it leads the footer's settings stack rather than
+                  sitting apart at the top of the panel: pick the output, then
+                  the model, then the output settings, then Generate. h-12 to
+                  match the large ModelPicker trigger below it — the whole
+                  footer stack (toggle / model / res+aspect chips) shares one
+                  control height. */}
+              <div className="mb-3">
+                <SegmentedToggle<Mode>
+                  className="h-12 !p-1"
+                  value={mode}
+                  onChange={handleModeChange}
+                  accent="influencers"
+                  options={[
+                    { value: 'edit', label: 'Edit Character', icon: Pencil },
+                    { value: 'sheet', label: 'Character Sheet', icon: LayoutGrid },
+                  ]}
+                />
+              </div>
               {/* Image Model picker — sits just above the resolution/aspect row
                   (mirrors the main Influencers footer); the picker auto-opens
                   upward this close to the footer. */}
@@ -647,7 +756,7 @@ export default function InfluencerEditModal({
                 {resolutionOptions.length > 0 && (
                   <ConstraintChip
                     grow
-                    size="sm"
+                    size="lg"
                     openDirection="up"
                     options={resolutionOptions}
                     value={resolution}
@@ -667,7 +776,7 @@ export default function InfluencerEditModal({
                   ? aspectOptions.length > 0 && (
                       <ConstraintChip
                         grow
-                        size="sm"
+                        size="lg"
                         openDirection="up"
                         options={aspectOptions}
                         value={editAspect}
@@ -683,7 +792,7 @@ export default function InfluencerEditModal({
                   : sheetAspectOptions.length > 0 && (
                       <ConstraintChip
                         grow
-                        size="sm"
+                        size="lg"
                         openDirection="up"
                         options={sheetAspectOptions}
                         value={sheetAspect}
@@ -703,7 +812,7 @@ export default function InfluencerEditModal({
                 <button
                   type="button"
                   onClick={handleEdit}
-                  disabled={!prompt.trim() || generating || !selected}
+                  disabled={(!prompt.trim() && !styleDirective) || generating || !selected}
                   className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-influencers-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-influencers-400 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
@@ -795,6 +904,29 @@ export default function InfluencerEditModal({
         title="Edit instruction"
         placeholder="Describe the change — e.g. 'change the top to a red hoodie', 'add round glasses', 'softer warm lighting'…"
         accent="ink"
+      />
+      <StyleModal
+        // Remount per open so the popup always lands on the browse view with a
+        // clean draft — it renders null while closed, so this costs nothing.
+        key={styleModalOpen ? 'open' : 'closed'}
+        open={styleModalOpen}
+        onClose={() => setStyleModalOpen(false)}
+        styleId={styleId}
+        styleBrief={styleBrief}
+        styleBankId={styleBankId}
+        onPickPreset={handlePickPresetStyle}
+        onUseCustom={handleUseCustomStyle}
+        styleRefs={styleRefs}
+        onAddStyleRefs={(files) => { void handleAddStyleRefs(files) }}
+        onRemoveStyleRef={(i) => setStyleRefs((prev) => prev.filter((_, idx) => idx !== i))}
+        onClearStyleRefs={() => setStyleRefs([])}
+        // No bank route in here — this editor has no B-Roll stills picker of its
+        // own, so reference frames come from the uploader only.
+        onPickStyleRefsFromBank={undefined}
+        onAnalyze={handleAnalyzeStyleRefs}
+        isAnalyzing={isAnalyzingStyle}
+        accent={INFLUENCERS_STYLE_ACCENT}
+        subjectLabel="character"
       />
     </>,
     document.body,

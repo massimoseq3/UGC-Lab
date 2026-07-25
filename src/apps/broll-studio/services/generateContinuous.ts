@@ -62,120 +62,19 @@ export function sceneDuration(scriptLine: string, modelId: string): number {
 }
 
 // ── Visual styles ──────────────────────────────────────────────
-// The preset seeds the LLM's STYLE block; the LLM adapts it to the product and
-// script. The chain mechanic works for any aesthetic — 3D is just the default.
-
-export interface ContinuousStyle {
-  id: string
-  label: string
-  hint: string
-  // True only for the live-action UGC style: it KEEPS the app's deterministic
-  // iPhone-realism stack switched on. Every stylized style bypasses it.
-  realism?: boolean
-}
-
-// Display order — this array IS the order of the picker's Presets grid. Live
-// action leads because it's what most ads are; the stylized looks follow.
-export const CONTINUOUS_STYLES: ContinuousStyle[] = [
-  {
-    id: 'ugc',
-    label: 'UGC Realism',
-    hint: 'Real, unpolished creator footage shot on a modern phone: casual unstaged framing, natural available light from a real source, zero bokeh and sharp focus across the frame, no colour grade and no commercial gloss. The look of a phone camera, never the sight of one — never name or show a phone, camera, tripod, or ring light anywhere in frame, and never stage a mirror selfie. People look like they just decided to film this.',
-    realism: true,
-  },
-  {
-    id: 'zack-3d',
-    label: '3D Animated',
-    hint: 'Glossy stylized 3D render in the viral explainer register: soft rounded character shapes with slightly exaggerated proportions, vivid saturated colors, clean smooth surfaces, soft volumetric lighting with gentle rim light, high-detail render like a premium animated short. Never photoreal, never live-action.',
-  },
-  {
-    id: 'clay',
-    label: 'Claymation',
-    hint: 'Handcrafted stop-motion claymation: visible fingerprints and tool marks in the clay, slightly imperfect handmade shapes, miniature-set depth, warm practical lighting on a physical diorama.',
-  },
-  {
-    id: 'paper',
-    label: 'Papercraft',
-    hint: 'Layered paper-cutout diorama: crisp cut edges, subtle drop shadows between paper layers, flat colors with visible paper texture, everything staged like a handmade pop-up book scene.',
-  },
-  {
-    id: 'anime',
-    label: 'Anime',
-    hint: 'Clean 2D anime cel style: bold linework, flat cel shading with two-tone shadows, expressive faces, painterly backgrounds with soft light bloom.',
-  },
-  {
-    id: 'cinematic',
-    label: 'Cinematic',
-    hint: 'Photoreal cinematic live-action: filmic color grade, shallow-but-controlled depth, deliberate camera language, commercial-grade art direction. Polished on purpose — the one style where gloss is the goal.',
-  },
-]
-
-// Fallback is pinned by id, not by position: the array's order is a display
-// choice, and reordering it must never silently change what an unknown or
-// legacy style id resolves to (it also decides `realism`).
-const FALLBACK_STYLE = CONTINUOUS_STYLES.find((s) => s.id === 'zack-3d')!
-
-export function getContinuousStyle(id: string): ContinuousStyle {
-  return CONTINUOUS_STYLES.find((s) => s.id === id) ?? FALLBACK_STYLE
-}
-
-// Whether this storyboard keeps the app-wide iPhone-realism suffix. A style
-// analysed from reference images is stylized by assumption — the user picks
-// UGC Realism explicitly when they want the live-action stack.
-export function styleUsesRealism(styleId: string, hasCustomBrief: boolean): boolean {
-  if (hasCustomBrief) return false
-  return getContinuousStyle(styleId).realism === true
-}
-
-// ── Style from reference images ────────────────────────────────
-// The user drops in frames of an ad whose look they want. A vision pass distils
-// the AESTHETIC ONLY — never the subjects, products, or scenes in them — into a
-// STYLE paragraph that then drives every keyframe and clip.
-
-const STYLE_ANALYSIS_SYSTEM = `You are an art director reverse-engineering a visual style from reference frames.
-
-Your ONLY job is to describe HOW these images look, never WHAT is in them. Your output is appended to unrelated image and video prompts for a completely different script, so any subject matter you carry over is a bug: no characters, no products, no locations, no story, no specific objects from these references.
-
-Describe, in ONE dense paragraph of 90-150 words:
-- MEDIUM & RENDER: the technique (3D render, 2D cel animation, claymation, papercraft, live-action photography, mixed media), how stylized vs photoreal it is, surface quality (glossy, matte, grainy, painterly), and the apparent render engine or film-stock character.
-- FORMS: how shapes and figures are treated — proportions (realistic vs exaggerated), edge quality (hard linework, soft rounded, cut-paper crisp), geometric detail level, texture density.
-- PALETTE: the actual dominant colours and their relationships (name the colours; never just "vibrant"), saturation, contrast, and any consistent grade or tint.
-- LIGHT: the lighting register — sources, softness, direction tendencies, rim and volumetric effects, shadow depth, bloom or haze.
-- CAMERA & FINISH: typical framing and lens character, depth-of-field behaviour, grain or noise, and any post treatment (vignette, chromatic aberration, halation).
-
-Write it as direct style direction an image model can act on, present tense, one flowing paragraph. Name concrete visual qualities, never vague praise ("beautiful", "high quality", "professional"). If the references disagree, describe the dominant look and ignore the outlier.
-
-Output ONLY the paragraph. No preamble, no headings, no bullets, no markdown.`
-
-// `images` are data URIs (the uploader converts on attach). Returns the style
-// paragraph, which replaces the preset hint for this storyboard.
-export async function analyzeStyleReferences(images: string[]): Promise<string> {
-  if (images.length === 0) throw new Error('Attach at least one reference image first.')
-  const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
-
-  const messages: ChatMessage[] = [
-    { role: 'system', content: [{ type: 'text', text: STYLE_ANALYSIS_SYSTEM }] },
-    {
-      role: 'user',
-      content: [
-        {
-          type: 'text',
-          text: `Describe the visual STYLE shared by ${images.length === 1 ? 'this reference frame' : `these ${images.length} reference frames`}. Style only — carry over no subjects, products, locations, or story from the images.`,
-        },
-        ...images.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
-      ],
-    },
-  ]
-
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages, {
-    timeoutMs: 180_000,
-    reasoningEffort: 'high',
-  })
-  const cleaned = responseText.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim()
-  if (!cleaned) throw new Error('The style analysis came back empty. Try again.')
-  return cleaned
-}
+// The style registry, the reference-frame analyser, and brief resolution now
+// live in utils/visualStyle.ts — Characters consumes them too, and apps don't
+// import from each other. Re-exported here so B-Roll's own call sites (and any
+// persisted imports) keep working unchanged.
+export {
+  type ContinuousStyle,
+  CONTINUOUS_STYLES,
+  getContinuousStyle,
+  styleUsesRealism,
+  analyzeStyleReferences,
+  styleBriefFor,
+} from '../../../utils/visualStyle'
+import { styleBriefFor, styleUsesRealism } from '../../../utils/visualStyle'
 
 // ── Prompt assembly at fire time ───────────────────────────────
 
@@ -339,19 +238,12 @@ export interface ContinuousInput {
   scriptText: string
   styleId: string
   // Style paragraph distilled from the user's reference images. When present it
-  // replaces the preset hint entirely.
+  // replaces the preset brief entirely.
   styleBrief?: string
   modelId: string
   productContext: string
   modelContext: string
   additionalContext: string
-}
-
-// The style paragraph a mode fires with: the reverse-engineered reference brief
-// when the user supplied one, otherwise the selected preset's hint. Shared by
-// all three modes (structural type so each mode's own input satisfies it).
-export function styleBriefFor(input: { styleId: string; styleBrief?: string }): string {
-  return input.styleBrief?.trim() || getContinuousStyle(input.styleId).hint
 }
 
 function buildUserPrompt(input: ContinuousInput): string {
