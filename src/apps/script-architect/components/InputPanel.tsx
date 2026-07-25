@@ -682,7 +682,8 @@ export default function InputPanel({
                 expand-don't-scroll pattern as Playground's prompt). The length
                 toggle is pinned to the footer above Generate, so the brief owns
                 all the leftover space here. */}
-            <div className="mt-3 flex min-h-0 flex-1 flex-col">
+            {/* No min-h-0 here either — see the Additional Context note below. */}
+            <div className="mt-3 flex flex-1 flex-col">
               <div className="mb-3 flex items-center gap-2">
                 <StepLabel
                   label="Describe Your Ad"
@@ -703,7 +704,7 @@ export default function InputPanel({
                 />
                 {/* Footer toolbar — Enhance + Clear + Undo/Redo bottom-left;
                     Expand bottom-right (mirrors the Playground prompt field). */}
-                <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
+                <div className="flex shrink-0 items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
@@ -811,7 +812,11 @@ export default function InputPanel({
             "Describe Your Video" brief (step 3), so it's only shown for the
             remix / scene-rewrite modes. */}
         {mode !== 'write' && (
-          <div className="mt-2 flex min-h-0 flex-1 flex-col">
+          // flex-1 to absorb leftover height, but NO min-h-0: that let the
+          // section shrink to zero on a short viewport while the textarea kept
+          // its min-height, so the footer toolbar overflowed and the box's
+          // overflow-hidden sliced it in half. Auto min-size = content size.
+          <div className="mt-2 flex flex-1 flex-col">
             <div className="mb-2 flex items-center gap-2">
               <StepLabel label="Additional Context" optional />
             </div>
@@ -830,7 +835,7 @@ export default function InputPanel({
               />
               {/* Footer toolbar — Enhance + Clear + Undo/Redo bottom-left;
                   Expand bottom-right (mirrors the Describe Your Ad field). */}
-              <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
+              <div className="flex shrink-0 items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
