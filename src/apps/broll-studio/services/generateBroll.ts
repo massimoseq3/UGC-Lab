@@ -216,9 +216,15 @@ VOICE — describe, in rich and reproducible detail, HOW the character sounds: p
 
 This one voice is shared by every dialogue clip in the ad, so it must be self-contained and consistent.`
 
-export async function generateBroll(input: BrollInput): Promise<BrollResult> {
-  const { apiKey, endpoint } = getChatEndpoint()
+// The system instruction the scene call runs on, with the dialogue override
+// appended in "With Dialogue" delivery. Exported so the Import-prompts brief
+// hands an outside model the EXACT same rules — one source, no drift.
+export function brollSystemInstruction(delivery: OneShotDelivery): string {
+  return delivery === 'dialogue' ? SYSTEM_INSTRUCTION + DIALOGUE_DELIVERY_ADDENDUM : SYSTEM_INSTRUCTION
+}
 
+// The user half of the scene call. Same reason for being exported.
+export function buildBrollUserPrompt(input: BrollInput): string {
   const withDialogue = input.delivery === 'dialogue'
   const variationBrief = withDialogue
     ? `For EACH scene emit four variations: VAR_1 is a DIALOGUE shot where the character speaks the exact line to camera (<TAG>DIALOGUE</TAG>, <REFS>character</REFS>), and VAR_2–VAR_4 are three genuinely DIFFERENT silent b-roll ideas for showing what the line SAYS. Pick three distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF) for VAR_2–VAR_4, declared in each <TAG> field.`
@@ -235,10 +241,15 @@ export async function generateBroll(input: BrollInput): Promise<BrollResult> {
   if (input.additionalContext) {
     prompt += `\n\nAdditional context:\n${input.additionalContext}`
   }
+  return prompt
+}
 
-  const systemInstruction = withDialogue
-    ? SYSTEM_INSTRUCTION + DIALOGUE_DELIVERY_ADDENDUM
-    : SYSTEM_INSTRUCTION
+export async function generateBroll(input: BrollInput): Promise<BrollResult> {
+  const { apiKey, endpoint } = getChatEndpoint()
+
+  const withDialogue = input.delivery === 'dialogue'
+  const prompt = buildBrollUserPrompt(input)
+  const systemInstruction = brollSystemInstruction(input.delivery)
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: systemInstruction }] },
     { role: 'user', content: [{ type: 'text', text: prompt }] },
@@ -261,7 +272,7 @@ export async function generateBroll(input: BrollInput): Promise<BrollResult> {
 
 // Pull the shared <VOICE_PROFILE> block out of a dialogue-mode response. Strips
 // a leading "VOICE —" label if present. Undefined when the model omitted it.
-function extractVoiceProfile(responseText: string): string | undefined {
+export function extractVoiceProfile(responseText: string): string | undefined {
   const raw = responseText.match(/<VOICE_PROFILE>([\s\S]*?)<\/VOICE_PROFILE>/)?.[1]?.trim()
   if (!raw) return undefined
   return raw.replace(/^VOICE\s*[—–-]\s*/i, '').trim() || undefined
@@ -278,7 +289,10 @@ function extractVoiceProfile(responseText: string): string | undefined {
 // Tolerant of legacy output that emits <VAR_N>plain text</VAR_N> with no
 // nested tags — falls back to position-based TAG defaults so a slightly
 // off-schema response still produces usable variations.
-function parseScenes(responseText: string, delivery: OneShotDelivery = 'silent'): Scene[] {
+//
+// Exported because Import prompts runs hand-written output through the SAME
+// parser the live call uses — an import can't drift from a generation.
+export function parseScenes(responseText: string, delivery: OneShotDelivery = 'silent'): Scene[] {
   const scenes: Scene[] = []
   const sceneRegex = /<SCENE>([\s\S]*?)<\/SCENE>/g
   const lineRegex = /<LINE>([\s\S]*?)<\/LINE>/

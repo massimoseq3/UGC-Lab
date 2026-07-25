@@ -128,7 +128,9 @@ const SILENT_RULES = {
   deliveryNote: `DELIVERY — B-ROLL CLIPS. No one speaks in any scene: a finished voiceover is laid over this footage in the edit, and there is NO VOICE PROFILE block. Each scene SHOWS what the matching script beat says — the act happening, the metaphor made literal, the proof on screen, the reaction landing — never a person idling while the line plays. A viewer should be able to guess the beat from the footage alone.`,
 }
 
-function oneShotSystem(delivery: OneShotDelivery): string {
+// Exported so the Import-prompts brief hands an outside model the EXACT rules
+// this mode generates against — one source of truth, no drift.
+export function oneShotSystem(delivery: OneShotDelivery): string {
   const rules = delivery === 'dialogue' ? DIALOGUE_RULES : SILENT_RULES
   const sceneFields = SCENE_PARAGRAPH
     .replace('__DIALOGUE_RULE__', rules.dialogueLine)
@@ -210,7 +212,7 @@ export function resolveOneShotTokens(prompt: string, productName?: string): stri
 // idea. The first four fan out on every generate; the rest feed the "Add
 // variation" button so a fifth+ card is a genuinely fresh angle, not a repeat.
 // The UGC counterpart of Scripts' WRITE_PROMPT_TAKE_INSTRUCTION.
-const ONE_SHOT_ANGLES: string[] = [
+export const ONE_SHOT_ANGLES: string[] = [
   'THIS CONCEPT — DIRECT CONFESSION: straight-to-camera storytime energy. One location, the character close and personal, escalating intimacy as the script builds. The classic "okay I have to tell you about this" register.',
   'THIS CONCEPT — DAY IN THE LIFE: the script carried across a real routine — morning counter, commute, desk, evening wind-down. The product is met naturally mid-day, never presented. Movement between micro-moments gives the cuts.',
   'THIS CONCEPT — DEMO FIRST: hands and product do the talking. Close-in inserts, textures, the actual use of the thing, the visible result. The character orbits the demonstration rather than fronting it.',
@@ -223,7 +225,7 @@ const ONE_SHOT_ANGLES: string[] = [
 
 // How many angles the initial Generate fans out on. The rest of the pool is
 // reserved for Add-variation.
-const INITIAL_ANGLE_COUNT = 4
+export const INITIAL_ANGLE_COUNT = 4
 
 export interface OneShotInput {
   scriptText: string
@@ -244,13 +246,23 @@ const MULTI_CLIP_RULE = `MULTIPLE CLIPS — THESE RENDER SEPARATELY BUT CUT TOGE
 - Repeat the VOICE PROFILE block VERBATIM in every clip so all clips are read by the same voice.
 - Each clip's scene timestamps restart at 00:00 (every clip renders independently).`
 
-function buildUserPrompt(input: OneShotInput, plan: SegmentPlan, angle: string): string {
+// `conceptCount` is 1 for the live call — it fans out one request per angle, so
+// each response holds one concept. The Import brief runs the whole fan-out in a
+// single chat, so it asks for all of them at once and `angle` carries the list.
+export function buildOneShotUserPrompt(
+  input: OneShotInput,
+  plan: SegmentPlan,
+  angle: string,
+  conceptCount = 1,
+): string {
   const est = estimateSpokenSeconds(input.scriptText)
   const words = wordCount(input.scriptText)
   const perClipWords = Math.ceil(words / plan.count)
   const perClipSeconds = Math.min(plan.maxClipSeconds, Math.ceil(est / plan.count))
 
-  let prompt = `Design one complete video concept for this script.\n\nScript:\n${input.scriptText}\n\n${angle}\n\n`
+  let prompt = conceptCount > 1
+    ? `Design ${conceptCount} complete video concepts for this script — one per creative angle below.\n\nScript:\n${input.scriptText}\n\n${angle}\n\n`
+    : `Design one complete video concept for this script.\n\nScript:\n${input.scriptText}\n\n${angle}\n\n`
 
   if (plan.count === 1) {
     prompt += `CLIPS: this is ONE clip covering the whole script, ≈ ${Math.max(est, 4)}s long. Break it into internal scenes with contiguous timestamps from 00:00 to about ${Math.max(est, 4)}s. Output exactly one <SEGMENT_1> whose <EXCERPT> is the full script.\n`
@@ -271,7 +283,9 @@ function buildUserPrompt(input: OneShotInput, plan: SegmentPlan, angle: string):
     prompt += `\nAdditional context and instructions:\n${input.additionalContext}\n`
   }
 
-  prompt += `\nWrite the full <CONCEPT> now.`
+  prompt += conceptCount > 1
+    ? `\nWrite all ${conceptCount} <CONCEPT> envelopes now, in the angle order above. The CLIPS instruction above describes how EACH concept is split — it applies to every one of them.`
+    : `\nWrite the full <CONCEPT> now.`
   return prompt
 }
 
@@ -355,7 +369,7 @@ async function generateConceptForAngle(
 ): Promise<OneShotConcept | null> {
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: system }] },
-    { role: 'user', content: [{ type: 'text', text: buildUserPrompt(input, plan, angle) }] },
+    { role: 'user', content: [{ type: 'text', text: buildOneShotUserPrompt(input, plan, angle) }] },
   ]
   const response = await kieChatCompletions(apiKey, endpoint, messages)
   const concept = parseOneShotConcept(response, input)

@@ -621,7 +621,7 @@ export default function OneShotView({
           </p>
         </div>
       )}
-      {result.concepts.length < 4 && (
+      {result.concepts.length < 4 && !result.imported && (
         <p className="mb-4 text-[11px] text-ink-600">
           {result.concepts.length} of 4 variations generated — the rest failed. Regenerate for a fresh set.
         </p>

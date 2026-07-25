@@ -8,6 +8,8 @@ import { generateBroll } from './services/generateBroll'
 import { generateOneShot, generateOneShotVariation, buildDemoOneShotResult, ONE_SHOT_DEFAULT_MODEL_ID } from './services/generateOneShot'
 import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
 import InputPanel from './components/InputPanel'
+import ImportPromptsModal from './components/ImportPromptsModal'
+import type { ImportContext, ImportParsed } from './services/importPrompts'
 import StyleModal, { BROLL_STYLE_ACCENT, type StyleSelection } from '../../components/StyleModal'
 import RightPanel from './components/RightPanel'
 import { brollHistoryMode } from './components/BrollHistoryView'
@@ -229,6 +231,7 @@ export default function BrollStudio() {
   const [continuousStyleBankId, setContinuousStyleBankId] = usePersistedState<string | null>(`${baseKey}:continuousStyleBankId`, null)
   const [continuousStyleName, setContinuousStyleName] = usePersistedState<string | null>(`${baseKey}:continuousStyleName`, null)
   const [styleModalOpen, setStyleModalOpen] = useState(false)
+  const [importModalOpen, setImportModalOpen] = useState(false)
   const [continuousResult, setContinuousResult] = usePersistedState<ContinuousResult | null>(`${baseKey}:continuousResult`, null)
   const [continuousSelections, setContinuousSelections] = usePersistedState<Record<string, ContinuousSelection>>(`${baseKey}:continuousSelections`, {})
   const [continuousFrameStates, setContinuousFrameStates] = usePersistedState<Record<string, ContinuousFrameCardState>>(
@@ -784,6 +787,52 @@ export default function BrollStudio() {
     setContinuousResult, setContinuousFrameStates, setContinuousClipStates, setContinuousSelections,
   ])
 
+  // ── Import prompts ───────────────────────────────────────────
+  // Everything a Generate would have fed the LLM, handed to the importer so a
+  // pasted storyboard resolves style / delivery / model exactly like a live one.
+  const importContext: ImportContext = {
+    scriptText,
+    productContext,
+    modelContext,
+    additionalContext,
+    styleId: resolvedStyleId,
+    styleBrief: continuousStyleBrief ?? undefined,
+    styleName: continuousStyleName ?? undefined,
+    lineDelivery,
+    oneShotDelivery,
+    oneShotModelId,
+    continuousModelId,
+  }
+
+  // Commit a parsed import as if it had just been generated: fresh session,
+  // cleared card states, style stamped. The views rebuild their cards off the
+  // new result, so nothing else has to know an import happened.
+  const handleImportPrompts = (parsed: ImportParsed) => {
+    setSessionId(newSessionId())
+    setSessionMode(parsed.mode)
+    stampSessionStyle()
+    // Recover the script from the storyboard when the panel's box is empty —
+    // it names the history row and backs the scene editors. Never clobbers a
+    // script the user actually pasted.
+    if (!scriptText.trim() && parsed.recoveredScript.trim()) {
+      setScriptText(parsed.recoveredScript.trim())
+      setSelectedScriptId(null)
+    }
+    if (parsed.mode === 'line') {
+      setCardStates({})
+      setResult(parsed.lineResult ?? null)
+    } else if (parsed.mode === 'continuous') {
+      setContinuousFrameStates({})
+      setContinuousClipStates({})
+      setContinuousSelections({})
+      setContinuousResult(parsed.continuousResult ?? null)
+    } else {
+      setOneShotCardStates({})
+      setOneShotResult(parsed.oneShotResult ?? null)
+    }
+    useAppStore.getState().addToast(`Imported ${parsed.summary}`, 'success')
+  }
+
   const handleGenerate = async () => {
     if (mode === 'oneshot') return handleGenerateOneShot()
     if (mode === 'continuous') return handleGenerateContinuous()
@@ -951,6 +1000,7 @@ export default function BrollStudio() {
           onScriptTextChange={(v) => { setScriptText(v); setSelectedScriptId(null) }}
           onAdditionalContextChange={setAdditionalContext}
           onGenerate={handleGenerate}
+          onImportPrompts={() => setImportModalOpen(true)}
           isGenerating={isGenerating}
           highlightField={highlightField}
           mode={mode}
@@ -1042,6 +1092,19 @@ export default function BrollStudio() {
         onSelect={() => { /* multi-select uses onSelectMany */ }}
         onSelectMany={(items) => { void handleAddStyleRefsFromBank(items as BRoll[]) }}
         onClose={() => setPickerMode(null)}
+      />
+
+      {/* Import prompts — bring a storyboard written outside the app (Claude
+          etc.) instead of paying for the prompt-writing call. Remounted per
+          open so the paste box starts empty. */}
+      <ImportPromptsModal
+        key={importModalOpen ? 'import-open' : 'import-closed'}
+        open={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        mode={mode}
+        ctx={importContext}
+        styleLabel={styleLabel}
+        onImport={handleImportPrompts}
       />
 
       {/* Visual style popup — presets, the user's saved styles, and the
