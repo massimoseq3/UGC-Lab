@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { Clock, PiggyBank, Flame, Trophy, CalendarCheck, ArrowUpRight, GraduationCap } from 'lucide-react'
-import type { ElementType, ReactNode } from 'react'
+import type { CSSProperties, ElementType, ReactNode } from 'react'
 import { useAuthStore } from '../../stores/authStore'
 import { useAppStore } from '../../stores/appStore'
 import { useSettingsStore } from '../../stores/settingsStore'
@@ -76,7 +76,15 @@ export default function Dashboard() {
   const hasActivity = metrics.totalGenerations > 0
 
   return (
-    <div className="mx-auto flex min-h-full max-w-5xl flex-col gap-4 px-5 py-6 md:px-8">
+    // `safe center` centres the bento on a tall window — the grid is a fixed
+    // ~800px of content, so anchored to the top it left a dead half-screen
+    // above the dock. `safe` is what keeps that honest: the moment the content
+    // is taller than the viewport it falls back to flex-start instead of
+    // clipping the greeting off the top.
+    <div
+      className="mx-auto flex min-h-full max-w-5xl flex-col gap-4 px-5 py-6 md:px-8"
+      style={{ justifyContent: 'safe center' }}
+    >
       {/* Greeting + quick links */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1">
@@ -101,42 +109,52 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-12">
         {needsKey && <ConnectKeyCard />}
 
-        {/* Time saved */}
-        <BentoCard className="col-span-2 md:col-span-6 md:h-[200px]">
+        {/* Time saved. Label pins to the top, the figure sits on the card's
+            floor (mt-auto) — the two hero cards used to stack everything
+            under the label and leave a dead band across the bottom third. */}
+        <BentoCard className="col-span-2 flex flex-col md:col-span-6 md:h-[200px]">
           <CardLabel icon={Clock} label="Time saved" />
-          <p className="mt-3 text-5xl italic font-normal tracking-tight text-ink-50 md:text-6xl" style={DISPLAY_FONT}>
-            {formatTimeSaved(metrics.minutesSaved)}
-          </p>
-          {metrics.minutesSavedLast7d > 0 && (
-            <p className="mt-1.5 text-[12px] font-semibold text-dashboard-400">
-              +{formatTimeSaved(metrics.minutesSavedLast7d)} this week
+          <div className="mt-auto pt-3">
+            <div className="flex flex-wrap items-baseline gap-x-3">
+              <p className="text-5xl italic font-normal tracking-tight text-ink-50 md:text-6xl" style={DISPLAY_FONT}>
+                {formatTimeSaved(metrics.minutesSaved)}
+              </p>
+              {metrics.minutesSavedLast7d > 0 && (
+                <p className="text-[12px] font-semibold text-dashboard-400">
+                  +{formatTimeSaved(metrics.minutesSavedLast7d)} this week
+                </p>
+              )}
+            </div>
+            <p className="mt-1.5 text-[13px] text-ink-500">
+              {workdays >= 1
+                ? `≈ ${workdays < 10 ? (Math.round(workdays * 10) / 10) : Math.round(workdays)} workdays of production and tool-hopping, across ${metrics.totalGenerations.toLocaleString()} generations`
+                : hasActivity
+                  ? `across ${metrics.totalGenerations.toLocaleString()} generation${metrics.totalGenerations === 1 ? '' : 's'}`
+                  : 'vs producing every asset by hand'}
             </p>
-          )}
-          <p className="mt-1 text-[13px] text-ink-500">
-            {workdays >= 1
-              ? `≈ ${workdays < 10 ? (Math.round(workdays * 10) / 10) : Math.round(workdays)} workdays of production and tool-hopping, across ${metrics.totalGenerations.toLocaleString()} generations`
-              : hasActivity
-                ? `across ${metrics.totalGenerations.toLocaleString()} generation${metrics.totalGenerations === 1 ? '' : 's'}`
-                : 'vs producing every asset by hand'}
-          </p>
+          </div>
         </BentoCard>
 
         {/* Money saved */}
-        <BentoCard className="col-span-2 md:col-span-6 md:h-[200px]">
+        <BentoCard className="col-span-2 flex flex-col md:col-span-6 md:h-[200px]">
           <CardLabel icon={PiggyBank} label="Money saved" />
-          <p className="mt-3 text-5xl italic font-normal tracking-tight text-ink-50 md:text-6xl" style={DISPLAY_FONT}>
-            {formatUsd(metrics.usdSaved)}
-          </p>
-          {metrics.usdSavedLast7d >= 0.01 && (
-            <p className="mt-1.5 text-[12px] font-semibold text-dashboard-400">
-              +{formatUsd(metrics.usdSavedLast7d)} this week
+          <div className="mt-auto pt-3">
+            <div className="flex flex-wrap items-baseline gap-x-3">
+              <p className="text-5xl italic font-normal tracking-tight text-ink-50 md:text-6xl" style={DISPLAY_FONT}>
+                {formatUsd(metrics.usdSaved)}
+              </p>
+              {metrics.usdSavedLast7d >= 0.01 && (
+                <p className="text-[12px] font-semibold text-dashboard-400">
+                  +{formatUsd(metrics.usdSavedLast7d)} this week
+                </p>
+              )}
+            </div>
+            <p className="mt-1.5 text-[13px] text-ink-500">
+              {hasActivity
+                ? `vs official APIs & creator platforms · ${Math.round(metrics.creditsSpent).toLocaleString()} credits used`
+                : 'vs paying for the same models elsewhere'}
             </p>
-          )}
-          <p className="mt-1 text-[13px] text-ink-500">
-            {hasActivity
-              ? `vs official APIs & creator platforms · ${Math.round(metrics.creditsSpent).toLocaleString()} credits used`
-              : 'vs paying for the same models elsewhere'}
-          </p>
+          </div>
         </BentoCard>
 
         {/* Streaks — sits left of the activity heatmap, matching its height.
@@ -219,35 +237,32 @@ export default function Dashboard() {
               <button
                 key={member.appId}
                 onClick={() => openApp(member.appId)}
-                title={`Open ${app.name}`}
-                className={`group relative flex flex-col items-start gap-2 rounded-2xl border border-ink/10 bg-surface-1/60 px-3.5 py-3 text-left transition-all hover:-translate-y-px ${CARD_SHADOW}`}
+                title={`Open ${app.name} — ${member.name}, ${member.role}`}
+                // Same colour discipline as the Meet-your-team roster: the
+                // sprite is the only colour at rest, and the accent arrives as
+                // the tile's own tint on hover. Eight always-on accent wells
+                // read as a colour chart, not a crew.
+                style={{ '--tint': `${app.accent}1A` } as CSSProperties}
+                className={`group relative flex flex-col items-start gap-2 rounded-2xl border border-ink/10 bg-surface-1/60 px-3.5 py-3 text-left transition-all hover:-translate-y-px hover:bg-[var(--tint)] focus-visible:bg-[var(--tint)] ${CARD_SHADOW}`}
               >
                 <ArrowUpRight
                   className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-ink-600 transition-colors group-hover:text-ink-300"
                   strokeWidth={2}
                 />
-                <span
-                  className="flex h-9 w-12 items-center justify-center rounded-xl"
-                  style={{ backgroundColor: `${app.accent}1F` }}
-                >
-                  <CrabSprite
-                    variant={member.appId}
-                    body={member.roleColor ?? app.accent}
-                    className="h-6 w-8"
-                  />
-                </span>
-                {/* w-full + min-w-0 so the app name truncates and the
-                    "Name · Role" line wraps within the card instead of
-                    spilling past its edge (items-start would size to content). */}
+                <CrabSprite
+                  variant={member.appId}
+                  body={member.roleColor ?? app.accent}
+                  className="h-7 w-9 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-0.5"
+                />
+                {/* w-full + min-w-0 so each line truncates inside the tile
+                    instead of spilling past its edge (items-start would size
+                    to content). */}
+                {/* App + persona only. The role title doesn't fit eight
+                    across ("STUDIO MAN…") and it already lives on the
+                    Meet-your-team roster; it stays in the tooltip. */}
                 <span className="w-full min-w-0">
                   <span className="block truncate text-[12px] font-semibold tracking-tight text-ink-100">{app.name}</span>
-                  <span
-                    className="block text-[11px] italic font-normal leading-tight tracking-tight"
-                    style={{ color: member.roleColor ?? app.accent, ...DISPLAY_FONT }}
-                  >
-                    <span className="block truncate">{member.name}</span>
-                    <span className="block truncate opacity-65">{member.role}</span>
-                  </span>
+                  <span className="block truncate text-[11px] leading-tight tracking-tight text-ink-500">{member.name}</span>
                 </span>
               </button>
             )
