@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, Loader2, ChevronDown, Sparkles, Check, LayoutGrid, Copy, Bookmark, Star } from 'lucide-react'
-import type { Product, Model, Script, VoicePreset, BRoll } from '../../stores/types'
+import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, Loader2, ChevronDown, Sparkles, Check, LayoutGrid, Copy, Bookmark, Star, Palette } from 'lucide-react'
+import type { Product, Model, Script, VoicePreset, BRoll, StylePreset } from '../../stores/types'
 import type { BankType } from '../../utils/constants'
 import type { ModelFilter } from './Finder'
 import { useBankStore } from '../../stores/bankStore'
@@ -417,6 +417,69 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
   )
 }
 
+// One tile of a style card's reference mosaic.
+function StyleThumb({ refId }: { refId: string }) {
+  const url = useAssetUrl(refId)
+  return url ? <img src={url} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-ink/[0.05]" />
+}
+
+function StyleCard({ item, onEdit, onDelete }: { item: StylePreset; onEdit: () => void; onDelete: () => void }) {
+  const [confirm, setConfirm] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const toggleStar = useBankStore((s) => s.toggleStar)
+  // Up to four reference frames tile the cover; a hand-written style has none
+  // and shows its brief as the card face instead.
+  const thumbs = (item.thumbRefs ?? []).slice(0, 4)
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    await copyToClipboard(item.brief)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div
+      onClick={onEdit}
+      className="group relative flex aspect-[9/16] cursor-pointer flex-col overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
+    >
+      {thumbs.length > 0 ? (
+        <div className={`absolute inset-0 grid gap-px ${thumbs.length === 1 ? '' : thumbs.length === 2 ? 'grid-rows-2' : 'grid-cols-2 grid-rows-2'}`}>
+          {thumbs.map((ref) => (
+            <StyleThumb key={ref} refId={ref} />
+          ))}
+        </div>
+      ) : (
+        // No reference frames (a hand-written style) — the brief itself is the
+        // card face, fading out above the name overlay like the Script cards.
+        <div className="absolute inset-0 flex flex-col p-4 pb-16">
+          <Palette className="h-6 w-6 shrink-0 text-ink-700" strokeWidth={1.25} />
+          <div className="relative mt-3 flex-1 overflow-hidden">
+            <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-ink-400">{item.brief}</p>
+          </div>
+        </div>
+      )}
+      {/* Bottom overlay — name, plus a taste of the brief only when the face is
+          taken up by thumbnails (otherwise the face already shows it). Same
+          gradient chrome as the image-backed cards. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-3 pt-12">
+        <span className="block truncate text-[13px] font-semibold tracking-tight text-zinc-100">{item.name}</span>
+        {thumbs.length > 0 && (
+          <span className="mt-0.5 block line-clamp-2 text-[10px] leading-snug text-zinc-400">{item.brief}</span>
+        )}
+      </div>
+      {/* Hover action stack — star · copy · delete. */}
+      <TileActionStack forceVisible={confirm}>
+        <TileStarButton starred={!!item.starred} onToggle={() => toggleStar('styles', item.id)} />
+        <TileActionButton title={copied ? 'Brief copied' : 'Copy style brief'} onClick={handleCopy}>
+          {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+        </TileActionButton>
+        <TileDeleteButton onDelete={onDelete} onArmedChange={setConfirm} />
+      </TileActionStack>
+    </div>
+  )
+}
+
 function VoiceCard({ item, onEdit, onDelete }: { item: VoicePreset; onEdit: () => void; onDelete: () => void }) {
   return (
     <div onClick={onEdit} className="group flex cursor-pointer items-center gap-3 rounded-full border border-ink/5 bg-ink/[0.03] p-3 transition-colors hover:border-ink/10 hover:bg-ink/[0.05] card-soft-shadow">
@@ -446,11 +509,13 @@ export default function BankList({ bankType, onEdit, onAdd, sort, modelFilter = 
   const scripts = useBankStore((s) => s.scripts)
   const voices = useBankStore((s) => s.voices)
   const brolls = useBankStore((s) => s.brolls)
+  const styles = useBankStore((s) => s.styles)
   const deleteProduct = useBankStore((s) => s.deleteProduct)
   const deleteModel = useBankStore((s) => s.deleteModel)
   const deleteScript = useBankStore((s) => s.deleteScript)
   const deleteVoice = useBankStore((s) => s.deleteVoice)
   const deleteBRoll = useBankStore((s) => s.deleteBRoll)
+  const deleteStyle = useBankStore((s) => s.deleteStyle)
 
   if (bankType === 'products') {
     return (
@@ -499,6 +564,11 @@ export default function BankList({ bankType, onEdit, onAdd, sort, modelFilter = 
         ))}
       </div>
     )
+  }
+
+  if (bankType === 'styles') {
+    if (styles.length === 0) return <EmptyState icon={Palette} label="styles" singular="style" onAdd={onAdd} />
+    return <StylesList items={styles} onEdit={onEdit} onDelete={deleteStyle} sort={sort} />
   }
 
   // brolls
@@ -580,6 +650,17 @@ function ScriptsList({ items, onEdit, onDelete, sort }: { items: Script[]; onEdi
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
       {sorted.map((s) => (
         <ScriptCard key={s.id} item={s} onEdit={() => onEdit(s.id)} onDelete={() => onDelete(s.id)} />
+      ))}
+    </div>
+  )
+}
+
+function StylesList({ items, onEdit, onDelete, sort }: { items: StylePreset[]; onEdit: (id: string) => void; onDelete: (id: string) => void; sort: SortOrder }) {
+  const sorted = useMemo(() => sortByOrder(items, sort, (s) => s.name), [items, sort])
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+      {sorted.map((s) => (
+        <StyleCard key={s.id} item={s} onEdit={() => onEdit(s.id)} onDelete={() => onDelete(s.id)} />
       ))}
     </div>
   )

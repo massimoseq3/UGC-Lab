@@ -11,6 +11,7 @@ import {
   ImagePlay,
   LayoutDashboard,
   Scissors,
+  Palette,
 } from 'lucide-react'
 import type { ElementType } from 'react'
 
@@ -60,7 +61,7 @@ export const CATEGORY_LABELS: Record<AppCategory, string> = {
   system: 'System',
 }
 
-export type BankType = 'products' | 'models' | 'scripts' | 'voices' | 'brolls'
+export type BankType = 'products' | 'models' | 'scripts' | 'voices' | 'brolls' | 'styles'
 
 export const BANK_CONFIG: Record<BankType, { label: string; icon: ElementType; accent: string }> = {
   products: { label: 'Products', icon: Package, accent: '#4C1D95' },
@@ -68,6 +69,7 @@ export const BANK_CONFIG: Record<BankType, { label: string; icon: ElementType; a
   scripts: { label: 'Scripts', icon: FileText, accent: '#24365A' },
   voices: { label: 'Voices', icon: Mic, accent: '#007AFF' },
   brolls: { label: 'B-Rolls', icon: Film, accent: '#7165FF' },
+  styles: { label: 'Styles', icon: Palette, accent: '#0D9488' },
 }
 
 export function getAppConfig(appId: string): AppConfig | undefined {

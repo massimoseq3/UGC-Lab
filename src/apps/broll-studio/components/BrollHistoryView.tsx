@@ -139,16 +139,23 @@ export function brollHistoryMode(item: BrollHistoryItem): BrollMode {
 // into the active mode's result (authoritative for line/continuous), then the
 // row-level snapshot (the only source for One-Shot, whose result has no styleId).
 function historyStyleLabel(item: BrollHistoryItem, mode: BrollMode): string | null {
+  // A named custom style (one saved to the Styles bank) shows its own name
+  // wherever a brief is in play; an unnamed one-off still reads "Custom style".
+  const customLabel = item.styleName?.trim() || 'Custom style'
   if (mode === 'continuous') {
+    // ContinuousResult stamps `styleId` unconditionally and has no brief field,
+    // so the row-level snapshot is the only place a custom look survives — it
+    // has to win here or every custom storyboard mislabels as its preset.
+    if (item.styleBrief) return customLabel
     const c = item.continuousResult as ContinuousResult | undefined
     if (c?.styleId) return getContinuousStyle(c.styleId).label
   }
   if (mode === 'line') {
     const r = item.result as BrollResult | null
-    if (r?.styleBrief) return 'Custom style'
+    if (r?.styleBrief) return customLabel
     if (r?.styleId) return getContinuousStyle(r.styleId).label
   }
-  if (item.styleBrief) return 'Custom style'
+  if (item.styleBrief) return customLabel
   if (item.styleId) return getContinuousStyle(item.styleId).label
   return null
 }

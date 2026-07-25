@@ -1,9 +1,9 @@
-import { Package, UserRound, Mic, Film, Star } from 'lucide-react'
-import type { Product, Model, Script, VoicePreset, BRoll } from '../stores/types'
+import { Package, UserRound, Mic, Film, Star, Palette } from 'lucide-react'
+import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, AnyBankItem } from '../stores/types'
 import type { BankType } from '../utils/constants'
 import { useAssetUrl } from '../hooks/useAssetUrl'
 
-type BankItem = Product | Model | Script | VoicePreset | BRoll
+type BankItem = AnyBankItem
 
 interface BankItemCardProps {
   bankType: BankType
@@ -107,6 +107,7 @@ export default function BankItemCard({ bankType, item, onClick, selected, accent
       }`}
     >
       {bankType === 'voices' && <VoiceContent item={item as VoicePreset} />}
+      {bankType === 'styles' && <StyleContent item={item as StylePreset} />}
     </button>
   )
 }
@@ -232,10 +233,29 @@ function VoiceContent({ item }: { item: VoicePreset }) {
   )
 }
 
-function RowThumbnail({ fallback: Icon }: { fallback: React.ElementType }) {
+function StyleContent({ item }: { item: StylePreset }) {
+  return (
+    <>
+      <RowThumbnail fallback={Palette} src={item.thumbRefs?.[0]} />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="truncate text-sm font-semibold tracking-tight text-ink-200">
+          {item.name || 'Untitled Style'}
+        </span>
+        <span className="truncate text-xs text-ink-500">{item.brief}</span>
+      </div>
+    </>
+  )
+}
+
+function RowThumbnail({ fallback: Icon, src }: { fallback: React.ElementType; src?: string }) {
+  const resolved = useAssetUrl(src)
   return (
     <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-ink/5">
-      <Icon className="h-4 w-4 text-ink-600" />
+      {resolved ? (
+        <img src={resolved} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <Icon className="h-4 w-4 text-ink-600" />
+      )}
     </div>
   )
 }

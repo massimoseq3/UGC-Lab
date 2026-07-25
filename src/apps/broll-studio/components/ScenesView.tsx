@@ -481,7 +481,7 @@ export default function ScenesView({
               which look every b-roll clip is rendered in. */}
           <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-broll-500/25 bg-broll-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-broll-300">
             <Palette className="h-3 w-3 shrink-0" strokeWidth={2} />
-            <span className="truncate">{result.styleBrief ? 'Custom style' : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
+            <span className="truncate">{result.styleBrief ? (result.styleName?.trim() || 'Custom style') : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-2">

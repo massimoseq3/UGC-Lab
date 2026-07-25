@@ -2,13 +2,13 @@ import { useRef, useState } from 'react'
 import { Image as ImageIcon } from 'lucide-react'
 import { fileToDataUri } from '../../utils/kie'
 import { isAssetRef, getAsBase64 } from '../../utils/assetStore'
-import type { BRoll, Product, Model, Script, VoicePreset } from '../../stores/types'
+import type { AnyBankItem, BRoll } from '../../stores/types'
 import type { BankType } from '../../utils/constants'
 import BankPicker from '../BankPicker'
 import SlotActionMenu from './SlotActionMenu'
 import { RefSlotPill, RefChip } from './RefSlot'
 
-type BankItem = Product | Model | Script | VoicePreset | BRoll
+type BankItem = AnyBankItem
 
 export interface VideoInputValue {
   dataUri: string

@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Package, UserRound, FileText, Mic, Film, Upload, LayoutGrid } from 'lucide-react'
+import { Plus, Package, UserRound, FileText, Mic, Film, Upload, LayoutGrid, Palette } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useBankStore } from '../../stores/bankStore'
 import type { BankType } from '../../utils/constants'
 import { BANK_CONFIG } from '../../utils/constants'
-import type { Product, Model, Script, VoicePreset, BRoll } from '../../stores/types'
+import type { Product, Model, Script, VoicePreset, BRoll, StylePreset } from '../../stores/types'
 import { saveFromDataUrl } from '../../utils/assetStore'
 import BankList, { SortControl } from './BankList'
 import SegmentedToggle from '../../components/SegmentedToggle'
@@ -14,6 +14,7 @@ import ModelForm from './ModelForm'
 import ScriptForm from './ScriptForm'
 import VoiceForm from './VoiceForm'
 import BRollForm from './BRollForm'
+import StyleForm from './StyleForm'
 import { isValidImageFile } from './services/imageValidation'
 import { saveProductDraft } from './services/saveProductDraft'
 
@@ -23,9 +24,10 @@ const SIDEBAR_ICONS: Record<BankType, React.ElementType> = {
   scripts: FileText,
   voices: Mic,
   brolls: Film,
+  styles: Palette,
 }
 
-const BANK_TYPES: BankType[] = ['products', 'models', 'scripts', 'voices', 'brolls']
+const BANK_TYPES: BankType[] = ['products', 'models', 'scripts', 'voices', 'brolls', 'styles']
 
 // Influencers bank sub-filter. An entry is a "sheet" when `sheetImage` is set,
 // otherwise a portrait. Local-only UI state — not persisted.
@@ -59,6 +61,7 @@ export default function Finder() {
   const scripts = useBankStore((s) => s.scripts)
   const voices = useBankStore((s) => s.voices)
   const brolls = useBankStore((s) => s.brolls)
+  const styles = useBankStore((s) => s.styles)
   const addProduct = useBankStore((s) => s.addProduct)
   const updateProduct = useBankStore((s) => s.updateProduct)
   const addModel = useBankStore((s) => s.addModel)
@@ -69,6 +72,8 @@ export default function Finder() {
   const updateVoice = useBankStore((s) => s.updateVoice)
   const addBRoll = useBankStore((s) => s.addBRoll)
   const updateBRoll = useBankStore((s) => s.updateBRoll)
+  const addStyle = useBankStore((s) => s.addStyle)
+  const updateStyle = useBankStore((s) => s.updateStyle)
 
   // Consume inter-app payload.
   // `activeBank`  → just switch to the bank.
@@ -103,6 +108,7 @@ export default function Finder() {
     scripts: scripts.length,
     voices: voices.length,
     brolls: brolls.length,
+    styles: styles.length,
   }
 
   const [sort, setSort, sortOptions] = useBankSort(activeBank)
@@ -212,11 +218,18 @@ export default function Finder() {
     closeForm()
   }, [editingId, updateBRoll, addBRoll, closeForm])
 
+  const handleSaveStyle = useCallback(async (data: Omit<StylePreset, 'id' | 'createdAt'>) => {
+    if (editingId) await updateStyle(editingId, data)
+    else await addStyle(data)
+    closeForm()
+  }, [editingId, updateStyle, addStyle, closeForm])
+
   const editingProduct = editingId ? products.find((p) => p.id === editingId) : null
   const editingModel = editingId ? models.find((m) => m.id === editingId) : null
   const editingScript = editingId ? scripts.find((s) => s.id === editingId) : null
   const editingVoice = editingId ? voices.find((v) => v.id === editingId) : null
   const editingBRoll = editingId ? brolls.find((b) => b.id === editingId) : null
+  const editingStyle = editingId ? styles.find((s) => s.id === editingId) : null
 
   // Products & Influencers pin the left column and scroll only the right side
   // on desktop, instead of scrolling the whole page.
@@ -305,7 +318,7 @@ export default function Finder() {
           details scroll (no whole-page scroll). */}
       <div className={`flex-1 overflow-y-auto p-5 ${fixedFormLayout ? 'lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden' : ''}`}>
         {showForm ? (
-          <div className={`mx-auto ${['products', 'models', 'brolls', 'scripts'].includes(activeBank) ? 'max-w-5xl' : 'max-w-md'} ${fixedFormLayout ? 'w-full lg:flex lg:min-h-0 lg:flex-1 lg:flex-col' : ''}`}>
+          <div className={`mx-auto ${['products', 'models', 'brolls', 'scripts', 'styles'].includes(activeBank) ? 'max-w-5xl' : 'max-w-md'} ${fixedFormLayout ? 'w-full lg:flex lg:min-h-0 lg:flex-1 lg:flex-col' : ''}`}>
             {activeBank === 'products' && (
               <ProductForm
                 item={editingProduct}
@@ -325,6 +338,9 @@ export default function Finder() {
             )}
             {activeBank === 'brolls' && (
               <BRollForm item={editingBRoll} onSave={handleSaveBRoll} onCancel={closeForm} />
+            )}
+            {activeBank === 'styles' && (
+              <StyleForm item={editingStyle} onSave={handleSaveStyle} onCancel={closeForm} />
             )}
           </div>
         ) : (

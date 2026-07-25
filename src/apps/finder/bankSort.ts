@@ -54,7 +54,9 @@ export function useBankSort(bankType: BankType): [SortOrder, (v: SortOrder) => v
   const [modelsSort, setModelsSort] = usePersistedState<SortOrder>('finder:sort:models', 'newest')
   const [scriptsSort, setScriptsSort] = usePersistedState<SortOrder>('finder:sort:scripts', 'newest')
   const [brollsSort, setBrollsSort] = usePersistedState<SortOrder>('finder:sort:brolls', 'newest')
+  const [stylesSort, setStylesSort] = usePersistedState<SortOrder>('finder:sort:styles', 'newest')
   switch (bankType) {
+    case 'styles': return [stylesSort, setStylesSort, SORT_OPTIONS_WITH_NAME]
     case 'products': return [productsSort, setProductsSort, SORT_OPTIONS_WITH_NAME]
     case 'models': return [modelsSort, setModelsSort, SORT_OPTIONS_WITH_NAME]
     case 'scripts': return [scriptsSort, setScriptsSort, SORT_OPTIONS_WITH_NAME]

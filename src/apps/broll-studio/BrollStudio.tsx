@@ -6,8 +6,9 @@ import type { Product, Model, Script, BRoll, BrollHistoryItem } from '../../stor
 import type { BrollResult, PromptVariation, ReferenceImage, VariationTag, VariationRefs, CardState, BrollMode, OneShotDelivery, OneShotResult, OneShotCardState, ContinuousResult, ContinuousConcept, ContinuousSelection, ContinuousFrameCardState, ContinuousClipCardState } from './types'
 import { generateBroll } from './services/generateBroll'
 import { generateOneShot, generateOneShotVariation, buildDemoOneShotResult, ONE_SHOT_DEFAULT_MODEL_ID } from './services/generateOneShot'
-import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
+import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
 import InputPanel from './components/InputPanel'
+import StyleModal, { type StyleSelection } from './components/StyleModal'
 import RightPanel from './components/RightPanel'
 import { brollHistoryMode } from './components/BrollHistoryView'
 import { backfillCardState, backfillOneShotCardState, backfillContinuousFrameState, backfillContinuousClipState } from './cardState'
@@ -213,6 +214,13 @@ export default function BrollStudio() {
   const [styleRefs, setStyleRefs] = useState<string[]>([])
   const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false)
   const [continuousStyleBrief, setContinuousStyleBrief] = usePersistedState<string | null>(`${baseKey}:continuousStyleBrief`, null)
+  // Identity of the custom style, when it has one: the Styles-bank row it came
+  // from (so the popup can show which card is selected) and its display name
+  // (so the trigger and the history pill read "Warm 90s Camcorder", not
+  // "Custom style"). Both null for a one-off brief that was never named.
+  const [continuousStyleBankId, setContinuousStyleBankId] = usePersistedState<string | null>(`${baseKey}:continuousStyleBankId`, null)
+  const [continuousStyleName, setContinuousStyleName] = usePersistedState<string | null>(`${baseKey}:continuousStyleName`, null)
+  const [styleModalOpen, setStyleModalOpen] = useState(false)
   const [continuousResult, setContinuousResult] = usePersistedState<ContinuousResult | null>(`${baseKey}:continuousResult`, null)
   const [continuousSelections, setContinuousSelections] = usePersistedState<Record<string, ContinuousSelection>>(`${baseKey}:continuousSelections`, {})
   const [continuousFrameStates, setContinuousFrameStates] = usePersistedState<Record<string, ContinuousFrameCardState>>(
@@ -301,6 +309,15 @@ export default function BrollStudio() {
   // custom-style row was opened without one loaded in the panel.
   const [sessionStyleId, setSessionStyleId] = usePersistedState<string>(`${baseKey}:sessionStyleId`, '')
   const [sessionStyleBrief, setSessionStyleBrief] = usePersistedState<string | null>(`${baseKey}:sessionStyleBrief`, null)
+  const [sessionStyleName, setSessionStyleName] = usePersistedState<string | null>(`${baseKey}:sessionStyleName`, null)
+
+  // Stamp the style onto the session about to be generated. Called from all
+  // four generate paths so a row can't record one field without the others.
+  const stampSessionStyle = () => {
+    setSessionStyleId(resolvedStyleId)
+    setSessionStyleBrief(continuousStyleBrief)
+    setSessionStyleName(continuousStyleName)
+  }
 
   // Active history row in the History tab — highlights the row that's
   // currently being edited / restored.
@@ -369,6 +386,7 @@ export default function BrollStudio() {
         // generation time so a later mode-toggle can't rewrite it.
         styleId: sessionStyleId || undefined,
         styleBrief: sessionStyleBrief ?? undefined,
+        styleName: sessionStyleName ?? undefined,
         inputSummary: buildInputSummary(selectedProduct?.productName, scriptText),
         productId: selectedProductId ?? undefined,
         modelId: selectedModelId ?? undefined,
@@ -393,7 +411,7 @@ export default function BrollStudio() {
       upsertBrollHistory(item)
     }, 1000)
     return () => clearTimeout(handle)
-  }, [result, cardStates, lineDelivery, oneShotResult, oneShotCardStates, oneShotDelivery, oneShotModelId, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, sessionStyleId, sessionStyleBrief, continuousModelId, sessionMode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, upsertBrollHistory])
+  }, [result, cardStates, lineDelivery, oneShotResult, oneShotCardStates, oneShotDelivery, oneShotModelId, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, sessionStyleId, sessionStyleBrief, sessionStyleName, continuousModelId, sessionMode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, upsertBrollHistory])
 
   const handleSelectProduct = (item: unknown) => {
     setSelectedProductId((item as Product).id)
@@ -506,8 +524,7 @@ export default function BrollStudio() {
     if (!useSettingsStore.getState().kieApiKey) {
       setSessionId(newSessionId())
       setSessionMode('oneshot')
-      setSessionStyleId(resolvedStyleId)
-      setSessionStyleBrief(continuousStyleBrief)
+      stampSessionStyle()
       setOneShotCardStates({})
       setOneShotResult(buildDemoOneShotResult(oneShotModelId, oneShotDelivery))
       useAppStore.getState().addToast('Showing sample concepts — add your kie.ai key to generate from your own script', 'info')
@@ -530,8 +547,7 @@ export default function BrollStudio() {
       // actually have concepts, so a failed call leaves the old ones intact.
       setSessionId(newSessionId())
       setSessionMode('oneshot')
-      setSessionStyleId(resolvedStyleId)
-      setSessionStyleBrief(continuousStyleBrief)
+      stampSessionStyle()
       setOneShotCardStates({})
       setOneShotResult(res)
       if (res.concepts.length < 4) {
@@ -592,8 +608,7 @@ export default function BrollStudio() {
     if (!useSettingsStore.getState().kieApiKey) {
       setSessionId(newSessionId())
       setSessionMode('continuous')
-      setSessionStyleId(resolvedStyleId)
-      setSessionStyleBrief(continuousStyleBrief)
+      stampSessionStyle()
       setContinuousFrameStates({})
       setContinuousClipStates({})
       setContinuousSelections({})
@@ -617,8 +632,7 @@ export default function BrollStudio() {
       // once a storyboard actually landed.
       setSessionId(newSessionId())
       setSessionMode('continuous')
-      setSessionStyleId(resolvedStyleId)
-      setSessionStyleBrief(continuousStyleBrief)
+      stampSessionStyle()
       setContinuousFrameStates({})
       setContinuousClipStates({})
       setContinuousSelections({})
@@ -660,24 +674,46 @@ export default function BrollStudio() {
     if (dataUris.length > 0) setStyleRefs((prev) => [...prev, ...dataUris].slice(0, 4))
   }
 
-  const handleAnalyzeStyleRefs = async () => {
-    if (styleRefs.length === 0 || isAnalyzingStyle) return
+  // Runs the vision pass and HANDS BACK the paragraph rather than applying it.
+  // The popup shows it for editing/naming first — nothing is committed to the
+  // session (or the bank) until the user picks Use or Save there.
+  const handleAnalyzeStyleRefs = async (): Promise<string | null> => {
+    if (styleRefs.length === 0 || isAnalyzingStyle) return null
     if (!useSettingsStore.getState().kieApiKey) {
       useAppStore.getState().addToast('Add your kie.ai key in Settings to analyze a reference style', 'info')
-      return
+      return null
     }
     setIsAnalyzingStyle(true)
     try {
-      const brief = await analyzeStyleReferences(styleRefs)
-      setContinuousStyleBrief(brief)
-      useAppStore.getState().addToast('Style locked from your references', 'success')
+      return await analyzeStyleReferences(styleRefs)
     } catch (err) {
       const msg = humanizeError(err, 'Could not read the style from those images.')
       useAppStore.getState().addToast(msg, 'error')
+      return null
     } finally {
       setIsAnalyzingStyle(false)
     }
   }
+
+  // A preset and a custom brief are mutually exclusive — picking either clears
+  // the other, so `styleBriefFor` never has to arbitrate between them.
+  const handlePickPresetStyle = (id: string) => {
+    chooseStyle(id)
+    setContinuousStyleBrief(null)
+    setContinuousStyleBankId(null)
+    setContinuousStyleName(null)
+  }
+
+  const handleUseCustomStyle = ({ brief, name, bankId }: StyleSelection) => {
+    setContinuousStyleBrief(brief)
+    setContinuousStyleName(name)
+    setContinuousStyleBankId(bankId)
+  }
+
+  // What the left panel's style row shows.
+  const styleLabel = continuousStyleBrief?.trim()
+    ? continuousStyleName?.trim() || 'Custom style'
+    : getContinuousStyle(resolvedStyleId).label
 
   // Add one blank concept box to a single keyframe (the frame row's "Add
   // concept" card). Mirrors Line-by-Line's "Add option": it drops an empty
@@ -712,6 +748,7 @@ export default function BrollStudio() {
         referenceImages,
         styleId: resolvedStyleId,
         styleBrief: continuousStyleBrief ?? undefined,
+        styleName: continuousStyleName ?? undefined,
         delivery: lineDelivery,
       })
       // Only now that we have scenes do we start a fresh session: rotating the
@@ -721,8 +758,7 @@ export default function BrollStudio() {
       // so the rebuild effect sees the new result against empty cards.
       setSessionId(newSessionId())
       setSessionMode('line')
-      setSessionStyleId(resolvedStyleId)
-      setSessionStyleBrief(continuousStyleBrief)
+      stampSessionStyle()
       setCardStates({})
       setResult(res)
       useAppStore.getState().addToast('B-roll image generated', 'success')
@@ -821,7 +857,13 @@ export default function BrollStudio() {
     const rowStyleId = item.continuousStyleId ?? item.styleId ?? ''
     setSessionStyleId(rowStyleId)
     setSessionStyleBrief(item.styleBrief ?? null)
+    setSessionStyleName(item.styleName ?? null)
     setContinuousStyleBrief(item.styleBrief ?? null)
+    setContinuousStyleName(item.styleName ?? null)
+    // The row records the style's name, not which bank entry it came from, so
+    // a restored session shows the name without claiming a saved-card selection
+    // (the entry may since have been renamed or deleted).
+    setContinuousStyleBankId(null)
     if (rowStyleId) {
       setContinuousStyleId(rowStyleId)
       setStyleChosen(true)
@@ -864,17 +906,9 @@ export default function BrollStudio() {
           oneShotDelivery={oneShotDelivery}
           onOneShotDeliveryChange={setOneShotDelivery}
           oneShotModelId={oneShotModelId}
-          continuousStyleId={resolvedStyleId}
-          onContinuousStyleChange={chooseStyle}
-          styleRefs={styleRefs}
-          onAddStyleRefs={(files) => { void handleAddStyleRefs(files) }}
-          onRemoveStyleRef={(i) => setStyleRefs((prev) => prev.filter((_, idx) => idx !== i))}
-          onClearStyleRefs={() => { setStyleRefs([]); setContinuousStyleBrief(null) }}
-          onAnalyzeStyleRefs={() => { void handleAnalyzeStyleRefs() }}
-          onPickStyleRefsFromBank={() => setPickerMode('styleRefs')}
-          isAnalyzingStyle={isAnalyzingStyle}
-          continuousStyleBrief={continuousStyleBrief}
-          onClearStyleBrief={() => setContinuousStyleBrief(null)}
+          styleLabel={styleLabel}
+          styleIsCustom={!!continuousStyleBrief?.trim()}
+          onOpenStyle={() => setStyleModalOpen(true)}
         />
       </div>
 
@@ -950,6 +984,28 @@ export default function BrollStudio() {
         onSelect={() => { /* multi-select uses onSelectMany */ }}
         onSelectMany={(items) => { void handleAddStyleRefsFromBank(items as BRoll[]) }}
         onClose={() => setPickerMode(null)}
+      />
+
+      {/* Visual style popup — presets, the user's saved styles, and the
+          analyse-from-references flow, all in one place. */}
+      <StyleModal
+        // Remount per open so the popup always lands on the browse view with a
+        // clean draft — it renders null while closed, so this costs nothing.
+        key={styleModalOpen ? 'open' : 'closed'}
+        open={styleModalOpen}
+        onClose={() => setStyleModalOpen(false)}
+        styleId={resolvedStyleId}
+        styleBrief={continuousStyleBrief}
+        styleBankId={continuousStyleBankId}
+        onPickPreset={handlePickPresetStyle}
+        onUseCustom={handleUseCustomStyle}
+        styleRefs={styleRefs}
+        onAddStyleRefs={(files) => { void handleAddStyleRefs(files) }}
+        onRemoveStyleRef={(i) => setStyleRefs((prev) => prev.filter((_, idx) => idx !== i))}
+        onClearStyleRefs={() => setStyleRefs([])}
+        onPickStyleRefsFromBank={() => setPickerMode('styleRefs')}
+        onAnalyze={handleAnalyzeStyleRefs}
+        isAnalyzing={isAnalyzingStyle}
       />
     </div>
   )
