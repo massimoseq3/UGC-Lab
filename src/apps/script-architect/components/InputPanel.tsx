@@ -1,7 +1,7 @@
 import { useState, type ComponentType } from 'react'
 import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Film, UserRound, Sparkles, Undo2, Redo2, Eraser, Shuffle, FishingHook } from 'lucide-react'
 import type { Model, Product, Script } from '../../../stores/types'
-import { WRITE_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNT, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice } from '../types'
+import { WRITE_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNT, SCRIPT_VARIATION_COUNT, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice } from '../types'
 
 // The cinematic 'prompt' format is single-clip-capped, so it only offers the
 // shorter durations a video model can render in one generation.
@@ -784,7 +784,7 @@ export default function InputPanel({
                 <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-4 py-2">
                   <span className={`flex min-w-0 items-center gap-1.5 truncate text-[11px] font-medium ${blueprintActive ? 'text-fuchsia-300 light:text-fuchsia-700' : 'text-ink-500'}`}>
                     {blueprintActive ? <Clapperboard className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
-                    {blueprintActive ? 'Scene blueprint detected — scenes will be rewritten' : 'Remixing as a plain script — 5 variations'}
+                    {blueprintActive ? 'Scene blueprint detected — scenes will be rewritten' : `Remixing as a plain script — ${SCRIPT_VARIATION_COUNT} variations`}
                   </span>
                   <button
                     type="button"

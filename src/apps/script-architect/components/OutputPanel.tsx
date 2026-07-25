@@ -4,7 +4,7 @@ import GenerationProgress from '../../../components/GenerationProgress'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import type { CinematicHandoffRef, CinematicVideoPayload, Model } from '../../../stores/types'
-import { REMIX_ANGLE_LABEL, HOOK_CATEGORY_META, HOOK_COUNT, parseHooks, hooksPlainText, type ParsedHook, type RemixAngle, type ScriptMode, type WriteFormat, type WriteLength } from '../types'
+import { REMIX_ANGLE_LABEL, SCRIPT_VARIATION_COUNT, remixAnglesForCount, HOOK_CATEGORY_META, HOOK_COUNT, parseHooks, hooksPlainText, type ParsedHook, type ScriptMode, type WriteFormat, type WriteLength } from '../types'
 
 // The cinematic handoff lands in Playground on a ref-capable, native-audio
 // model so the @INFLUENCER + @PRODUCT references actually lock and the VO bakes
@@ -713,12 +713,12 @@ export default function OutputPanel({ variations, mode, liveMode, writeFormat, w
   if (isGenerating) {
     const message = copyMode === 'write'
       ? (writeFormat === 'prompt'
-          ? ['Reading your brief...', 'Directing 5 cinematic concepts...', 'Building the world bible...', 'Laying out the timeline...']
+          ? ['Reading your brief...', `Directing ${SCRIPT_VARIATION_COUNT} cinematic concepts...`, 'Building the world bible...', 'Laying out the timeline...']
           : writeFormat === 'hooks'
             ? ['Reading your brief...', 'Digging through the hook library...', `Writing ${HOOK_COUNT} hooks...`, 'Cutting the weak ones...']
-            : ['Reading your brief...', 'Writing 5 takes...', 'Making it sound human...', 'Tightening the hooks...'])
+            : ['Reading your brief...', `Writing ${SCRIPT_VARIATION_COUNT} takes...`, 'Making it sound human...', 'Tightening the hooks...'])
       : copyMode === 'remix'
-        ? ['Building 5 angles...', 'Sending parallel requests...', 'Writing variations...', 'Polishing final drafts...']
+        ? [`Building ${SCRIPT_VARIATION_COUNT} angles...`, 'Sending parallel requests...', 'Writing variations...', 'Polishing final drafts...']
         : ['Reading scene blueprint...', 'Mapping product into structure...', 'Rewriting scenes...', 'Preserving structure...']
     return (
       <div className="flex h-full flex-col gap-2 p-5">
@@ -742,8 +742,8 @@ export default function OutputPanel({ variations, mode, liveMode, writeFormat, w
         <PenLine className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
         <p className="text-sm text-ink-700">
           {copyMode === 'write'
-            ? (writeFormat === 'prompt' ? 'Your 5 cinematic concepts will appear here' : writeFormat === 'hooks' ? `Your ${HOOK_COUNT} hooks will appear here` : 'Your 5 takes will appear here')
-            : copyMode === 'remix' ? 'Your 5 script variations will appear here' : 'Your scene prompts will appear here'}
+            ? (writeFormat === 'prompt' ? `Your ${SCRIPT_VARIATION_COUNT} cinematic concepts will appear here` : writeFormat === 'hooks' ? `Your ${HOOK_COUNT} hooks will appear here` : `Your ${SCRIPT_VARIATION_COUNT} takes will appear here`)
+            : copyMode === 'remix' ? `Your ${SCRIPT_VARIATION_COUNT} script variations will appear here` : 'Your scene prompts will appear here'}
         </p>
         {error && (
           <div className="mt-2 flex max-w-sm items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
@@ -755,7 +755,9 @@ export default function OutputPanel({ variations, mode, liveMode, writeFormat, w
     )
   }
 
-  const angles: RemixAngle[] = ['hook-led', 'pain-point-led', 'curiosity-led', 'story-led', 'proof-led']
+  // Resolved from the row's own variation count, so a five-variation session
+  // saved before the cut still labels its angles correctly.
+  const angles = remixAnglesForCount(variations.length)
   const takeUnit = isCinematic ? 'Concept' : mode === 'remix' ? 'Variation' : 'Take'
 
   return (
@@ -785,7 +787,7 @@ export default function OutputPanel({ variations, mode, liveMode, writeFormat, w
         {variations.map((text, i) => {
           const isRemix = mode === 'remix'
           const isWrite = mode === 'write'
-          const angleLabel = isRemix && variations.length === angles.length ? REMIX_ANGLE_LABEL[angles[i]] : null
+          const angleLabel = isRemix && angles ? REMIX_ANGLE_LABEL[angles[i]] : null
           const cardTitle = isHooks
             ? `Hooks · ${hookCategoryLabel ?? 'Best Mix'}`
             : isCinematic

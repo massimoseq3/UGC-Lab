@@ -43,7 +43,7 @@ export default function ScriptArchitect() {
   })
   const [source, setSource] = usePersistedState(`${baseKey}:source`, readLegacySource(baseKey))
   // Override for the blueprint auto-detect: remix the pasted blueprint as a
-  // plain script (5 variations) instead of rewriting its scene prompts.
+  // plain script (a batch of variations) instead of rewriting its scene prompts.
   const [forceTranscript, setForceTranscript] = useState(false)
   const [brief, setBrief] = usePersistedState(`${baseKey}:brief`, '')
   const [writeStyle, setWriteStyle] = usePersistedState<WriteStyle>(`${baseKey}:writeStyle`, 'pas', {
@@ -221,10 +221,13 @@ export default function ScriptArchitect() {
       setActiveHistoryId(item.id)
 
       const hookCount = writeFormat === 'hooks' ? parseHooks(result.variations[0] ?? '').length : 0
+      // Count what actually came back rather than the configured batch size, so
+      // the toast stays honest if a take fails or the count changes again.
+      const n = result.variations.length
       useAppStore.getState().addToast(
         resolvedMode === 'write'
-          ? (writeFormat === 'hooks' ? `${hookCount || 'Your'} hooks generated` : writeFormat === 'prompt' ? '5 cinematic concepts generated' : writeFormat === 'scenes' ? '5 scene drafts generated' : '5 scripts generated')
-          : resolvedMode === 'remix' ? '5 script variations generated' : 'Script rewritten',
+          ? (writeFormat === 'hooks' ? `${hookCount || 'Your'} hooks generated` : writeFormat === 'prompt' ? `${n} cinematic concepts generated` : writeFormat === 'scenes' ? `${n} scene drafts generated` : `${n} scripts generated`)
+          : resolvedMode === 'remix' ? `${n} script variations generated` : 'Script rewritten',
         'success',
       )
     } catch (err) {

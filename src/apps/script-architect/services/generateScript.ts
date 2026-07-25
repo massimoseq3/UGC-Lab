@@ -1,5 +1,5 @@
 import type { GenerateScriptInput, GeneratedScript, RemixAngle, EditableProductContext, WriteStyle, WriteLength, HookCategory } from '../types'
-import { HOOK_COUNT } from '../types'
+import { HOOK_COUNT, REMIX_ANGLES } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { kieChatCompletions, type ChatMessage } from '../../../utils/kie'
 import { getChatEndpointPath } from '../../../utils/models'
@@ -387,17 +387,25 @@ const WRITE_STYLE_INSTRUCTION: Record<WriteStyle, string> = {
   comparison: 'STRUCTURE — US VS THEM: what people normally use versus this. Concrete differences — price, time, result. Never name competitor brands; say "the stuff from the drugstore", "the one everyone buys". End on why switching is obvious, then the call-to-action.',
 }
 
-// Five parallel takes per generate — same style, deliberately different
+// Three parallel takes per generate — same style, deliberately different
 // openings AND different committed angles, so the batch is a real A/B test
-// instead of five flavors of one hook. Each take runs as its own LLM call
-// (blind to the others), so the anchor heuristics below are what keep the
-// five from all converging on the same pain point.
+// instead of three flavors of one hook. Each take runs as its own LLM call
+// (blind to the others), so the anchor heuristics below are what keep them
+// from all converging on the same pain point.
+//
+// This was five. The two that got cut were the ones that doubled up: a "bold
+// claim" take that landed on the same solution-aware viewer as the proof take
+// while sounding more like an ad, and a "call out the viewer" take that shared
+// the problem-aware slot with the confession take and kept drifting toward the
+// banned "if you struggle with..." opener. What's left spans the whole
+// awareness ladder — problem-aware, solution-aware, unaware — with a different
+// opening device and a different anchor on each.
 const WRITE_ANGLE_DISCIPLINE = `ANGLE DISCIPLINE: commit to exactly ONE pain point and the ONE benefit that pays it off — chosen from the product details per the anchor below (or inferred from the brief if no product details are given). Every line of the script drives that single idea deeper. Do NOT tour multiple pain points, stack USPs, or list benefits — a script that mentions three benefits sells none. Other product facts may appear only in service of the one idea (a spec as proof, the offer at the CTA).`
 
+// Keep this at SCRIPT_VARIATION_COUNT entries — the batch size is derived from
+// its length, so adding one here adds an LLM call per generate.
 const WRITE_TAKE_INSTRUCTION: string[] = [
-  `THIS TAKE: open with a bold claim or hot take stated as fact. Anchor: the single strongest USP — write for a solution-aware viewer comparing options.\n${WRITE_ANGLE_DISCIPLINE}`,
   `THIS TAKE: open with a specific personal confession or moment ("I did X for years before I realized..."). Anchor: the most personal, private-feeling pain point — write for a problem-aware viewer who thinks it's just them.\n${WRITE_ANGLE_DISCIPLINE}`,
-  `THIS TAKE: open by directly calling out the viewer ("if you [pain point], stop scrolling" energy — in your own words, not that phrase). Anchor: the most widespread everyday pain point — write for a problem-aware viewer who hasn't looked for a fix yet.\n${WRITE_ANGLE_DISCIPLINE}`,
   `THIS TAKE: open with a surprising number, stat, or before/after result that reframes the problem. Anchor: the most concrete, measurable benefit — write proof-first for a skeptical, solution-aware viewer.\n${WRITE_ANGLE_DISCIPLINE}`,
   `THIS TAKE: open mid-story, in the middle of a moment or a question, so the viewer is dropped straight into the action. Anchor: the most unexpected benefit or use-moment — write curiosity-first for an unaware viewer who wasn't shopping at all.\n${WRITE_ANGLE_DISCIPLINE}`,
 ]
@@ -457,12 +465,14 @@ HARD RULES:
 
 // Five parallel concepts per generate — deliberately different cinematic
 // worlds so the cards are real alternatives, not five flavours of one idea.
+// Three worlds, as far apart as the format allows: mythic scale, one quiet
+// human, pure design. The cut pair were modifiers more than worlds — KINETIC
+// was a pacing choice that epic and sleek can both carry, and NATURAL's warmth
+// largely restated intimate. Same length rule as WRITE_TAKE_INSTRUCTION.
 const WRITE_PROMPT_TAKE_INSTRUCTION: string[] = [
   'THIS CONCEPT — EPIC / GRAND: build a powerful, large-scale, atmospheric world that dramatises the product\'s core benefit as something mythic and larger than life. Wide, awe-driven, cinematic scale.',
   'THIS CONCEPT — INTIMATE / HUMAN: a quiet, real, emotionally-driven moment built around one character. The product appears as a personal ritual or a turning point. Restrained and sincere.',
   'THIS CONCEPT — SLEEK / DESIGN-FORWARD: a stylised, ultra-premium brand-film world — bold colour, striking architecture, or a surreal-but-photoreal setting. Modern, iconic, high-fashion energy.',
-  'THIS CONCEPT — KINETIC / HIGH-ENERGY: a fast-cut, dynamic world full of movement and momentum — sport, motion, speed, or urban energy. Punchy rhythm, athletic camera, adrenaline.',
-  'THIS CONCEPT — NATURAL / ORGANIC: a warm, grounded world rooted in nature, craft, or everyday texture — golden light, real hands, tactile materials. Honest, earthy, effortlessly premium.',
 ]
 
 // Single-clip beat budgets. The cinematic format renders as one generation, so
@@ -674,17 +684,21 @@ export async function generateScript(input: GenerateScriptInput): Promise<Genera
   }
 
   if (input.mode === 'write') {
-    // Hooks: one pack of tagged one-liners, not 5 parallel takes.
+    // Hooks: one pack of tagged one-liners, not a batch of parallel takes.
     if (input.writeFormat === 'hooks') {
       const text = await runHooks(input, apiKey, endpoint)
       return { variations: [text] }
     }
-    const variations = await Promise.all([0, 1, 2, 3, 4].map((take) => runWrite(input, take, apiKey, endpoint)))
+    // Batch size comes from the instruction list Cinematic vs Script/Scenes
+    // will actually read, so the two can never fall out of step with it.
+    const takeCount = (input.writeFormat === 'prompt' ? WRITE_PROMPT_TAKE_INSTRUCTION : WRITE_TAKE_INSTRUCTION).length
+    const variations = await Promise.all(
+      Array.from({ length: takeCount }, (_, take) => runWrite(input, take, apiKey, endpoint)),
+    )
     return { variations }
   }
 
-  const angles: RemixAngle[] = ['hook-led', 'pain-point-led', 'curiosity-led', 'story-led', 'proof-led']
-  const variations = await Promise.all(angles.map((angle) => runRemix(input, angle, apiKey, endpoint)))
+  const variations = await Promise.all(REMIX_ANGLES.map((angle) => runRemix(input, angle, apiKey, endpoint)))
   return { variations }
 }
 

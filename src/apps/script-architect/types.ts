@@ -80,6 +80,13 @@ export type HookCategoryChoice = 'auto' | HookCategory
 
 export const HOOK_COUNT = 10
 
+// How many takes a Script / Scenes / Cinematic / Remix generate returns. Was 5;
+// cut to 3 because five parallel takes off one brief crowd each other — the
+// weakest two were always variations on a stronger one, and five long scripts
+// is more than anyone reads before picking. Three forces genuinely separate
+// angles. Hooks are exempt (HOOK_COUNT) — those are one-liners, not scripts.
+export const SCRIPT_VARIATION_COUNT = 3
+
 export const HOOK_CATEGORY_META: Record<HookCategoryChoice, { label: string; hint: string }> = {
   auto: { label: 'Best Mix', hint: 'The model picks the strongest angles across all 7 families' },
   educational: { label: 'Educational', hint: '"Here\'s exactly how much X you need to get Y"' },
@@ -170,4 +177,30 @@ export const REMIX_ANGLE_LABEL: Record<RemixAngle, string> = {
   'curiosity-led': 'Curiosity-led',
   'story-led': 'Story-led',
   'proof-led': 'Proof-led',
+}
+
+// The three angles a remix generates, in card order. Three different
+// persuasion mechanisms rather than three flavours of one: feel the problem /
+// need to know / see the result. 'hook-led' is gone because every script
+// already runs the global hook rules, so it wasn't an angle at all; 'story-led'
+// because its narrative pull is reachable from inside pain-point-led.
+export const REMIX_ANGLES: RemixAngle[] = ['pain-point-led', 'curiosity-led', 'proof-led']
+
+// Pre-cut sessions generated five, and those rows are still in Script History.
+// Keeping the old order lets them keep their angle labels instead of silently
+// degrading to a bare "Variation N".
+const LEGACY_REMIX_ANGLES: RemixAngle[] = [
+  'hook-led',
+  'pain-point-led',
+  'curiosity-led',
+  'story-led',
+  'proof-led',
+]
+
+// Angle list matching a stored variation count, or null when it matches neither
+// (a hand-edited row) — the caller falls back to an unlabelled title.
+export function remixAnglesForCount(count: number): RemixAngle[] | null {
+  if (count === REMIX_ANGLES.length) return REMIX_ANGLES
+  if (count === LEGACY_REMIX_ANGLES.length) return LEGACY_REMIX_ANGLES
+  return null
 }
