@@ -44,14 +44,20 @@ interface InputPanelProps {
   oneShotDelivery: OneShotDelivery
   onOneShotDeliveryChange: (delivery: OneShotDelivery) => void
   oneShotModelId: string
-  // Visual style — one row, one popup. The preset presets, the user's saved
-  // styles, and the analyse-from-references flow all live in StyleModal (opened
-  // by the parent), so this panel only shows what's picked. The video model is
-  // NOT picked here: it only matters once there are keyframes to animate, so
-  // that picker lives in the clip modal.
+  // Visual style — one row, one popup. The presets, the user's saved styles,
+  // and the analyse-from-references flow all live in StyleModal (opened by the
+  // parent), so this panel only shows what's picked. The video model is NOT
+  // picked here: it only matters once there are keyframes to animate, so that
+  // picker lives in the clip modal.
+  // The row mirrors Scripts' Script Style row: dashed + prompting until a style
+  // is actively picked, accent-filled with a clear X after. It's a required
+  // input — nothing generates until the user has chosen a look.
+  styleChosen: boolean
   styleLabel: string
+  styleHint: string
   styleIsCustom: boolean
   onOpenStyle: () => void
+  onClearStyle: () => void
 }
 
 function BankCard({
@@ -228,12 +234,17 @@ export default function InputPanel({
   oneShotDelivery,
   onOneShotDeliveryChange,
   oneShotModelId,
+  styleChosen,
   styleLabel,
+  styleHint,
   styleIsCustom,
   onOpenStyle,
+  onClearStyle,
 }: InputPanelProps) {
   const hasScript = scriptText.trim().length > 0
-  const canGenerate = hasScript
+  // Style is a required input, like the script: the look drives every prompt in
+  // every mode, so it's an explicit decision rather than a silent default.
+  const canGenerate = hasScript && styleChosen
   const [scriptExpanded, setScriptExpanded] = useState(false)
   const [instructionsExpanded, setInstructionsExpanded] = useState(false)
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
@@ -464,23 +475,62 @@ export default function InputPanel({
 
           {/* Visual style — one row that opens the style popup (presets, your
               saved styles, and the analyse-from-references flow all live
-              there). A custom style shows its name with a Custom tag. */}
-          <button
-            type="button"
+              there). Same shape as Scripts' Script Style row: dashed and
+              asking to be filled until a look is picked, accent-filled with a
+              clear X after. A custom style shows its name with a Custom tag. */}
+          <div
+            role="button"
+            tabIndex={0}
             onClick={onOpenStyle}
-            className="order-first flex h-12 w-full items-center gap-2.5 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-3.5 text-left transition-colors hover:border-ink/20 hover:bg-ink/[0.05]"
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenStyle() } }}
+            className={`group order-first flex w-full cursor-pointer items-center gap-3 rounded-full border px-3.5 py-3 text-left transition-colors ${
+              styleChosen
+                ? 'border-broll-500/25 bg-broll-500/[0.07] hover:border-broll-500/35 hover:bg-broll-500/10'
+                : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-broll-500/30 hover:bg-broll-500/5'
+            }`}
           >
-            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${styleIsCustom ? 'bg-broll-500/20 text-broll-300' : 'bg-broll-500/10 text-broll-400 light:text-broll-600'}`}>
-              {styleIsCustom ? <Sparkles className="h-3.5 w-3.5" strokeWidth={1.75} /> : <Palette className="h-3.5 w-3.5" strokeWidth={1.5} />}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-100">{styleLabel}</span>
-            {styleIsCustom && (
-              <span className="shrink-0 rounded-full bg-broll-500/15 px-2 py-0.5 text-[10px] font-semibold tracking-tight text-broll-300 light:text-broll-700">
-                Custom
-              </span>
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${styleIsCustom ? 'bg-broll-500/20 text-broll-300' : 'bg-broll-500/10 text-broll-400 light:text-broll-600'}`}>
+              {styleIsCustom ? <Sparkles className="h-5 w-5" strokeWidth={1.75} /> : <Palette className="h-5 w-5" strokeWidth={1.5} />}
+            </div>
+            <div className="min-w-0 flex-1">
+              {styleChosen ? (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-[13px] font-medium tracking-tight text-broll-200 light:text-broll-700">{styleLabel}</span>
+                    {styleIsCustom && (
+                      <span className="shrink-0 rounded-full bg-broll-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-broll-300 light:text-broll-700">
+                        Custom
+                      </span>
+                    )}
+                  </div>
+                  <div className="truncate text-[11px] leading-snug text-ink-500">{styleHint}</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-sm font-medium text-ink-300">Visual Style</div>
+                  <div className="text-xs text-ink-600">Select how every clip looks</div>
+                </>
+              )}
+            </div>
+            {styleChosen ? (
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
+                  <RefreshCw className="h-2.5 w-2.5" />
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onClearStyle() }}
+                  title="Clear style"
+                  aria-label="Clear style"
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
             )}
-            <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
-          </button>
+          </div>
         </div>
 
         <button
@@ -519,7 +569,7 @@ export default function InputPanel({
         </button>
         {!canGenerate && !isGenerating && (
           <p className="mt-2 text-center text-[10px] text-ink-700">
-            Select or paste a script to get started
+            {!hasScript ? 'Select or paste a script to get started' : 'Choose a visual style to get started'}
           </p>
         )}
       </div>
