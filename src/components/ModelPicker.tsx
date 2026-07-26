@@ -159,7 +159,9 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
             <>
               <ProviderLogo provider={selected.provider} />
               <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                <span className={`truncate font-medium text-ink-100 ${large ? 'text-[14px]' : 'text-[13px]'}`}>{selected.displayName}</span>
+                {/* One trigger text size across every surface — `large` only
+                    widens the padding/gap, it never bumps the type. */}
+                <span className="truncate text-[13px] font-medium text-ink-100">{selected.displayName}</span>
                 {selected.tags.includes('recommended') && (
                   <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
                 )}
