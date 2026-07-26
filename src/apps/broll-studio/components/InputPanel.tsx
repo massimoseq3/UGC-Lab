@@ -245,7 +245,7 @@ export default function InputPanel({
   // Estimated cost of the prompt-writing call behind the Generate button. These
   // are chat completions, so it's fractions of a credit — the pill is there so
   // nothing ever fires unpriced, not because the number is large.
-  const promptCredits = hasScript ? formatCredits(estimatePromptCredits(mode, scriptText)) : null
+  const promptCredits = hasScript ? formatCredits(estimatePromptCredits(mode, scriptText, lineDelivery)) : null
 
   return (
     <div className="flex flex-col md:h-full">
@@ -375,9 +375,10 @@ export default function InputPanel({
       <div className="sticky bottom-0 z-30 border-t border-ink/5 bg-surface-0 px-5 py-3 md:static md:z-auto md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
         <div className="mb-2.5 flex flex-col gap-2">
 
-          {/* Line-by-Line delivery — "With Dialogue" adds one talking-to-camera
-              card per scene (the character speaks the line) alongside the
-              silent b-roll cards; "B-Roll Clips" keeps every card silent. */}
+          {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
+              card silent; "With Dialogue" adds a fourth, talking-to-camera card
+              per scene on top of the three silent b-roll ideas. Default first,
+              same as every other toggle in the app. */}
           {mode === 'line' && (
             <SegmentedToggle<BrollDelivery>
               className="h-12 !p-1"
@@ -385,8 +386,8 @@ export default function InputPanel({
               onChange={onLineDeliveryChange}
               accent="broll"
               options={[
-                { value: 'dialogue', label: 'With Dialogue' },
                 { value: 'silent', label: 'B-Roll Clips' },
+                { value: 'dialogue', label: 'With Dialogue' },
               ]}
             />
           )}

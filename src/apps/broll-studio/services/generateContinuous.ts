@@ -15,6 +15,7 @@ import type { ContinuousConcept, ContinuousFrame, ContinuousResult, ContinuousSc
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { kieChatCompletions, type ChatMessage } from '../../../utils/kie'
 import { getChatEndpointPath, getModel, snapVideoDurationUp } from '../../../utils/models'
+import { IPHONE_REALISM_SUFFIX } from './realism'
 
 // Models LISTED in the Continuous picker. The whole mode is first/last-frame
 // interpolation, so only frames-to-video models are actually selectable — the
@@ -103,6 +104,26 @@ export function applyStyleToPrompt(
   const stylized = !!style && style.realism === false && !!style.style?.trim()
   if (!stylized) return { prompt: editablePrompt, noRealism: false }
   return { prompt: `${editablePrompt.trim()}\n\nSTYLE: ${style!.style!.trim()}`, noRealism: true }
+}
+
+// What a Line-by-Line render actually bolts onto the prompt, for the read-only
+// note at the top of a card's workspace. Both of these ride OUTSIDE the
+// editable prompt so they can't be forked per card — which also means that note
+// is the only place a member can read them.
+//
+// It mirrors applyStyleToPrompt deliberately, so the note can never claim
+// something the render won't do: a stylized look appends its STYLE block and
+// drops the realism stack, while UGC Realism (and legacy results, whose
+// `realism` is undefined) keep the stack and append nothing. Keep the two in
+// step. Continuous doesn't need this — it appends the brief unconditionally, so
+// its modals show `result.style` directly.
+export function appliedStyleNote(
+  style: { style?: string; realism?: boolean } | null | undefined,
+): { label: string; text: string } {
+  if (style?.realism === false && style.style?.trim()) {
+    return { label: 'Style (applied automatically)', text: style.style.trim() }
+  }
+  return { label: 'Realism (applied automatically)', text: IPHONE_REALISM_SUFFIX }
 }
 
 // Reference preamble for keyframe image generation. The chain reference (the

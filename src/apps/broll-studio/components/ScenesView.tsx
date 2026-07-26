@@ -1238,11 +1238,12 @@ function SceneSection({
         </div>
       </div>
 
-      {/* Three variations plus the Add-option card across one row at xl — four
-          equal cards, the Add card just another cell in the grid. (A session
-          generated before the cut to three still renders: it simply wraps its
-          extra card onto a second line.) */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+      {/* The scene's variations plus the Add-option card across one row at xl —
+          the Add card is just another cell in the grid. Silent delivery is three
+          variations (a four-column row); With Dialogue adds the talking card on
+          top, so its row runs five wide rather than wrapping the Add card onto a
+          line of its own. */}
+      <div className={`grid grid-cols-2 gap-3 md:grid-cols-3 ${scene.variations.length >= 4 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
         {scene.variations.map((variation, i) => {
           const key = `${scene.number}-${i}`
           const state = cardStates[key] ?? createDefaultCardState(variation)

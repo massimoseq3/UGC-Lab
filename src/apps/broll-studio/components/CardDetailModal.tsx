@@ -44,7 +44,9 @@ import {
   ModalGallery,
   ReferenceSlotCard,
   ExtraRefsRow,
+  StyleNote,
 } from './cardDetailParts'
+import { appliedStyleNote } from '../services/generateContinuous'
 
 // After deleting tile #removed, shift the saved/saving index sets so they
 // still point at the right tiles (indices above the removed one slide down).
@@ -105,6 +107,11 @@ interface CardDetailModalProps {
   // DIALOGUE cards only: the previous scene's chosen talking-head still. Renders
   // a "Previous cut" reference slot whose toggle is cardState.chainLink.
   chainImageRef?: string
+  // The session's visual style, as stamped on the result. Shown read-only at the
+  // top of the workspace (StyleNote) because it's appended at fire time, outside
+  // the editable prompt below — the same note Continuous' modals carry.
+  resultStyle?: string
+  resultRealism?: boolean
 }
 
 // Playground-faithful per-variation workspace.
@@ -151,9 +158,18 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     voiceProfile,
     onUpdateVoiceProfile,
     chainImageRef,
+    resultStyle,
+    resultRealism,
   } = props
 
-  const [tab, setTab] = useState<Tab>(initialTab ?? 'image')
+  // What the render will actually append to the prompt below — resolved by the
+  // same rule the generation uses, so the note can't promise a look the card
+  // won't fire with.
+  const styleNote = appliedStyleNote({ style: resultStyle, realism: resultRealism })
+
+  // Video leads: a clip is what the card is ultimately for, and it's the tab
+  // members open the card on. Image and Animate follow.
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'video')
   // Video-model picker is a slide-in side panel (like the ref-image bank
   // picker) rather than an inline dropdown.
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
@@ -422,10 +438,11 @@ export default function CardDetailModal(props: CardDetailModalProps) {
           {/* LEFT 50% — scrollable body (model + refs + prompt) over a pinned
               footer (output settings + Generate), mirroring the Playground panel. */}
           <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 md:border-b-0 md:border-r">
-            {/* Sticky header — the Image / Video / Animate toggle, pulled out of
+            {/* Sticky header — the Video / Image / Animate toggle, pulled out of
                 the scroll area so it stays put while the body scrolls. Mirrors
                 the right panel's identity header (same px-5 pt-3, h-12 row, and
-                hairline) so the two line up across the modal. */}
+                hairline) so the two line up across the modal. Video leads: the
+                clip is the deliverable, and it's the landing tab. */}
             <div className="flex flex-col gap-3 px-5 pt-3">
               <div className="flex h-12 items-center">
                 <SegmentedToggle<Tab>
@@ -433,8 +450,8 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                   value={tab}
                   onChange={setTab}
                   options={[
-                    { value: 'image', label: 'Image', icon: ImageIcon },
                     { value: 'video', label: 'Video', icon: VideoIcon },
+                    { value: 'image', label: 'Image', icon: ImageIcon },
                     { value: 'animate', label: 'Animate', icon: Film },
                   ]}
                 />
@@ -445,6 +462,13 @@ export default function CardDetailModal(props: CardDetailModalProps) {
             {/* Scrollable body */}
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
               <div className="flex grow flex-col gap-3 px-5 pb-6 pt-3">
+                {/* The session's look, read-only at the top of the workspace —
+                    same note Continuous' frame and clip modals carry. It's
+                    appended at fire time, outside the editable prompt below, so
+                    this is the only place it's visible. On every tab, because
+                    both the image and the video gen append it. */}
+                <StyleNote style={styleNote.text} label={styleNote.label} />
+
                 {/* Animate tab → Start frame preview. Image/Video tabs →
                     the Influencer / Product reference slot cards + extra refs. */}
                 {tab === 'animate' ? (
