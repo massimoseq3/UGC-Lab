@@ -1,4 +1,4 @@
-import { ChevronRight, RotateCcw, Bookmark, X } from 'lucide-react'
+import { ChevronRight, RotateCcw, Mic, X } from 'lucide-react'
 import type { VoiceSettings } from '../types'
 import { DEFAULT_VOICE_SETTINGS, DIRECTION_PRESETS, getVoiceById, VOICE_STYLES, VOICE_PACES, VOICE_ACCENTS } from '../types'
 import { seedColor } from './seedColor'
@@ -88,18 +88,18 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
           />
         </div>
 
-        {/* Optional direction — scene + overall tone (always visible) */}
-        <DirectionBox
-          label="Scene"
-          value={settings.scene}
-          placeholder="e.g. A bright, upbeat product demo in a sunny kitchen."
-          onChange={(scene) => update({ scene })}
-        />
+        {/* Optional direction — overall tone + scene (always visible) */}
         <DirectionBox
           label="Tone / context"
           value={settings.sampleContext}
           placeholder="e.g. An excited creator sharing a product they love with a friend."
           onChange={(sampleContext) => update({ sampleContext })}
+        />
+        <DirectionBox
+          label="Scene"
+          value={settings.scene}
+          placeholder="e.g. A bright, upbeat product demo in a sunny kitchen."
+          onChange={(scene) => update({ scene })}
         />
 
         {/* One-tap direction presets — fill both boxes above. Tapping the
@@ -145,7 +145,7 @@ function PresetRow({
         className="group flex w-full items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.015] px-3.5 py-2.5 text-left transition-colors hover:border-ink/20 hover:bg-ink/[0.03]"
       >
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-voice-500/10 text-voice-300/80 transition-colors group-hover:bg-voice-500/15 group-hover:text-voice-300">
-          <Bookmark className="h-4 w-4" />
+          <Mic className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-sm font-medium text-ink-200">Preset</div>
@@ -165,7 +165,7 @@ function PresetRow({
       className="flex w-full cursor-pointer items-center gap-3 rounded-full border border-voice-500/25 bg-voice-500/[0.06] px-3.5 py-2.5 text-left transition-colors hover:bg-voice-500/10"
     >
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-voice-500/15 text-voice-300">
-        <Bookmark className="h-4 w-4" />
+        <Mic className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-ink-100">{label}</div>
@@ -201,7 +201,7 @@ function DirectionBox({
     <div className="flex flex-col gap-2">
       <span className="flex items-center gap-2">
         <span className="text-sm font-medium text-ink-200">{label}</span>
-        <span className="rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium text-ink-500">optional</span>
+        <span className="rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">optional</span>
       </span>
       <textarea
         value={value}
