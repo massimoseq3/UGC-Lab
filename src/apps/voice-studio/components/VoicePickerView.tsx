@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { ArrowLeft, Search, Play, Pause, Check } from 'lucide-react'
 import type { VoiceOption, VoicePitch } from '../types'
 import { VOICES, PITCH_ORDER, PITCH_LABELS } from '../types'
-import { voicePreviewUrl } from '../services/previewVoice'
 
 import { seedColor } from './seedColor'
+import { useVoicePreview } from './useVoicePreview'
 
 interface VoicePickerViewProps {
   selectedId: string
@@ -19,18 +19,7 @@ const PITCH_FILTERS: PitchFilter[] = ['All', ...PITCH_ORDER]
 export default function VoicePickerView({ selectedId, onSelect, onClose }: VoicePickerViewProps) {
   const [query, setQuery] = useState('')
   const [pitchFilter, setPitchFilter] = useState<PitchFilter>('All')
-  const [previewingId, setPreviewingId] = useState<string | null>(null)
-  const [loadingId, setLoadingId] = useState<string | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
-    }
-  }, [])
+  const { previewingId, loadingId, toggle } = useVoicePreview()
 
   // Filter by query + pitch, then group by pitch band (highest → lowest) with a
   // header per group, so members can scan voices by register.
@@ -52,47 +41,9 @@ export default function VoicePickerView({ selectedId, onSelect, onClose }: Voice
 
   const totalCount = groups.reduce((n, [, list]) => n + list.length, 0)
 
-  const playPreview = (voice: VoiceOption, url: string) => {
-    audioRef.current?.pause()
-    const audio = new Audio(url)
-    audioRef.current = audio
-    audio.addEventListener('playing', () => {
-      setPreviewingId(voice.id)
-      setLoadingId(null)
-    })
-    audio.addEventListener('ended', () => {
-      setPreviewingId(null)
-      setLoadingId(null)
-    })
-    audio.addEventListener('error', () => {
-      setPreviewingId(null)
-      setLoadingId(null)
-    })
-    audio.play().catch(() => {
-      setLoadingId(null)
-      setPreviewingId(null)
-    })
-  }
-
   const handlePreview = (voice: VoiceOption, e: React.MouseEvent) => {
     e.stopPropagation()
-
-    // Toggle off if the same voice is playing or being fetched.
-    if (previewingId === voice.id || loadingId === voice.id) {
-      audioRef.current?.pause()
-      audioRef.current = null
-      setPreviewingId(null)
-      setLoadingId(null)
-      return
-    }
-
-    // Play Google's pre-rendered sample straight from the public gstatic CDN —
-    // instant, free, no kie.ai call or key (see previewVoice.ts). The loading
-    // ring shows only for the brief first fetch; 'playing'/'error' clear it.
-    audioRef.current?.pause()
-    setLoadingId(voice.id)
-    setPreviewingId(null)
-    playPreview(voice, voicePreviewUrl(voice.id))
+    toggle(voice.id, voice.id)
   }
 
   const renderRow = (voice: VoiceOption) => {

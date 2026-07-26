@@ -1,9 +1,6 @@
-import { useState } from 'react'
 import { ChevronRight, RotateCcw, Bookmark, X } from 'lucide-react'
 import type { VoiceSettings } from '../types'
-import { DEFAULT_VOICE_SETTINGS, DIRECTION_PRESETS, getVoiceById, settingsFromPreset, VOICE_STYLES, VOICE_PACES, VOICE_ACCENTS } from '../types'
-import type { VoicePreset } from '../../../stores/types'
-import BankPicker from '../../../components/BankPicker'
+import { DEFAULT_VOICE_SETTINGS, DIRECTION_PRESETS, getVoiceById, VOICE_STYLES, VOICE_PACES, VOICE_ACCENTS } from '../types'
 import { seedColor } from './seedColor'
 import Slider from './Slider'
 import Dropdown from './Dropdown'
@@ -12,11 +9,11 @@ interface SettingsViewProps {
   settings: VoiceSettings
   onSettingsChange: (next: VoiceSettings) => void
   onOpenVoicePicker: () => void
+  onOpenPresetPicker: () => void
 }
 
-export default function SettingsView({ settings, onSettingsChange, onOpenVoicePicker }: SettingsViewProps) {
+export default function SettingsView({ settings, onSettingsChange, onOpenVoicePicker, onOpenPresetPicker }: SettingsViewProps) {
   const voice = getVoiceById(settings.voiceId)
-  const [presetPickerOpen, setPresetPickerOpen] = useState(false)
 
   // Every hand edit drops the preset stamp — once a control moves, the settings
   // are no longer that preset, and the row must not keep claiming they are.
@@ -27,11 +24,6 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
     onSettingsChange({ ...settings, ...DEFAULT_VOICE_SETTINGS })
   }
 
-  const handleSelectPreset = (item: unknown) => {
-    onSettingsChange(settingsFromPreset(item as VoicePreset))
-    setPresetPickerOpen(false)
-  }
-
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="flex flex-col gap-4 px-5 pb-6 pt-2">
@@ -39,7 +31,7 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
             delivery params, scene and tone all together). */}
         <PresetRow
           label={settings.presetLabel}
-          onOpen={() => setPresetPickerOpen(true)}
+          onOpen={onOpenPresetPicker}
           onClear={() => onSettingsChange({ ...settings, presetId: undefined, presetLabel: undefined })}
         />
 
@@ -129,13 +121,6 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
           </button>
         </div>
       </div>
-
-      <BankPicker
-        bankType="voices"
-        isOpen={presetPickerOpen}
-        onSelect={handleSelectPreset}
-        onClose={() => setPresetPickerOpen(false)}
-      />
     </div>
   )
 }
