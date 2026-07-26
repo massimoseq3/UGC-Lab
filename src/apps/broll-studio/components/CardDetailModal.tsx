@@ -940,13 +940,16 @@ export default function CardDetailModal(props: CardDetailModalProps) {
               onDeleteImage={handleDeleteImageTile}
               onDeleteVideo={handleDeleteVideoTile}
               onCopyPrompt={handleCopyPrompt}
-              onAnimateImage={(index) => {
+              // Image tab only — the Animate bar's whole job is to carry a still
+              // over to the Animate tab, so on Animate (and on Video) it points
+              // at the tab you're already on.
+              onAnimateImage={tab === 'image' ? (index) => {
                 const ref = cardState.images[index]?.imageUrl
                 if (ref) {
                   setAnimateFrameRef(ref)
                   setTab('animate')
                 }
-              }}
+              } : undefined}
               onRetryInFlight={handleRetryInFlight}
               onDismissInFlight={handleDismissInFlight}
             />
