@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import type { VoiceSettings } from '../types'
-import type { VoiceHistoryItem } from '../../../stores/types'
+import { settingsFromPreset } from '../types'
+import type { VoiceHistoryItem, VoicePreset } from '../../../stores/types'
 import SettingsView from './SettingsView'
 import VoicePickerView from './VoicePickerView'
+import PresetPickerView from './PresetPickerView'
 import HistoryView, { type PendingVoice } from './HistoryView'
 import HistoryDetailsView from './HistoryDetailsView'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -42,6 +44,7 @@ export default function RightPanel({
 }: RightPanelProps) {
   const [tab, setTab] = useState<Tab>('settings')
   const [voicePickerOpen, setVoicePickerOpen] = useState(false)
+  const [presetPickerOpen, setPresetPickerOpen] = useState(false)
 
   const openPicker = () => setVoicePickerOpen(true)
   const closePicker = () => setVoicePickerOpen(false)
@@ -68,6 +71,11 @@ export default function RightPanel({
     closePicker()
   }
 
+  const handleSelectPreset = (preset: VoicePreset) => {
+    onSettingsChange(settingsFromPreset(preset))
+    setPresetPickerOpen(false)
+  }
+
   const handleShowDetails = (item: VoiceHistoryItem) => {
     onShowDetails(item)
   }
@@ -77,7 +85,7 @@ export default function RightPanel({
   }
 
   // Tabs are hidden when a slide-over view (picker, details) owns the chrome.
-  const showTabs = !voicePickerOpen && !detailsItem
+  const showTabs = !voicePickerOpen && !presetPickerOpen && !detailsItem
 
   return (
     <div className="flex h-full flex-col">
@@ -103,6 +111,7 @@ export default function RightPanel({
             settings={settings}
             onSettingsChange={onSettingsChange}
             onOpenVoicePicker={openPicker}
+            onOpenPresetPicker={() => setPresetPickerOpen(true)}
           />
         ) : (
           <HistoryView
@@ -121,6 +130,15 @@ export default function RightPanel({
               selectedId={settings.voiceId}
               onSelect={handleSelectVoice}
               onClose={closePicker}
+            />
+          </div>
+        )}
+        {presetPickerOpen && (
+          <div className="absolute inset-0 bg-surface-1">
+            <PresetPickerView
+              selectedId={settings.presetId}
+              onSelect={handleSelectPreset}
+              onClose={() => setPresetPickerOpen(false)}
             />
           </div>
         )}
