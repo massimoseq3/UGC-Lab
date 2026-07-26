@@ -15,12 +15,14 @@ import {
   Film,
 } from 'lucide-react'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
+import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
 import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
 import type { PromptVariation, CardState, GeneratedImage, ReferenceImage, BatchVideoSettings } from '../types'
 import type { VideoHistoryItem, Product, Model, BRoll } from '../../../stores/types'
-import { enhanceVariationPrompt, generateNewVariation, startImageTask, finishImageTask, buildDialogueChainPreamble } from '../services/generateBroll'
+import { enhanceVariationPrompt, generateNewVariation, startImageTask, finishImageTask, buildDialogueChainPreamble, resolveImageModelId } from '../services/generateBroll'
+import { attachProductAngles } from '../services/productAngles'
 import { applyStyleToPrompt } from '../services/generateContinuous'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
 import { claimTask, releaseTask } from '../services/taskRegistry'
@@ -51,6 +53,9 @@ interface VariationCardProps {
   onDelete: () => void
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
+  // The product's extra bank angles, auto-attached behind the hero shot
+  // whenever the product ref is on. See attachProductAngles.
+  productAngleRefs?: ReferenceImage[]
   selectedProduct?: Product | null
   selectedModel?: Model | null
   selectedProductId?: string
@@ -99,6 +104,7 @@ export default function VariationCard(props: VariationCardProps) {
     onDelete,
     characterRef,
     productRef,
+    productAngleRefs,
     selectedProduct,
     selectedModel,
     selectedProductId,
@@ -203,13 +209,25 @@ export default function VariationCard(props: VariationCardProps) {
   // Attach script-level refs respecting the per-card on/off toggles
   // (cardState.refsCharacter / refsProduct), which the user controls via
   // the tick-circle button in each ReferenceSlotCard.
-  const buildCardRefs = (): ReferenceImage[] => {
+  //
+  // `modelId` is the model the request will really run on — it decides how many
+  // of the product's extra angles fit. Omitted (image gens) → the resolved image
+  // model. Nothing the user chose is ever dropped; only the auto angles are
+  // clamped.
+  const buildCardRefs = (modelId?: string): ReferenceImage[] => {
     const out: ReferenceImage[] = []
+    const productOn = !!productRef && cardState.refsProduct !== false
     if (characterRef && cardState.refsCharacter !== false) out.push(characterRef)
-    if (productRef && cardState.refsProduct !== false) out.push(productRef)
+    if (productOn) out.push(productRef!)
     // Any extra references the user attached in the modal ride along too.
     out.push(...extraRefs)
-    return out
+    return attachProductAngles({
+      manual: out,
+      angles: productOn ? productAngleRefs ?? [] : [],
+      modelId: modelId ?? resolveImageModelId(true),
+      // A chained DIALOGUE card prepends the previous cut at fire time.
+      reserved: chainRef ? 1 : 0,
+    })
   }
 
   // Push a new entry onto the prompt undo/redo stack, trimming any forward
@@ -718,7 +736,7 @@ export default function VariationCard(props: VariationCardProps) {
     videoModelId: string | undefined,
     batchSettings?: { resolution: string; durationSeconds: number },
   ) => {
-    const refs = buildCardRefs()
+    const refs = buildCardRefs(videoModelId)
     const referenceDataUris: string[] = []
     for (const r of refs) {
       const uri = await toDataUri(r.dataUrl)
@@ -995,6 +1013,14 @@ export default function VariationCard(props: VariationCardProps) {
                     <Film className="h-4 w-4" />
                   </TileActionButton>
                 )}
+                {coverKind === 'video' && resolvedVideoUrl && (
+                  <ExpandVideoButton
+                    videoUrl={resolvedVideoUrl}
+                    prompt={coverVideo?.prompt ?? cardState.editablePrompt}
+                    fileStem={`broll-scene-${sceneNumber}`}
+                    aspectRatio={coverVideo?.aspectRatio}
+                  />
+                )}
               </>
             )}
             <TileDeleteButton title="Delete variation" onDelete={onDelete} onArmedChange={setConfirmingDelete} />
@@ -1072,6 +1098,7 @@ export default function VariationCard(props: VariationCardProps) {
           initialTab={detailTab}
           characterRef={characterRef}
           productRef={productRef}
+          productAngleRefs={productAngleRefs}
           selectedProduct={selectedProduct}
           selectedModel={selectedModel}
           selectedProductId={selectedProductId}

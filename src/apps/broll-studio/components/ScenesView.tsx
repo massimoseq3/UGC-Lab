@@ -35,6 +35,7 @@ interface ScenesViewProps {
   onUpdateVoiceProfile?: (text: string) => void
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
+  productAngleRefs?: ReferenceImage[]
   selectedProduct?: Product | null
   selectedModel?: Model | null
   selectedProductId?: string
@@ -83,6 +84,7 @@ export default function ScenesView({
   onUpdateVoiceProfile,
   characterRef,
   productRef,
+  productAngleRefs,
   selectedProduct,
   selectedModel,
   selectedProductId,
@@ -717,6 +719,7 @@ export default function ScenesView({
             onDeleteVariation={onDeleteVariation}
             characterRef={characterRef}
             productRef={productRef}
+            productAngleRefs={productAngleRefs}
             selectedProduct={selectedProduct}
             selectedModel={selectedModel}
             selectedProductId={selectedProductId}
@@ -1029,6 +1032,7 @@ const VariationCardRow = memo(function VariationCardRow({
   onDeleteVariation,
   characterRef,
   productRef,
+  productAngleRefs,
   selectedProduct,
   selectedModel,
   selectedProductId,
@@ -1058,6 +1062,7 @@ const VariationCardRow = memo(function VariationCardRow({
   onDeleteVariation: (sceneNumber: number, variationId: string) => void
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
+  productAngleRefs?: ReferenceImage[]
   selectedProduct?: Product | null
   selectedModel?: Model | null
   selectedProductId?: string
@@ -1101,6 +1106,7 @@ const VariationCardRow = memo(function VariationCardRow({
       onDelete={onDelete}
       characterRef={characterRef}
       productRef={productRef}
+      productAngleRefs={productAngleRefs}
       selectedProduct={selectedProduct}
       selectedModel={selectedModel}
       selectedProductId={selectedProductId}
@@ -1132,6 +1138,7 @@ function SceneSection({
   onDeleteVariation,
   characterRef,
   productRef,
+  productAngleRefs,
   selectedProduct,
   selectedModel,
   selectedProductId,
@@ -1161,6 +1168,7 @@ function SceneSection({
   onDeleteVariation: (sceneNumber: number, variationId: string) => void
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
+  productAngleRefs?: ReferenceImage[]
   selectedProduct?: Product | null
   selectedModel?: Model | null
   selectedProductId?: string
@@ -1259,6 +1267,7 @@ function SceneSection({
               onDeleteVariation={onDeleteVariation}
               characterRef={characterRef}
               productRef={productRef}
+              productAngleRefs={productAngleRefs}
               selectedProduct={selectedProduct}
               selectedModel={selectedModel}
               selectedProductId={selectedProductId}

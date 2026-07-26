@@ -11,6 +11,7 @@ import { isAssetRef, getAsBase64 } from '../../../utils/assetStore'
 import { finishImageAssetTask } from '../../../utils/imageTask'
 import { useBankStore } from '../../../stores/bankStore'
 import { withIphoneRealism } from './realism'
+import { countProductAngles } from './productAngles'
 import { styleBriefFor, styleUsesRealism } from './generateContinuous'
 
 function getChatEndpoint(): { apiKey: string; endpoint: string } {
@@ -481,7 +482,18 @@ export function buildReferencePreamble(refs: ReferenceImage[]): string {
   if (hasCharacter) matchParts.push("the character's face, hair, skin tone, and wardrobe exactly to the character reference")
   if (hasProduct) matchParts.push("the product's shape, label text, and colours exactly to the product reference")
   const matchClause = matchParts.length ? `Match ${matchParts.join(', and ')}. ` : ''
-  return `REFERENCE USAGE — The attached image(s) are appearance references only. ${matchClause}Do NOT copy the reference's framing, crop, pose, camera angle, distance, or background — the composition is defined entirely by the scene description below. Build a new shot from scratch.`
+  return `REFERENCE USAGE — The attached image(s) are appearance references only. ${matchClause}${productAnglesClause(refs)}Do NOT copy the reference's framing, crop, pose, camera angle, distance, or background — the composition is defined entirely by the scene description below. Build a new shot from scratch.`
+}
+
+// One object, several shots. The product's extra bank angles ride along with the
+// hero shot automatically (attachProductAngles), and without this line a model
+// handed three photos of the same bar renders three bars — or a multipack. It
+// also names what the angles are FOR: the unwrapped, opened, back-of-pack states
+// the hero shot can't show, which is exactly what a "she bites into it" scene
+// needs to get right.
+export function productAnglesClause(refs: ReferenceImage[]): string {
+  if (countProductAngles(refs) === 0) return ''
+  return 'Several product photos are attached: they are ONE single product shot from different angles and in different states (in and out of its packaging, opened, from the back) — never several products, never a multipack. Render only the state the scene below calls for, and use the other photos to get that state right. '
 }
 
 // The DIALOGUE chain preamble. A talking-to-camera card generates with the
@@ -498,7 +510,7 @@ export function buildReferencePreamble(refs: ReferenceImage[]): string {
 export function buildDialogueChainPreamble(refs: ReferenceImage[]): string {
   const hasProduct = refs.some((r) => r.label === 'product')
   const productClause = hasProduct
-    ? " Match the product's shape, label text, and colours exactly to the product reference image."
+    ? ` Match the product's shape, label text, and colours exactly to the product reference image. ${productAnglesClause(refs)}`.trimEnd()
     : ''
   return `REFERENCE USAGE — The FIRST attached image is the PREVIOUS talking-to-camera shot from this same ad, filmed moments earlier in one continuous take. Recreate its world exactly: the same character with the same face, hair, make-up and wardrobe, the same room and the same background objects in the same places, the same time of day and the same light from the same direction, and the same camera position, height, distance and framing. Nothing has been restaged between the two shots — the character has not changed clothes, moved house, or relocated within the room.
 

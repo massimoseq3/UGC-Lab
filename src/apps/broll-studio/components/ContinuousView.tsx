@@ -54,7 +54,8 @@ import type {
 } from '../types'
 import type { Product, Model, VideoHistoryItem, BRoll } from '../../../stores/types'
 import { createDefaultContinuousFrameState, createDefaultContinuousClipState } from '../cardState'
-import { startImageTask, finishImageTask } from '../services/generateBroll'
+import { startImageTask, finishImageTask, resolveImageModelId } from '../services/generateBroll'
+import { attachProductAngles, countProductAngles } from '../services/productAngles'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
 import { claimTask, releaseTask } from '../services/taskRegistry'
 import {
@@ -78,6 +79,7 @@ import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { TileActionStack, TileActionButton } from '../../../components/tileActions'
+import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
 import { getModel, getDefaultModel, snapVideoDurationUp, estimateCredits, formatCredits, officialSavingsPercent, type VideoMode, type ImageResolution } from '../../../utils/models'
@@ -105,6 +107,7 @@ interface ContinuousViewProps {
   error?: string | null
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
+  productAngleRefs?: ReferenceImage[]
   selectedModel?: Model | null
   selectedProduct?: Product | null
   // Plain-text context strings — ground the per-frame Enhance / Regenerate.
@@ -136,6 +139,7 @@ export default function ContinuousView({
   error,
   characterRef,
   productRef,
+  productAngleRefs,
   selectedModel,
   selectedProduct,
   productContext,
@@ -412,12 +416,20 @@ export default function ContinuousView({
       )
     }
     const cardExtras = extraRefs[key] ?? []
-    const refs: ReferenceImage[] = [
-      ...(chainRefUrl ? [{ dataUrl: chainRefUrl, label: 'style' }] : []),
-      ...(card.refsCharacter && characterRef ? [characterRef] : []),
-      ...(card.refsProduct && productRef ? [productRef] : []),
-      ...cardExtras,
-    ]
+    const productOn = !!(card.refsProduct && productRef)
+    const refs: ReferenceImage[] = attachProductAngles({
+      manual: [
+        ...(chainRefUrl ? [{ dataUrl: chainRefUrl, label: 'style' }] : []),
+        ...(card.refsCharacter && characterRef ? [characterRef] : []),
+        ...(productOn ? [productRef!] : []),
+        ...cardExtras,
+      ],
+      // The extra angles show the product in the states the hero shot can't —
+      // out of the box, opened, from the back — and fill whatever slots the
+      // image model has left.
+      angles: productOn ? productAngleRefs ?? [] : [],
+      modelId: resolveImageModelId(true),
+    })
     // A product exists in the bank but this frame is not attaching it — the
     // beat criticises the category, so the preamble has to name the exclusion
     // out loud. Otherwise a chained previous keyframe carries the real
@@ -427,7 +439,8 @@ export default function ContinuousView({
       ? buildContinuousPreamble({
           chain: !!chainRefUrl,
           character: !!(card.refsCharacter && characterRef),
-          product: !!(card.refsProduct && productRef),
+          product: productOn,
+          productAngles: countProductAngles(refs),
           extras: cardExtras.length,
           productExcluded,
         })
@@ -1511,6 +1524,7 @@ export default function ContinuousView({
           chainImageRef={openFrame.index > 1 ? keyframeRef(openFrame.index - 1) : undefined}
           characterRef={characterRef}
           productRef={productRef}
+          productAngleRefs={productAngleRefs}
           selectedModel={selectedModel}
           selectedProduct={selectedProduct}
           extraRefs={extraRefs[openFrameKey] ?? []}
@@ -2345,6 +2359,14 @@ function ClipCard({
             >
               <Film className="h-4 w-4" />
             </TileActionButton>
+            {videoUrl && (
+              <ExpandVideoButton
+                videoUrl={videoUrl}
+                prompt={currentVideo.prompt}
+                fileStem={`continuous-clip-${sceneIndex}`}
+                aspectRatio={currentVideo.aspectRatio}
+              />
+            )}
           </TileActionStack>
         )}
 

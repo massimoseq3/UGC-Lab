@@ -112,6 +112,8 @@ export function buildContinuousPreamble(opts: {
   chain: boolean
   character: boolean
   product: boolean
+  // How many of the product's extra bank angles ride along with the hero shot.
+  productAngles?: number
   extras: number
   // True when a product reference EXISTS but is deliberately withheld from this
   // frame — the beat criticises the category, so the item on screen has to be an
@@ -137,6 +139,12 @@ export function buildContinuousPreamble(opts: {
   }
   if (opts.product) {
     parts.push("Match the product's shape, label text, and colours exactly to the product reference image, translated into the sequence's art style.")
+    if ((opts.productAngles ?? 0) > 0) {
+      // One object, several shots — see productAnglesClause in generateBroll.
+      parts.push(
+        'Several product photos are attached: they are ONE single product shot from different angles and in different states (in and out of its packaging, opened, from the back) — never several products, never a multipack. Render only the state the scene below calls for, and use the other photos to get that state right.',
+      )
+    }
   }
   if (opts.productExcluded) {
     parts.push(
