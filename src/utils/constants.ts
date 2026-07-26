@@ -69,7 +69,7 @@ export const BANK_CONFIG: Record<BankType, { label: string; icon: ElementType; a
   scripts: { label: 'Scripts', icon: FileText, accent: '#24365A' },
   voices: { label: 'Voices', icon: Mic, accent: '#007AFF' },
   brolls: { label: 'B-Rolls', icon: Film, accent: '#7165FF' },
-  styles: { label: 'Styles', icon: Palette, accent: '#0D9488' },
+  styles: { label: 'Visual Styles', icon: Palette, accent: '#0D9488' },
 }
 
 export function getAppConfig(appId: string): AppConfig | undefined {

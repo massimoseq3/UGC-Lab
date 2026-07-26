@@ -12,6 +12,8 @@ import { useIsDesktop } from '../hooks/useBreakpoint'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import { sortByOrder, starredFirst, SORT_OPTIONS_WITH_NAME, SORT_OPTIONS_DATE_ONLY, type SortOrder } from '../apps/finder/bankSort'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
+import DayPill from './DayPill'
+import { groupByDay, sectionLabel } from '../utils/history'
 
 type BankItem = AnyBankItem
 
@@ -162,6 +164,69 @@ export default function BankPicker({
     // picker is where pinned assets pay off.
     return starredFirst(sortByOrder(filtered, sort, nameOf))
   }, [filtered, sort, sortOptions, currentBankType])
+
+  // B-Rolls are day-grouped under a date pill, exactly as the Bank browser
+  // shows them — a still is recognised by when it was shot, and the picker is
+  // where you go looking for "the one from yesterday". `groupByDay` is
+  // newest-day-first; flip it when the user sorts oldest-first.
+  const brollDayGroups = useMemo(() => {
+    if (currentBankType !== 'brolls') return null
+    const groups = groupByDay(sorted, (item) => (item as BRoll).createdAt)
+    return sort === 'oldest' ? groups.reverse() : groups
+  }, [sorted, sort, currentBankType])
+
+  // Everything with a thumbnail (influencers, products, b-rolls, scripts) packs
+  // into the same dense grid the main Bank uses — `grid-flow-row-dense`
+  // backfills the hole a wide card leaves. Voices are text rows, so they stay
+  // single-column. Three columns only from `md` — that's the breakpoint where
+  // the panel becomes the fixed 560px slide-over; below it the sheet is
+  // full-width on a phone, where three tiles would be unreadable.
+  const gridClass =
+    currentBankType === 'voices'
+      ? 'flex flex-col gap-2'
+      : 'grid grid-flow-row-dense grid-cols-2 items-start gap-2 md:grid-cols-3'
+
+  const renderCard = (item: BankItem) => {
+    const isSelected = multiSelect && selectedIds.includes(item.id)
+    // A b-roll still or character sheet spans two columns only when it is
+    // actually wide (a 16:9 frame or turnaround, unreadable squeezed into one
+    // portrait-width column). Sheets render in whatever aspect the character was
+    // generated at, so a 9:16 sheet stays a normal one-column tile like every
+    // other card — measured on load rather than assumed from the sheetImage stamp.
+    const isWide =
+      (currentBankType === 'brolls' || currentBankType === 'models') && landscapeIds.has(item.id)
+    return (
+      <div key={item.id} className={`relative ${isWide ? 'col-span-2' : ''}`}>
+        <BankItemCard
+          bankType={currentBankType}
+          item={item}
+          onClick={() => handleSelect(item)}
+          selected={isSelected}
+          accentColor={accentColor}
+          onLandscape={
+            currentBankType === 'brolls' || currentBankType === 'models'
+              ? (landscape) =>
+                  setLandscapeIds((prev) => {
+                    if (prev.has(item.id) === landscape) return prev
+                    const next = new Set(prev)
+                    if (landscape) next.add(item.id)
+                    else next.delete(item.id)
+                    return next
+                  })
+              : undefined
+          }
+        />
+        {isSelected && (
+          <div
+            className="pointer-events-none absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full text-white"
+            style={{ backgroundColor: accentColor }}
+          >
+            <Check className="h-3 w-3" strokeWidth={3} />
+          </div>
+        )}
+      </div>
+    )
+  }
 
   // Brolls don't have a Finder-form create path (no useful empty record to
   // create) — they come from generation flows. Other bank types let the
@@ -347,68 +412,17 @@ export default function BankPicker({
                 {search ? 'Try a different search' : 'Add one below to get started'}
               </span>
             </div>
-          ) : (
-            <div
-              className={
-                // Everything with a thumbnail (influencers, products, b-rolls,
-                // scripts) packs into the same dense grid the main Bank uses —
-                // `grid-flow-row-dense` backfills the hole a wide card leaves.
-                // Voices are text rows, so they stay single-column.
-                // Three columns only from `md` — that's the breakpoint where the
-                // panel becomes the fixed 560px slide-over; below it the sheet is
-                // full-width on a phone, where three tiles would be unreadable.
-                currentBankType === 'voices'
-                  ? 'flex flex-col gap-2'
-                  : 'grid grid-flow-row-dense grid-cols-2 items-start gap-2 md:grid-cols-3'
-              }
-            >
-              {sorted.map((item) => {
-                const isSelected = multiSelect && selectedIds.includes(item.id)
-                // A b-roll still or character sheet spans two columns only when it
-                // is actually wide (a 16:9 frame or turnaround, unreadable squeezed
-                // into one portrait-width column). Sheets render in whatever aspect
-                // the character was generated at, so a 9:16 sheet stays a normal
-                // one-column tile like every other card — measured on load rather
-                // than assumed from the sheetImage stamp.
-                const isWide =
-                  (currentBankType === 'brolls' || currentBankType === 'models') &&
-                  landscapeIds.has(item.id)
-                return (
-                  <div
-                    key={item.id}
-                    className={`relative ${isWide ? 'col-span-2' : ''}`}
-                  >
-                    <BankItemCard
-                      bankType={currentBankType}
-                      item={item}
-                      onClick={() => handleSelect(item)}
-                      selected={isSelected}
-                      accentColor={accentColor}
-                      onLandscape={
-                        currentBankType === 'brolls' || currentBankType === 'models'
-                          ? (landscape) =>
-                              setLandscapeIds((prev) => {
-                                if (prev.has(item.id) === landscape) return prev
-                                const next = new Set(prev)
-                                if (landscape) next.add(item.id)
-                                else next.delete(item.id)
-                                return next
-                              })
-                          : undefined
-                      }
-                    />
-                    {isSelected && (
-                      <div
-                        className="pointer-events-none absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full text-white"
-                        style={{ backgroundColor: accentColor }}
-                      >
-                        <Check className="h-3 w-3" strokeWidth={3} />
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+          ) : brollDayGroups ? (
+            <div className="flex flex-col">
+              {brollDayGroups.map(([dayTs, dayItems]) => (
+                <div key={dayTs}>
+                  <DayPill label={sectionLabel(dayTs)} />
+                  <div className={gridClass}>{dayItems.map(renderCard)}</div>
+                </div>
+              ))}
             </div>
+          ) : (
+            <div className={gridClass}>{sorted.map(renderCard)}</div>
           )}
         </div>
 

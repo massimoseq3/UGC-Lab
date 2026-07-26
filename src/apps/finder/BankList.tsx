@@ -573,7 +573,7 @@ export default function BankList({ bankType, onEdit, onAdd, sort, modelFilter = 
   }
 
   if (bankType === 'styles') {
-    if (styles.length === 0) return <EmptyState icon={Palette} label="styles" singular="style" onAdd={onAdd} />
+    if (styles.length === 0) return <EmptyState icon={Palette} label="visual styles" singular="visual style" onAdd={onAdd} />
     return <StylesList items={styles} onEdit={onEdit} onDelete={deleteStyle} sort={sort} />
   }
 
@@ -723,7 +723,7 @@ function EmptyState({ icon: Icon, label, singular, onAdd }: { icon: React.Elemen
         className="flex items-center gap-1.5 rounded-full bg-ink/[0.07] px-4 py-2 text-sm font-medium text-ink-300 transition-colors hover:bg-ink/10"
       >
         <Plus className="h-4 w-4" />
-        Add Your First {singular.charAt(0).toUpperCase() + singular.slice(1)}
+        Add Your First {singular.replace(/\b\w/g, (c) => c.toUpperCase())}
       </button>
     </div>
   )

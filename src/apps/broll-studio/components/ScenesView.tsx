@@ -1224,7 +1224,7 @@ function SceneSection({
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
           >
             <Images className="h-3.5 w-3.5" />
-            Images
+            Generate Images
           </button>
           <button
             type="button"
@@ -1233,7 +1233,7 @@ function SceneSection({
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
           >
             <VideoIcon className="h-3.5 w-3.5" />
-            Videos
+            Generate Videos
           </button>
         </div>
       </div>

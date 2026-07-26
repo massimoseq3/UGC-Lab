@@ -187,7 +187,8 @@ Single full-width column: a header toolbar over a scrolling card area.
 ### Header toolbar (`Finder.tsx:215`, `lg:justify-between`)
 
 - **Leading (left):** bank-type tabs, left→right: **Products · Characters ·
-  Scripts · Voices · B-Rolls** (each with a count badge). `Finder.tsx:217`.
+  Scripts · Voices · B-Rolls · Visual Styles** (each with a count badge).
+  `Finder.tsx:217`.
 - **Trailing (right):** in order — **Sort** control (pill+chevron, e.g. "Newest
   first"; only when the active bank has items) → **Bulk add** (Products bank only)
   → **Add** (filled pill, always). `Finder.tsx:229`–`262`.
@@ -348,7 +349,7 @@ Top tabs: **Settings / History**. Settings (`SettingsView.tsx`), top→bottom:
    Promo·Hype / Deadpan).
 3. **Pace** + **Accent** dropdowns, side by side.
 4. **Expressiveness** slider (the `temperature` param, Focused → Creative).
-5. Collapsible **Scene** / **Tone / context** textareas, both optional.
+5. **Tone / context** then **Scene** textareas, both tagged with an `OPTIONAL` pill.
 6. **Reset values** link.
 
 The engine is **Gemini 3.1 Flash TTS**, not ElevenLabs — the model name shows on
