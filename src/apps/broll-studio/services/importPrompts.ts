@@ -94,8 +94,9 @@ function importLine(text: string, ctx: ImportContext): ImportOutcome {
 
   const promptCount = scenes.reduce((n, s) => n + s.variations.length, 0)
   const notes: string[] = []
-  // A dialogue import is expected to carry one more prompt per scene (the
-  // talking card on top of the three b-roll ideas), so the "thin" bar moves.
+  // Both deliveries expect three prompts per scene — dialogue just spends the
+  // first slot on the talking card. Read through the helper anyway, so the bar
+  // follows the count if either mode's shape changes again.
   const expected = variationsForDelivery(ctx.lineDelivery)
   const thin = scenes.filter((s) => s.variations.length < expected).map((s) => s.number)
   if (thin.length > 0) {

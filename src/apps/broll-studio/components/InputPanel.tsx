@@ -376,9 +376,9 @@ export default function InputPanel({
         <div className="mb-2.5 flex flex-col gap-2">
 
           {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
-              card silent; "With Dialogue" adds a fourth, talking-to-camera card
-              per scene on top of the three silent b-roll ideas. Default first,
-              same as every other toggle in the app. */}
+              card silent; "With Dialogue" spends the first of the scene's three
+              cards on a talking-to-camera shot, leaving two silent b-roll ideas.
+              Default first, same as every other toggle in the app. */}
           {mode === 'line' && (
             <SegmentedToggle<BrollDelivery>
               className="h-12 !p-1"

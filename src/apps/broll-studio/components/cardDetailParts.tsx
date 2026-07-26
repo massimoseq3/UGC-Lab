@@ -65,8 +65,10 @@ export interface ModalGalleryProps {
   onDeleteVideo: (index: number) => void
   // Copy a tile's prompt to the clipboard.
   onCopyPrompt: (text: string) => void
-  // Open the Animate tab with this image set as the start frame.
-  onAnimateImage: (index: number) => void
+  // Open the Animate tab with this image set as the start frame. Omitted on any
+  // tab but Image: the bar is the way OUT of the Image tab, so offering it while
+  // the Animate tab is already open (or on Video) is a button to where you are.
+  onAnimateImage?: (index: number) => void
   // Re-fire / drop a failed in-flight entry (one whose `error` is set).
   onRetryInFlight: (id: string, isVideo: boolean) => void
   onDismissInFlight: (id: string, isVideo: boolean) => void
@@ -223,7 +225,7 @@ export function ModalGallery({
                       onSave={() => onSaveImage(entry.idx)}
                       onDelete={() => onDeleteImage(entry.idx)}
                       onCopyPrompt={() => onCopyPrompt(entry.prompt)}
-                      onAnimate={() => onAnimateImage(entry.idx)}
+                      onAnimate={onAnimateImage ? () => onAnimateImage(entry.idx) : undefined}
                     />
                   </div>
                 )

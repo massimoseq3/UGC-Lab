@@ -42,8 +42,9 @@ function sentenceCount(scriptText: string): number {
 export function estimatePromptCredits(
   mode: BrollMode,
   scriptText: string,
-  // Line-by-Line only — "With Dialogue" writes a fourth (talking) prompt per
-  // scene, so it costs a third more output than the silent delivery.
+  // Line-by-Line only. Both deliveries write three prompts per scene, so this
+  // costs the same either way — kept as an input because the count comes from
+  // variationsForDelivery, which is where a future change would land.
   delivery: BrollDelivery = 'silent',
 ): number | null {
   const chatModelId = getDefaultModel('broll-studio', 'chat')?.id
