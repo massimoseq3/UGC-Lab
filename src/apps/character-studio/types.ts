@@ -28,6 +28,9 @@ export interface InFlightCharacterGen {
   // the edit modal) so the finished row rejoins that character's strip — and so
   // the modal can re-render this tile after a close + reopen.
   lineageId?: string
+  // Name of the visual style the edit modal rendered this in, stamped onto the
+  // finished history row (label only — see CharacterHistoryItem.styleName).
+  styleName?: string
 }
 
 // Everything a caller needs to kick off a generation through CharacterStudio's
@@ -46,6 +49,8 @@ export interface LaunchGenOptions {
   // built straight off the form.
   direction?: string
   extraReferenceUrls?: string[]
+  // The picked visual style's label, when it isn't the default UGC Realism.
+  styleName?: string
   edit?: {
     instruction: string
     baseImageRef: string
