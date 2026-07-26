@@ -5,8 +5,8 @@ import { useBankStore } from '../../stores/bankStore'
 import type { Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
 import type { BrollResult, PromptVariation, ReferenceImage, VariationTag, VariationRefs, CardState, BrollMode, BrollDelivery, ContinuousResult, ContinuousConcept, ContinuousSelection, ContinuousFrameCardState, ContinuousClipCardState } from './types'
 import { generateBroll } from './services/generateBroll'
-import { productAngleRefsFrom } from './services/productAngles'
-import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
+import { productPhotosOf } from './services/productAngles'
+import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, styleBriefFor, styleUsesRealism, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
 import InputPanel from './components/InputPanel'
 import ImportPromptsModal from './components/ImportPromptsModal'
 import type { ImportContext, ImportParsed } from './services/importPrompts'
@@ -498,14 +498,18 @@ export default function BrollStudio() {
     () => (selectedProduct?.productImage ? { dataUrl: selectedProduct.productImage, label: 'product' } : undefined),
     [selectedProduct?.productImage],
   )
-  // The product's extra bank angles (box open, bar out of the wrapper, the
-  // label). They ride along with the hero shot on every gen that attaches the
-  // product, filling whatever reference slots the model has left — see
-  // attachProductAngles. Without them a "she bites into it" scene renders the
-  // bar still sealed, because the sealed wrapper is all the model was shown.
-  const productAngleRefs = useMemo<ReferenceImage[]>(
-    () => productAngleRefsFrom(selectedProduct?.extraImages),
-    [selectedProduct?.extraImages],
+  // Every photo the bank holds for this product, hero first: the packshot plus
+  // the extra angles (box open, bar out of the wrapper, the label). The
+  // storyboard sees all of them and names the ONE each shot needs, and the card
+  // attaches that one — see productRefsForSelection. Attaching them all is what
+  // put two bars in a shot of someone eating one.
+  const productPhotos = useMemo<string[]>(
+    () => productPhotosOf(selectedProduct),
+    [selectedProduct],
+  )
+  const productPhotoRefs = useMemo<ReferenceImage[]>(
+    () => productPhotos.map((dataUrl) => ({ dataUrl, label: 'product' })),
+    [productPhotos],
   )
   // Combined ref bundle passed to the scene-generation LLM call — gives it
   // visibility into which reference images the user has selected so it can
@@ -541,6 +545,7 @@ export default function BrollStudio() {
         productContext,
         modelContext,
         additionalContext,
+        productPhotos: productPhotoRefs,
       })
       // Same commit discipline as the other modes: only rotate the session
       // once a storyboard actually landed.
@@ -609,6 +614,38 @@ export default function BrollStudio() {
     }
   }
 
+  // Re-style the session that's already on screen: same storyboard, new look.
+  //
+  // The style block rides OUTSIDE the editable card prompts (it's appended at
+  // fire time), so switching looks costs nothing but a re-render — which is the
+  // whole point: shoot the ad you liked again in claymation. Only the result's
+  // style stamp moves; every prompt, reference and pick stays exactly as it is,
+  // and the media already generated stays too (the member regenerates whatever
+  // they want in the new look).
+  //
+  // It also re-stamps the session, so the history row's style pill names the
+  // look the cards would render in now rather than the one they were storyboarded
+  // with. No-ops when there's nothing generated yet.
+  const restyleSession = (styleId: string, brief: string | null, name: string | null) => {
+    if (!result && !continuousResult) return
+    const trimmedBrief = brief?.trim() || undefined
+    const style = styleBriefFor({ styleId, styleBrief: trimmedBrief })
+    const realism = styleUsesRealism(styleId, !!trimmedBrief)
+    setSessionStyleId(styleId)
+    setSessionStyleBrief(brief)
+    setSessionStyleName(name)
+    setResult((prev) => (prev ? {
+      ...prev,
+      style,
+      realism,
+      styleId,
+      styleBrief: trimmedBrief,
+      styleName: trimmedBrief ? name?.trim() || undefined : undefined,
+    } : prev))
+    setContinuousResult((prev) => (prev ? { ...prev, style, realism, styleId } : prev))
+    useAppStore.getState().addToast('Style updated — regenerate any card to render it in the new look', 'success')
+  }
+
   // A preset and a custom brief are mutually exclusive — picking either clears
   // the other, so `styleBriefFor` never has to arbitrate between them.
   const handlePickPresetStyle = (id: string) => {
@@ -616,6 +653,7 @@ export default function BrollStudio() {
     setContinuousStyleBrief(null)
     setContinuousStyleBankId(null)
     setContinuousStyleName(null)
+    restyleSession(id, null, null)
   }
 
   const handleUseCustomStyle = ({ brief, name, bankId }: StyleSelection) => {
@@ -625,6 +663,7 @@ export default function BrollStudio() {
     // A custom brief only exists because the user built or picked one — that's
     // as explicit a choice as tapping a preset.
     setStyleChosen(true)
+    restyleSession(resolvedStyleId, brief, name)
   }
 
   const handleClearStyle = () => {
@@ -703,6 +742,7 @@ export default function BrollStudio() {
     styleName: continuousStyleName ?? undefined,
     lineDelivery,
     continuousModelId,
+    productPhotoCount: productPhotos.length,
   }
 
   // Commit a parsed import as if it had just been generated: fresh session,
@@ -746,6 +786,7 @@ export default function BrollStudio() {
         productContext,
         modelContext,
         referenceImages,
+        productPhotos: productPhotoRefs,
         styleId: resolvedStyleId,
         styleBrief: continuousStyleBrief ?? undefined,
         styleName: continuousStyleName ?? undefined,
@@ -920,7 +961,8 @@ export default function BrollStudio() {
           onUpdateVoiceProfile={handleUpdateVoiceProfile}
           characterRef={characterRef}
           productRef={productRef}
-          productAngleRefs={productAngleRefs}
+          productPhotos={productPhotos}
+          onChangeStyle={() => setStyleModalOpen(true)}
           selectedProduct={selectedProduct}
           selectedModel={selectedModel}
           selectedProductId={selectedProduct?.id ?? undefined}

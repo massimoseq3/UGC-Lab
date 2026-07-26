@@ -11,7 +11,8 @@ import { isAssetRef, getAsBase64 } from '../../../utils/assetStore'
 import { finishImageAssetTask } from '../../../utils/imageTask'
 import { useBankStore } from '../../../stores/bankStore'
 import { withIphoneRealism } from './realism'
-import { countProductAngles } from './productAngles'
+import { countProductAngles, parsePhotoPick, productPhotoDataUris, productPhotoInstruction } from './productAngles'
+import { extractBlock, extractNumberedBlock } from './xmlBlocks'
 import { styleBriefFor, styleUsesRealism } from './generateContinuous'
 
 function getChatEndpoint(): { apiKey: string; endpoint: string } {
@@ -253,8 +254,12 @@ This one voice is shared by every dialogue clip in the ad, so it must be self-co
 // The system instruction the scene call runs on, with the dialogue override
 // appended in "With Dialogue" delivery. Exported so the Import-prompts brief
 // hands an outside model the EXACT same rules — one source, no drift.
-export function brollSystemInstruction(delivery: BrollDelivery): string {
-  return delivery === 'dialogue' ? SYSTEM_INSTRUCTION + DIALOGUE_DELIVERY_ADDENDUM : SYSTEM_INSTRUCTION
+// `productPhotoCount` is how many photos the product bank row holds. More than
+// one and the storyboard is shown all of them and asked to pick per variation
+// (see productPhotoInstruction) — one photo can never render two products.
+export function brollSystemInstruction(delivery: BrollDelivery, productPhotoCount = 0): string {
+  const base = delivery === 'dialogue' ? SYSTEM_INSTRUCTION + DIALOGUE_DELIVERY_ADDENDUM : SYSTEM_INSTRUCTION
+  return productPhotoCount > 1 ? base + productPhotoInstruction(productPhotoCount, 'variation') : base
 }
 
 // The user half of the scene call. Same reason for being exported.
@@ -283,10 +288,20 @@ export async function generateBroll(input: BrollInput): Promise<BrollResult> {
 
   const withDialogue = input.delivery === 'dialogue'
   const prompt = buildBrollUserPrompt(input)
-  const systemInstruction = brollSystemInstruction(input.delivery)
+  // The product's photos ride along as vision inputs when there's more than
+  // one, so the storyboard can name the state each shot needs rather than
+  // having every angle attached to every card.
+  const photoUris = await productPhotoDataUris(input.productPhotos)
+  const systemInstruction = brollSystemInstruction(input.delivery, photoUris.length)
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: systemInstruction }] },
-    { role: 'user', content: [{ type: 'text', text: prompt }] },
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: prompt },
+        ...photoUris.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
+      ],
+    },
   ]
   const responseText = await kieChatCompletions(apiKey, endpoint, messages)
 
@@ -328,10 +343,14 @@ export function extractVoiceProfile(responseText: string): string | undefined {
 // parser the live call uses — an import can't drift from a generation.
 export function parseScenes(responseText: string, delivery: BrollDelivery = 'silent'): Scene[] {
   const scenes: Scene[] = []
-  const sceneRegex = /<SCENE>([\s\S]*?)<\/SCENE>/g
-  const lineRegex = /<LINE>([\s\S]*?)<\/LINE>/
-  const positionRegex = /<POSITION>([\s\S]*?)<\/POSITION>/
-  const visibilityRegex = /<VISIBILITY>([\s\S]*?)<\/VISIBILITY>/
+  // Scene blocks, tolerant of a missing </SCENE>: a scene runs to its own
+  // closing tag or, failing that, to the start of the next one. Dropping the
+  // last scene of a storyboard because the model didn't close the envelope
+  // costs the member a line of their ad.
+  const sceneBlocks = responseText
+    .split(/<SCENE>/i)
+    .slice(1)
+    .map((chunk) => chunk.split(/<\/SCENE>/i)[0])
 
   // Every variation carries the LLM's per-line role pick in <TAG>; these
   // defaults only apply when the tag is missing or unrecognised. In dialogue
@@ -342,13 +361,11 @@ export function parseScenes(responseText: string, delivery: BrollDelivery = 'sil
     ? ['DIALOGUE', 'ACTION', 'EMOTIONAL', 'PRODUCT']
     : ['ACTION', 'EMOTIONAL', 'PRODUCT', 'POV']
 
-  let match
   let number = 1
-  while ((match = sceneRegex.exec(responseText)) !== null) {
-    const block = match[1]
-    const scriptLine = block.match(lineRegex)?.[1]?.trim() || ''
-    const positionRaw = block.match(positionRegex)?.[1]?.trim().toLowerCase()
-    const visibilityRaw = block.match(visibilityRegex)?.[1]?.trim().toLowerCase()
+  for (const block of sceneBlocks) {
+    const scriptLine = extractBlock(block, 'LINE') ?? ''
+    const positionRaw = extractBlock(block, 'POSITION')?.toLowerCase()
+    const visibilityRaw = extractBlock(block, 'VISIBILITY')?.toLowerCase()
 
     const position = parsePosition(positionRaw)
     const productVisible = visibilityRaw === 'yes'
@@ -359,14 +376,15 @@ export function parseScenes(responseText: string, delivery: BrollDelivery = 'sil
 
     const variations: PromptVariation[] = []
     for (let i = 1; i <= MAX_PARSED_VARIATIONS; i++) {
-      const varRegex = new RegExp(`<VAR_${i}>([\\s\\S]*?)<\\/VAR_${i}>`)
-      const varBlock = block.match(varRegex)?.[1]
+      // Tolerant: a VAR block missing its closing tag still yields its prompt
+      // rather than vanishing, which is what left scenes showing two cards.
+      const varBlock = extractNumberedBlock(block, 'VAR', i)
       if (!varBlock) continue
 
-      const tagRaw = varBlock.match(/<TAG>([\s\S]*?)<\/TAG>/)?.[1]?.trim()
-      const labelRaw = varBlock.match(/<LABEL>([\s\S]*?)<\/LABEL>/)?.[1]?.trim()
-      const refsRaw = varBlock.match(/<REFS>([\s\S]*?)<\/REFS>/)?.[1]?.trim().toLowerCase()
-      const promptRaw = varBlock.match(/<PROMPT>([\s\S]*?)<\/PROMPT>/)?.[1]?.trim()
+      const tagRaw = extractBlock(varBlock, 'TAG') ?? undefined
+      const labelRaw = extractBlock(varBlock, 'LABEL') ?? undefined
+      const refsRaw = extractBlock(varBlock, 'REFS')?.toLowerCase()
+      const promptRaw = extractBlock(varBlock, 'PROMPT') ?? undefined
 
       // Every variation honours its emitted role, falling back to the
       // positional default when the tag is missing or unrecognised.
@@ -379,23 +397,28 @@ export function parseScenes(responseText: string, delivery: BrollDelivery = 'sil
         .replace(/<TAG>[\s\S]*?<\/TAG>/g, '')
         .replace(/<LABEL>[\s\S]*?<\/LABEL>/g, '')
         .replace(/<REFS>[\s\S]*?<\/REFS>/g, '')
+        .replace(/<PHOTOS>[\s\S]*?<\/PHOTOS>/g, '')
         .replace(/<\/?PROMPT>/g, '')
         .trim()
       // Final belt-and-braces — wipe any straggler control tags. Cheap to
       // run, catches misformed LLM output without touching legitimate prose.
       const cleanPrompt = promptText
-        .replace(/<\/?(LABEL|REFS|PROMPT|VAR_\d+|TAG|POSITION|VISIBILITY)>/g, '')
+        .replace(/<\/?(LABEL|REFS|PHOTOS|PROMPT|VAR_\d+|TAG|POSITION|VISIBILITY)>/g, '')
         .trim()
       if (!cleanPrompt) continue
 
       const label = labelRaw || defaultLabelFor(tag)
       const refs = clampRefsToVisibility(parseRefs(refsRaw) ?? defaultRefsFor(tag, productVisible), productVisible, tag)
+      // Which product photo this shot needs (the sealed wrapper, the unwrapped
+      // bar). Absent → the card falls back to the hero photo alone.
+      const productPhotos = parsePhotoPick(extractBlock(varBlock, 'PHOTOS'))
 
       variations.push({
         id: nextId(),
         tag,
         label,
         refs,
+        ...(productPhotos ? { productPhotos } : {}),
         prompt: cleanPrompt,
       })
     }
@@ -528,7 +551,7 @@ export function buildReferencePreamble(refs: ReferenceImage[]): string {
 // needs to get right.
 export function productAnglesClause(refs: ReferenceImage[]): string {
   if (countProductAngles(refs) === 0) return ''
-  return 'Several product photos are attached: they are ONE single product shot from different angles and in different states (in and out of its packaging, opened, from the back) — never several products, never a multipack. Render only the state the scene below calls for, and use the other photos to get that state right. '
+  return 'Several product photos are attached: they are ONE single product shot from different angles and in different states (in and out of its packaging, opened, from the back) — never several products, never a multipack. EXACTLY ONE of the product appears in the frame you render, in the state the scene below calls for; the other photos exist only to get that state right. Never draw a second copy of it anywhere in shot. '
 }
 
 // The DIALOGUE chain preamble. A talking-to-camera card generates with the

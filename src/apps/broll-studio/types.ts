@@ -50,6 +50,13 @@ export interface PromptVariation {
   // Which references the LLM thinks this variation should attach by default.
   // The user can override via the card's refs toggle pills.
   refs: VariationRefs
+  // WHICH of the product's bank photos this shot needs, as 0-based indexes into
+  // productPhotosOf() — hero packshot first. The storyboard call sees the
+  // photos and picks the state the shot is actually in: the sealed wrapper for
+  // a shot of it in a drawer, the unwrapped bar for a shot of someone eating
+  // it. Absent (legacy rows, imports) → the hero photo alone, which is the only
+  // selection that can never render two products.
+  productPhotos?: number[]
   prompt: string
 }
 
@@ -107,6 +114,11 @@ export interface BrollInput {
   productContext: string
   modelContext: string
   referenceImages: ReferenceImage[]
+  // Every photo the product bank row holds, hero first (productPhotosOf). When
+  // there's more than one they're attached to the storyboard call as numbered
+  // vision inputs, so each variation can name the ONE it needs — see
+  // PromptVariation.productPhotos.
+  productPhotos?: ReferenceImage[]
   // Visual-style pick shared with Continuous mode. `styleBrief` (distilled from
   // reference frames) overrides the preset `styleId` when present.
   styleId: string
@@ -252,6 +264,11 @@ export interface CardState {
   // field via refsToToggles(), then preserved across regenerates.
   refsCharacter: boolean
   refsProduct: boolean
+  // Which of the product's bank photos this card attaches, as 0-based indexes
+  // into productPhotosOf() (hero packshot first). Seeded from the storyboard's
+  // pick and overridable in the modal's product photo strip. Absent → the hero
+  // photo alone.
+  productPhotos?: number[]
   // DIALOGUE cards only (the "With Dialogue" talking-to-camera variation).
   // When on — the default — the card's image gen attaches the previous scene's
   // chosen dialogue still as its FIRST reference, so every talking clip is the
@@ -320,6 +337,10 @@ export interface ContinuousConcept {
   // toggle pills the user can override. Absent on legacy sessions and on
   // hand-added concepts, which fall back to the scene's product visibility.
   refs?: VariationRefs
+  // Which of the product's bank photos this staging needs, 0-based into
+  // productPhotosOf(). Same job as PromptVariation.productPhotos: one photo of
+  // the state the shot is in, so the frame can't render the product twice.
+  productPhotos?: number[]
   // Departure motion for THIS specific staging — how this concept animates
   // forward into the next beat. Motion belongs to the start frame's concept,
   // not the frame pair: picking a concept as the keyframe auto-carries its
@@ -401,6 +422,11 @@ export interface ContinuousFrameCardState {
   chainLink: boolean
   refsCharacter: boolean
   refsProduct: boolean
+  // Which of the product's bank photos this card attaches, as 0-based indexes
+  // into productPhotosOf() (hero packshot first). Seeded from the storyboard's
+  // pick and overridable in the modal's product photo strip. Absent → the hero
+  // photo alone.
+  productPhotos?: number[]
   aspectRatio: string
   resolution: ImageResolution
   // ── Standalone Animate (frame modal's Animate tab) ──

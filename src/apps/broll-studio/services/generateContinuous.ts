@@ -11,11 +11,13 @@
 // style except UGC Realism bypasses the app's deterministic iPhone-realism
 // stack — "unedited photorealism, zero bokeh" actively fights a 3D render.
 
-import type { ContinuousConcept, ContinuousFrame, ContinuousResult, ContinuousScene, VariationRefs } from '../types'
+import type { ContinuousConcept, ContinuousFrame, ContinuousResult, ContinuousScene, ReferenceImage, VariationRefs } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { kieChatCompletions, type ChatMessage } from '../../../utils/kie'
 import { getChatEndpointPath, getModel, snapVideoDurationUp } from '../../../utils/models'
 import { IPHONE_REALISM_SUFFIX } from './realism'
+import { extractBlock, extractNumberedBlock } from './xmlBlocks'
+import { parsePhotoPick, productPhotoDataUris, productPhotoInstruction } from './productAngles'
 
 // Models LISTED in the Continuous picker. The whole mode is first/last-frame
 // interpolation, so only frames-to-video models are actually selectable — the
@@ -163,7 +165,7 @@ export function buildContinuousPreamble(opts: {
     if ((opts.productAngles ?? 0) > 0) {
       // One object, several shots — see productAnglesClause in generateBroll.
       parts.push(
-        'Several product photos are attached: they are ONE single product shot from different angles and in different states (in and out of its packaging, opened, from the back) — never several products, never a multipack. Render only the state the scene below calls for, and use the other photos to get that state right.',
+        'Several product photos are attached: they are ONE single product shot from different angles and in different states (in and out of its packaging, opened, from the back) — never several products, never a multipack. EXACTLY ONE of the product appears in the frame you render, in the state the scene below calls for; the other photos exist only to get that state right. Never draw a second copy of it anywhere in shot.',
       )
     }
   }
@@ -417,6 +419,21 @@ export interface ContinuousInput {
   productContext: string
   modelContext: string
   additionalContext: string
+  // Every photo the product bank row holds, hero first. More than one and they
+  // ride along as numbered vision inputs so each concept can name the state its
+  // shot needs — see productPhotoInstruction.
+  productPhotos?: ReferenceImage[]
+}
+
+// The storyboard's system half. `productPhotoCount` is how many photos the
+// product bank row holds — more than one and the model is shown all of them and
+// asked to name which each concept needs, so a frame can't be handed the sealed
+// wrapper AND the unwrapped bar and draw both. Exported so the Import-prompts
+// brief carries the same rules.
+export function continuousSystemInstruction(productPhotoCount = 0): string {
+  return productPhotoCount > 1
+    ? CONTINUOUS_SYSTEM + productPhotoInstruction(productPhotoCount, 'concept')
+    : CONTINUOUS_SYSTEM
 }
 
 // The script's own lines are the scenes — see the SCENES section of the system
@@ -454,9 +471,9 @@ Before you answer, run this check and rewrite anything that fails:
 
 // ── Parser ─────────────────────────────────────────────────────
 
+// Leaf-field read. Tolerant of a missing closing tag — see xmlBlocks.ts.
 function extractTag(source: string, tag: string): string | null {
-  const m = source.match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i'))
-  return m ? m[1].trim() : null
+  return extractBlock(source, tag)
 }
 
 // Strip straggler control tags from a prompt body so a misformed response never
@@ -465,9 +482,10 @@ function cleanPromptBody(text: string): string {
   return text
     .replace(/<LABEL>[\s\S]*?<\/LABEL>/gi, '')
     .replace(/<REFS>[\s\S]*?<\/REFS>/gi, '')
+    .replace(/<PHOTOS>[\s\S]*?<\/PHOTOS>/gi, '')
     .replace(/<SHOT>[\s\S]*?<\/SHOT>/gi, '')
     .replace(/<VISIBILITY>[\s\S]*?<\/VISIBILITY>/gi, '')
-    .replace(/<\/?(STORYBOARD|SCENE_\d+|CONCEPT_\d+|FINAL_FRAME|FRAME|PROMPT|LABEL|REFS|SHOT|VISIBILITY|LINE|MOTION|STYLE)>/gi, '')
+    .replace(/<\/?(STORYBOARD|SCENE_\d+|CONCEPT_\d+|FINAL_FRAME|FRAME|PROMPT|LABEL|REFS|PHOTOS|SHOT|VISIBILITY|LINE|MOTION|STYLE)>/gi, '')
     .trim()
 }
 
@@ -503,7 +521,7 @@ const MAX_SCENES = 40
 function parseConcepts(frameBlock: string, productVisible: boolean | undefined): ContinuousConcept[] {
   const concepts: ContinuousConcept[] = []
   for (let j = 1; j <= CONCEPTS_PER_FRAME + 2; j++) {
-    const block = extractTag(frameBlock, `CONCEPT_${j}`)
+    const block = extractNumberedBlock(frameBlock, 'CONCEPT', j)
     if (!block) continue
     // Read MOTION and REFS before cleaning the block, then strip the whole
     // concept down to its PROMPT body (falling back to the block minus its
@@ -521,12 +539,16 @@ function parseConcepts(frameBlock: string, productVisible: boolean | undefined):
     const refs = declared && productVisible === false
       ? (declared === 'both' || declared === 'character' ? 'character' : 'none')
       : declared
+    // Which product photo this staging needs (sealed wrapper / unwrapped / open
+    // box). Absent → the card falls back to the hero photo alone.
+    const productPhotos = parsePhotoPick(extractTag(block, 'PHOTOS'))
     concepts.push({
       id: nextConceptId(),
       label: extractTag(block, 'LABEL') ?? `Option ${concepts.length + 1}`,
       ...(shot ? { shot } : {}),
       prompt,
       ...(refs ? { refs } : {}),
+      ...(productPhotos ? { productPhotos } : {}),
       ...(motion ? { motionPrompt: motion } : {}),
     })
   }
@@ -542,7 +564,7 @@ export function parseContinuousResult(responseText: string, input: ContinuousInp
   const scenes: ContinuousScene[] = []
   const frames: ContinuousFrame[] = []
   for (let i = 1; i <= MAX_SCENES; i++) {
-    const sceneBlock = extractTag(body, `SCENE_${i}`)
+    const sceneBlock = extractNumberedBlock(body, 'SCENE', i)
     if (!sceneBlock) break
     const line = extractTag(sceneBlock, 'LINE') ?? ''
     // Only an explicit "no" hides the product — a missing tag leaves visibility
@@ -599,9 +621,16 @@ export function parseContinuousResult(responseText: string, input: ContinuousInp
 export async function generateContinuous(input: ContinuousInput): Promise<ContinuousResult> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const endpoint = getChatEndpointPath()
+  const photoUris = await productPhotoDataUris(input.productPhotos)
   const messages: ChatMessage[] = [
-    { role: 'system', content: [{ type: 'text', text: CONTINUOUS_SYSTEM }] },
-    { role: 'user', content: [{ type: 'text', text: buildContinuousUserPrompt(input) }] },
+    { role: 'system', content: [{ type: 'text', text: continuousSystemInstruction(photoUris.length) }] },
+    {
+      role: 'user',
+      content: [
+        { type: 'text', text: buildContinuousUserPrompt(input) },
+        ...photoUris.map((url) => ({ type: 'image_url' as const, image_url: { url } })),
+      ],
+    },
   ]
   const responseText = await kieChatCompletions(apiKey, endpoint, messages)
   const result = parseContinuousResult(responseText, input)

@@ -38,7 +38,7 @@ import { getDefaultModel, getModel, estimateCredits, formatCredits, videoResolut
 import { tagChipStyle, tagLabel } from './variationTags'
 import { humanizeError } from '../../../utils/friendlyError'
 import { resolveImageModelId } from '../services/generateBroll'
-import { productAngleSlots } from '../services/productAngles'
+import { productAngleSlots, normalizePhotoSelection } from '../services/productAngles'
 import ModelWaitNotice from '../../../components/ModelWaitNotice'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
@@ -46,6 +46,7 @@ import {
   ModalGallery,
   ReferenceSlotCard,
   ExtraRefsRow,
+  ProductPhotoRow,
   StyleNote,
 } from './cardDetailParts'
 import { appliedStyleNote } from '../services/generateContinuous'
@@ -76,7 +77,8 @@ interface CardDetailModalProps {
   initialTab?: Tab
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
-  productAngleRefs?: ReferenceImage[]
+  productPhotos?: string[]
+  onChangeStyle?: () => void
   // Full bank entries — rendered as side-by-side slot cards in the modal.
   selectedProduct?: Product | null
   selectedModel?: Model | null
@@ -143,7 +145,8 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     selectedScriptId,
     characterRef,
     productRef,
-    productAngleRefs,
+    productPhotos,
+    onChangeStyle,
     onOpenCharacterPicker,
     onOpenProductPicker,
     extraRefs = [],
@@ -249,11 +252,12 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     (!!characterRef && cardState.refsCharacter !== false) ||
     (!!productRef && cardState.refsProduct !== false)
 
-  // How many of the product's extra bank angles will actually ride along with
-  // this tab's generation. They fill the reference slots the model has left over
-  // (see attachProductAngles), so the count is model-dependent — and the slot
-  // card should report what will really be sent, not what the bank holds.
+  // Which of the product's photos this card sends, and how many of them fit.
+  // The first pick IS the product reference (the state the shot is in); any
+  // beyond it ride as angles and fill whatever slots the model has left, so the
+  // count is model-dependent — the slot card reports what will really be sent.
   const productActive = !!productRef && cardState.refsProduct !== false
+  const photoSelection = normalizePhotoSelection(cardState.productPhotos, productPhotos?.length ?? 0)
   const manualRefCount =
     (characterRef && cardState.refsCharacter !== false ? 1 : 0) +
     (productActive ? 1 : 0) +
@@ -261,7 +265,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   const attachedAngleCount = productActive
     ? productAngleSlots({
         manualCount: manualRefCount,
-        angleCount: productAngleRefs?.length ?? 0,
+        angleCount: Math.max(0, photoSelection.length - 1),
         modelId: tab === 'video' ? videoModelId : resolveImageModelId(true),
         reserved: isDialogue && chainImageRef && cardState.chainLink !== false ? 1 : 0,
       })
@@ -489,7 +493,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                     appended at fire time, outside the editable prompt below, so
                     this is the only place it's visible. On every tab, because
                     both the image and the video gen append it. */}
-                <StyleNote style={styleNote.text} label={styleNote.label} />
+                <StyleNote style={styleNote.text} label={styleNote.label} onChange={onChangeStyle} />
 
                 {/* Animate tab → Start frame preview. Image/Video tabs →
                     the Influencer / Product reference slot cards + extra refs. */}
@@ -556,7 +560,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         kind="Product"
                         note={attachedAngleCount > 0 ? `+${attachedAngleCount} angle${attachedAngleCount > 1 ? 's' : ''}` : null}
                         name={selectedProduct?.productName}
-                        imageRef={selectedProduct?.productImage}
+                        imageRef={productPhotos?.[photoSelection[0]] ?? selectedProduct?.productImage}
                         onClick={() => onOpenProductPicker?.()}
                         active={cardState.refsProduct !== false}
                         onToggleActive={() => onUpdateState({ refsProduct: cardState.refsProduct === false })}
@@ -564,6 +568,17 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         dimmedReason={`${videoModelName} doesn't accept reference images. Switch to Veo 3.1 Fast or Seedance 2.0 to use them.`}
                       />
                     </div>
+                    {/* Which product photo this shot is built from. Only shown
+                        when the bank row holds more than one — see
+                        ProductPhotoRow. */}
+                    {productActive && (
+                      <ProductPhotoRow
+                        photos={productPhotos ?? []}
+                        selection={photoSelection}
+                        onChange={(next) => onUpdateState({ productPhotos: next })}
+                        dimmed={refsUnsupportedForVideo}
+                      />
+                    )}
                     {/* Extra references — keep the bank-keyed pills above, but
                         let the user attach more (a second product, an outfit,
                         a pose) via upload or the bank. */}

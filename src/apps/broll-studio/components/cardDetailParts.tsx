@@ -34,21 +34,45 @@ import { downloadImage } from '../../../utils/downloadImage'
 // `label` names what's being appended: a stylized look adds the style block,
 // while UGC Realism adds the app's realism stack instead. Saying which is the
 // point — the note must not claim something the render won't do.
-export function StyleNote({ style, label = 'Style (applied automatically)' }: { style: string; label?: string }) {
+// `onChange` opens the style popup. The look is session-wide and rides outside
+// every card prompt, so switching it here re-renders the SAME storyboard in a
+// new style — the "I liked this ad, now give me the claymation cut" move. Left
+// off (read-only note) wherever no picker is wired.
+export function StyleNote({
+  style,
+  label = 'Style (applied automatically)',
+  onChange,
+}: {
+  style: string
+  label?: string
+  onChange?: () => void
+}) {
   const [open, setOpen] = useState(false)
   return (
-    <button
-      type="button"
-      onClick={() => setOpen((v) => !v)}
-      className="flex w-full items-start gap-2 rounded-2xl border border-ink/10 bg-ink/[0.02] px-3.5 py-2.5 text-left transition-colors hover:bg-ink/[0.04]"
-      title={open ? 'Collapse' : 'Show the full style block'}
-    >
+    <div className="flex w-full items-start gap-2 rounded-2xl border border-ink/10 bg-ink/[0.02] px-3.5 py-2.5 transition-colors hover:bg-ink/[0.04]">
       <Palette className="mt-0.5 h-3.5 w-3.5 shrink-0 text-broll-300" />
-      <span className={`min-w-0 flex-1 text-[11px] leading-relaxed text-ink-500 ${open ? '' : 'line-clamp-2'}`}>
-        <span className="font-semibold text-ink-400">{label}: </span>
-        {style}
-      </span>
-    </button>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="min-w-0 flex-1 text-left"
+        title={open ? 'Collapse' : 'Show the full style block'}
+      >
+        <span className={`text-[11px] leading-relaxed text-ink-500 ${open ? 'block' : 'line-clamp-2'}`}>
+          <span className="font-semibold text-ink-400">{label}: </span>
+          {style}
+        </span>
+      </button>
+      {onChange && (
+        <button
+          type="button"
+          onClick={onChange}
+          title="Render this storyboard in a different visual style"
+          className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.04] px-2.5 py-1 text-[10px] font-medium tracking-tight text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.08] hover:text-ink-100"
+        >
+          Change
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -729,6 +753,92 @@ export function ReferenceSlotCard({
         </button>
       )}
     </div>
+  )
+}
+
+// Product photo strip — which of the bank row's photos this card sends.
+//
+// A product can hold several shots of ONE object (sealed wrapper, unwrapped,
+// box open). Attaching all of them puts two products in the frame: a scene of
+// someone eating the bar came back with the bite happening beside an identical
+// sealed bar, because both photos went in. So the storyboard picks the state
+// its shot is actually in, and this row is where the member overrides it.
+//
+// Renders nothing for a single-photo product — there's nothing to choose.
+export function ProductPhotoRow({
+  photos,
+  selection,
+  onChange,
+  dimmed,
+}: {
+  photos: string[]
+  selection: number[]
+  onChange: (next: number[]) => void
+  dimmed?: boolean
+}) {
+  if (photos.length < 2) return null
+  const toggle = (index: number) => {
+    if (selection.includes(index)) {
+      // Never leave a product-on card with no photo — the last one stays.
+      if (selection.length === 1) return
+      onChange(selection.filter((i) => i !== index))
+    } else {
+      onChange([...selection, index])
+    }
+  }
+  return (
+    <div className={`flex flex-col gap-1.5 ${dimmed ? 'opacity-50' : ''}`}>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[11px] font-medium tracking-tight text-ink-400">Product photo</span>
+        <span className="text-[10px] tracking-tight text-ink-600">
+          {selection.length === 1 ? 'One state per shot' : `${selection.length} attached`}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {photos.map((ref, i) => (
+          <ProductPhotoTile
+            key={`${ref}-${i}`}
+            imageRef={ref}
+            index={i}
+            active={selection.includes(i)}
+            onClick={() => toggle(i)}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ProductPhotoTile({
+  imageRef,
+  index,
+  active,
+  onClick,
+}: {
+  imageRef: string
+  index: number
+  active: boolean
+  onClick: () => void
+}) {
+  const url = useAssetUrl(imageRef)
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={index === 0 ? 'Hero packshot' : `Angle ${index}`}
+      className={`relative h-14 w-14 overflow-hidden rounded-xl border transition-colors ${
+        active
+          ? 'border-gold-500/60 ring-1 ring-inset ring-gold-500/25'
+          : 'border-ink/10 opacity-45 hover:opacity-80'
+      }`}
+    >
+      {url && <img src={url} alt="" className="h-full w-full object-cover" />}
+      {active && (
+        <span className="absolute bottom-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-gold-500/90">
+          <Check className="h-2.5 w-2.5 text-black" strokeWidth={3} />
+        </span>
+      )}
+    </button>
   )
 }
 

@@ -61,6 +61,9 @@ export function createDefaultCardState(variation: PromptVariation): CardState {
     pendingStartedAt: null,
     refsCharacter,
     refsProduct,
+    // The product photo(s) the storyboard picked for this shot — the state it's
+    // actually in. Absent → the card falls back to the hero packshot alone.
+    ...(variation.productPhotos ? { productPhotos: variation.productPhotos } : {}),
     // Only read by DIALOGUE cards — see CardState.chainLink.
     chainLink: true,
     cardImageAspectRatio: '9:16',
@@ -233,6 +236,7 @@ export function createDefaultContinuousFrameState(
     // the spread. Off per frame via the row's Chained/Unchained pill.
     chainLink: true,
     ...toggles,
+    ...(concept.productPhotos ? { productPhotos: concept.productPhotos } : {}),
     aspectRatio: '9:16',
     resolution: '1K',
     // Standalone-animate defaults. Motion seeds from the concept's departure
