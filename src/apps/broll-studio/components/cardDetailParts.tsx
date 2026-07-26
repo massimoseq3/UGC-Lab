@@ -9,6 +9,7 @@ import {
 import { GeneratingMediaFill, PendingMedia, type GeneratingMediaProps } from '../../../components/GeneratingMedia'
 import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
+import DayPill from '../../../components/DayPill'
 import BankPicker from '../../../components/BankPicker'
 import SlotActionMenu from '../../../components/video/SlotActionMenu'
 import type { CardState, ReferenceImage } from '../types'
@@ -576,14 +577,6 @@ function FailedTile({
 }
 
 // ─── Shared bits ─────────────────────────────────────────────────────────
-
-function DayPill({ label }: { label: string }) {
-  return (
-    <div className="my-2 flex items-center justify-center">
-      <span className="rounded-full bg-ink/[0.06] px-3 py-1 text-[11px] font-medium text-ink-300">{label}</span>
-    </div>
-  )
-}
 
 // Reference Images slot card — Bank-picker-style. Same outer shell as
 // the ModelPicker rows: rounded-xl border + bg-ink/[0.02] + p-3 with an

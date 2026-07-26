@@ -18,6 +18,7 @@ import type { ImageHistoryItem, VideoHistoryItem, MusicHistoryItem } from '../..
 import AudioTile from './AudioTile'
 import GenerationProgress from '../../../components/GenerationProgress'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
+import DayPill from '../../../components/DayPill'
 import GeneratingBackdrop from '../../../components/GeneratingBackdrop'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import type { PlaygroundMode, InFlightGen } from '../types'
@@ -165,7 +166,7 @@ export default function PlaygroundHistoryGrid({ inFlight, filterMode }: Playgrou
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {visibleInFlight.length > 0 && (
           <>
-            <DayPill label="In progress" />
+            <DayPill label="In progress" className="my-5" />
             {viewMode === 'grid' ? (
               <div className="grid grid-cols-2 items-start gap-2.5 [grid-auto-flow:dense] lg:grid-cols-3 xl:grid-cols-4">
                 {visibleInFlight.map((gen) => {
@@ -187,7 +188,7 @@ export default function PlaygroundHistoryGrid({ inFlight, filterMode }: Playgrou
 
         {dayGroups.map(([dayTs, dayItems]) => (
           <div key={dayTs}>
-            <DayPill label={sectionLabel(dayTs)} />
+            <DayPill label={sectionLabel(dayTs)} className="my-5" />
             {viewMode === 'grid' ? (
               <div className="grid grid-cols-2 items-start gap-2.5 [grid-auto-flow:dense] lg:grid-cols-3 xl:grid-cols-4">
                 {dayItems.map((entry) => {
@@ -273,14 +274,6 @@ export default function PlaygroundHistoryGrid({ inFlight, filterMode }: Playgrou
           }}
         />
       )}
-    </div>
-  )
-}
-
-function DayPill({ label }: { label: string }) {
-  return (
-    <div className="my-5 flex items-center justify-center">
-      <span className="rounded-full bg-ink/[0.06] px-3 py-1 text-[11px] font-medium text-ink-300">{label}</span>
     </div>
   )
 }

@@ -16,6 +16,7 @@ import { usePersistedState } from '../../../hooks/usePersistedState'
 import { getContinuousStyle } from '../services/generateContinuous'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
 import { TileActionStack, TileDeleteButton } from '../../../components/tileActions'
+import DayPill from '../../../components/DayPill'
 
 interface BrollHistoryViewProps {
   // Already filtered by the parent (see isRetiredOneShotRow) so the tab's
@@ -410,16 +411,7 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
           <div className="flex flex-col gap-6 px-5 py-4">
             {groups.map(([dayTs, dayItems]) => (
               <div key={dayTs} className="flex flex-col gap-3">
-                {/* Day header sits left of a hairline rather than centred over
-                    the list: with a grid below it, a centred pill reads as a
-                    divider between two unrelated blocks. */}
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">
-                    {sectionLabel(dayTs)}
-                  </span>
-                  <span className="text-[11px] text-ink-600">{dayItems.length}</span>
-                  <span className="h-px flex-1 bg-ink/[0.07]" />
-                </div>
+                <DayPill label={sectionLabel(dayTs)} className="" />
 
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                   {dayItems.map((item) => (
