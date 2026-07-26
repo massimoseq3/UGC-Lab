@@ -13,7 +13,7 @@ import {
   buildBrollUserPrompt,
   extractVoiceProfile,
   parseScenes,
-  VARIATIONS_PER_SCENE,
+  variationsForDelivery,
 } from './generateBroll'
 import {
   CONTINUOUS_SYSTEM,
@@ -88,15 +88,18 @@ function importLine(text: string, ctx: ImportContext): ImportOutcome {
       ok: false,
       error: detected && detected !== 'line'
         ? wrongModeError(detected, 'line')
-        : 'No <SCENE> blocks found. Each scene needs <SCENE>…</SCENE> wrapping a <LINE> and its <VAR_1>…<VAR_3> prompts.',
+        : `No <SCENE> blocks found. Each scene needs <SCENE>…</SCENE> wrapping a <LINE> and its <VAR_1>…<VAR_${variationsForDelivery(ctx.lineDelivery)}> prompts.`,
     }
   }
 
   const promptCount = scenes.reduce((n, s) => n + s.variations.length, 0)
   const notes: string[] = []
-  const thin = scenes.filter((s) => s.variations.length < VARIATIONS_PER_SCENE).map((s) => s.number)
+  // A dialogue import is expected to carry one more prompt per scene (the
+  // talking card on top of the three b-roll ideas), so the "thin" bar moves.
+  const expected = variationsForDelivery(ctx.lineDelivery)
+  const thin = scenes.filter((s) => s.variations.length < expected).map((s) => s.number)
   if (thin.length > 0) {
-    notes.push(`Scene${thin.length === 1 ? '' : 's'} ${thin.join(', ')} came in with fewer than ${VARIATIONS_PER_SCENE} prompts — you can add options per scene afterwards.`)
+    notes.push(`Scene${thin.length === 1 ? '' : 's'} ${thin.join(', ')} came in with fewer than ${expected} prompts — you can add options per scene afterwards.`)
   }
   const voiceProfile = ctx.lineDelivery === 'dialogue' ? extractVoiceProfile(text) : undefined
   if (ctx.lineDelivery === 'dialogue' && !voiceProfile) {

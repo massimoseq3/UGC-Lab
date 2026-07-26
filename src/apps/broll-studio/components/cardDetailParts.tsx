@@ -4,7 +4,7 @@
 // modal's orchestration (state + handlers). These all communicate via props.
 import { useState, useEffect, useRef } from 'react'
 import {
-  ImageIcon, Film, Loader2, Check, Download, Bookmark, Volume2, VolumeX, Play, Pause, Copy, Circle, AlertCircle, RefreshCw, X, ImagePlus,
+  ImageIcon, Film, Loader2, Check, Download, Bookmark, Volume2, VolumeX, Play, Pause, Copy, Circle, AlertCircle, RefreshCw, X, ImagePlus, Palette,
 } from 'lucide-react'
 import { GeneratingMediaFill, PendingMedia, type GeneratingMediaProps } from '../../../components/GeneratingMedia'
 import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
@@ -21,6 +21,35 @@ import { getModel } from '../../../utils/models'
 import { startOfDay, sectionLabel } from '../../../utils/history'
 import { sendClipToPlayground } from '../services/sendClipToPlayground'
 import { downloadImage } from '../../../utils/downloadImage'
+
+// ─── Style note ──────────────────────────────────────────────────────────
+
+// The session-wide style block, shown read-only at the top of a card's
+// workspace. Both modes append it at fire time and OUTSIDE the editable prompt
+// so it can't be forked per card — which also means this note is the only place
+// the member can read what actually rides along with their prompt. Clamped to
+// two lines; tap to expand.
+//
+// `label` names what's being appended: a stylized look adds the style block,
+// while UGC Realism adds the app's realism stack instead. Saying which is the
+// point — the note must not claim something the render won't do.
+export function StyleNote({ style, label = 'Style (applied automatically)' }: { style: string; label?: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen((v) => !v)}
+      className="flex w-full items-start gap-2 rounded-2xl border border-ink/10 bg-ink/[0.02] px-3.5 py-2.5 text-left transition-colors hover:bg-ink/[0.04]"
+      title={open ? 'Collapse' : 'Show the full style block'}
+    >
+      <Palette className="mt-0.5 h-3.5 w-3.5 shrink-0 text-broll-300" />
+      <span className={`min-w-0 flex-1 text-[11px] leading-relaxed text-ink-500 ${open ? '' : 'line-clamp-2'}`}>
+        <span className="font-semibold text-ink-400">{label}: </span>
+        {style}
+      </span>
+    </button>
+  )
+}
 
 // ─── Modal gallery — per-card masonry ────────────────────────────────────
 
