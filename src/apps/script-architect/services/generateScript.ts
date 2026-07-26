@@ -60,7 +60,8 @@ const SELF_AUDIT = `SELF-AUDIT BEFORE YOU ANSWER (do this silently; output ONLY 
 const VOICE_PROFILE_SPEC = `VOICE — describe, in rich and reproducible detail, HOW the speaker sounds, so the exact same voice can be reused across every video. Cover: the perceived age and gender of the voice, accent / region, pitch (low / mid / high), pace (slow, measured, fast), texture (warm, raspy, breathy, smooth, nasal, gravelly), energy (calm, hyped, deadpan, bubbly), and 1-2 signature quirks (uptalk, slight vocal fry, a laugh living in the voice, clipped consonants). Write it as one dense paragraph you could hand to a voice actor or a TTS engine and get the same person every single time. Describe ONLY the sound — never physical appearance.`
 
 // Short clips drown when the model tries to cram the whole product brief in.
-// This is length-tiered discipline: ≤15s = one idea, longer = room for an arc.
+// This is length-tiered discipline: ≤15s = one idea, 20s = one idea with a
+// supporting beat, 30s+ = room for a full arc.
 //
 // The CUT-LINES clause exists because the failure mode of a shorter target is
 // keeping the SAME number of beats and clipping every sentence into fragments —
@@ -71,6 +72,11 @@ const CUT_LINES_NOT_LENGTH = `HOW TO HIT THE WORD BUDGET: shorten the script by 
 function lengthDiscipline(length: WriteLength): string {
   if (length <= 15) {
     return `LENGTH DISCIPLINE — THIS IS ONLY ${length}s, SO BE RUTHLESS: a ${length}-second ad has room for exactly ONE idea, not a product tour. Pick ONE angle and ONE benefit (or one pain point) and commit the entire clip to it. Do NOT try to fit the product's full feature list, multiple USPs, the offer, AND the CTA into ${length} seconds — cramming all of it is exactly what makes short scripts feel rushed and disconnected. Almost all the words belong to the hook and its single payoff. Mention the product once. Always end on a CTA, but keep it QUICK at this length — a few words folded into or right after the payoff ("link's below", "grab one") — never a full closing pitch.\n\n${CUT_LINES_NOT_LENGTH}`
+  }
+  // 20s is the in-between the two tiers above kept missing: too long to be a
+  // single hook-and-payoff, too short to survive a 30s structure squeezed down.
+  if (length <= 20) {
+    return `LENGTH DISCIPLINE — ${length}s IS ONE IDEA WITH ROOM TO LAND IT: still ONE angle and ONE benefit (or one pain point), but unlike a 10-15s cut you have room for ONE supporting beat between the hook and the payoff — a bit of proof, one specific detail, or the moment the problem actually bites. Do NOT use that room to add a second selling point or list features; use it to make the single idea land harder. Mention the product once, twice at most. Close on a real but brief CTA — a full spoken sentence, not a closing pitch.\n\n${CUT_LINES_NOT_LENGTH}`
   }
   return `LENGTH DISCIPLINE: you have ${length}s — enough for a real arc (hook, tension, payoff, CTA). Still resist listing every feature; choose the 1-2 points that actually sell and let them breathe. Depth on one idea beats a shallow tour of five. Always close with a CTA; it can stay short and casual.\n\n${CUT_LINES_NOT_LENGTH}`
 }
@@ -465,6 +471,7 @@ const WRITE_TAKE_INSTRUCTION: string[] = [
 const WRITE_LENGTH_BUDGET: Record<WriteLength, { words: string; scenes: string }> = {
   10: { words: '20–28 words', scenes: 'usually 1-2 scenes (a single continuous shot is fine)' },
   15: { words: '30–42 words', scenes: 'usually 1-3 scenes' },
+  20: { words: '42–56 words', scenes: 'usually 2-4 scenes' },
   30: { words: '62–82 words', scenes: 'usually 3-5 scenes' },
   60: { words: '125–160 words', scenes: 'usually 6-9 scenes' },
 }
@@ -534,10 +541,11 @@ const WRITE_PROMPT_TAKE_INSTRUCTION: string[] = [
 
 // Single-clip beat budgets. The cinematic format renders as one generation, so
 // it offers the durations a video model can do in a single shot (10s / 15s /
-// 30s); anything longer would need a multi-clip chain the models can't do.
+// 20s / 30s); anything longer would need a multi-clip chain the models can't do.
 const WRITE_PROMPT_BEATS: Record<number, string> = {
   10: '3–4 contiguous beats spanning 0–10s',
   15: '5 contiguous beats spanning 0–15s',
+  20: '6–7 contiguous beats spanning 0–20s',
   30: '7–9 contiguous beats spanning 0–30s',
 }
 

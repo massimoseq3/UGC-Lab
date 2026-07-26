@@ -7,7 +7,7 @@ import InputPanel from './components/InputPanel'
 import RightPanel from './components/RightPanel'
 import { generateScript } from './services/generateScript'
 import { humanizeError } from '../../utils/friendlyError'
-import { WRITE_STYLE_META, HOOK_CATEGORY_META, detectSceneBlueprint, isWriteStyle, isHookCategoryChoice, isVariationCount, parseHooks, DEFAULT_VARIATION_COUNT, type ScriptMode, type ScriptUiMode, type EditableProductContext, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount, type RemixAngle } from './types'
+import { WRITE_STYLE_META, HOOK_CATEGORY_META, detectSceneBlueprint, isWriteStyle, isWriteLength, isHookCategoryChoice, isVariationCount, parseHooks, DEFAULT_VARIATION_COUNT, type ScriptMode, type ScriptUiMode, type EditableProductContext, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount, type RemixAngle } from './types'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 
 interface ReverseEngineerPayload {
@@ -260,7 +260,7 @@ export default function ScriptArchitect() {
     setOutputMode(item.mode)
     setOutputStyle(item.writeStyle && item.writeStyle in WRITE_STYLE_META ? (item.writeStyle as WriteStyle) : 'pas')
     setOutputFormat(item.writeFormat ?? 'script')
-    setOutputLength(item.writeLength === 10 || item.writeLength === 15 || item.writeLength === 30 || item.writeLength === 60 ? item.writeLength : 15)
+    setOutputLength(isWriteLength(item.writeLength) ? item.writeLength : 15)
     setOutputHookCategory(isHookCategoryChoice(item.hookCategory) ? item.hookCategory : 'auto')
     // Rows saved before the count was pickable carry no angle list; OutputPanel
     // falls back to matching them by variation count.
@@ -284,9 +284,7 @@ export default function ScriptArchitect() {
       setBrief(item.brief ?? item.inputSummary)
       if (item.writeStyle && item.writeStyle in WRITE_STYLE_META) setWriteStyle(item.writeStyle as WriteStyle)
       if (item.writeFormat) setWriteFormat(item.writeFormat)
-      if (item.writeLength === 10 || item.writeLength === 15 || item.writeLength === 30 || item.writeLength === 60) {
-        setWriteLength(item.writeLength)
-      }
+      if (isWriteLength(item.writeLength)) setWriteLength(item.writeLength)
       if (item.writeFormat === 'hooks' && isHookCategoryChoice(item.hookCategory)) {
         setHookCategory(item.hookCategory)
       }

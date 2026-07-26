@@ -76,8 +76,14 @@ export type WriteStyle =
 // @INFLUENCER / @PRODUCT reference tokens → Playground video mode.
 export type WriteFormat = 'script' | 'hooks' | 'scenes' | 'prompt'
 
-export type WriteLength = 10 | 15 | 30 | 60
-export const WRITE_LENGTHS: WriteLength[] = [10, 15, 30, 60]
+export type WriteLength = 10 | 15 | 20 | 30 | 60
+export const WRITE_LENGTHS: WriteLength[] = [10, 15, 20, 30, 60]
+
+// Guards persisted / history-restored lengths. The list has grown once (20s was
+// added after launch), so callers coerce a miss back to the default instead of
+// hand-listing the members at every read site.
+export const isWriteLength = (value: unknown): value is WriteLength =>
+  WRITE_LENGTHS.includes(value as WriteLength)
 
 export const WRITE_STYLE_GROUP_META: Record<WriteStyleGroup, { label: string; hint: string }> = {
   structure: { label: 'Structures', hint: 'How the argument is built' },
