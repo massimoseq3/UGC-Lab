@@ -33,7 +33,7 @@ import {
   enhanceEditInstruction,
 } from '../services/generateCharacter'
 import type { InFlightCharacterGen, LaunchGenOptions } from '../types'
-import { pickInfluencerName, sheetNameFrom } from './nameGenerator'
+import { pickInfluencerName, sheetNameFrom, uniqueBankName, variantNameFrom } from './nameGenerator'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import StyleModal, { INFLUENCERS_STYLE_ACCENT, type StyleSelection } from '../../../components/StyleModal'
 import { analyzeStyleReferences, getContinuousStyle, styleBriefForStill } from '../../../utils/visualStyle'
@@ -71,6 +71,9 @@ interface SessionOutput {
   imageRef: string
   aspectRatio: string
   kind: 'portrait' | 'sheet'
+  // The visual style this output was rendered in, when one was picked — used to
+  // name it on save ("Mia - Claymation").
+  styleName?: string
   // Set once the row has been saved to the Influencers bank — drives the tile's
   // Saved badge straight from the store so it survives a reopen.
   linkedModelId?: string
@@ -154,11 +157,12 @@ export default function InfluencerEditModal({
         imageRef: h.imageRef,
         aspectRatio: h.aspectRatio,
         kind: h.kind ?? 'portrait',
+        styleName: h.styleName,
         linkedModelId: h.linkedModelId,
       }))
     return rows.length > 0
       ? rows
-      : [{ id: item.id, imageRef: item.imageRef, aspectRatio: item.aspectRatio, kind: item.kind ?? 'portrait' }]
+      : [{ id: item.id, imageRef: item.imageRef, aspectRatio: item.aspectRatio, kind: item.kind ?? 'portrait', styleName: item.styleName }]
   }, [characterHistory, lineageKey, item])
   const [selectedId, setSelectedId] = useState(item.id)
   const [prompt, setPrompt] = useState('')
@@ -246,7 +250,13 @@ export default function InfluencerEditModal({
   // bank name when this generation is saved; otherwise a stable generated one
   // (matches how the gallery names an influencer at save time).
   const linkedModelName = item.linkedModelId ? models.find((m) => m.id === item.linkedModelId)?.name : undefined
-  const fallbackName = useMemo(() => pickInfluencerName(item.profile.gender), [item.id])
+  // Seeded on the lineage so an unsaved character keeps ONE suggested name
+  // across its whole strip (and in the main gallery), instead of a fresh random
+  // one per save — the variants have to read as the same person.
+  const fallbackName = useMemo(
+    () => pickInfluencerName(item.profile.gender, lineageKey),
+    [item.profile.gender, lineageKey],
+  )
   // Prefer the lineage's source-portrait name so a sheet saved off it inherits
   // that influencer's name (not this row's, which may itself be a sheet).
   const lineagePortrait = characterHistory.find((h) => h.id === lineageKey && h.kind !== 'sheet')
@@ -390,6 +400,7 @@ export default function InfluencerEditModal({
       kind: 'portrait',
       aspect: coerceAspect(aspect),
       lineageId: lineageKey,
+      styleName: styleActive ? styleLabel : undefined,
       edit: {
         instruction,
         baseImageRef: selected.imageRef,
@@ -419,18 +430,22 @@ export default function InfluencerEditModal({
       aspect: sheetAspect,
       referenceUrl: selected.imageRef,
       lineageId: lineageKey,
+      styleName: styleActive ? styleLabel : undefined,
       direction,
       extraReferenceUrls: refs.map((r) => r.url),
     })
   }
 
-  // Suggested name when opening the inline save input — sheets file next to
-  // their source portrait ("<influencer> - Influencer Sheet"); a fresh portrait
-  // gets a fresh generated name. Mirrors the main gallery's save flow.
+  // Suggested name when opening the inline save input. Everything in this strip
+  // is the SAME character, so everything files under that character's name:
+  // sheets take the " - Character Sheet" suffix, an edit takes the style it was
+  // rendered in ("Mia - Claymation") or the next free number ("Mia 2"). Only the
+  // source portrait itself keeps the bare name. Mirrors the main gallery.
   function suggestSaveName(output: SessionOutput): string {
-    return output.kind === 'sheet'
-      ? sheetNameFrom(influencerName)
-      : pickInfluencerName(item.profile.gender)
+    const taken = models.map((m) => m.name)
+    if (output.kind === 'sheet') return uniqueBankName(sheetNameFrom(influencerName), taken)
+    if (output.id === lineageKey) return uniqueBankName(influencerName, taken)
+    return variantNameFrom(influencerName, output.styleName, taken)
   }
 
   async function handleSave(output: SessionOutput, rawName: string) {

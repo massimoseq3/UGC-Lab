@@ -16,7 +16,7 @@ import DayPill from '../../../components/DayPill'
 import InfluencerEditModal from './InfluencerEditModal'
 import GeneratingTile from './GeneratingTile'
 import { buildJsonPrompt, buildImagePrompt } from '../services/generateCharacter'
-import { pickInfluencerName, sheetNameFrom } from './nameGenerator'
+import { pickInfluencerName, sheetNameFrom, uniqueBankName, variantNameFrom } from './nameGenerator'
 import { downloadImage } from '../../../utils/downloadImage'
 
 // List-view size-slider bounds. The raw value only drives the slider fill % and
@@ -255,18 +255,24 @@ function useHistoryTileActions(item: CharacterHistoryItem, onDelete: () => void 
   // The AI model that produced this image, shown as a small caption.
   const modelLabel = getModel(item.modelId)?.displayName ?? item.modelId
 
-  // A sheet derived from a portrait suggests the source influencer's saved name
-  // + " - Influencer Sheet" so it files alongside its portrait. Falls back to a
-  // fresh name when the source isn't (or no longer) saved to the bank.
-  const sourcePortrait = isSheet
-    ? characterHistory.find((h) => h.id === (item.lineageId ?? item.id) && h.kind !== 'sheet')
-    : undefined
+  // Anything derived from a portrait — a sheet or an edit — files under that
+  // character's name rather than a fresh random one: sheets take the
+  // " - Character Sheet" suffix, edits take the style they were rendered in
+  // ("Mia - Claymation") or the next free number ("Mia 2"). The fallback name is
+  // seeded on the lineage, so an unsaved character reads the same here and in
+  // the edit modal.
+  const lineageKey = item.lineageId ?? item.id
+  const isDerived = !!item.lineageId
+  const sourcePortrait = characterHistory.find((h) => h.id === lineageKey && h.kind !== 'sheet')
   const sourceModelName = sourcePortrait?.linkedModelId
     ? models.find((m) => m.id === sourcePortrait.linkedModelId)?.name
     : undefined
   function suggestSaveName(): string {
-    const base = sourceModelName ?? pickInfluencerName(item.profile.gender)
-    return isSheet ? sheetNameFrom(base) : base
+    const taken = models.map((m) => m.name)
+    const base = sourceModelName ?? pickInfluencerName(item.profile.gender, lineageKey)
+    if (isSheet) return uniqueBankName(sheetNameFrom(base), taken)
+    if (isDerived) return variantNameFrom(base, item.styleName, taken)
+    return uniqueBankName(base, taken)
   }
 
   function openNameInput() {

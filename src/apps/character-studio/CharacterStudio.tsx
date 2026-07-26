@@ -199,6 +199,7 @@ export default function CharacterStudio() {
         kind: gen.kind ?? 'portrait',
         // Derived gens (edit modal) rejoin their source's lineage strip.
         lineageId: gen.lineageId,
+        styleName: gen.styleName,
         createdAt: Date.now(),
       })
       // A lineage'd portrait can only have come from the modal's Edit tab —
@@ -247,6 +248,7 @@ export default function CharacterStudio() {
       kind: opts.kind,
       profile: opts.profile,
       lineageId: opts.lineageId,
+      styleName: opts.styleName,
     }
     setInFlight((prev) => [...prev, placeholder])
     setError(null)

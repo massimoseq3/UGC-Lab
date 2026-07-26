@@ -261,6 +261,10 @@ export interface CharacterHistoryItem {
   // by its own id); a derived gen inherits its source's lineage so reopening the
   // editor re-shows the whole strip. See InfluencerEditModal.
   lineageId?: string
+  // The visual style this edit was rendered in, when one was picked in the edit
+  // modal ("Claymation", a saved style's name). Label only — it never feeds a
+  // prompt; it's what lets a save suggest "Mia - Claymation".
+  styleName?: string
   linkedModelId?: string
   createdAt: number
 }
