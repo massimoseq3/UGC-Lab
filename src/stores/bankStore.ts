@@ -36,6 +36,12 @@ interface BankState {
   // every successful generation (the add*History actions call this). Feeds
   // the Dashboard's savings + streak metrics. Never decremented.
   recordUsage: (event: UsageEvent) => void
+  // Demo-seeding only (utils/mockData). Adds whole day rows, skipping any day
+  // that already has one — so seeded activity can never merge into, and then
+  // take down with it, a day of the member's real generations. Returns the ids
+  // it actually wrote, which the manifest keeps so removal is exact.
+  addUsageDays: (rows: UsageDay[]) => string[]
+  deleteUsageDays: (ids: string[]) => void
 
   // Product CRUD
   addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => Promise<string>
@@ -149,7 +155,7 @@ export function setUsageRecordingSuppressed(suppressed: boolean): void {
 
 // Fold one event into a day-row array (pure — shared by recordUsage and the
 // one-time history backfill).
-function foldUsageEvent(days: UsageDay[], event: UsageEvent): { days: UsageDay[]; row: UsageDay } {
+export function foldUsageEvent(days: UsageDay[], event: UsageEvent): { days: UsageDay[]; row: UsageDay } {
   const at = event.at ?? Date.now()
   const id = usageDayId(at)
   const credits = event.modelId ? (estimateCredits(event.modelId, event.params) ?? 0) : 0
@@ -423,6 +429,30 @@ export const useBankStore = create<BankState>((set, get) => ({
       return next
     })
     if (row) pushRow('usageDays', row)
+  },
+
+  addUsageDays: (rows) => {
+    const existing = new Set(get().usageDays.map((d) => d.id))
+    const fresh = rows.filter((d) => !existing.has(d.id))
+    if (fresh.length === 0) return []
+    set((state) => {
+      const next = { usageDays: [...state.usageDays, ...fresh] }
+      saveToStorage({ ...state, ...next })
+      return next
+    })
+    for (const row of fresh) pushRow('usageDays', row)
+    return fresh.map((d) => d.id)
+  },
+
+  deleteUsageDays: (ids) => {
+    if (ids.length === 0) return
+    const doomed = new Set(ids)
+    set((state) => {
+      const next = { usageDays: state.usageDays.filter((d) => !doomed.has(d.id)) }
+      saveToStorage({ ...state, ...next })
+      return next
+    })
+    for (const id of ids) dropRow('usageDays', id)
   },
 
   // ── Products ─────────────────────────────────────────────────────

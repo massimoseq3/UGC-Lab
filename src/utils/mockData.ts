@@ -10,9 +10,10 @@
 // Every created row's id is recorded in a localStorage manifest so the same
 // control can cleanly remove the demo data afterwards.
 
-import { useBankStore, setUsageRecordingSuppressed } from '../stores/bankStore'
+import { useBankStore, setUsageRecordingSuppressed, foldUsageEvent, type UsageEvent } from '../stores/bankStore'
 import { useAppStore } from '../stores/appStore'
 import { saveAsset } from './assetStore'
+import { getContinuousStyle } from './visualStyle'
 import type {
   CharacterHistoryItem,
   ScriptHistoryItem,
@@ -22,6 +23,7 @@ import type {
   VoiceHistoryItem,
   MusicHistoryItem,
   AdAnatomyHistoryItem,
+  UsageDay,
 } from '../stores/types'
 
 const MANIFEST_KEY = 'ugc-os:mock-data-manifest'
@@ -32,6 +34,14 @@ const MANIFEST_KEY = 'ugc-os:mock-data-manifest'
 // lets the user restore it from the History tab too.
 const BROLL_DRAFT_PREFIX = 'ai-ugc-lab:draft:broll-studio'
 const BROLL_SESSION_ID = 'demo-broll-session'
+// The Continuous storyboard rides History rather than the live draft: the
+// workspace holds one session at a time, and the Line-by-Line one owns it.
+// Clicking this row in History restores the whole keyframe chain.
+const BROLL_CONTINUOUS_SESSION_ID = 'demo-broll-continuous-session'
+// Seedance 1.5 Pro — Continuous' own default (frames-native, cheap per clip).
+const CONTINUOUS_MODEL_ID = 'bytedance/seedance-1.5-pro'
+// Grok Imagine Video 1.5 — B-Roll's default video model.
+const BROLL_VIDEO_MODEL_ID = 'grok-imagine-video-1-5-preview'
 
 interface Manifest {
   products: string[]
@@ -39,6 +49,7 @@ interface Manifest {
   scripts: string[]
   voices: string[]
   brolls: string[]
+  styles: string[]
   characterHistory: string[]
   scriptHistory: string[]
   imageHistory: string[]
@@ -47,12 +58,17 @@ interface Manifest {
   voiceHistory: string[]
   musicHistory: string[]
   adAnatomyHistory: string[]
+  // Day ids the seed added to the usage ledger. Only days that had NO row
+  // before seeding are written, so removal deletes exactly what we created and
+  // a member's real generation days are never touched.
+  usageDays: string[]
 }
 
 const EMPTY_MANIFEST: Manifest = {
-  products: [], models: [], scripts: [], voices: [], brolls: [],
+  products: [], models: [], scripts: [], voices: [], brolls: [], styles: [],
   characterHistory: [], scriptHistory: [], imageHistory: [], brollHistory: [],
   videoHistory: [], voiceHistory: [], musicHistory: [], adAnatomyHistory: [],
+  usageDays: [],
 }
 
 export function hasMockData(): boolean {
@@ -246,14 +262,61 @@ const INFLUENCERS = [
   { name: 'Sofia Reyes', from: '#a78bfa', to: '#7c3aed', profile: { gender: 'Female', age: '24', ethnicity: 'Latina', bodyType: 'curvy', skinTone: 'tan', eyeColor: 'hazel', hairColor: 'dark brown', hairStyle: 'wavy shoulder-length', clothingStyle: 'athleisure', location: 'home gym', lighting: 'soft ring light', expression: 'friendly', shotType: 'close-up', cameraDevice: 'shot on iPhone, photorealistic, UGC' } },
 ]
 
+// Extra product angles (Product.extraImages — the "More Angles" strip). Seeded
+// on the first product so the angle picker in every image-picking BankPicker has
+// something beyond the hero shot.
+const PRODUCT_ANGLES = [
+  { label: 'Box open', sub: 'ANGLE · unboxed' },
+  { label: 'Ingredients label', sub: 'ANGLE · back of bottle' },
+]
+
 const VOICES = [
-  { label: 'Warm Female VO', voiceName: 'Sulafat', gender: 'Female' as const },
-  { label: 'Confident Male VO', voiceName: 'Puck', gender: 'Male' as const },
+  // The first two carry a scene + tone, which is what makes them useful as
+  // Voiceovers presets (the Preset row loads delivery AND context in one tap).
+  {
+    label: 'Warm Female VO',
+    voiceName: 'Sulafat',
+    gender: 'Female' as const,
+    scene: 'Speaking straight to camera in a quiet sunlit bedroom, phone at arm’s length.',
+    sampleContext: 'Friendly and unhurried, like telling a friend about something that actually worked.',
+  },
+  {
+    label: 'Confident Male VO',
+    voiceName: 'Puck',
+    gender: 'Male' as const,
+    scene: 'Voiceover laid over fast-cut product footage.',
+    sampleContext: 'Assured and punchy, landing every claim without shouting.',
+  },
   { label: 'Friendly Female VO', voiceName: 'Leda', gender: 'Female' as const },
+]
+
+// Styles bank (B-Roll's saved visual looks). The brief IS the style — it's the
+// paragraph appended to every prompt rendered in that look, so each describes
+// only the LOOK, never anything from the frames it was read from.
+const STYLES = [
+  {
+    name: 'Sun-Bleached Super 8',
+    brief: 'Grainy sun-bleached 16mm-style footage with warm faded highlights, milky lifted blacks, and gentle gate weave. Colour skews amber and dusty rose, contrast is soft, and edges fall off into a mild halation. Movement carries a slight handheld drift and a hint of frame judder, as though shot on an old home-movie camera on a bright afternoon.',
+    frames: [{ from: '#fbbf24', to: '#c2410c' }, { from: '#fda4af', to: '#b45309' }],
+  },
+  {
+    name: 'Clean Studio Product',
+    brief: 'Immaculate tabletop product photography: seamless pale backdrop, one broad soft key from high left with a subtle fill card opposite, and crisp controlled shadows pooling directly under the subject. Surfaces read glossy and precise with tight specular highlights, colour is neutral and true, and the frame is uncluttered with generous negative space. Everything is sharp, still, and deliberately composed.',
+    frames: [{ from: '#e5e7eb', to: '#94a3b8' }, { from: '#f8fafc', to: '#cbd5e1' }],
+  },
+  {
+    name: 'Night Neon UGC',
+    brief: 'Handheld night footage lit by whatever the city provides: magenta and cyan neon spill, wet reflective surfaces, and deep shadows that hold visible sensor noise. Highlights bloom and smear slightly, white balance shifts between sources, and focus hunts for a beat before settling. Raw, unpolished, and alive with ambient light.',
+    frames: [{ from: '#a855f7', to: '#0e7490' }, { from: '#ec4899', to: '#1e1b4b' }],
+  },
 ]
 
 const SCRIPT_TEXT_1 = `Okay so I almost returned this serum… and now I'm on my third bottle.\n\nMy skin was so dull I'd cake on foundation just to look awake. Nothing worked.\n\nThen I tried this for a week — and people literally asked if I'd been on holiday.\n\nIt's 15% vitamin C, no sticky finish, zero fragrance. I just put it on, glow, done.\n\nThey're doing 20% off right now. Don't sleep on it.`
 const SCRIPT_TEXT_2 = `I thought I was just "bad at sleeping." Turns out I had no idea what was actually happening at night.\n\nThis little ring tracks my sleep, recovery, all of it — seven day battery, no subscription.\n\nFirst week it told me my late coffee was wrecking my deep sleep. Cut it. Now I actually wake up rested.\n\nIf you wake up tired for no reason, this is the move.`
+// Ad Analyzer's product-agnostic Script Style Prompt, saved to the Script Bank
+// as kind 'style' — the reusable recipe, not a script for one product.
+const STYLE_PROMPT = `STYLE: Skeptic-to-believer UGC testimonial.\n\nOpen on an admission that undercuts the ad ("I almost returned this") so the viewer reads it as a real opinion, not a pitch. Spend the next beat on the problem in concrete, unflattering detail — what it actually looked and felt like day to day. Turn on a specific moment of proof someone else noticed, never a claim about the product itself. Only then state the mechanism in plain specs, flatly, as though it barely matters. Close on a casual, low-pressure CTA with the current offer.\n\nDelivery: talking straight to the front camera, unscripted cadence, no adjectives a real person wouldn't use. Name the product at most twice.`
+
 const SCENE_PROMPT = `SCENE 1 — A-ROLL CHARACTER: @INFLUENCER talking to camera in a sunlit apartment, holding @PRODUCT, warm natural light, UGC selfie framing.\n\nSCENE 2 — B-ROLL DETAIL: extreme close-up of @PRODUCT, water droplets, soft studio light.\n\nSCENE 3 — A-ROLL PRODUCT: @INFLUENCER applying @PRODUCT in a mirror, satisfied expression.`
 
 const BROLLS = [
@@ -266,6 +329,8 @@ const BROLLS = [
 // A full B-Roll Studio session for the Glow Lab serum — scenes with variations,
 // each carrying a placeholder generation so the scene grid looks worked-on.
 // @INFLUENCER / @PRODUCT tokens mirror what the real scene-generation LLM emits.
+// Three variations per scene, matching VARIATIONS_PER_SCENE — a seeded session
+// has to fill the same four-cell row a real one does.
 const BROLL_SESSION_SCENES = [
   {
     type: 'A-ROLL CHARACTER' as const,
@@ -275,6 +340,7 @@ const BROLL_SESSION_SCENES = [
     variations: [
       { tag: 'DIALOGUE' as const, label: 'Talking to camera', refs: 'character' as const, from: '#fb7185', to: '#e11d48', prompt: "@INFLUENCER sits on the edge of her bed, phone held at arm's length, talking candidly into the front camera in a sunlit apartment. Natural handheld micro-jitter, UGC selfie framing, no on-screen text." },
       { tag: 'EMOTIONAL' as const, label: 'Skeptical glance', refs: 'character' as const, from: '#f472b6', to: '#be123c', prompt: '@INFLUENCER raises an eyebrow at the camera, half-smiling in disbelief, soft window light across her face, tight close-up UGC selfie.' },
+      { tag: 'ACTION' as const, label: 'The return box', refs: 'both' as const, from: '#e879f9', to: '#831843', prompt: 'A half-packed return box sits open on a bedroom floor with @PRODUCT balanced on the flap, a hand lifting it back out again, flat afternoon light, handheld close shot.' },
     ],
   },
   {
@@ -285,6 +351,7 @@ const BROLL_SESSION_SCENES = [
     variations: [
       { tag: 'PRODUCT' as const, label: 'Product detail', refs: 'product' as const, from: '#f59e0b', to: '#b45309', prompt: 'Extreme close-up of @PRODUCT glass bottle on a marble vanity, a single drop sliding down the dropper, soft morning light, photorealistic.' },
       { tag: 'ACTION' as const, label: 'Applying serum', refs: 'both' as const, from: '#fbbf24', to: '#d97706', prompt: '@INFLUENCER dispenses @PRODUCT onto her fingertips and pats it across her cheek in front of the bathroom mirror, bright daylight, UGC handheld.' },
+      { tag: 'PROOF' as const, label: 'Label in focus', refs: 'product' as const, from: '#fcd34d', to: '#92400e', prompt: 'Macro rack-focus across the back label of @PRODUCT until the 15% vitamin C line snaps sharp, fingers rotating the bottle slowly, soft window light.' },
     ],
   },
   {
@@ -295,6 +362,70 @@ const BROLL_SESSION_SCENES = [
     variations: [
       { tag: 'DIALOGUE' as const, label: 'Direct CTA', refs: 'both' as const, from: '#fb7185', to: '#9f1239', prompt: '@INFLUENCER holds @PRODUCT up beside her face, grinning at the camera as she delivers the call to action, warm natural light, UGC selfie.' },
       { tag: 'PRODUCT' as const, label: 'Hero shot', refs: 'product' as const, from: '#f59e0b', to: '#c2410c', prompt: '@PRODUCT standing centered on a clean countertop with soft shadows and a subtle glow, lifestyle hero shot, photorealistic.' },
+      { tag: 'ENVIRONMENT' as const, label: 'Shelf lineup', refs: 'both' as const, from: '#fb923c', to: '#7c2d12', prompt: '@PRODUCT sitting at the front of a lived-in bathroom shelf among everyday bottles, morning light through frosted glass, shot from just above shelf height.' },
+    ],
+  },
+]
+
+// A full B-Roll Continuous (keyframe-chain) session for the same serum. N
+// script lines → N scenes + N+1 keyframes, where keyframe N+1 is both scene N's
+// end state and scene N+1's start, so each clip is a frames-to-video gen. Three
+// concepts per frame, matching CONCEPTS_PER_FRAME — the seeded session has to
+// look like a real one, and a short row reads as a bug in the app.
+const CONTINUOUS_SCENES = [
+  {
+    scriptLine: "Okay so I almost returned this serum… and now I'm on my third bottle.",
+    motion: 'She lowers the bottle from beside her face and sets it down on the counter as she keeps talking, the camera easing a few inches closer over the move. Soft room tone under her voice.',
+    sfx: 'quiet bedroom ambience',
+    durationSeconds: 5,
+    productVisible: true,
+  },
+  {
+    scriptLine: "It's 15% vitamin C, no sticky finish, zero fragrance.",
+    motion: 'Her hand enters frame and tips the dropper, a single bead swelling and releasing onto her fingertips while the camera holds still. A faint glassy tap as the dropper returns.',
+    sfx: 'soft glass tap',
+    durationSeconds: 5,
+    productVisible: true,
+  },
+  {
+    scriptLine: "They're doing 20% off right now. Don't sleep on it.",
+    motion: 'She turns back toward the lens mid-sentence, breaking into a grin as the camera settles level with her eyes. Room tone only.',
+    sfx: 'room tone',
+    durationSeconds: 5,
+    productVisible: true,
+  },
+]
+
+// Keyframes: one per scene plus the closing end state. Each concept is a
+// different way to stage the same story state, caught at the instant its action
+// begins — the start-frame rule the real storyboard prompt enforces.
+const CONTINUOUS_FRAMES = [
+  {
+    concepts: [
+      { label: 'Bottle beside her face', shot: 'medium', from: '#fb7185', to: '#e11d48', prompt: 'A young woman sits on the edge of her bed in a sunlit bedroom, the serum bottle just lifted beside her cheek, mouth open on the first word. Warm window light rakes across her face from the left, the room soft and lived-in behind her, camera at eye level about a metre away.' },
+      { label: 'Caught mid-shrug', shot: 'close-up', from: '#f472b6', to: '#9f1239', prompt: 'Close on the same woman as her shoulders start to rise into a disbelieving shrug, eyebrows lifting, the bottle held loosely at chest height. Soft daylight from a window off to her left, plain wall behind, camera at eye level and close enough to hold her face and hands.' },
+      { label: 'Reaching for the return box', shot: 'medium-wide', from: '#e879f9', to: '#831843', prompt: 'She sits cross-legged on the bedroom floor beside a half-packed return box, hand just starting to lower the serum toward it, head turning toward the lens as she speaks. Flat afternoon light from a window behind her, camera at floor level a couple of metres back.' },
+    ],
+  },
+  {
+    concepts: [
+      { label: 'Bottle meets counter', shot: 'medium', from: '#f59e0b', to: '#b45309', prompt: 'The serum bottle is set down on a pale marble counter, her fingers still curled around the glass as it makes contact. Morning light from a window to the right throws a soft shadow across the stone, camera just above counter height and close.' },
+      { label: 'Reaching for the dropper', shot: 'close-up', from: '#fbbf24', to: '#c2410c', prompt: 'Her hand reaches into frame toward the dropper cap of the serum standing on a marble counter, fingertips a few centimetres away and closing. Bright diffused daylight, shallow clean background, camera low and level with the bottle.' },
+      { label: 'Bottle lands in the lineup', shot: 'medium', from: '#fcd34d', to: '#92400e', prompt: 'The serum is set down at the end of a row of bathroom shelf bottles, her fingers still on the glass as it meets the shelf. Warm side light from a frosted window, tiled wall behind, camera level with the shelf a step back.' },
+    ],
+  },
+  {
+    concepts: [
+      { label: 'Drop about to fall', shot: 'macro', from: '#fde68a', to: '#d97706', prompt: 'Macro on the glass dropper held above open fingertips, a single bead of serum swelling at the tip on the point of releasing. Soft bright daylight catches the amber liquid, background falls to a clean blur, camera inches from the dropper.' },
+      { label: 'Patting it in', shot: 'close-up', from: '#fb923c', to: '#9a3412', prompt: 'Her fingertips make first contact with her cheekbone, serum still glossy on the skin, the pat only just beginning. Bathroom mirror light, soft and even, camera at eye level and close on the side of her face.' },
+      { label: 'Palm tips toward the face', shot: 'medium', from: '#f97316', to: '#7c2d12', prompt: 'She raises her cupped palm toward her cheek, the serum pooled in it and beginning to tilt, chin lifting to meet the movement. Even daylight from a window ahead of her, soft bathroom background, camera at eye level a step away.' },
+    ],
+  },
+  {
+    concepts: [
+      { label: 'Turning back to camera', shot: 'medium', from: '#fb7185', to: '#9f1239', prompt: 'She begins turning her head back toward the lens, a grin starting at one corner of her mouth, the serum bottle raised beside her jaw. Warm window light, the sunlit bedroom soft behind her, camera at eye level about a metre out.' },
+      { label: 'Hero on the counter', shot: 'medium', from: '#f59e0b', to: '#c2410c', prompt: 'The serum bottle stands alone and centred on a clean pale counter as her hand withdraws from frame, soft shadow anchoring it to the surface. Warm daylight from the left, uncluttered background, camera level with the bottle.' },
+      { label: 'Settled back on the bed', shot: 'medium-wide', from: '#fda4af', to: '#7f1d1d', prompt: 'She settles back onto the end of the bed with the serum resting in her lap, still half-smiling at the lens. Warm window light across the duvet, the bedroom soft and open behind her, camera at seated eye level a couple of metres out.' },
     ],
   },
 ]
@@ -398,6 +529,7 @@ function idSnapshot() {
     scripts: s.scripts.map((x) => x.id),
     voices: s.voices.map((x) => x.id),
     brolls: s.brolls.map((x) => x.id),
+    styles: s.styles.map((x) => x.id),
     characterHistory: s.characterHistory.map((x) => x.id),
     scriptHistory: s.scriptHistory.map((x) => x.id),
     imageHistory: s.imageHistory.map((x) => x.id),
@@ -412,7 +544,9 @@ function idSnapshot() {
 function diffNewIds(before: ReturnType<typeof idSnapshot>): Manifest {
   const after = idSnapshot()
   const out = { ...EMPTY_MANIFEST }
-  for (const key of Object.keys(out) as (keyof Manifest)[]) {
+  // usageDays isn't a bank of rows we add by id — the seeder fills it in
+  // separately (only on days that had no row) and sets it on the manifest.
+  for (const key of Object.keys(after) as (keyof typeof after)[]) {
     const had = new Set(before[key])
     out[key] = after[key].filter((id) => !had.has(id))
   }
@@ -445,7 +579,17 @@ export async function seedMockData(): Promise<void> {
       const p = PRODUCTS[i]
       const img = await makeImageAsset({ w: 1024, h: 1024, from: p.from, to: p.to, label: p.name, sub: 'PRODUCT' })
       productImages.push(img)
+      // Extra angles on the first product only — one product with a populated
+      // "More Angles" strip is enough to exercise every image-picking BankPicker.
+      const extraImages = i === 0
+        ? await Promise.all(
+            PRODUCT_ANGLES.map((a) =>
+              makeImageAsset({ w: 1024, h: 1024, from: p.from, to: p.to, label: a.label, sub: a.sub }),
+            ),
+          )
+        : undefined
       await store.addProduct({
+        ...(extraImages ? { extraImages } : {}),
         productImage: img,
         productName: p.name,
         productDescription: p.desc,
@@ -481,8 +625,12 @@ export async function seedMockData(): Promise<void> {
     await store.addScript({ title: 'Glow Serum — Almost Returned It', scriptText: SCRIPT_TEXT_1, linkedProductId: '', source: 'script-architect', kind: 'remix' })
     await store.addScript({ title: 'Sleep Tracker — Bad At Sleeping', scriptText: SCRIPT_TEXT_2, linkedProductId: '', source: 'script-architect', kind: 'remix' })
     await store.addScript({ title: 'Serum Ad — Scene Blueprint', scriptText: SCENE_PROMPT, linkedProductId: '', source: 'script-architect', kind: 'reverse-engineer' })
+    // A saved Script Style Prompt — what Ad Analyzer writes into the Script Bank
+    // (kind 'style'): product-agnostic, so it can be pointed at anything.
+    await store.addScript({ title: 'Skeptic-to-Believer UGC', scriptText: STYLE_PROMPT, linkedProductId: '', source: 'script-architect', kind: 'style' })
 
-    // Voices bank
+    // Voices bank — presets carry their scene/tone, so loading one fills the
+    // whole right panel in a tap.
     for (const v of VOICES) {
       await store.addVoice({
         label: v.label,
@@ -494,7 +642,18 @@ export async function seedMockData(): Promise<void> {
         accent: 'Neutral',
         temperature: 1,
         linkedModelId: '',
+        ...('scene' in v ? { scene: v.scene, sampleContext: v.sampleContext } : {}),
       })
+    }
+
+    // Styles bank — B-Roll's saved looks, each with its reference frames.
+    for (const s of STYLES) {
+      const thumbRefs: string[] = []
+      for (let i = 0; i < s.frames.length; i++) {
+        const f = s.frames[i]
+        thumbRefs.push(await makeImageAsset({ w: 768, h: 1365, from: f.from, to: f.to, label: s.name, sub: `reference ${i + 1}` }))
+      }
+      await store.addStyle({ name: s.name, brief: s.brief, thumbRefs })
     }
 
     // B-Roll bank stills (sourceApp 'broll-studio' → show in B-Roll's Gallery)
@@ -701,13 +860,55 @@ export async function seedMockData(): Promise<void> {
         const v = sc.variations[vi]
         variations.push({ id: `demo-broll-s${sceneNumber}-v${vi}`, tag: v.tag, label: v.label, refs: v.refs, prompt: v.prompt })
         const img = await makeImageAsset({ w: 768, h: 1365, from: v.from, to: v.to, label: `Scene ${sceneNumber}`, sub: v.label })
+        // The first variation of the first two scenes is animated as well, so
+        // the grid shows video covers and "Download clips" has something to zip.
+        // The rest stay stills — which is also what leaves the new "Generate all
+        // videos" batch with real work to do.
+        const withClip = vi === 0 && si < 2
+        let videos: Array<Record<string, unknown>> = []
+        if (withClip) {
+          try {
+            const clip = await makeVideoAsset({ w: 540, h: 960, from: v.from, to: v.to, label: `Scene ${sceneNumber}`, sub: v.label })
+            videos = [{
+              url: clip,
+              modelId: BROLL_VIDEO_MODEL_ID,
+              prompt: v.prompt,
+              aspectRatio: '9:16',
+              durationSeconds: 5,
+              resolution: '480p',
+              audio: true,
+              mode: 'image-to-video',
+              createdAt: ago(brollTick),
+            }]
+            await store.addVideoHistory({
+              id: `demo-broll-clip-${sceneNumber}`,
+              modelId: BROLL_VIDEO_MODEL_ID,
+              prompt: v.prompt,
+              mode: 'image-to-video',
+              aspectRatio: '9:16',
+              durationSeconds: 5,
+              resolution: '480p',
+              audio: true,
+              videoUrl: clip,
+              thumbnailUrl: img,
+              sourceApp: 'broll-studio',
+              createdAt: ago(brollTick),
+            } satisfies VideoHistoryItem)
+          } catch (e) {
+            console.warn('[mockData] b-roll clip seed skipped', e)
+          }
+        }
         cardStates[`${sceneNumber}-${vi}`] = {
           editablePrompt: v.prompt,
           promptHistory: [v.prompt],
           promptHistoryIndex: 0,
           images: [{ imageUrl: img, prompt: v.prompt, modelId: 'nano-banana-2', createdAt: ago(brollTick++) }],
           currentImageIndex: 0,
-          selected: { kind: 'image', index: 0 },
+          videos,
+          currentVideoIndex: 0,
+          // Cover = the clip when there is one (that's what the card face plays
+          // and what Download clips pre-ticks), otherwise the still.
+          selected: videos.length > 0 ? { kind: 'video', index: 0 } : { kind: 'image', index: 0 },
           ...toToggles(v.refs),
         }
       }
@@ -724,6 +925,150 @@ export async function seedMockData(): Promise<void> {
       scriptText: SCRIPT_TEXT_1,
       result: brollResult,
       cardStates,
+    } satisfies BrollHistoryItem)
+
+    // B-Roll Continuous — a worked keyframe-chain session: every concept
+    // rendered, a keyframe picked per frame, and the first two clips animated.
+    // It lives in History rather than the live draft (the workspace holds one
+    // session, and the Line-by-Line one above owns it) — clicking the row
+    // restores the whole chain, mode toggle included.
+    const contStyle = getContinuousStyle('ugc')
+    const contScenes = CONTINUOUS_SCENES.map((s, i) => ({
+      index: i + 1,
+      scriptLine: s.scriptLine,
+      motionPrompt: s.motion,
+      sfx: s.sfx,
+      durationSeconds: s.durationSeconds,
+      productVisible: s.productVisible,
+    }))
+    const contFrames: Array<Record<string, unknown>> = []
+    const contFrameStates: Record<string, unknown> = {}
+    const contSelections: Record<string, unknown> = {}
+    let contTick = 0
+    for (let fi = 0; fi < CONTINUOUS_FRAMES.length; fi++) {
+      const frameIndex = fi + 1
+      const isFinal = fi === CONTINUOUS_FRAMES.length - 1
+      const concepts: Array<Record<string, unknown>> = []
+      for (let ci = 0; ci < CONTINUOUS_FRAMES[fi].concepts.length; ci++) {
+        const c = CONTINUOUS_FRAMES[fi].concepts[ci]
+        const conceptId = `demo-cont-f${frameIndex}-c${ci}`
+        concepts.push({
+          id: conceptId,
+          label: c.label,
+          shot: c.shot,
+          prompt: c.prompt,
+          refs: 'both',
+          // Motion belongs to the START frame's concept — the final frame has
+          // none, since nothing animates out of it.
+          ...(isFinal ? {} : { motionPrompt: CONTINUOUS_SCENES[fi].motion }),
+        })
+        const img = await makeImageAsset({ w: 768, h: 1365, from: c.from, to: c.to, label: `Frame ${frameIndex}`, sub: c.label })
+        contFrameStates[`${frameIndex}:${conceptId}`] = {
+          editablePrompt: c.prompt,
+          promptHistory: [c.prompt],
+          promptHistoryIndex: 0,
+          images: [{ imageUrl: img, prompt: c.prompt, modelId: 'nano-banana-2', createdAt: ago(contTick++) }],
+          currentImageIndex: 0,
+          inFlightImages: [],
+          chainLink: true,
+          refsCharacter: true,
+          refsProduct: true,
+          aspectRatio: '9:16',
+          resolution: '1K',
+          animateMotion: isFinal ? '' : CONTINUOUS_SCENES[fi].motion,
+          videos: [],
+          currentVideoIndex: 0,
+          inFlightVideos: [],
+          videoDurationSeconds: 5,
+          videoResolution: '480p',
+          videoAudio: true,
+        }
+        // The first concept of each frame is the picked keyframe.
+        if (ci === 0) contSelections[String(frameIndex)] = { conceptId, imageIndex: 0 }
+      }
+      contFrames.push({ index: frameIndex, concepts })
+    }
+
+    const contClipStates: Record<string, unknown> = {}
+    for (let si = 0; si < CONTINUOUS_SCENES.length; si++) {
+      const s = CONTINUOUS_SCENES[si]
+      const motion = `${s.motion}`
+      // Clips 1 and 2 are rendered; clip 3 is left for the user to generate, so
+      // "Generate all clips" has something to do on a freshly seeded workspace.
+      let videos: Array<Record<string, unknown>> = []
+      if (si < 2) {
+        try {
+          const c = CONTINUOUS_FRAMES[si].concepts[0]
+          const clip = await makeVideoAsset({ w: 540, h: 960, from: c.from, to: c.to, label: `Clip ${si + 1}`, sub: s.scriptLine.slice(0, 40) })
+          videos = [{
+            url: clip,
+            modelId: CONTINUOUS_MODEL_ID,
+            prompt: motion,
+            aspectRatio: '9:16',
+            durationSeconds: s.durationSeconds,
+            resolution: '480p',
+            audio: true,
+            mode: 'frames-to-video',
+            createdAt: ago(si),
+          }]
+          await store.addVideoHistory({
+            id: `demo-cont-clip-${si + 1}`,
+            modelId: CONTINUOUS_MODEL_ID,
+            prompt: motion,
+            mode: 'frames-to-video',
+            aspectRatio: '9:16',
+            durationSeconds: s.durationSeconds,
+            resolution: '480p',
+            audio: true,
+            videoUrl: clip,
+            sourceApp: 'broll-studio',
+            createdAt: ago(si),
+          } satisfies VideoHistoryItem)
+        } catch (e) {
+          console.warn('[mockData] continuous clip seed skipped', e)
+        }
+      }
+      contClipStates[`c${si + 1}`] = {
+        editablePrompt: motion,
+        promptHistory: [motion],
+        promptHistoryIndex: 0,
+        motionEdited: false,
+        videos,
+        currentVideoIndex: 0,
+        inFlightVideos: [],
+        durationSeconds: s.durationSeconds,
+        resolution: '480p',
+        audio: true,
+      }
+    }
+
+    await store.upsertBrollHistory({
+      id: BROLL_CONTINUOUS_SESSION_ID,
+      createdAt: ago(3),
+      inputSummary: 'Glow Lab Vitamin C Serum — continuous keyframe chain',
+      productId: sessionProductId,
+      modelId: sessionModelId,
+      scriptText: CONTINUOUS_SCENES.map((s) => s.scriptLine).join('\n'),
+      styleId: 'ugc',
+      styleName: contStyle.label,
+      mode: 'continuous',
+      // A continuous row carries no Line-by-Line result; the shape still
+      // requires both fields, so they go in empty (same as the live snapshot).
+      result: { scenes: [] },
+      cardStates: {},
+      continuousResult: {
+        style: contStyle.brief,
+        styleId: 'ugc',
+        realism: true,
+        modelId: CONTINUOUS_MODEL_ID,
+        scenes: contScenes,
+        frames: contFrames,
+      },
+      continuousFrameStates: contFrameStates,
+      continuousClipStates: contClipStates,
+      continuousSelections: contSelections,
+      continuousStyleId: 'ugc',
+      continuousModelId: CONTINUOUS_MODEL_ID,
     } satisfies BrollHistoryItem)
 
     // Seed the live workspace draft — but never clobber a real in-progress
@@ -745,7 +1090,57 @@ export async function seedMockData(): Promise<void> {
   }
 
   const manifest = diffNewIds(before)
+  manifest.usageDays = seedUsageLedger()
   try { localStorage.setItem(MANIFEST_KEY, JSON.stringify(manifest)) } catch { /* ignore */ }
+}
+
+// ── Usage ledger ───────────────────────────────────────────────────────────
+
+// The Dashboard reads nothing but `usageDays`, so without it the landing page
+// of a demo install is all zeroes — no streak, no savings, an empty heatmap.
+// This fills the last ~9 weeks with a plausible working rhythm.
+//
+// Two rules keep it safe: rows are folded through the SAME foldUsageEvent the
+// live app uses (so credits and official-USD are priced by the real registry,
+// never invented), and `addUsageDays` skips any day that already has a row — a
+// member with genuine activity keeps every one of their own days untouched, and
+// removal deletes only the ids seeded here.
+function seedUsageLedger(): string[] {
+  // A week's shape: quiet at the weekend, heaviest midweek. Index = weekday
+  // (0 = Sunday). Multiplied by a per-week ramp so recent weeks look busier.
+  const BY_WEEKDAY = [0, 3, 5, 4, 6, 3, 1]
+  const DAY_MS = 24 * 60 * 60 * 1000
+  // What one "session" of work looks like, in the proportions the apps actually
+  // get used: mostly stills, a couple of clips, the odd voiceover or analysis.
+  const MIX: UsageEvent[] = [
+    { kind: 'image', modelId: 'nano-banana-2', params: { imageCount: 1, resolution: '1K' } },
+    { kind: 'image', modelId: 'nano-banana-2', params: { imageCount: 1, resolution: '1K' } },
+    { kind: 'image', modelId: 'nano-banana-2', params: { imageCount: 1, resolution: '1K' } },
+    { kind: 'video', modelId: BROLL_VIDEO_MODEL_ID, params: { durationSeconds: 5, resolution: '480p' } },
+    { kind: 'video', modelId: CONTINUOUS_MODEL_ID, params: { durationSeconds: 5, resolution: '720p' } },
+    { kind: 'character', modelId: 'gpt-image-2-text-to-image', params: { imageCount: 1, resolution: '1K' } },
+    { kind: 'voice' },
+    { kind: 'script' },
+    { kind: 'analysis' },
+  ]
+
+  const now = new Date()
+  let days: UsageDay[] = []
+  // 63 days back through today. The current day gets activity too, so the
+  // streak chip in the menu bar reads as live.
+  for (let back = 62; back >= 0; back--) {
+    const at = new Date(now.getTime() - back * DAY_MS)
+    const weeksAgo = Math.floor(back / 7)
+    const ramp = weeksAgo >= 7 ? 0.4 : weeksAgo >= 4 ? 0.7 : 1
+    const count = Math.round(BY_WEEKDAY[at.getDay()] * ramp)
+    for (let i = 0; i < count; i++) {
+      // Spread each day's work across the working hours so createdAt looks real.
+      const stamp = new Date(at)
+      stamp.setHours(9 + (i % 9), (i * 17) % 60, 0, 0)
+      days = foldUsageEvent(days, { ...MIX[i % MIX.length], at: stamp.getTime() }).days
+    }
+  }
+  return useBankStore.getState().addUsageDays(days)
 }
 
 // ── Remove ─────────────────────────────────────────────────────────────────
@@ -764,6 +1159,7 @@ export async function removeMockData(): Promise<void> {
     for (const id of manifest.scripts) await store.deleteScript(id)
     for (const id of manifest.voices) await store.deleteVoice(id)
     for (const id of manifest.brolls) await store.deleteBRoll(id)
+    for (const id of manifest.styles) await store.deleteStyle(id)
     for (const id of manifest.characterHistory) await store.deleteCharacterHistory(id)
     for (const id of manifest.scriptHistory) await store.deleteScriptHistory(id)
     for (const id of manifest.imageHistory) await store.deleteImageHistory(id)
@@ -772,6 +1168,9 @@ export async function removeMockData(): Promise<void> {
     for (const id of manifest.voiceHistory) await store.deleteVoiceHistory(id)
     for (const id of manifest.musicHistory) await store.deleteMusicHistory(id)
     for (const id of manifest.adAnatomyHistory) await store.deleteAdAnatomyHistory(id)
+    // Only the day rows this seed created (days that had none of the member's
+    // own activity) — see seedUsageLedger.
+    store.deleteUsageDays(manifest.usageDays)
   } finally {
     useAppStore.setState({ addToast: realAddToast })
   }
