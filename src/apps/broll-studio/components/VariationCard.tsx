@@ -22,7 +22,7 @@ import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
 import type { PromptVariation, CardState, GeneratedImage, ReferenceImage, BatchVideoSettings } from '../types'
 import type { VideoHistoryItem, Product, Model, BRoll } from '../../../stores/types'
 import { enhanceVariationPrompt, generateNewVariation, startImageTask, finishImageTask, buildDialogueChainPreamble, resolveImageModelId } from '../services/generateBroll'
-import { attachProductAngles } from '../services/productAngles'
+import { attachProductAngles, productRefsForSelection } from '../services/productAngles'
 import { applyStyleToPrompt } from '../services/generateContinuous'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
 import { claimTask, releaseTask } from '../services/taskRegistry'
@@ -53,9 +53,10 @@ interface VariationCardProps {
   onDelete: () => void
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
-  // The product's extra bank angles, auto-attached behind the hero shot
-  // whenever the product ref is on. See attachProductAngles.
-  productAngleRefs?: ReferenceImage[]
+  // Every photo the product bank row holds, hero first. The card sends the
+  // one(s) its scene actually needs — see CardState.productPhotos.
+  productPhotos?: string[]
+  onChangeStyle?: () => void
   selectedProduct?: Product | null
   selectedModel?: Model | null
   selectedProductId?: string
@@ -104,7 +105,8 @@ export default function VariationCard(props: VariationCardProps) {
     onDelete,
     characterRef,
     productRef,
-    productAngleRefs,
+    productPhotos,
+    onChangeStyle,
     selectedProduct,
     selectedModel,
     selectedProductId,
@@ -210,20 +212,28 @@ export default function VariationCard(props: VariationCardProps) {
   // (cardState.refsCharacter / refsProduct), which the user controls via
   // the tick-circle button in each ReferenceSlotCard.
   //
+  // Which of the product's photos this card sends. The storyboard picked the
+  // state the shot is in (sealed wrapper / unwrapped / open box); the member can
+  // re-tick it in the modal's photo strip. First pick is THE product reference,
+  // any others ride behind it as angles.
+  const { product: pickedProductRef, angles: pickedAngles } = productRefsForSelection(
+    productPhotos ?? [],
+    cardState.productPhotos,
+  )
+
   // `modelId` is the model the request will really run on — it decides how many
-  // of the product's extra angles fit. Omitted (image gens) → the resolved image
-  // model. Nothing the user chose is ever dropped; only the auto angles are
-  // clamped.
+  // of the extra angles fit. Omitted (image gens) → the resolved image model.
+  // Nothing the user chose is ever dropped; only the auto angles are clamped.
   const buildCardRefs = (modelId?: string): ReferenceImage[] => {
     const out: ReferenceImage[] = []
     const productOn = !!productRef && cardState.refsProduct !== false
     if (characterRef && cardState.refsCharacter !== false) out.push(characterRef)
-    if (productOn) out.push(productRef!)
+    if (productOn && pickedProductRef) out.push(pickedProductRef)
     // Any extra references the user attached in the modal ride along too.
     out.push(...extraRefs)
     return attachProductAngles({
       manual: out,
-      angles: productOn ? productAngleRefs ?? [] : [],
+      angles: productOn ? pickedAngles : [],
       modelId: modelId ?? resolveImageModelId(true),
       // A chained DIALOGUE card prepends the previous cut at fire time.
       reserved: chainRef ? 1 : 0,
@@ -1101,7 +1111,8 @@ export default function VariationCard(props: VariationCardProps) {
           resultRealism={resultRealism}
           characterRef={characterRef}
           productRef={productRef}
-          productAngleRefs={productAngleRefs}
+          productPhotos={productPhotos}
+          onChangeStyle={onChangeStyle}
           selectedProduct={selectedProduct}
           selectedModel={selectedModel}
           selectedProductId={selectedProductId}

@@ -16,7 +16,7 @@ import {
   variationsForDelivery,
 } from './generateBroll'
 import {
-  CONTINUOUS_SYSTEM,
+  continuousSystemInstruction,
   buildContinuousUserPrompt,
   parseContinuousResult,
   scriptLines as splitScriptLines,
@@ -37,6 +37,10 @@ export interface ImportContext {
   styleName?: string
   lineDelivery: BrollDelivery
   continuousModelId: string
+  // How many photos the selected product holds. More than one and the brief
+  // carries the same <PHOTOS> pick rules the live call sends — the outside
+  // model can't see the photos, but the member can tell it what each one is.
+  productPhotoCount?: number
 }
 
 export interface ImportParsed {
@@ -227,7 +231,7 @@ export function buildImportBrief(mode: BrollMode, ctx: ImportContext): string {
       styleName: ctx.styleName,
       delivery: ctx.lineDelivery,
     }
-    return [brollSystemInstruction(ctx.lineDelivery), buildBrollUserPrompt(input), importTail('line')].join('\n\n')
+    return [brollSystemInstruction(ctx.lineDelivery, ctx.productPhotoCount), buildBrollUserPrompt(input), importTail('line')].join('\n\n')
   }
 
   const input: ContinuousInput = {
@@ -239,5 +243,5 @@ export function buildImportBrief(mode: BrollMode, ctx: ImportContext): string {
     modelContext: ctx.modelContext,
     additionalContext: ctx.additionalContext,
   }
-  return [CONTINUOUS_SYSTEM, buildContinuousUserPrompt(input), importTail('continuous')].join('\n\n')
+  return [continuousSystemInstruction(ctx.productPhotoCount), buildContinuousUserPrompt(input), importTail('continuous')].join('\n\n')
 }

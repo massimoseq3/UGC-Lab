@@ -34,13 +34,13 @@ import SegmentedToggle from '../../../components/SegmentedToggle'
 import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
-import { ReferenceSlotCard, ExtraRefsRow, PendingMediaTile, ModalVideoPlayer, StyleNote } from './cardDetailParts'
+import { ReferenceSlotCard, ExtraRefsRow, ProductPhotoRow, PendingMediaTile, ModalVideoPlayer, StyleNote } from './cardDetailParts'
 import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import type { ContinuousFrameCardState, ContinuousClipCardState, GeneratedVideo, ReferenceImage } from '../types'
 import type { Product, Model } from '../../../stores/types'
 import { CONTINUOUS_MODEL_IDS } from '../services/generateContinuous'
 import { resolveImageModelId } from '../services/generateBroll'
-import { productAngleSlots } from '../services/productAngles'
+import { productAngleSlots, normalizePhotoSelection } from '../services/productAngles'
 import { useAppStore } from '../../../stores/appStore'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
@@ -111,7 +111,8 @@ interface ContinuousFrameModalProps {
   chainImageRef?: string
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
-  productAngleRefs?: ReferenceImage[]
+  productPhotos?: string[]
+  onChangeStyle?: () => void
   selectedModel?: Model | null
   selectedProduct?: Product | null
   // Extra user-attached reference images (memory-only, like the Line-by-Line
@@ -153,7 +154,8 @@ export function ContinuousFrameModal({
   chainImageRef,
   characterRef,
   productRef,
-  productAngleRefs,
+  productPhotos,
+  onChangeStyle,
   selectedModel,
   selectedProduct,
   extraRefs,
@@ -205,9 +207,11 @@ export function ContinuousFrameModal({
     ?? getDefaultModel('broll-studio', 'image', 'text-to-image')?.id
   const imageConstraints = imageModelId ? getModel(imageModelId)?.imageConstraints : undefined
 
-  // How many of the product's extra bank angles this frame's gen will really
-  // carry — they fill the slots the image model has left after the chain,
-  // character, product and any hand-attached refs.
+  // Which of the product's photos this frame sends — the storyboard picked the
+  // state its staging is in, and the strip below overrides it. The first pick IS
+  // the product reference; anything past it fills the slots the image model has
+  // left after the chain, character, product and hand-attached refs.
+  const photoSelection = normalizePhotoSelection(cardState.productPhotos, productPhotos?.length ?? 0)
   const angleCount = cardState.refsProduct && productRef
     ? productAngleSlots({
         manualCount:
@@ -215,7 +219,7 @@ export function ContinuousFrameModal({
           (cardState.refsCharacter && characterRef ? 1 : 0) +
           1 +
           extraRefs.length,
-        angleCount: productAngleRefs?.length ?? 0,
+        angleCount: Math.max(0, photoSelection.length - 1),
         modelId: resolveImageModelId(true),
       })
     : 0
@@ -290,7 +294,7 @@ export function ContinuousFrameModal({
               <div className="-mx-5 -mt-1 border-b border-ink/5" />
 
               {frameTab === 'image' && (<>
-              <StyleNote style={style} />
+              <StyleNote style={style} onChange={onChangeStyle} />
 
               {/* Reference toggles — the chain ref (previous keyframe) is the
                   continuity lock; character/product fix identity. */}
@@ -327,13 +331,23 @@ export function ContinuousFrameModal({
                       kind="Product"
                       note={angleCount > 0 ? `+${angleCount} angle${angleCount > 1 ? 's' : ''}` : null}
                       name={selectedProduct?.productName}
-                      imageRef={productRef.dataUrl}
+                      imageRef={productPhotos?.[photoSelection[0]] ?? productRef.dataUrl}
                       onClick={() => onUpdate((p) => ({ refsProduct: !p.refsProduct }))}
                       active={cardState.refsProduct}
                       onToggleActive={() => onUpdate((p) => ({ refsProduct: !p.refsProduct }))}
                     />
                   )}
                 </div>
+              )}
+
+              {/* Which product photo this staging is built from — only shown
+                  when the bank row holds more than one. See ProductPhotoRow. */}
+              {cardState.refsProduct && productRef && (
+                <ProductPhotoRow
+                  photos={productPhotos ?? []}
+                  selection={photoSelection}
+                  onChange={(next) => onUpdate(() => ({ productPhotos: next }))}
+                />
               )}
 
               {/* Extra references — attach more (a prop, a location, a pose). */}
@@ -825,6 +839,9 @@ interface ContinuousClipModalProps {
   onDeleteVideo: (index: number) => void
   onRetryInFlight: (id: string) => void
   onDismissInFlight: (id: string) => void
+  // Opens the style popup — the look is session-wide, so a clip modal can
+  // change it as readily as the left panel can.
+  onChangeStyle?: () => void
 }
 
 export function ContinuousClipModal({
@@ -832,6 +849,7 @@ export function ContinuousClipModal({
   sceneNumber,
   scriptLine,
   style,
+  onChangeStyle,
   cardState,
   modelId,
   startImageRef,
@@ -959,7 +977,7 @@ export function ContinuousClipModal({
                 </p>
               )}
 
-              <StyleNote style={style} />
+              <StyleNote style={style} onChange={onChangeStyle} />
 
               {/* Motion prompt — how the shot animates from the first frame to
                   the last. Auto-filled from the picked keyframe's own motion.

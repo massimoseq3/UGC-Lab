@@ -55,7 +55,7 @@ import type {
 import type { Product, Model, VideoHistoryItem, BRoll } from '../../../stores/types'
 import { createDefaultContinuousFrameState, createDefaultContinuousClipState } from '../cardState'
 import { startImageTask, finishImageTask, resolveImageModelId } from '../services/generateBroll'
-import { attachProductAngles, countProductAngles } from '../services/productAngles'
+import { attachProductAngles, countProductAngles, productRefsForSelection } from '../services/productAngles'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
 import { claimTask, releaseTask } from '../services/taskRegistry'
 import {
@@ -107,7 +107,8 @@ interface ContinuousViewProps {
   error?: string | null
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
-  productAngleRefs?: ReferenceImage[]
+  productPhotos?: string[]
+  onChangeStyle?: () => void
   selectedModel?: Model | null
   selectedProduct?: Product | null
   // Plain-text context strings — ground the per-frame Enhance / Regenerate.
@@ -139,7 +140,8 @@ export default function ContinuousView({
   error,
   characterRef,
   productRef,
-  productAngleRefs,
+  productPhotos,
+  onChangeStyle,
   selectedModel,
   selectedProduct,
   productContext,
@@ -417,17 +419,18 @@ export default function ContinuousView({
     }
     const cardExtras = extraRefs[key] ?? []
     const productOn = !!(card.refsProduct && productRef)
+    // The photos this frame's staging needs: the storyboard named the state
+    // (sealed / unwrapped / open box) and the member can re-tick it in the
+    // frame modal. First pick is THE product reference; any others ride behind.
+    const picked = productRefsForSelection(productPhotos ?? [], card.productPhotos)
     const refs: ReferenceImage[] = attachProductAngles({
       manual: [
         ...(chainRefUrl ? [{ dataUrl: chainRefUrl, label: 'style' }] : []),
         ...(card.refsCharacter && characterRef ? [characterRef] : []),
-        ...(productOn ? [productRef!] : []),
+        ...(productOn && picked.product ? [picked.product] : []),
         ...cardExtras,
       ],
-      // The extra angles show the product in the states the hero shot can't —
-      // out of the box, opened, from the back — and fill whatever slots the
-      // image model has left.
-      angles: productOn ? productAngleRefs ?? [] : [],
+      angles: productOn ? picked.angles : [],
       modelId: resolveImageModelId(true),
     })
     // A product exists in the bank but this frame is not attaching it — the
@@ -1524,7 +1527,8 @@ export default function ContinuousView({
           chainImageRef={openFrame.index > 1 ? keyframeRef(openFrame.index - 1) : undefined}
           characterRef={characterRef}
           productRef={productRef}
-          productAngleRefs={productAngleRefs}
+          productPhotos={productPhotos}
+          onChangeStyle={onChangeStyle}
           selectedModel={selectedModel}
           selectedProduct={selectedProduct}
           extraRefs={extraRefs[openFrameKey] ?? []}
@@ -1573,6 +1577,7 @@ export default function ContinuousView({
           sceneNumber={openScene.index}
           scriptLine={openScene.scriptLine}
           style={result.style}
+          onChangeStyle={onChangeStyle}
           cardState={openClipCard}
           modelId={continuousModelId}
           startImageRef={keyframeRef(openScene.index)}
