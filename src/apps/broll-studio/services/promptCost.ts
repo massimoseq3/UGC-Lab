@@ -8,9 +8,9 @@
 // which is the honest, useful signal (prompt writing is cheap; the image and
 // video generations that follow are where the credits actually go).
 
-import type { BrollMode } from '../types'
+import type { BrollDelivery, BrollMode } from '../types'
 import { estimateCredits, getDefaultModel } from '../../../utils/models'
-import { VARIATIONS_PER_SCENE } from './generateBroll'
+import { variationsForDelivery } from './generateBroll'
 import { CONCEPTS_PER_FRAME } from './generateContinuous'
 
 // Rough chars-per-token for English prose.
@@ -39,7 +39,13 @@ function sentenceCount(scriptText: string): number {
 
 // Estimated credits for the prompt-writing call(s) behind a mode's Generate
 // button. Null when the chat model has no pricing entry (never in practice).
-export function estimatePromptCredits(mode: BrollMode, scriptText: string): number | null {
+export function estimatePromptCredits(
+  mode: BrollMode,
+  scriptText: string,
+  // Line-by-Line only — "With Dialogue" writes a fourth (talking) prompt per
+  // scene, so it costs a third more output than the silent delivery.
+  delivery: BrollDelivery = 'silent',
+): number | null {
   const chatModelId = getDefaultModel('broll-studio', 'chat')?.id
   if (!chatModelId) return null
   const scriptTokens = Math.ceil(scriptText.length / CHARS_PER_TOKEN)
@@ -50,9 +56,9 @@ export function estimatePromptCredits(mode: BrollMode, scriptText: string): numb
 
   switch (mode) {
     case 'line':
-      // One call: every scene gets VARIATIONS_PER_SCENE variations.
+      // One call: every scene gets this delivery's variation count.
       inputTokens = SYSTEM_TOKENS.line + scriptTokens
-      outputTokens = scenes * VARIATIONS_PER_SCENE * TOKENS_PER_VARIATION
+      outputTokens = scenes * variationsForDelivery(delivery) * TOKENS_PER_VARIATION
       break
     case 'continuous':
       // One call: N+1 frames × concepts, plus a motion block per scene.

@@ -20,7 +20,6 @@ import {
   Trash2,
   Copy,
   ArrowDown,
-  Palette,
   Sparkles,
   Undo2,
   Redo2,
@@ -35,7 +34,7 @@ import SegmentedToggle from '../../../components/SegmentedToggle'
 import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
-import { ReferenceSlotCard, ExtraRefsRow, PendingMediaTile, ModalVideoPlayer } from './cardDetailParts'
+import { ReferenceSlotCard, ExtraRefsRow, PendingMediaTile, ModalVideoPlayer, StyleNote } from './cardDetailParts'
 import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import type { ContinuousFrameCardState, ContinuousClipCardState, GeneratedVideo, ReferenceImage } from '../types'
 import type { Product, Model } from '../../../stores/types'
@@ -96,26 +95,6 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
       </div>
     </div>
   ), document.body)
-}
-
-// The storyboard-wide style block — shown read-only so the user knows what
-// rides along with every prompt without being able to fork it per-frame.
-function StyleNote({ style }: { style: string }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <button
-      type="button"
-      onClick={() => setOpen((v) => !v)}
-      className="flex w-full items-start gap-2 rounded-2xl border border-ink/10 bg-ink/[0.02] px-3.5 py-2.5 text-left transition-colors hover:bg-ink/[0.04]"
-      title={open ? 'Collapse' : 'Show the full style block'}
-    >
-      <Palette className="mt-0.5 h-3.5 w-3.5 shrink-0 text-broll-300" />
-      <span className={`min-w-0 flex-1 text-[11px] leading-relaxed text-ink-500 ${open ? '' : 'line-clamp-2'}`}>
-        <span className="font-semibold text-ink-400">Style (applied automatically): </span>
-        {style}
-      </span>
-    </button>
-  )
 }
 
 // ── Frame modal — keyframe concept workspace ───────────────────

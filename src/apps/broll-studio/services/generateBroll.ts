@@ -35,10 +35,24 @@ function nextId() {
 export const VARIATIONS_PER_SCENE = 3
 
 /**
- * How many <VAR_N> blocks the parser will still READ. Deliberately one more
- * than we ask for: a storyboard written before the cut — or pasted in through
- * Import prompts from an older brief — carries a VAR_4, and silently dropping
- * a prompt the member already wrote is worse than showing a fourth card.
+ * How many variations a "With Dialogue" scene gets: the talking-to-camera card
+ * PLUS the same three b-roll ideas a silent scene gets. The dialogue card is an
+ * extra deliverable, not a replacement — spending one of the three b-roll slots
+ * on it left only two ways to cut away from the talking head.
+ */
+export const DIALOGUE_VARIATIONS_PER_SCENE = VARIATIONS_PER_SCENE + 1
+
+/** How many variations a scene gets in this delivery. */
+export function variationsForDelivery(delivery: BrollDelivery): number {
+  return delivery === 'dialogue' ? DIALOGUE_VARIATIONS_PER_SCENE : VARIATIONS_PER_SCENE
+}
+
+/**
+ * How many <VAR_N> blocks the parser will still READ. Deliberately at least one
+ * more than the silent mode asks for: a storyboard written before the cut to
+ * three — or pasted in through Import prompts from an older brief — carries a
+ * VAR_4, and silently dropping a prompt the member already wrote is worse than
+ * showing a fourth card. It is also exactly what dialogue delivery asks for.
  */
 const MAX_PARSED_VARIATIONS = 4
 
@@ -119,7 +133,7 @@ Lens rules:
 
 You decide per variation:
 - LABEL — a short slug naming the actual idea (e.g. "CARDBOARD BITE", "BAR HITS THE BIN", "DRAWER OF REJECTS"). Two-to-four words.
-- REFS — which reference images to attach: character / product / both / none. ERR ON THE SIDE OF ATTACHING — a reference the model doesn't strictly need is harmless, but a missing one loses the character's face or the product's exact look. Attach the character reference whenever a person (or even just their hands, for POV) could appear, OR whenever holding the character's look consistent might help — when unsure, attach it. Attach the product reference whenever the product could appear or its exact packaging/shape could inform the frame — when unsure, attach it. Prefer "both" whenever both could plausibly help. Reserve "none" only for shots that clearly show neither a person nor the product (a bare environment, an abstract insert). The ONE hard exclusion: when VISIBILITY is no, REFS must NOT include product — the product cannot appear at all in that shot.
+- REFS — which reference images to attach: character / product / both / none. ERR ON THE SIDE OF ATTACHING — a reference the model doesn't strictly need is harmless, but a missing one loses the character's face or the product's exact look. Attach the character reference whenever a person (or even just their hands, for POV) could appear, OR whenever holding the character's look consistent might help — when unsure, attach it. Attach the product reference whenever the product could appear or its exact packaging/shape could inform the frame — when unsure, attach it. Prefer "both" whenever both could plausibly help. Reserve "none" only for shots that clearly show neither a person nor the product (a bare environment, an abstract insert). Two rules are absolute: when VISIBILITY is no, REFS must NOT include product — the product cannot appear at all in that shot. When VISIBILITY is yes, REFS MUST include product on EVERY variation of that scene — the voiceover is talking about the product, so the shot has to be built from the real packaging rather than the model's invention of it.
 
 # PROMPT FORMAT (EVERY PROMPT, EVERY VARIATION)
 
@@ -138,7 +152,7 @@ The ONE exception: a PROOF shot may show a screen as the deliberate subject bein
 
 1. SCRIPT SEGMENTATION — ONE LINE, ONE IDEA. A scene is one shot, and one shot can only show one thing. Split any sentence carrying two visual ideas into two <LINE>s — the giveaway is a turn ("but", "though", "however", "until", "then", "so", "that's why") or a problem paired with its solution, a before with its after, a claim with its proof. "Most taste like chewed up cardboard, but this one tastes like real cookie dough" is TWO lines: the complaint, then the fix. Never cut mid-clause, and every <LINE> must be a speakable phrase of at least five words — merge anything shorter forward ("Listen up." + "This serum changed my skin." → one <LINE>). Never a standalone scene for "Listen up", "Be honest", "So...", "Right?". The <LINE>s are the actual voiceover: use the script's exact words in the script's order, dropping only a connecting word at a split. Never paraphrase, add, or reorder.
 
-2. PRODUCT VISIBILITY IS LOCKED TO THE VOICEOVER — if VISIBILITY is no, the product appears nowhere: not in the background, not blurred, not implied by packaging-coloured objects. If the line itself names or references the product ("this bar", "I tried it"), VISIBILITY is YES regardless of position — the viewer hears it named, so the shot may show it.
+2. PRODUCT VISIBILITY IS LOCKED TO THE VOICEOVER — if VISIBILITY is no, the product appears nowhere: not in the background, not blurred, not implied by packaging-coloured objects. If the line itself names or references the product ("this bar", "I tried it"), VISIBILITY is YES regardless of position — the viewer hears it named, so the shot may show it, and every variation of that scene carries <REFS> that include product.
 
 2b. THE BAD VERSION IS ALWAYS GENERIC — when VISIBILITY is no but the line still needs a category object on screen (the cardboard-tasting bar, the serum that did nothing, the old gadget), that object is an UNBRANDED STAND-IN and you must say so in the prompt: plain matte packaging, no logo, no brand name, no readable text, in colours and a shape deliberately unlike the advertised product. "A brittle chalky bar in a plain unmarked grey wrapper, no logo or text anywhere" is right; "a protein bar" is wrong — the model fills that blank with the attached product reference and the ad ends up trashing its own product. The words "the product" mean the advertised product and nothing else; never use them for a stand-in.
 
@@ -207,14 +221,18 @@ Wrap every scene in this exact XML envelope. Do not include any text outside the
 // while leaving the other variations untouched. The dialogue card is
 // deliberately light — a single independent clip, so no shared VOICE PROFILE
 // block per card; the character just speaks the scene's line.
+//
+// It ADDS a fourth variation rather than spending one of the three: the talking
+// card is an extra deliverable, and taking a b-roll slot for it left only two
+// ways to cut away from the talking head.
 const DIALOGUE_DELIVERY_ADDENDUM = `
 
 # DELIVERY OVERRIDE — WITH DIALOGUE (READ LAST, HIGHEST PRIORITY)
 
-This ad is delivered WITH DIALOGUE. For EVERY scene, VAR_1 is NOT silent b-roll — it is a talking-to-camera DIALOGUE shot. VAR_2 and VAR_3 stay silent b-roll exactly as described above (two genuinely different lenses).
+This ad is delivered WITH DIALOGUE. Every scene gets FOUR variations, not three — this overrides the "produce 3 variations" instruction above. VAR_1 is NOT silent b-roll: it is a talking-to-camera DIALOGUE shot. VAR_2, VAR_3 and VAR_4 are the three silent b-roll ideas exactly as described above — three genuinely different lenses, three genuinely different concepts, judged by the same standard (no filler; if one is weaker than the others, replace it). Emit a <VAR_4> block in the same shape as the others, inside the same <SCENE> envelope.
 
 VAR_1 rules, every scene:
-- <TAG>DIALOGUE</TAG> and <REFS>character</REFS>.
+- <TAG>DIALOGUE</TAG>, and <REFS>character</REFS> — or <REFS>both</REFS> when VISIBILITY is yes, since the character may hold the product up as they talk about it.
 - The character is on camera, looking into the lens, and SPEAKS the scene's exact <LINE> word-for-word. Write ONE flowing paragraph that embeds the line verbatim, e.g.: "the character, [expression/gesture], looks into the lens and says: \\"<the exact line>\\"". A real person talking to their phone — natural, not a news anchor.
 - Describe the delivery, expression, gesture, setting, and where the light comes from. This is the ONE variation that is NOT silent — the character speaks and audio is on. The "footage is SILENT / no one speaks" rule in the PROMPT FORMAT and SHOW-DON'T-TELL sections governs VAR_2 and VAR_3 only — it does NOT apply to VAR_1.
 - ONE CONTINUOUS TAKE, CUT UP. Every dialogue shot in this ad is the same person filming themselves in ONE sitting: the same room, the same spot in that room, the same wardrobe and hair, the same time of day and light, and the same distance and lens height. Decide that setup once, on VAR_1 of scene 1, and describe the SAME setup in every later scene's VAR_1 — never move them to another room, another outfit, or another part of the day between lines. What changes line to line is only the moment: the expression, the gesture, the head and hand position, a shift in posture. The app attaches the previous scene's dialogue still when it renders each of these, so a prompt that relocates the character fights the reference and produces a jump cut.
@@ -241,10 +259,10 @@ export function brollSystemInstruction(delivery: BrollDelivery): string {
 export function buildBrollUserPrompt(input: BrollInput): string {
   const withDialogue = input.delivery === 'dialogue'
   const variationBrief = withDialogue
-    ? `For EACH scene emit exactly three variations: VAR_1 is a DIALOGUE shot where the character speaks the exact line to camera (<TAG>DIALOGUE</TAG>, <REFS>character</REFS>), and VAR_2–VAR_3 are two genuinely DIFFERENT silent b-roll ideas for showing what the line SAYS. Pick two distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF) for VAR_2–VAR_3, declared in each <TAG> field.`
+    ? `For EACH scene emit exactly four variations: VAR_1 is a DIALOGUE shot where the character speaks the exact line to camera (<TAG>DIALOGUE</TAG>, <REFS>character</REFS> — or <REFS>both</REFS> when VISIBILITY is yes), and VAR_2–VAR_4 are three genuinely DIFFERENT silent b-roll ideas for showing what the line SAYS. Pick three distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF) for VAR_2–VAR_4, declared in each <TAG> field. Those three have to earn their place the same way — no filler.`
     : `For EACH scene emit exactly three variations: three genuinely DIFFERENT ideas for showing what that line SAYS — make metaphors literal, show the act, the feeling, the proof. Pick three distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF), declared in each <TAG> field. Every shot is silent — no one speaks (a voiceover is added later). Three slots only, so every one has to earn its place — no filler fourth idea.`
 
-  let prompt = `Break this script into B-Roll scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph, as long as the idea needs — no word limit, and never trim a detail to hit a length. Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation, erring toward attaching references whenever they could plausibly help — only the VISIBILITY=no product exclusion is a hard rule.\n\nScript:\n${input.scriptText}`
+  let prompt = `Break this script into B-Roll scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph, as long as the idea needs — no word limit, and never trim a detail to hit a length. Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation, erring toward attaching references whenever they could plausibly help. Two REFS rules are hard: VISIBILITY=no excludes the product from every variation, and VISIBILITY=yes includes it in every variation.\n\nScript:\n${input.scriptText}`
 
   if (input.productContext) {
     prompt += `\n\n${input.productContext}`
@@ -432,13 +450,22 @@ function parseRefs(raw: string | undefined): VariationRefs | undefined {
   return undefined
 }
 
-// Visibility is the hard rule; the LLM's <REFS> pick is only a preference. A
-// scene whose voiceover forbids the product never attaches the product
-// reference, even when the model asked for it — attaching it is how the
-// advertised product ends up rendered as the thing the ad is criticising.
+// Visibility is the hard rule in BOTH directions; the LLM's <REFS> pick is only
+// a preference.
+//
+// VISIBILITY=no: never attach the product reference, even when the model asked
+// for it — attaching it is how the advertised product ends up rendered as the
+// thing the ad is criticising.
+//
+// VISIBILITY=yes: always attach it. The line is talking about the product, so
+// the shot has to be built from the real packaging — label text, shape, colours
+// — rather than the model's invention of it. The model drops the ref often
+// enough on lenses that "don't need" it (POV, ENVIRONMENT) that this can't be
+// left to the prompt alone. Still a per-card toggle afterwards.
 function clampRefsToVisibility(refs: VariationRefs, productVisible: boolean | undefined): VariationRefs {
-  if (productVisible !== false) return refs
-  return refs === 'both' || refs === 'character' ? 'character' : 'none'
+  if (productVisible === false) return refs === 'both' || refs === 'character' ? 'character' : 'none'
+  if (productVisible === true) return refs === 'product' || refs === 'none' ? 'product' : 'both'
+  return refs
 }
 
 // Sensible default when the LLM emits a variation without a <REFS> tag.
@@ -446,9 +473,10 @@ function clampRefsToVisibility(refs: VariationRefs, productVisible: boolean | un
 // likeness — so this errs ON. The only hard exclusion is the product when the
 // voiceover forbids it appearing (VISIBILITY=no), a deliberate creative rule.
 function defaultRefsFor(tag: VariationTag, productVisible: boolean | undefined): VariationRefs {
-  // A talking DIALOGUE card and a legacy STATIC anchor are sourced entirely from
-  // the character reference — the product never belongs in them, whatever
-  // VISIBILITY says.
+  // A talking DIALOGUE card and a legacy STATIC anchor are sourced from the
+  // character reference. (clampRefsToVisibility adds the product back on top
+  // when the scene's line is talking about it — a character holding up the
+  // thing they're describing still needs the real packaging.)
   if (tag === 'STATIC' || tag === 'DIALOGUE') return 'character'
   // Product must not appear when VISIBILITY is no — keep the character ref on so
   // any person/hands stay consistent, drop only the product.

@@ -1232,7 +1232,7 @@ function SceneSection({
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
           >
             <Images className="h-3.5 w-3.5" />
-            Images
+            Generate Images
           </button>
           <button
             type="button"
@@ -1241,16 +1241,17 @@ function SceneSection({
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
           >
             <VideoIcon className="h-3.5 w-3.5" />
-            Videos
+            Generate Videos
           </button>
         </div>
       </div>
 
-      {/* Three variations plus the Add-option card across one row at xl — four
-          equal cards, the Add card just another cell in the grid. (A session
-          generated before the cut to three still renders: it simply wraps its
-          extra card onto a second line.) */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+      {/* The scene's variations plus the Add-option card across one row at xl —
+          the Add card is just another cell in the grid. Silent delivery is three
+          variations (a four-column row); With Dialogue adds the talking card on
+          top, so its row runs five wide rather than wrapping the Add card onto a
+          line of its own. */}
+      <div className={`grid grid-cols-2 gap-3 md:grid-cols-3 ${scene.variations.length >= 4 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
         {scene.variations.map((variation, i) => {
           const key = `${scene.number}-${i}`
           const state = cardStates[key] ?? createDefaultCardState(variation)
