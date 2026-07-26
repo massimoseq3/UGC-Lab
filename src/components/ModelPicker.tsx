@@ -27,13 +27,17 @@ interface ModelPickerProps {
   mode?: Mode
   value?: string
   onChange?: (modelId: string) => void
-  // When set, models whose `modes` don't include this are greyed out (muted)
-  // but still selectable — a hint, not a hard block (e.g. B-Roll passes
-  // 'reference-to-video' so non-reference-capable video models dim while a
-  // ref is attached, but the user can still pick one for text-to-video).
+  // When set, models whose `modes` don't include this are greyed out AND
+  // unselectable — same semantics as ModelSidePanel, which this dropdown is the
+  // sibling of. Greyed used to stay clickable as a soft hint, but a row you can
+  // press and then watch fail reads as a bug, not a warning.
   requireMode?: Mode
-  // One-line explanation shown as a footer under the dropdown list when
-  // requireMode dims at least one model.
+  // Like requireMode, but satisfied by ANY of these modes — for a surface where
+  // several modes get the job done (a still can be animated as a start frame OR
+  // handed over as a reference image, so both count).
+  requireAnyModes?: Mode[]
+  // One-line explanation shown as a footer under the dropdown list when the
+  // requirement dims at least one model.
   requireModeNote?: string
   // Slim single-line trigger (h-9, no provider sub-line) so the picker can
   // sit inline with ConstraintChips in a footer row.
@@ -53,7 +57,7 @@ interface ModelPickerProps {
   persistKey?: string
 }
 
-export default function ModelPicker({ appId, task, mode, value, onChange, requireMode, requireModeNote, compact, large, costParams, allowedModelIds, persistKey }: ModelPickerProps) {
+export default function ModelPicker({ appId, task, mode, value, onChange, requireMode, requireAnyModes, requireModeNote, compact, large, costParams, allowedModelIds, persistKey }: ModelPickerProps) {
   const setAppModel = useSettingsStore((s) => s.setAppModel)
   const getAppModel = useSettingsStore((s) => s.getAppModel)
   const persistedKey = persistKey ?? `${appId}:${task}${mode ? `:${mode}` : ''}`
@@ -87,6 +91,12 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
   // Mirror the rows on the collapsed trigger with the same "% off" chip (the
   // per-params credit cost lives on the Generate button, not here).
   const selectedSavings = selected ? officialSavingsPercent(selected.id) : null
+
+  // Whether a model is out of scope for this surface — greyed AND unselectable,
+  // same rule as ModelSidePanel's isMuted.
+  const isMuted = (m: ModelEntry) =>
+    (!!requireMode && !m.modes?.includes(requireMode)) ||
+    (!!requireAnyModes && requireAnyModes.length > 0 && !requireAnyModes.some((mode) => m.modes?.includes(mode)))
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -174,7 +184,7 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
                 then a hairline, then the full list below (the starred ones
                 appear in both places). */}
             {recommended.map((m) => {
-              const muted = requireMode ? !m.modes?.includes(requireMode) : false
+              const muted = isMuted(m)
               return (
                 <ModelRow
                   key={`rec-${m.id}`}
@@ -189,7 +199,7 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
             })}
             {recommended.length > 0 && <div className="my-1 border-t border-ink/10" />}
             {models.map((m) => {
-              const muted = requireMode ? !m.modes?.includes(requireMode) : false
+              const muted = isMuted(m)
               return (
                 <ModelRow
                   key={m.id}
@@ -203,7 +213,7 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
               )
             })}
           </div>
-          {requireMode && requireModeNote && models.some((m) => !m.modes?.includes(requireMode)) && (
+          {requireModeNote && models.some(isMuted) && (
             <p className="border-t border-ink/5 px-3 py-2 text-[11px] leading-relaxed text-ink-500">
               {requireModeNote}
             </p>
@@ -267,16 +277,18 @@ function ModelRow({ model, active, muted, accent, costParams, onClick }: ModelRo
     <button
       type="button"
       onClick={onClick}
+      disabled={muted}
+      aria-disabled={muted}
       style={active && !muted ? { backgroundColor: hexAlpha(accent, '1a') } : undefined}
       className={`flex w-full items-center gap-3 rounded-full px-2.5 py-2.5 text-left transition-colors ${
-        muted ? 'opacity-45 hover:opacity-70' : active ? '' : 'hover:bg-ink/[0.04]'
+        muted ? 'cursor-not-allowed opacity-30 grayscale' : active ? '' : 'hover:bg-ink/[0.04]'
       }`}
     >
       <ProviderLogo provider={model.provider} />
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
-          <span className="truncate text-[13px] font-semibold leading-snug text-ink-100">{model.displayName}</span>
+          <span className={`truncate text-[13px] font-semibold leading-snug text-ink-100 ${muted ? 'line-through decoration-ink-400' : ''}`}>{model.displayName}</span>
           {isRecommended && (
             <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
           )}

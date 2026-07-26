@@ -192,6 +192,16 @@ export interface InFlightVideo {
   error?: string | null
 }
 
+// Settings a "Generate all videos" run picks once for the whole batch. Applied
+// at fire time instead of each card's own video settings, so a 12-clip run bills
+// one predictable tier rather than whatever each card happened to be left on.
+// The batch dialog clamps these to the chosen model before handing them over.
+export interface BatchVideoSettings {
+  modelId: string
+  resolution: string
+  durationSeconds: number
+}
+
 export interface CardState {
   editablePrompt: string
   // Linear undo/redo history for the prompt. Each entry is a snapshot pushed

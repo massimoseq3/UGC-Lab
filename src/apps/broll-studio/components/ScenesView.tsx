@@ -1,8 +1,8 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Film, AlertCircle, Plus, Images, X, Palette, Download } from 'lucide-react'
+import { Film, AlertCircle, Plus, Images, X, Palette, Download, Video as VideoIcon, Coins } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
-import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage } from '../types'
+import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage, BatchVideoSettings } from '../types'
 import type { Product, Model } from '../../../stores/types'
 import { createDefaultCardState } from '../cardState'
 import type { VideoHistoryItem } from '../../../stores/types'
@@ -15,7 +15,7 @@ import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { useCreditsStore } from '../../../stores/creditsStore'
-import { getDefaultModel, getModel, estimateCredits, formatCredits, type ImageResolution } from '../../../utils/models'
+import { getDefaultModel, getModel, estimateCredits, formatCredits, snapVideoDuration, videoResolutionLabel, type ImageResolution, type Mode } from '../../../utils/models'
 import ModelPicker from '../../../components/ModelPicker'
 import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
@@ -51,6 +51,19 @@ interface ScenesViewProps {
   cardStates: Record<string, CardState>
   setCardStates: React.Dispatch<React.SetStateAction<Record<string, CardState>>>
 }
+
+// Defaults for a bulk video run — deliberately the cheap tier. A batch here is
+// one clip per card (often a dozen at once) on the member's own credits, so it
+// starts at the smallest usable size and the shortest cut rather than inheriting
+// whatever each card was last left on. Both clamp to the chosen model's grid.
+const BATCH_VIDEO_RESOLUTION = '480p'
+const BATCH_VIDEO_DURATION = 5
+
+// The two ways a card's still can drive a clip: as a true first frame, or as a
+// reference image (Gemini Omni's only route — it has no image-to-video mode but
+// animates a still perfectly well as a reference). A model with neither can't
+// use the still at all, which is what greys it out in the batch dialog.
+const STILL_CAPABLE_MODES: Mode[] = ['image-to-video', 'reference-to-video']
 
 // The still a card is currently showing — the user's pick if they made one,
 // otherwise the one on the card face. Used to resolve what the next dialogue
@@ -249,6 +262,101 @@ export default function ScenesView({
       : null
     setDialogueQueue(restChained)
     setBatchConfirm(null)
+  }
+
+  // ─── Batch video generation ────────────────────────────────────────────
+  // Same machinery as the image batch: a per-card token, bumped once per run,
+  // fires exactly one clip inside each card (which knows whether to animate its
+  // still or render from the prompt). Clips are independent — no chaining — so
+  // the whole run goes in parallel.
+  const batchVideoModelId =
+    useSettingsStore((s) => s.perAppModel['broll-studio:video']) ??
+    getDefaultModel('broll-studio', 'video')?.id
+  const [videoTokens, setVideoTokens] = useState<Record<string, number>>({})
+  const [videoConfirm, setVideoConfirm] = useState<
+    { fresh: string[]; done: string[]; scope: string } | null
+  >(null)
+  const [includeExistingVideos, setIncludeExistingVideos] = useState(false)
+  const [batchVideoOverride, setBatchVideoOverride] = useState<BatchVideoSettings | null>(null)
+  const [batchVideoResolution, setBatchVideoResolution] = useState<string | undefined>(undefined)
+  const [batchVideoDuration, setBatchVideoDuration] = useState<number | undefined>(undefined)
+  useCloseOnAppSwitch(!!videoConfirm, () => setVideoConfirm(null))
+  useCloseOnEscape(!!videoConfirm, () => setVideoConfirm(null))
+
+  // Clamp resolution + duration to the picked model, so swapping models inside
+  // the dialog never leaves a value kie would reject (or silently re-tier).
+  const batchVideoConstraints = batchVideoModelId ? getModel(batchVideoModelId)?.videoConstraints : undefined
+  const batchVideoResOptions = batchVideoConstraints?.resolutions ?? []
+  const batchVideoDurationOptions = batchVideoConstraints?.durations ?? []
+  const effectiveVideoRes =
+    batchVideoResolution && batchVideoResOptions.includes(batchVideoResolution)
+      ? batchVideoResolution
+      : batchVideoResOptions.includes(BATCH_VIDEO_RESOLUTION)
+        ? BATCH_VIDEO_RESOLUTION
+        : batchVideoConstraints?.default ?? batchVideoResOptions[0] ?? '720p'
+  const effectiveVideoDuration =
+    batchVideoDuration && batchVideoDurationOptions.includes(batchVideoDuration)
+      ? batchVideoDuration
+      : batchVideoDurationOptions.length > 0
+        ? snapVideoDuration(BATCH_VIDEO_DURATION, batchVideoDurationOptions)
+        : BATCH_VIDEO_DURATION
+  const videoTargets = videoConfirm
+    ? includeExistingVideos
+      ? [...videoConfirm.fresh, ...videoConfirm.done]
+      : videoConfirm.fresh
+    : []
+  // How many of this run animate a still they already have. The rest render
+  // from the prompt alone — worth saying out loud, since those cost the same
+  // but come back as something the member hasn't seen a frame of.
+  const videoAnimateCount = videoTargets.filter((k) => (cardStates[k]?.images.length ?? 0) > 0).length
+  const videoBatchCredits = batchVideoModelId
+    ? videoTargets.reduce<number | null>((sum, key) => {
+        if (sum === null) return null
+        const credits = estimateCredits(batchVideoModelId, {
+          durationSeconds: effectiveVideoDuration,
+          resolution: effectiveVideoRes,
+          audio: cardStates[key]?.cardVideoAudio ?? true,
+        })
+        return credits == null ? null : sum + credits
+      }, 0)
+    : null
+  const videoOverBudget = videoBatchCredits != null && balance !== null && videoBatchCredits > balance
+  // A model that takes neither a start frame nor reference images can't animate
+  // a still, so every card holding one would fail at fire time — a dozen
+  // identical error toasts and nothing rendered. Say so here and hold the run.
+  const videoModelModes = batchVideoModelId ? getModel(batchVideoModelId)?.modes ?? [] : []
+  const videoModelCantAnimate =
+    videoAnimateCount > 0 &&
+    !videoModelModes.includes('image-to-video') &&
+    !videoModelModes.includes('reference-to-video')
+
+  const requestVideoBatch = (keys: string[], scope: string) => {
+    const targets = keys.filter((k) => (cardStates[k]?.editablePrompt ?? '').trim())
+    if (targets.length === 0) {
+      useAppStore.getState().addToast('No prompts ready to generate.', 'error')
+      return
+    }
+    // Cards that already have a clip are held back by default — a video is the
+    // expensive half of this app, so re-billing one takes an explicit tick.
+    const fresh = targets.filter((k) => (cardStates[k]?.videos.length ?? 0) === 0)
+    const done = targets.filter((k) => (cardStates[k]?.videos.length ?? 0) > 0)
+    setIncludeExistingVideos(false)
+    setVideoConfirm({ fresh, done, scope })
+  }
+
+  const confirmVideoBatch = () => {
+    if (!videoConfirm || videoTargets.length === 0 || !batchVideoModelId) return
+    setBatchVideoOverride({
+      modelId: batchVideoModelId,
+      resolution: effectiveVideoRes,
+      durationSeconds: effectiveVideoDuration,
+    })
+    setVideoTokens((prev) => {
+      const next = { ...prev }
+      for (const k of videoTargets) next[k] = (next[k] ?? 0) + 1
+      return next
+    })
+    setVideoConfirm(null)
   }
 
   // Arm the next chained dialogue card once the current one has settled — an
@@ -563,7 +671,27 @@ export default function ScenesView({
             <span className="truncate">{result.styleBrief ? (result.styleName?.trim() || 'Custom style') : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
           </span>
         </div>
+        {/* Batch actions, in the order the work happens — images, then videos,
+            then the export. Same shape and styling as Continuous' top strip. */}
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => requestBatch(allKeys, 'All scenes')}
+            title="Generate images for every variation across all scenes"
+            className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
+          >
+            <Images className="h-3.5 w-3.5" />
+            Generate all images
+          </button>
+          <button
+            type="button"
+            onClick={() => requestVideoBatch(allKeys, 'All scenes')}
+            title="Generate a clip for every variation across all scenes"
+            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400"
+          >
+            <VideoIcon className="h-3.5 w-3.5" />
+            Generate all videos
+          </button>
           {allClipEntries.length > 0 && (
             <button
               type="button"
@@ -575,15 +703,6 @@ export default function ScenesView({
               {`Download clips (${allClipEntries.length})`}
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => requestBatch(allKeys, 'All scenes')}
-            title="Generate images for every variation across all scenes"
-            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400"
-          >
-            <Images className="h-3.5 w-3.5" />
-            Generate all images
-          </button>
         </div>
       </div>
       <div className="flex flex-col gap-10">
@@ -609,9 +728,17 @@ export default function ScenesView({
             onOpenProductPicker={onOpenProductPicker}
             batchTokens={batchTokens}
             batchImageOverride={batchImageOverride}
+            videoTokens={videoTokens}
+            batchVideoOverride={batchVideoOverride}
             dialogueChainRefs={dialogueChainRefs}
             onGenerateScene={() =>
               requestBatch(
+                scene.variations.map((_, i) => `${scene.number}-${i}`),
+                `Scene ${scene.number}`,
+              )
+            }
+            onGenerateSceneVideos={() =>
+              requestVideoBatch(
                 scene.variations.map((_, i) => `${scene.number}-${i}`),
                 `Scene ${scene.number}`,
               )
@@ -746,6 +873,134 @@ export default function ScenesView({
         document.body,
       )}
 
+      {/* Video-batch confirm. Clips are the expensive half of this app, so the
+          run is priced, counted and settled here before a single task fires. */}
+      {videoConfirm && createPortal(
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
+          onClick={() => setVideoConfirm(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl border border-ink/10 bg-ink-950/95 p-5 shadow-2xl"
+          >
+            <h3 className="text-sm font-medium text-ink-100">
+              {videoTargets.length === 0
+                ? 'Nothing to generate'
+                : `Generate ${videoTargets.length} video${videoTargets.length === 1 ? '' : 's'}`}
+            </h3>
+            <p className="mt-1 text-xs text-ink-500">
+              {videoConfirm.scope} · all render in parallel and survive a refresh.
+              {videoTargets.length > 0 && (
+                <>
+                  {' '}
+                  {videoAnimateCount > 0 && `${videoAnimateCount} animate the still on the card`}
+                  {videoAnimateCount > 0 && videoAnimateCount < videoTargets.length && ', and '}
+                  {videoAnimateCount < videoTargets.length &&
+                    `${videoTargets.length - videoAnimateCount} render from the prompt alone`}
+                  .
+                </>
+              )}
+              {videoConfirm.done.length > 0 && !includeExistingVideos && (
+                <> {videoConfirm.done.length} card{videoConfirm.done.length === 1 ? '' : 's'} already
+                {videoConfirm.done.length === 1 ? ' has' : ' have'} a clip and will be skipped.</>
+              )}
+            </p>
+
+            {videoConfirm.done.length > 0 && (
+              <label className="mt-3 flex cursor-pointer items-center gap-2.5 rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={includeExistingVideos}
+                  onChange={(e) => setIncludeExistingVideos(e.target.checked)}
+                  className="h-3.5 w-3.5 shrink-0 accent-broll-500"
+                />
+                <span className="text-xs text-ink-300">
+                  Also regenerate the {videoConfirm.done.length} card
+                  {videoConfirm.done.length === 1 ? '' : 's'} that already {videoConfirm.done.length === 1 ? 'has' : 'have'} a clip
+                </span>
+              </label>
+            )}
+
+            {/* Run settings — the shared B-Roll video model (same setting the
+                card modal's picker writes), plus one resolution and one clip
+                length for every video in the batch. */}
+            <div className="mt-4 flex flex-col gap-2.5">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Model</span>
+              <ModelPicker
+                appId="broll-studio"
+                task="video"
+                costParams={{ durationSeconds: effectiveVideoDuration, resolution: effectiveVideoRes }}
+                requireAnyModes={videoAnimateCount > 0 ? STILL_CAPABLE_MODES : undefined}
+                requireModeNote="Greyed-out models can't animate a still — they take neither a start frame nor reference images."
+              />
+              {(batchVideoResOptions.length > 0 || batchVideoDurationOptions.length > 0) && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {batchVideoResOptions.length > 0 && (
+                    <ConstraintChip
+                      grow
+                      openDirection="up"
+                      options={batchVideoResOptions}
+                      value={effectiveVideoRes}
+                      onChange={(v) => setBatchVideoResolution(v)}
+                      render={videoResolutionLabel}
+                    />
+                  )}
+                  {batchVideoDurationOptions.length > 0 && (
+                    <ConstraintChip
+                      grow
+                      openDirection="up"
+                      options={batchVideoDurationOptions.map(String)}
+                      value={String(effectiveVideoDuration)}
+                      onChange={(v) => setBatchVideoDuration(Number(v))}
+                      render={(v) => <span>{v}s</span>}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 flex items-center justify-between rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5 text-xs">
+              <span className="text-ink-400">Estimated cost</span>
+              <span className="flex items-center gap-1 font-medium text-ink-100">
+                <Coins className="h-3 w-3" strokeWidth={2} />
+                {videoTargets.length === 0 ? '—' : formatCredits(videoBatchCredits) ?? '— credits'}
+              </span>
+            </div>
+            {balance !== null && (
+              <p className={`mt-1.5 text-[11px] ${videoOverBudget ? 'text-red-400 light:text-red-600' : 'text-ink-500'}`}>
+                Your balance: {balance.toLocaleString()} credits{videoOverBudget ? ' — not enough' : ''}
+              </p>
+            )}
+            {videoModelCantAnimate && (
+              <p className="mt-1.5 text-[11px] text-red-300 light:text-red-700">
+                {getModel(batchVideoModelId ?? '')?.displayName ?? 'This model'} can&rsquo;t animate a still — every card with an image would fail. Pick a model that takes a start frame or reference images.
+              </p>
+            )}
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setVideoConfirm(null)}
+                className="flex items-center gap-1 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[12px] font-medium text-ink-300 transition-colors hover:bg-ink/[0.06]"
+              >
+                <X className="h-3.5 w-3.5" />
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmVideoBatch}
+                disabled={videoTargets.length === 0 || videoModelCantAnimate}
+                className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-4 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-broll-500"
+              >
+                <VideoIcon className="h-3.5 w-3.5" />
+                Generate
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
       {downloadOpen && (
         <ClipDownloadModal
           entries={allClipEntries}
@@ -785,6 +1040,8 @@ const VariationCardRow = memo(function VariationCardRow({
   onOpenProductPicker,
   generateImageToken,
   batchImageOverride,
+  generateVideoToken,
+  batchVideoOverride,
   chainImageRef,
   resultStyle,
   resultRealism,
@@ -812,6 +1069,8 @@ const VariationCardRow = memo(function VariationCardRow({
   onOpenProductPicker?: () => void
   generateImageToken?: number
   batchImageOverride?: { aspectRatio: string; resolution?: ImageResolution } | null
+  generateVideoToken?: number
+  batchVideoOverride?: BatchVideoSettings | null
   chainImageRef?: string
   resultStyle?: string
   resultRealism?: boolean
@@ -853,6 +1112,8 @@ const VariationCardRow = memo(function VariationCardRow({
       onOpenProductPicker={onOpenProductPicker}
       generateImageToken={generateImageToken}
       batchImageOverride={batchImageOverride}
+      generateVideoToken={generateVideoToken}
+      batchVideoOverride={batchVideoOverride}
       chainImageRef={chainImageRef}
       resultStyle={resultStyle}
       resultRealism={resultRealism}
@@ -882,8 +1143,11 @@ function SceneSection({
   onOpenProductPicker,
   batchTokens,
   batchImageOverride,
+  videoTokens,
+  batchVideoOverride,
   dialogueChainRefs,
   onGenerateScene,
+  onGenerateSceneVideos,
   resultStyle,
   resultRealism,
   resultVoiceProfile,
@@ -908,10 +1172,13 @@ function SceneSection({
   onOpenProductPicker?: () => void
   batchTokens: Record<string, number>
   batchImageOverride?: { aspectRatio: string; resolution?: ImageResolution } | null
+  videoTokens: Record<string, number>
+  batchVideoOverride?: BatchVideoSettings | null
   // Card key → the still that card's talking-head shot chains from. Only
   // DIALOGUE cards have an entry, and only from the second one onward.
   dialogueChainRefs: Record<string, string>
   onGenerateScene: () => void
+  onGenerateSceneVideos: () => void
   resultStyle?: string
   resultRealism?: boolean
   resultVoiceProfile?: string
@@ -946,15 +1213,29 @@ function SceneSection({
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onGenerateScene}
-          title="Generate images for every variation in this scene"
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
-        >
-          <Images className="h-3.5 w-3.5" />
-          Generate all
-        </button>
+        {/* Per-scene batches — one row's worth of images or clips, so a member
+            can work scene by scene instead of committing the whole storyboard's
+            credits in one press. */}
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onGenerateScene}
+            title="Generate images for every variation in this scene"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
+          >
+            <Images className="h-3.5 w-3.5" />
+            Images
+          </button>
+          <button
+            type="button"
+            onClick={onGenerateSceneVideos}
+            title="Generate a clip for every variation in this scene"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
+          >
+            <VideoIcon className="h-3.5 w-3.5" />
+            Videos
+          </button>
+        </div>
       </div>
 
       {/* Three variations plus the Add-option card across one row at xl — four
@@ -989,6 +1270,8 @@ function SceneSection({
               onOpenProductPicker={onOpenProductPicker}
               generateImageToken={batchTokens[key]}
               batchImageOverride={batchImageOverride}
+              generateVideoToken={videoTokens[key]}
+              batchVideoOverride={batchVideoOverride}
               chainImageRef={dialogueChainRefs[key]}
               resultStyle={resultStyle}
               resultRealism={resultRealism}

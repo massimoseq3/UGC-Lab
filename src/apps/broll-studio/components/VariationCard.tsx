@@ -18,7 +18,7 @@ import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../co
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
 import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
-import type { PromptVariation, CardState, GeneratedImage, ReferenceImage } from '../types'
+import type { PromptVariation, CardState, GeneratedImage, ReferenceImage, BatchVideoSettings } from '../types'
 import type { VideoHistoryItem, Product, Model, BRoll } from '../../../stores/types'
 import { enhanceVariationPrompt, generateNewVariation, startImageTask, finishImageTask, buildDialogueChainPreamble } from '../services/generateBroll'
 import { applyStyleToPrompt } from '../services/generateContinuous'
@@ -66,6 +66,11 @@ interface VariationCardProps {
   // Settings the active batch run chose (model is global; these override the
   // card's own aspect/resolution for the batched gen only).
   batchImageOverride?: { aspectRatio: string; resolution?: ImageResolution } | null
+  // Same idea for video. Each increment of the token fires one clip: the card's
+  // cover still animated when it has one, otherwise a reference-/text-to-video
+  // off the prompt. Undefined = no batch.
+  generateVideoToken?: number
+  batchVideoOverride?: BatchVideoSettings | null
   // Visual style resolved on the result. Only a stylized look (realism === false)
   // appends a STYLE block to the prompt and drops the iPhone-realism stack; UGC
   // Realism / legacy leave the render untouched. See applyStyleToPrompt.
@@ -105,6 +110,8 @@ export default function VariationCard(props: VariationCardProps) {
     onOpenProductPicker,
     generateImageToken,
     batchImageOverride,
+    generateVideoToken,
+    batchVideoOverride,
     resultStyle,
     resultRealism,
     voiceProfile,
@@ -486,6 +493,10 @@ export default function VariationCard(props: VariationCardProps) {
     // Asset ref behind firstFrameDataUri / a single-still reference, recorded
     // on the in-flight entry so Retry can replay the same generation.
     startFrameRef?: string,
+    // A batch run's shared resolution/duration, standing in for the card's own.
+    // The card's persisted settings are left untouched, exactly as the image
+    // batch does — the run is one-off, not a new default for the card.
+    batchSettings?: { resolution: string; durationSeconds: number },
   ) => {
     if (!videoModelId) {
       useAppStore.getState().addToast('No video model configured.', 'error')
@@ -543,8 +554,8 @@ export default function VariationCard(props: VariationCardProps) {
     const inFlightId = crypto.randomUUID()
     const promptText = cardState.editablePrompt
     const videoAspectRatio = cardState.cardVideoAspectRatio
-    const videoDurationSeconds = cardState.cardVideoDurationSeconds
-    const videoResolution = cardState.cardVideoResolution
+    const videoDurationSeconds = batchSettings?.durationSeconds ?? cardState.cardVideoDurationSeconds
+    const videoResolution = batchSettings?.resolution ?? cardState.cardVideoResolution
     const videoAudio = cardState.cardVideoAudio
     const sourceBRollId = cardState.videoSourceBRollId
 
@@ -676,7 +687,11 @@ export default function VariationCard(props: VariationCardProps) {
   // Animate a still into a video (image-to-video) from inside the modal's
   // Animate tab. The start frame is one of this card's generated images,
   // converted to a data URI the model can seed from.
-  const handleAnimate = async (startFrameRef: string | undefined, videoModelId: string | undefined) => {
+  const handleAnimate = async (
+    startFrameRef: string | undefined,
+    videoModelId: string | undefined,
+    batchSettings?: { resolution: string; durationSeconds: number },
+  ) => {
     if (!startFrameRef) {
       useAppStore.getState().addToast('Generate or pick an image to animate first.', 'error')
       return
@@ -691,15 +706,18 @@ export default function VariationCard(props: VariationCardProps) {
     // reference-to-video model. Either way the chosen still drives the clip.
     const modes = (videoModelId ? getModel(videoModelId)?.modes : undefined) ?? []
     if (modes.includes('image-to-video')) {
-      await runVideoTask('image-to-video', dataUri, undefined, videoModelId, startFrameRef)
+      await runVideoTask('image-to-video', dataUri, undefined, videoModelId, startFrameRef, batchSettings)
     } else if (modes.includes('reference-to-video')) {
-      await runVideoTask('reference-to-video', undefined, [dataUri], videoModelId, startFrameRef)
+      await runVideoTask('reference-to-video', undefined, [dataUri], videoModelId, startFrameRef, batchSettings)
     } else {
       useAppStore.getState().addToast("This model can't animate a still — pick one that takes a start frame or reference images.", 'error')
     }
   }
 
-  const handleGenerateVideo = async (videoModelId: string | undefined) => {
+  const handleGenerateVideo = async (
+    videoModelId: string | undefined,
+    batchSettings?: { resolution: string; durationSeconds: number },
+  ) => {
     const refs = buildCardRefs()
     const referenceDataUris: string[] = []
     for (const r of refs) {
@@ -711,8 +729,33 @@ export default function VariationCard(props: VariationCardProps) {
       undefined,
       referenceDataUris.length > 0 ? referenceDataUris : undefined,
       videoModelId,
+      undefined,
+      batchSettings,
     )
   }
+
+  // Batch trigger. Same shape as the image one above: the parent bumps
+  // `generateVideoToken` and the card fires exactly one clip. A card that has a
+  // still animates it — that's what "Generate all videos" means after a
+  // Generate-all-images pass — and a card with no image yet renders from its
+  // prompt instead, so a text-to-video-only session isn't left out.
+  const lastVideoTokenRef = useRef(generateVideoToken ?? 0)
+  useEffect(() => {
+    const tok = generateVideoToken ?? 0
+    if (tok === lastVideoTokenRef.current) return
+    lastVideoTokenRef.current = tok
+    if (!cardState.editablePrompt.trim()) return
+    const batchSettings = batchVideoOverride
+      ? { resolution: batchVideoOverride.resolution, durationSeconds: batchVideoOverride.durationSeconds }
+      : undefined
+    const modelId = batchVideoOverride?.modelId
+    const startFrame = coverKind === 'image' ? coverImage?.imageUrl : undefined
+    if (startFrame) void handleAnimate(startFrame, modelId, batchSettings)
+    else void handleGenerateVideo(modelId, batchSettings)
+    // Intentionally only react to the token; everything else is read fresh from
+    // this render's closure.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generateVideoToken])
 
   // Retry a failed in-flight gen: drop the errored entry, then re-fire the
   // SAME generation. A clip that animated a still retries as that animation —
