@@ -5,7 +5,7 @@ import { WRITE_LENGTHS, WRITE_STYLE_META, WRITE_STYLE_GROUP_META, writeStylesInG
 
 // The cinematic 'prompt' format is single-clip-capped, so it only offers the
 // shorter durations a video model can render in one generation.
-const PROMPT_LENGTHS: WriteLength[] = [10, 15, 30]
+const PROMPT_LENGTHS: WriteLength[] = [10, 15, 20, 30]
 import { useBankStore } from '../../../stores/bankStore'
 import BankPicker from '../../../components/BankPicker'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -168,7 +168,7 @@ export default function InputPanel({
   const blueprintActive = isBlueprint && !forceTranscript
 
   // Switching into the cinematic format clamps the length to one the single-clip
-  // format offers (10s / 15s / 30s).
+  // format offers (10s / 15s / 20s / 30s).
   const handleFormatChange = (f: WriteFormat) => {
     if (f === 'prompt' && !PROMPT_LENGTHS.includes(writeLength)) onWriteLengthChange(15)
     onWriteFormatChange(f)
