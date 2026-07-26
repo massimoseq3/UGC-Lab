@@ -4,6 +4,7 @@ import type { ScriptHistoryItem } from '../../../stores/types'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
 import { WRITE_STYLE_META, HOOK_CATEGORY_META, isHookCategoryChoice, parseHooks, hooksPlainText } from '../types'
 import { TileActionStack, TileDeleteButton } from '../../../components/tileActions'
+import DayPill from '../../../components/DayPill'
 
 const isHooksItem = (item: ScriptHistoryItem) => item.mode === 'write' && item.writeFormat === 'hooks'
 
@@ -108,16 +109,7 @@ export default function HistoryView({ items, activeId, onSelect, onDelete }: His
           <div className="flex flex-col gap-6 px-5 py-4">
             {groups.map(([dayTs, dayItems]) => (
               <div key={dayTs} className="flex flex-col gap-3">
-                {/* Day header sits left of a hairline rather than centred over
-                    the list: with a grid below it, a centred pill reads as a
-                    divider between two unrelated blocks. */}
-                <div className="flex items-center gap-3">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-400">
-                    {sectionLabel(dayTs)}
-                  </span>
-                  <span className="text-[11px] text-ink-600">{dayItems.length}</span>
-                  <span className="h-px flex-1 bg-ink/[0.07]" />
-                </div>
+                <DayPill label={sectionLabel(dayTs)} className="" />
 
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                   {dayItems.map((item) => (
