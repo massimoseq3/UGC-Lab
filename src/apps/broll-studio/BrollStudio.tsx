@@ -5,6 +5,7 @@ import { useBankStore } from '../../stores/bankStore'
 import type { Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
 import type { BrollResult, PromptVariation, ReferenceImage, VariationTag, VariationRefs, CardState, BrollMode, BrollDelivery, ContinuousResult, ContinuousConcept, ContinuousSelection, ContinuousFrameCardState, ContinuousClipCardState } from './types'
 import { generateBroll } from './services/generateBroll'
+import { productAngleRefsFrom } from './services/productAngles'
 import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
 import InputPanel from './components/InputPanel'
 import ImportPromptsModal from './components/ImportPromptsModal'
@@ -497,6 +498,15 @@ export default function BrollStudio() {
     () => (selectedProduct?.productImage ? { dataUrl: selectedProduct.productImage, label: 'product' } : undefined),
     [selectedProduct?.productImage],
   )
+  // The product's extra bank angles (box open, bar out of the wrapper, the
+  // label). They ride along with the hero shot on every gen that attaches the
+  // product, filling whatever reference slots the model has left — see
+  // attachProductAngles. Without them a "she bites into it" scene renders the
+  // bar still sealed, because the sealed wrapper is all the model was shown.
+  const productAngleRefs = useMemo<ReferenceImage[]>(
+    () => productAngleRefsFrom(selectedProduct?.extraImages),
+    [selectedProduct?.extraImages],
+  )
   // Combined ref bundle passed to the scene-generation LLM call — gives it
   // visibility into which reference images the user has selected so it can
   // emit sensible <REFS> tags per variation.
@@ -910,6 +920,7 @@ export default function BrollStudio() {
           onUpdateVoiceProfile={handleUpdateVoiceProfile}
           characterRef={characterRef}
           productRef={productRef}
+          productAngleRefs={productAngleRefs}
           selectedProduct={selectedProduct}
           selectedModel={selectedModel}
           selectedProductId={selectedProduct?.id ?? undefined}

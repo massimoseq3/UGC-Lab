@@ -35,9 +35,12 @@ import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import { ReferenceSlotCard, ExtraRefsRow, PendingMediaTile, ModalVideoPlayer, StyleNote } from './cardDetailParts'
+import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import type { ContinuousFrameCardState, ContinuousClipCardState, GeneratedVideo, ReferenceImage } from '../types'
 import type { Product, Model } from '../../../stores/types'
 import { CONTINUOUS_MODEL_IDS } from '../services/generateContinuous'
+import { resolveImageModelId } from '../services/generateBroll'
+import { productAngleSlots } from '../services/productAngles'
 import { useAppStore } from '../../../stores/appStore'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
@@ -108,6 +111,7 @@ interface ContinuousFrameModalProps {
   chainImageRef?: string
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
+  productAngleRefs?: ReferenceImage[]
   selectedModel?: Model | null
   selectedProduct?: Product | null
   // Extra user-attached reference images (memory-only, like the Line-by-Line
@@ -149,6 +153,7 @@ export function ContinuousFrameModal({
   chainImageRef,
   characterRef,
   productRef,
+  productAngleRefs,
   selectedModel,
   selectedProduct,
   extraRefs,
@@ -199,6 +204,21 @@ export function ContinuousFrameModal({
   const imageModelId = useSettingsStore((s) => s.perAppModel['broll-studio:image:text-to-image'])
     ?? getDefaultModel('broll-studio', 'image', 'text-to-image')?.id
   const imageConstraints = imageModelId ? getModel(imageModelId)?.imageConstraints : undefined
+
+  // How many of the product's extra bank angles this frame's gen will really
+  // carry — they fill the slots the image model has left after the chain,
+  // character, product and any hand-attached refs.
+  const angleCount = cardState.refsProduct && productRef
+    ? productAngleSlots({
+        manualCount:
+          (chainImageRef && cardState.chainLink ? 1 : 0) +
+          (cardState.refsCharacter && characterRef ? 1 : 0) +
+          1 +
+          extraRefs.length,
+        angleCount: productAngleRefs?.length ?? 0,
+        modelId: resolveImageModelId(true),
+      })
+    : 0
   const resolutions = (imageConstraints?.resolutions ?? imageResolutionsFor(imageModelId ?? '')) as ImageResolution[]
   const aspects = imageConstraints?.aspectRatios ?? ['9:16', '1:1', '16:9', '4:3', '3:4']
   const credits = imageModelId
@@ -305,6 +325,7 @@ export function ContinuousFrameModal({
                       icon={<Package className="h-4 w-4 text-gold-400 light:text-gold-600" />}
                       accentClass="bg-gold-500/15 text-gold-400 light:text-gold-600"
                       kind="Product"
+                      note={angleCount > 0 ? `+${angleCount} angle${angleCount > 1 ? 's' : ''}` : null}
                       name={selectedProduct?.productName}
                       imageRef={productRef.dataUrl}
                       onClick={() => onUpdate((p) => ({ refsProduct: !p.refsProduct }))}
@@ -1250,13 +1271,22 @@ function ClipVideoTile({
         <div className="pointer-events-none absolute right-1.5 top-1.5 flex flex-col gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           <button type="button" title="Download" onClick={handleDownload} className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm hover:bg-black/80"><Download className="h-3.5 w-3.5" /></button>
           <button type="button" title="Copy prompt" onClick={handleCopy} className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm hover:bg-black/80">{copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}</button>
+          {url && (
+            <ExpandVideoButton
+              chrome="plain"
+              videoUrl={url}
+              prompt={video.prompt}
+              fileStem="continuous-clip"
+              aspectRatio={video.aspectRatio}
+            />
+          )}
           <button type="button" title="Delete" onClick={(e) => { e.stopPropagation(); onDelete() }} className="pointer-events-auto flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm hover:bg-red-500/80"><Trash2 className="h-3.5 w-3.5" /></button>
         </div>
       }
     >
       <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-medium tabular-nums text-white backdrop-blur-sm">{video.durationSeconds}s</span>
       {selected && (
-        <span className="pointer-events-none absolute bottom-1.5 left-1.5 rounded-full bg-broll-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
+        <span className="pointer-events-none absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-broll-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
           Cover
         </span>
       )}

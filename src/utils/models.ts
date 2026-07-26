@@ -99,6 +99,11 @@ export interface ModelEntry {
   modes?: Mode[]
   tags: Tag[]
   supportsReferenceImages?: boolean
+  // How many reference images the model takes in ONE request. Only set from a
+  // verified provider cap (see the entry's comment) — an undeclared model falls
+  // back to UNDECLARED_REFERENCE_IMAGE_CAP, which is deliberately conservative
+  // because an over-long ref array is a 400, not a graceful drop.
+  maxReferenceImages?: number
   // Video-only: model accepts reference audio clips (Seedance 2 family's
   // `reference_audio_urls` — voice/lip-sync/sound guidance, ≤15s total).
   supportsReferenceAudio?: boolean
@@ -390,6 +395,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsReferenceImages: true,
     supportsReferenceAudio: true,
     supportsReferenceVideos: true,
+    maxReferenceImages: 9,
     // Per-second × resolution. Source: https://kie.ai/seedance-2-0 (the
     // marketing page lists a "with video input" tier we don't expose — none
     // of our flows pass a video URL, only image inputs, so the higher
@@ -427,6 +433,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsReferenceImages: true,
     supportsReferenceAudio: true,
     supportsReferenceVideos: true,
+    maxReferenceImages: 9,
     pricing: {
       unit: 'per-second',
       credits: 33,
@@ -454,6 +461,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsReferenceImages: true,
     supportsReferenceAudio: true,
     supportsReferenceVideos: true,
+    maxReferenceImages: 9,
     // Per-second × resolution. 480p/720p only (no 1080p). As with the rest of
     // the 2.0 family we expose the higher "no video input" rate across the
     // board — our flows pass image/audio refs, never a video URL that would
@@ -683,6 +691,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['text-to-video', 'image-to-video', 'frames-to-video', 'reference-to-video'],
     tags: ['fast'],
     supportsReferenceImages: true,
+    // Veo's REFERENCE_2_VIDEO takes at most 3 reference images.
+    maxReferenceImages: 3,
     pricing: {
       unit: 'per-call',
       credits: 60,
@@ -801,6 +811,10 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['text-to-video', 'reference-to-video'],
     tags: ['recommended', 'new'],
     supportsReferenceImages: true,
+    // Images cost one slot each out of the shared 7-slot input quota, so 7 is
+    // the ceiling when no characters or source clip are attached. Playground,
+    // which can attach those, subtracts their slots on top of this.
+    maxReferenceImages: 7,
     omniInputs: true,
     pricing: {
       unit: 'per-call',
@@ -974,6 +988,19 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 
 export function getModel(id: string): ModelEntry | undefined {
   return MODEL_REGISTRY.find((m) => m.id === id)
+}
+
+// How many reference images a model with no declared cap is assumed to take.
+// Six is what B-Roll can already put on a single request today — character,
+// product, and the four hand-attached extras — so nothing new is being asked of
+// an undocumented provider limit. It leaves room for a character, the product
+// and all four of its extra angles. Raise a model past this by declaring
+// `maxReferenceImages` on its registry entry, with the source in a comment.
+export const UNDECLARED_REFERENCE_IMAGE_CAP = 6
+
+export function referenceImageCapacity(modelId?: string): number {
+  const model = modelId ? getModel(modelId) : undefined
+  return model?.maxReferenceImages ?? UNDECLARED_REFERENCE_IMAGE_CAP
 }
 
 // Display label for a video resolution tier. Some providers name their tiers

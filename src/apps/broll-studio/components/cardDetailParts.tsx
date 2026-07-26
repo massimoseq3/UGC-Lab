@@ -9,6 +9,7 @@ import {
 import { GeneratingMediaFill, PendingMedia, type GeneratingMediaProps } from '../../../components/GeneratingMedia'
 import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
+import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import DayPill from '../../../components/DayPill'
 import BankPicker from '../../../components/BankPicker'
 import SlotActionMenu from '../../../components/video/SlotActionMenu'
@@ -232,8 +233,10 @@ export function ModalGallery({
                   <div key={`vid-${entry.idx}`} className="mb-2 break-inside-avoid">
                     <VideoTile
                       videoRef={entry.videoUrl}
+                      idx={entry.idx}
                       aspectRatio={entry.aspectRatio}
                       modelId={entry.modelId}
+                      prompt={entry.prompt}
                       selected={isVideoSelected(entry.idx)}
                       onClick={() => {
                         onUpdateState({ selected: { kind: 'video', index: entry.idx }, currentVideoIndex: entry.idx })
@@ -308,8 +311,11 @@ function ImageTile({
       {modelLabel && (
         <p className="pointer-events-none absolute left-2 bottom-1 max-w-[70%] truncate text-[10px] text-zinc-300/90 transition-opacity group-hover:opacity-0">{modelLabel}</p>
       )}
+      {/* Centred, like the tag chip on a scene card — the corners belong to the
+          hover actions, and a badge that names the whole tile reads better over
+          the middle of it. */}
       {selected && (
-        <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-full bg-broll-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
+        <span className="pointer-events-none absolute left-1/2 top-1.5 -translate-x-1/2 rounded-full bg-broll-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
           Cover
         </span>
       )}
@@ -358,8 +364,10 @@ function ImageTile({
 
 function VideoTile({
   videoRef,
+  idx,
   aspectRatio,
   modelId,
+  prompt,
   selected,
   onClick,
   onDelete,
@@ -367,8 +375,11 @@ function VideoTile({
   onSendToPlayground,
 }: {
   videoRef: string
+  // Position in the card's video list — names downloaded files.
+  idx: number
   aspectRatio: string
   modelId: string
+  prompt: string
   selected: boolean
   onClick: () => void
   onDelete: () => void
@@ -427,12 +438,17 @@ function VideoTile({
         </button>
       )}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
-      <p className="pointer-events-none absolute inset-x-2 bottom-1 line-clamp-1 text-[10px] text-zinc-300/90">{modelLabel}</p>
-      {selected && (
-        <span className="pointer-events-none absolute left-1.5 bottom-1.5 rounded-full bg-broll-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
-          Cover
-        </span>
-      )}
+      {/* Bottom caption column — the Cover badge sits centred ABOVE the model
+          name rather than beside it, which is where the two used to overlap.
+          The top corners are taken by play/mute and the action stack. */}
+      <div className="pointer-events-none absolute inset-x-2 bottom-1 flex flex-col items-center gap-1">
+        {selected && (
+          <span className="rounded-full bg-broll-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
+            Cover
+          </span>
+        )}
+        <p className="max-w-full truncate text-[10px] text-zinc-300/90">{modelLabel}</p>
+      </div>
       {/* Hover action stack — top-right vertical column, app-wide standard
           order: download · copy · send-to-Playground · delete (video has no
           save-to-bank). Steps aside while the clip plays with sound. */}
@@ -450,6 +466,14 @@ function VideoTile({
         <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
           <Copy className="h-4 w-4" />
         </TileActionButton>
+        {url && (
+          <ExpandVideoButton
+            videoUrl={url}
+            prompt={prompt}
+            fileStem={`broll-clip-${idx + 1}`}
+            aspectRatio={aspectRatio}
+          />
+        )}
         <TileActionButton
           title="Use in Playground as Gemini Omni source clip"
           onClick={(e) => { e.stopPropagation(); onSendToPlayground() }}
@@ -615,6 +639,7 @@ export function ReferenceSlotCard({
   accentClass,
   kind,
   name,
+  note,
   imageRef,
   onClick,
   active,
@@ -627,6 +652,9 @@ export function ReferenceSlotCard({
   // Slot label ('Character', 'Product', Continuous mode's 'Previous frame', …).
   kind: string
   name?: string | null
+  // Trailing detail on the kind line — today the product's extra angles
+  // ('· +2 angles'), which attach automatically behind the hero shot.
+  note?: string | null
   imageRef?: string | null
   onClick: () => void
   active: boolean
@@ -678,7 +706,10 @@ export function ReferenceSlotCard({
           <span className={`truncate text-[13px] font-medium ${name ? 'text-ink-100' : 'text-ink-600'}`}>
             {name || `Select ${kind.toLowerCase()}`}
           </span>
-          <span className="text-[11px] font-medium tracking-tight text-ink-400">{kind}</span>
+          <span className="truncate text-[11px] font-medium tracking-tight text-ink-400">
+            {kind}
+            {note && <span className="text-gold-400 light:text-gold-600"> · {note}</span>}
+          </span>
         </div>
       </button>
       {hasRef && (

@@ -30,6 +30,7 @@ interface RightPanelProps {
   onUpdateVoiceProfile?: (text: string) => void
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
+  productAngleRefs?: ReferenceImage[]
   selectedProduct?: Product | null
   selectedModel?: Model | null
   selectedProductId?: string
@@ -71,6 +72,7 @@ export default function RightPanel(props: RightPanelProps) {
     onUpdateVoiceProfile,
     characterRef,
     productRef,
+    productAngleRefs,
     selectedProduct,
     selectedModel,
     selectedProductId,
@@ -126,6 +128,7 @@ export default function RightPanel(props: RightPanelProps) {
             error={error}
             characterRef={characterRef}
             productRef={productRef}
+            productAngleRefs={productAngleRefs}
             selectedModel={selectedModel}
             selectedProduct={selectedProduct}
             productContext={productContext}
@@ -150,6 +153,7 @@ export default function RightPanel(props: RightPanelProps) {
             onUpdateVoiceProfile={onUpdateVoiceProfile}
             characterRef={characterRef}
             productRef={productRef}
+            productAngleRefs={productAngleRefs}
             selectedProduct={selectedProduct}
             selectedModel={selectedModel}
             selectedProductId={selectedProductId}

@@ -283,15 +283,17 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
     onChange({ ...state, refs: [...others, ...refs] })
   }
 
-  // Veo 3.1 Fast caps reference inputs at 3; Seedance family allows up to 9.
-  // Match B-Roll Videos' rule. Gemini Omni's image cap is whatever its 7-slot
-  // quota leaves after characters (×1 each) and the source clip (×2).
+  // A model's own declared cap wins (Veo 3.1 Fast takes 3, the Seedance family
+  // 9 — see `maxReferenceImages` in the registry); anything undeclared keeps the
+  // panel's historical 9. Gemini Omni is the exception: its image cap is
+  // whatever its 7-slot quota leaves after characters (×1 each) and the source
+  // clip (×2), so it's computed here rather than read off the entry.
   const omniImageCap = 7
     - state.refs.filter((r) => r.slot === 'omni-character').length
     - (state.refs.some((r) => r.slot === 'omni-clip') ? 2 : 0)
   const maxRefs = model?.omniInputs
     ? Math.max(0, omniImageCap)
-    : state.modelId === 'veo3_fast' ? 3 : 9
+    : model?.maxReferenceImages ?? 9
   const refsAllowed = model?.supportsReferenceImages ?? false
   const supportsFrames = !!model?.modes?.includes('image-to-video') || !!model?.modes?.includes('frames-to-video')
   const supportsEndFrame = !!model?.modes?.includes('frames-to-video')

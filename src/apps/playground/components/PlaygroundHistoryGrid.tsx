@@ -8,8 +8,8 @@ import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState, useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useInlineVideo, useExclusiveVideo } from '../../../hooks/useInlineVideo'
 import { useAppStore } from '../../../stores/appStore'
-import { getUrl, saveAsset } from '../../../utils/assetStore'
-import { extractVideoFrame } from '../../../utils/videoFrames'
+import { getUrl } from '../../../utils/assetStore'
+import { VideoFrameActions } from '../../../components/VideoLightbox'
 import { getModel } from '../../../utils/models'
 import { usePersistedState } from '../../../hooks/usePersistedState'
 import { sectionLabel, groupByDay } from '../../../utils/history'
@@ -851,7 +851,13 @@ function PreviewModal({
               still out of the clip to reuse as a start frame / reference (save to
               bank) or keep (download). */}
           {entry.kind === 'video' && videoUrl && (
-            <VideoFrameActions videoUrl={videoUrl} prompt={prompt} videoId={entry.data.id} aspectRatio={entry.data.aspectRatio} />
+            <VideoFrameActions
+              videoUrl={videoUrl}
+              prompt={prompt}
+              fileStem={`playground-${entry.data.id}`}
+              aspectRatio={entry.data.aspectRatio}
+              sourceApp="playground"
+            />
           )}
           {prompt && (
             <div className="max-h-[18vh] w-full overflow-y-auto rounded-lg bg-white/[0.02] px-4 py-3 text-center text-[12px] leading-relaxed text-zinc-400">
@@ -886,161 +892,6 @@ function PreviewModal({
         </div>
       </div>
     </div>
-  )
-}
-
-// ── Video frame grabs ───────────────────────────────────────────
-
-function VideoFrameActions({ videoUrl, prompt, videoId, aspectRatio }: { videoUrl: string; prompt: string; videoId: string; aspectRatio?: string }) {
-  return (
-    <div className="flex w-full flex-col items-center gap-2">
-      <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">Frames</span>
-      <div className="grid w-full grid-cols-2 items-start gap-2.5">
-        <FrameCard label="First frame" position="first" videoUrl={videoUrl} prompt={prompt} videoId={videoId} aspectRatio={aspectRatio} />
-        <FrameCard label="Last frame" position="last" videoUrl={videoUrl} prompt={prompt} videoId={videoId} aspectRatio={aspectRatio} />
-      </div>
-    </div>
-  )
-}
-
-function FrameCard({
-  label,
-  position,
-  videoUrl,
-  prompt,
-  videoId,
-  aspectRatio,
-}: {
-  label: string
-  position: 'first' | 'last'
-  videoUrl: string
-  prompt: string
-  videoId: string
-  aspectRatio?: string
-}) {
-  const addBRoll = useBankStore((s) => s.addBRoll)
-  const addToast = useAppStore((s) => s.addToast)
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
-  const [thumbUrl, setThumbUrl] = useState<string | null>(null)
-  const [blob, setBlob] = useState<Blob | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  // The thumbnail box matches the frame's real aspect ratio. Seed it from the
-  // video's declared ratio (so there's no layout shift while the frame loads),
-  // then refine from the decoded image's actual dimensions on load.
-  const [ratio, setRatio] = useState<React.CSSProperties>(
-    aspectRatio ? aspectStyle(aspectRatio) : { aspectRatio: '9 / 16' },
-  )
-
-  useEffect(() => {
-    let cancelled = false
-    let objectUrl: string | null = null
-    setStatus('loading')
-    extractVideoFrame(videoUrl, position)
-      .then((b) => {
-        if (cancelled) return
-        objectUrl = URL.createObjectURL(b)
-        setBlob(b)
-        setThumbUrl(objectUrl)
-        setStatus('ready')
-      })
-      .catch(() => { if (!cancelled) setStatus('error') })
-    return () => {
-      cancelled = true
-      if (objectUrl) URL.revokeObjectURL(objectUrl)
-    }
-  }, [videoUrl, position])
-
-  async function handleSave() {
-    if (!blob || saving || saved) return
-    setSaving(true)
-    try {
-      const id = await saveAsset(blob, 'image/png')
-      await addBRoll({ imageUrl: id, prompt, sourceApp: 'playground' })
-      setSaved(true)
-    } catch {
-      addToast('Could not save the frame', 'error')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  function handleDownload() {
-    if (!thumbUrl) return
-    void downloadImage(thumbUrl, `playground-${videoId}-${position}-frame`, 'png')
-  }
-
-  return (
-    <div className="flex w-full flex-col items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-2.5">
-      <div
-        style={ratio}
-        className="flex w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/40"
-      >
-        {status === 'ready' && thumbUrl ? (
-          <img
-            src={thumbUrl}
-            alt={`${label} preview`}
-            onLoad={(e) => {
-              const { naturalWidth: w, naturalHeight: h } = e.currentTarget
-              if (w && h) setRatio({ aspectRatio: `${w} / ${h}` })
-            }}
-            className="h-full w-full object-cover"
-          />
-        ) : status === 'loading' ? (
-          <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
-        ) : (
-          <Film className="h-5 w-5 text-zinc-600" />
-        )}
-      </div>
-      <span className="text-[11px] font-medium text-zinc-300">{label}</span>
-      <div className="flex w-full flex-col gap-1.5">
-        <FrameButton
-          className="w-full justify-center"
-          title={saved ? 'Saved to B-Rolls' : 'Save to Bank'}
-          disabled={status !== 'ready' || saving || saved}
-          tone={saved ? 'saved' : 'default'}
-          onClick={handleSave}
-        >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-          <span>{saved ? 'Saved' : 'Save'}</span>
-        </FrameButton>
-        <FrameButton className="w-full justify-center" title="Download frame" disabled={status !== 'ready'} onClick={handleDownload}>
-          <Download className="h-4 w-4" />
-          <span>Download</span>
-        </FrameButton>
-      </div>
-    </div>
-  )
-}
-
-function FrameButton({
-  children,
-  onClick,
-  title,
-  disabled,
-  tone = 'default',
-  className = '',
-}: {
-  children: React.ReactNode
-  onClick: () => void
-  title: string
-  disabled?: boolean
-  tone?: 'default' | 'saved'
-  className?: string
-}) {
-  const toneClass = tone === 'saved'
-    ? 'border-emerald-500/40 bg-emerald-500/20 text-emerald-200'
-    : 'border-white/15 bg-white/[0.06] text-zinc-100 hover:bg-white/[0.12]'
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${toneClass} ${className}`}
-    >
-      {children}
-    </button>
   )
 }
 

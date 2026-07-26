@@ -37,6 +37,8 @@ import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { getDefaultModel, getModel, estimateCredits, formatCredits, videoResolutionLabel, snapVideoDuration, officialSavingsPercent, type ImageResolution } from '../../../utils/models'
 import { tagChipStyle, tagLabel } from './variationTags'
 import { humanizeError } from '../../../utils/friendlyError'
+import { resolveImageModelId } from '../services/generateBroll'
+import { productAngleSlots } from '../services/productAngles'
 import ModelWaitNotice from '../../../components/ModelWaitNotice'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
@@ -74,6 +76,7 @@ interface CardDetailModalProps {
   initialTab?: Tab
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
+  productAngleRefs?: ReferenceImage[]
   // Full bank entries — rendered as side-by-side slot cards in the modal.
   selectedProduct?: Product | null
   selectedModel?: Model | null
@@ -140,6 +143,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     selectedScriptId,
     characterRef,
     productRef,
+    productAngleRefs,
     onOpenCharacterPicker,
     onOpenProductPicker,
     extraRefs = [],
@@ -244,6 +248,24 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   const hasActiveRef =
     (!!characterRef && cardState.refsCharacter !== false) ||
     (!!productRef && cardState.refsProduct !== false)
+
+  // How many of the product's extra bank angles will actually ride along with
+  // this tab's generation. They fill the reference slots the model has left over
+  // (see attachProductAngles), so the count is model-dependent — and the slot
+  // card should report what will really be sent, not what the bank holds.
+  const productActive = !!productRef && cardState.refsProduct !== false
+  const manualRefCount =
+    (characterRef && cardState.refsCharacter !== false ? 1 : 0) +
+    (productActive ? 1 : 0) +
+    extraRefs.length
+  const attachedAngleCount = productActive
+    ? productAngleSlots({
+        manualCount: manualRefCount,
+        angleCount: productAngleRefs?.length ?? 0,
+        modelId: tab === 'video' ? videoModelId : resolveImageModelId(true),
+        reserved: isDialogue && chainImageRef && cardState.chainLink !== false ? 1 : 0,
+      })
+    : 0
 
   // Re-clamp per-card settings when the user switches models. For audio:
   // FORCE on whenever the new model supports audio so it's the default for
@@ -532,6 +554,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         icon={<Package className="h-4 w-4 text-gold-400 light:text-gold-600" />}
                         accentClass="bg-gold-500/15 text-gold-400 light:text-gold-600"
                         kind="Product"
+                        note={attachedAngleCount > 0 ? `+${attachedAngleCount} angle${attachedAngleCount > 1 ? 's' : ''}` : null}
                         name={selectedProduct?.productName}
                         imageRef={selectedProduct?.productImage}
                         onClick={() => onOpenProductPicker?.()}
