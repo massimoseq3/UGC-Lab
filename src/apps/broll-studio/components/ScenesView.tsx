@@ -1287,12 +1287,15 @@ function SceneLineEditModal({
   const [line, setLine] = useState(scriptLine)
   useCloseOnEscape(true, onClose)
   useCloseOnAppSwitch(true, onClose)
+  // Selecting the line and releasing the mouse over the backdrop fires a click
+  // on the common ancestor — a bare onClick={onClose} would throw the edit away.
+  const backdrop = useBackdropClose(onClose)
 
   const trimmed = line.trim()
   const dirty = trimmed !== scriptLine.trim()
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" {...backdrop}>
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl border border-ink/10 bg-ink-950/95 p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
