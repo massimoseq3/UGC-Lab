@@ -328,31 +328,37 @@ then a wrapping action-button row. Button order (`OutputPanel.tsx:275`):
 
 ## 5. Voiceovers (Voice Studio) — `src/apps/voice-studio/`
 
-Three regions (`VoiceStudio.tsx:193`): **center editor** (flex-fill) + **right
-panel** (fixed `w-[400px]`) + a **bottom player** bar that appears when a clip is
-playing.
+Three regions (`VoiceStudio.tsx:253`): **left side panel** (fixed `w-[400px]`) +
+**editor** (flex-fill, to its right) + a **bottom player** bar that appears when
+a clip is playing. On mobile the two stack with the editor on top (`order-first`).
 
-### Center editor (`components/EditorArea.tsx`), top→bottom
+### Editor (`components/EditorArea.tsx`), top→bottom
 
 A `h-[57px]` header band holding the **New** reset pill (`ClearAllButton` —
 clears the picked script + pasted text; every generated voiceover stays in
-History), aligned with the right panel's Settings/History strip. Then: script
+History), aligned with the side panel's Settings/History strip. Then: script
 bank selector (pill / dashed "Click to select from bank") → "or paste script
 manually" divider → large textarea → progress bar → **footer row**: character
 counter (leading) · model chip + **Generate Voiceover** button (trailing).
 
-### Right panel (`components/RightPanel.tsx`)
+### Side panel (`components/SidePanel.tsx`)
 
-Top tabs: **Settings / History**. Settings (`SettingsView.tsx`), top→bottom:
+Header band: **Settings / History** tab strip + a **Reset values** pill (Settings
+tab only, sized like Scripts' "New" pill). Settings (`SettingsView.tsx`), top→bottom:
 
-1. **Voice** selector (avatar + name + description; opens the voice picker
+1. **Preset** row — pinned over the scroll (the Characters controls pattern:
+   opaque backdrop + a feathered gradient, so the fields dissolve underneath).
+2. **Voice** selector (avatar + name + description; opens the voice picker
    slide-over).
-2. **Style** dropdown (Vocal Smile / Newscaster / Whisper / Empathetic /
+3. **Style** dropdown (Vocal Smile / Newscaster / Whisper / Empathetic /
    Promo·Hype / Deadpan).
-3. **Pace** + **Accent** dropdowns, side by side.
-4. **Expressiveness** slider (the `temperature` param, Focused → Creative).
-5. **Tone / context** then **Scene** textareas, both tagged with an `OPTIONAL` pill.
-6. **Reset values** link.
+4. **Pace** + **Accent** dropdowns, side by side.
+5. **Expressiveness** slider (the `temperature` param, Focused → Creative).
+6. **Tone / context** then **Scene** textareas, both tagged with an `OPTIONAL` pill.
+7. One-tap **direction chips**.
+
+Subheadings are one shared size (`SETTING_LABEL`, 12px) over 13px value text and
+11px subtext — the editor's Script card matches those same three sizes.
 
 The engine is **Gemini 3.1 Flash TTS**, not ElevenLabs — the model name shows on
 the generate row's chip, and there is no model picker.

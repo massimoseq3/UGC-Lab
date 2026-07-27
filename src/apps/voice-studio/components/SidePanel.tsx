@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { RotateCcw } from 'lucide-react'
 import type { VoiceSettings } from '../types'
-import { settingsFromPreset } from '../types'
+import { DEFAULT_VOICE_SETTINGS, settingsFromPreset } from '../types'
 import type { VoiceHistoryItem, VoicePreset } from '../../../stores/types'
 import SettingsView from './SettingsView'
 import VoicePickerView from './VoicePickerView'
@@ -11,7 +12,25 @@ import SegmentedToggle from '../../../components/SegmentedToggle'
 
 type Tab = 'settings' | 'history'
 
-interface RightPanelProps {
+// Header pill, sized and toned like the shared ClearAllButton ("New") so the
+// two read as the same class of affordance in their respective panel headers.
+// Not that component: this restores defaults rather than clearing inputs, so
+// it carries its own glyph and stays a single click.
+function ResetValuesButton({ onReset }: { onReset: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onReset}
+      title="Restore the delivery settings to their defaults"
+      className="flex shrink-0 items-center gap-1 rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-300"
+    >
+      <RotateCcw className="h-2.5 w-2.5" strokeWidth={2.5} />
+      Reset values
+    </button>
+  )
+}
+
+interface SidePanelProps {
   settings: VoiceSettings
   onSettingsChange: (next: VoiceSettings) => void
   history: VoiceHistoryItem[]
@@ -28,7 +47,7 @@ interface RightPanelProps {
   onRestoreSettings: (settings: Partial<VoiceSettings>) => void
 }
 
-export default function RightPanel({
+export default function SidePanel({
   settings,
   onSettingsChange,
   history,
@@ -41,7 +60,7 @@ export default function RightPanel({
   onCloseDetails,
   onRestoreText,
   onRestoreSettings,
-}: RightPanelProps) {
+}: SidePanelProps) {
   const [tab, setTab] = useState<Tab>('settings')
   const [voicePickerOpen, setVoicePickerOpen] = useState(false)
   const [presetPickerOpen, setPresetPickerOpen] = useState(false)
@@ -71,6 +90,13 @@ export default function RightPanel({
     closePicker()
   }
 
+  // Restores the delivery params to their defaults. DEFAULT_VOICE_SETTINGS
+  // carries explicit `undefined` preset fields, so this also drops a loaded
+  // preset's stamp — the settings are no longer that preset.
+  const handleReset = () => {
+    onSettingsChange({ ...settings, ...DEFAULT_VOICE_SETTINGS })
+  }
+
   const handleSelectPreset = (preset: VoicePreset) => {
     onSettingsChange(settingsFromPreset(preset))
     setPresetPickerOpen(false)
@@ -90,7 +116,7 @@ export default function RightPanel({
   return (
     <div className="flex h-full flex-col">
       {showTabs && (
-        <div className="flex h-[57px] items-center border-b border-ink/5 px-5">
+        <div className="flex h-[57px] items-center gap-2 border-b border-ink/5 px-5">
           <SegmentedToggle<Tab>
             className="h-10 !p-1"
             value={tab}
@@ -100,6 +126,11 @@ export default function RightPanel({
               { value: 'history', label: 'History', badge: history.length + pending.length > 0 ? history.length + pending.length : undefined },
             ]}
           />
+          {/* Reset rides in the header beside the tab strip — the same spot
+              Scripts puts its "New" pill — instead of trailing the settings
+              column, where it sat below the fold. Settings tab only: there is
+              nothing to reset while History is up. */}
+          {tab === 'settings' && <ResetValuesButton onReset={handleReset} />}
         </div>
       )}
 

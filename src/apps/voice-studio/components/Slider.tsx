@@ -44,7 +44,9 @@ export default function Slider({
       {/* Title row — label (with hover tooltip) and current value */}
       <div className="flex items-baseline justify-between">
         <span
-          className="relative cursor-help text-sm font-medium text-ink-200"
+          // Matches SETTING_LABEL in SettingsView — the one size every setting
+          // subheading in this panel reads at.
+          className="relative cursor-help text-xs font-medium text-ink-200"
           onMouseEnter={() => setLabelHover(true)}
           onMouseLeave={() => setLabelHover(false)}
           onFocus={() => setLabelHover(true)}

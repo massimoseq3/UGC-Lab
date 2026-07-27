@@ -64,13 +64,13 @@ export default function EditorArea({
             tabIndex={0}
             onClick={onSelectScript}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectScript() } }}
-            className="group flex w-full cursor-pointer items-center gap-3 rounded-full border border-voice-500/25 bg-voice-500/[0.06] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-inset ring-voice-500/10 transition-colors hover:bg-voice-500/10"
+            className="group flex w-full cursor-pointer items-center gap-3 rounded-full border border-voice-500/25 bg-voice-500/[0.06] px-3.5 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-inset ring-voice-500/10 transition-colors hover:bg-voice-500/10"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-voice-500/15 text-voice-300">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-voice-500/15 text-voice-300">
               <FileText className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium text-ink-200">{selectedScript.title}</div>
+              <div className="truncate text-[13px] font-medium text-ink-100">{selectedScript.title}</div>
               <div className="truncate text-[11px] text-ink-500">Script</div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
@@ -92,14 +92,14 @@ export default function EditorArea({
           <button
             type="button"
             onClick={onSelectScript}
-            className="group flex w-full items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.015] px-4 py-3 text-left transition-colors hover:border-ink/20 hover:bg-ink/[0.03]"
+            className="group flex w-full items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.015] px-3.5 py-2.5 text-left transition-colors hover:border-ink/20 hover:bg-ink/[0.03]"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-voice-500/10 text-voice-300/80 transition-colors group-hover:bg-voice-500/15 group-hover:text-voice-300">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-voice-500/10 text-voice-300/80 transition-colors group-hover:bg-voice-500/15 group-hover:text-voice-300">
               <FileText className="h-4 w-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-ink-200">Script</div>
-              <div className="text-xs text-ink-400">Click to select from bank</div>
+              <div className="text-[13px] font-medium text-ink-200">Script</div>
+              <div className="truncate text-[11px] text-ink-400">Click to select from bank</div>
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
           </button>

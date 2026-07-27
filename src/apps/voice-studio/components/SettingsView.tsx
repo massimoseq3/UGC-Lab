@@ -1,9 +1,15 @@
-import { ChevronRight, RotateCcw, Mic, X } from 'lucide-react'
+import { ChevronRight, Mic, X } from 'lucide-react'
 import type { VoiceSettings } from '../types'
-import { DEFAULT_VOICE_SETTINGS, DIRECTION_PRESETS, getVoiceById, VOICE_STYLES, VOICE_PACES, VOICE_ACCENTS } from '../types'
+import { DIRECTION_PRESETS, getVoiceById, VOICE_STYLES, VOICE_PACES, VOICE_ACCENTS } from '../types'
 import { seedColor } from './seedColor'
 import Slider from './Slider'
 import Dropdown from './Dropdown'
+
+// One size for every setting subheading (Voice / Style / Pace / Accent /
+// Expressiveness / Tone / Scene). 12px sits a step under the 13px value text
+// it labels, so the column reads as a stack of controls rather than headings.
+// Slider carries the same class on its own label — keep the two in step.
+const SETTING_LABEL = 'text-xs font-medium text-ink-200'
 
 interface SettingsViewProps {
   settings: VoiceSettings
@@ -20,24 +26,27 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
   const update = (patch: Partial<VoiceSettings>) =>
     onSettingsChange({ ...settings, ...patch, presetId: undefined, presetLabel: undefined })
 
-  const handleReset = () => {
-    onSettingsChange({ ...settings, ...DEFAULT_VOICE_SETTINGS })
-  }
-
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="flex flex-col gap-4 px-5 pb-6 pt-2">
         {/* Preset — loads a saved voice from the bank in one click (voice,
-            delivery params, scene and tone all together). */}
-        <PresetRow
-          label={settings.presetLabel}
-          onOpen={onOpenPresetPicker}
-          onClear={() => onSettingsChange({ ...settings, presetId: undefined, presetLabel: undefined })}
-        />
+            delivery params, scene and tone all together). Pinned over the
+            scroll (the Characters controls pattern): an opaque backdrop
+            stretched across the column's padding by -mx-5/px-5, plus a
+            feathered gradient below it so the fields dissolve underneath
+            instead of clipping against a hard edge. */}
+        <div className="sticky top-0 z-10 -mx-5 bg-surface-0 px-5 pt-2">
+          <PresetRow
+            label={settings.presetLabel}
+            onOpen={onOpenPresetPicker}
+            onClear={() => onSettingsChange({ ...settings, presetId: undefined, presetLabel: undefined })}
+          />
+          <div className="pointer-events-none absolute inset-x-0 top-full h-5 bg-gradient-to-b from-surface-0 to-transparent" />
+        </div>
 
         {/* Voice — clickable, slides into picker */}
         <div>
-          <span className="text-sm font-medium text-ink-200">Voice</span>
+          <span className={SETTING_LABEL}>Voice</span>
           <button
             onClick={onOpenVoicePicker}
             className="mt-1.5 flex w-full items-center gap-3 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-2.5 text-left transition-colors hover:bg-ink/[0.06]"
@@ -51,7 +60,7 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
                   a picked voice reads at the weight a picker row does app-wide. */}
               <div className="truncate text-[13px] font-medium text-ink-100">{settings.voiceName}</div>
               {voice?.description && (
-                <div className="truncate text-xs text-ink-400">{voice.description}</div>
+                <div className="truncate text-[11px] text-ink-400">{voice.description}</div>
               )}
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-ink-400" />
@@ -111,17 +120,6 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
           sampleContext={settings.sampleContext}
           onApply={(scene, sampleContext) => update({ scene, sampleContext })}
         />
-
-        {/* Reset */}
-        <div className="mt-1">
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-1.5 text-xs text-ink-400 transition-colors hover:text-ink-200"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-            Reset values
-          </button>
-        </div>
       </div>
     </div>
   )
@@ -151,7 +149,7 @@ function PresetRow({
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[13px] font-medium text-ink-200">Preset</div>
-          <div className="truncate text-xs text-ink-400">Load a saved voice from the bank</div>
+          <div className="truncate text-[11px] text-ink-400">Load a saved voice from the bank</div>
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
       </button>
@@ -202,7 +200,7 @@ function DirectionBox({
   return (
     <div className="flex flex-col gap-2">
       <span className="flex items-center gap-2">
-        <span className="text-sm font-medium text-ink-200">{label}</span>
+        <span className={SETTING_LABEL}>{label}</span>
         <span className="rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">optional</span>
       </span>
       <textarea
@@ -257,7 +255,7 @@ function DirectionChips({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <span className="text-sm font-medium text-ink-200">{label}</span>
+      <span className={SETTING_LABEL}>{label}</span>
       <div className="mt-1.5">{children}</div>
     </div>
   )
