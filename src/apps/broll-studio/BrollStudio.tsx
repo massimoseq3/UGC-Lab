@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
-import type { Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
+import type { AdBlueprintPayload, Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
 import { deliveryForMode, isLineMode, isAdFormat, sanitizeBrollMode, type AdFormat, type BrollResult, type PromptVariation, type ReferenceImage, type VariationTag, type VariationRefs, type CardState, type BrollMode, type BrollDelivery, type ContinuousResult, type ContinuousConcept, type ContinuousSelection, type ContinuousFrameCardState, type ContinuousClipCardState } from './types'
 import { generateBroll } from './services/generateBroll'
 import { productPhotosOf } from './services/productAngles'
@@ -35,6 +35,15 @@ import { writeAutoScript } from './services/autoScript'
 import { swapQuotedLine, swapScriptLine } from './services/scriptLineEdit'
 
 type PickerMode = 'products' | 'models' | 'scripts' | 'styleRefs' | null
+
+// Guards both the inter-app payload (untyped `data`) and the persisted slot,
+// so a stale or hand-edited localStorage entry can't put a half-built blueprint
+// into the storyboard prompt.
+function isAdBlueprint(raw: unknown): raw is AdBlueprintPayload {
+  if (!raw || typeof raw !== 'object') return false
+  const b = raw as Partial<AdBlueprintPayload>
+  return typeof b.title === 'string' && typeof b.script === 'string' && !!b.staging?.trim()
+}
 
 // The delivery a pre-split session was left on, read straight out of its own
 // localStorage slot. `usePersistedState`'s sanitize only sees its own value, and
@@ -133,6 +142,10 @@ export default function BrollStudio() {
     setSelectedScriptId(null)
     setScriptText('')
     setAdditionalContext('')
+    // The blueprint is an input like any other — "New" clears the words it
+    // brought, so leaving its staging behind would silently shoot the next
+    // storyboard like the ad the member just cleared.
+    setAdBlueprint(null)
     setClearedCanvasSig(canvasSigRef.current)
   }
   const [result, setResult] = usePersistedState<BrollResult | null>(
@@ -238,9 +251,23 @@ export default function BrollStudio() {
     30,
     { sanitize: (raw) => (isWriteLength(raw) ? raw : 30) },
   )
+  // A storyboard staged on an analysed ad, handed over from the Ad Analyzer
+  // ("Clone this with my product"). It answers the same question the Ad Format
+  // row answers — how is this shot — so it OCCUPIES that row rather than adding
+  // a competing one, and it supplies the staging in the format's place. The
+  // title is what the row displays; without it the row would read "Standard
+  // UGC" while a blueprint quietly drove the shots.
+  const [adBlueprint, setAdBlueprint] = usePersistedState<AdBlueprintPayload | null>(
+    `${baseKey}:adBlueprint`,
+    null,
+    { sanitize: (raw) => (isAdBlueprint(raw) ? raw : null) },
+  )
+
   // Undefined for a structure (an argument implies no camera) and when nothing
-  // is picked. Shared by both storyboard calls.
-  const sceneStaging = sceneStagingFor(isWriteStyle(autoScriptStyle) ? autoScriptStyle : null)
+  // is picked. Shared by both storyboard calls. A blueprint outranks the format
+  // pick: it's the more specific instruction, and it's what the row is showing.
+  const sceneStaging =
+    adBlueprint?.staging || sceneStagingFor(isWriteStyle(autoScriptStyle) ? autoScriptStyle : null)
 
   // ── Continuous mode (keyframe chain) state ─────────────────────
   // Until the user actively picks a style, the look falls back to a mode-
@@ -407,6 +434,21 @@ export default function BrollStudio() {
     if (targetField === 'scriptText' && typeof data === 'string') {
       setScriptText(data)
       setSelectedScriptId(null)
+      setHighlightField('script')
+      setTimeout(() => setHighlightField(null), 800)
+    }
+
+    // Ad Analyzer → "Clone this with my product". The ad's transcript becomes
+    // the script and its staging drives the shots; the analysed prompts stay
+    // behind on purpose (see ad-anatomy/services/adBlueprint.ts). Generate is
+    // gated on an Ad Format pick, and the blueprint IS that answer — so it
+    // seeds 'standard' when nothing is picked rather than landing the member
+    // on a disabled button with no clue which row is empty.
+    if (targetField === 'adBlueprint' && isAdBlueprint(data)) {
+      setAdBlueprint(data)
+      setScriptText(data.script)
+      setSelectedScriptId(null)
+      setAutoScriptStyle((prev) => prev ?? 'standard')
       setHighlightField('script')
       setTimeout(() => setHighlightField(null), 800)
     }
@@ -1116,6 +1158,8 @@ export default function BrollStudio() {
           mode={mode}
           onModeChange={setMode}
           autoScriptStyle={autoScriptStyle}
+          adBlueprintTitle={adBlueprint?.title ?? null}
+          onClearAdBlueprint={() => setAdBlueprint(null)}
           onAutoScriptStyleChange={setAutoScriptStyle}
           autoScriptLength={autoScriptLength}
           onAutoScriptLengthChange={setAutoScriptLength}

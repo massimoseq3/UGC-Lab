@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote, Video } from 'lucide-react'
+import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote, Video, Clapperboard } from 'lucide-react'
 import type { Product, Model, Script } from '../../../stores/types'
 import { deliveryForMode, type BrollMode } from '../types'
 import { WRITE_LENGTHS, WRITE_STYLE_META, isWriteStyle, type WriteLength } from '../../script-architect/types'
@@ -57,6 +57,12 @@ interface InputPanelProps {
   // decides how the ad is SHOT, and when no script is supplied it also decides
   // how the words are written. The length only applies in that second case.
   autoScriptStyle: AdFormat | null
+  // Set when the Ad Analyzer handed over an analysed ad's staging. It answers
+  // the Ad Format row's question ("how is this shot"), so it takes that row
+  // over rather than adding a competing one — and the row must SAY so, or it
+  // reads "Standard UGC" while a blueprint quietly drives every prompt.
+  adBlueprintTitle?: string | null
+  onClearAdBlueprint?: () => void
   onAutoScriptStyleChange: (style: AdFormat | null) => void
   autoScriptLength: WriteLength
   onAutoScriptLengthChange: (length: WriteLength) => void
@@ -268,6 +274,8 @@ export default function InputPanel({
   onModeChange,
   autoScriptStyle,
   onAutoScriptStyleChange,
+  adBlueprintTitle,
+  onClearAdBlueprint,
   autoScriptLength,
   onAutoScriptLengthChange,
   styleChosen,
@@ -535,12 +543,22 @@ export default function InputPanel({
             }`}
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
-              {isWriteStyle(autoScriptStyle) && WRITE_STYLE_META[autoScriptStyle].group === 'format'
-                ? <Video className="h-5 w-5" strokeWidth={1.75} />
-                : <FileText className="h-5 w-5" strokeWidth={1.75} />}
+              {adBlueprintTitle
+                ? <Clapperboard className="h-5 w-5" strokeWidth={1.75} />
+                : isWriteStyle(autoScriptStyle) && WRITE_STYLE_META[autoScriptStyle].group === 'format'
+                  ? <Video className="h-5 w-5" strokeWidth={1.75} />
+                  : <FileText className="h-5 w-5" strokeWidth={1.75} />}
             </div>
             <div className="min-w-0 flex-1">
-              {autoScriptStyle ? (
+              {adBlueprintTitle ? (
+                // Provenance rides the hint line, not a chip beside the title:
+                // an "Analysed ad" chip is wide enough to truncate a real ad
+                // title down to about four characters in this column.
+                <>
+                  <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">{adBlueprintTitle}</div>
+                  <div className="truncate text-[11px] leading-snug text-ink-500">Analysed ad — your product, your character</div>
+                </>
+              ) : autoScriptStyle ? (
                 <>
                   <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">
                     {isWriteStyle(autoScriptStyle) ? WRITE_STYLE_META[autoScriptStyle].label : STANDARD_UGC.label}
@@ -556,16 +574,22 @@ export default function InputPanel({
                 </>
               )}
             </div>
-            {autoScriptStyle ? (
+            {adBlueprintTitle || autoScriptStyle ? (
               <div className="flex shrink-0 items-center gap-1">
                 <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
                   <RefreshCw className="h-2.5 w-2.5" />
                 </span>
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); onAutoScriptStyleChange(null) }}
-                  title="Clear format"
-                  aria-label="Clear format"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    // Clearing the blueprint hands the row back to the format
+                    // picker; the format pick underneath it survives.
+                    if (adBlueprintTitle) onClearAdBlueprint?.()
+                    else onAutoScriptStyleChange(null)
+                  }}
+                  title={adBlueprintTitle ? 'Clear analysed ad' : 'Clear format'}
+                  aria-label={adBlueprintTitle ? 'Clear analysed ad' : 'Clear format'}
                   className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
                 >
                   <X className="h-3.5 w-3.5" />

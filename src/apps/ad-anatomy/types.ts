@@ -29,15 +29,16 @@ export interface ReverseEngineeredPrompt {
 }
 
 // Strategy-level dissection of why the ad works (vs. the shot-level scenes).
-// `stylePrompt` is the reusable artifact: a product-agnostic writing brief
-// distilled from the ad's psychology + DTC fundamentals, meant to be saved to
-// the Script Bank and fed to Scripts to write new scripts in the same style.
+// It carried a fourth field, `stylePrompt` — a product-agnostic writing brief
+// saveable to the Script Bank as `kind: 'style'`. Cut July 2026: it read as a
+// generic list of DTC platitudes whichever ad went in, because stripping every
+// concrete detail is what made it reusable. Rows already saved to the bank
+// still render; nothing produces new ones. See git history to restore.
 export interface CreativeBreakdown {
   hook: string
   angle: string
   // Beat-by-beat skeleton, one beat per line ("MM:SS–MM:SS BEAT — role").
   structure: string
-  stylePrompt: string
 }
 
 // ── Two-pass pipeline shapes ─────────────────────────────────────────

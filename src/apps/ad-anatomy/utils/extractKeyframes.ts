@@ -121,15 +121,7 @@ export async function extractCutKeyframes(file: File): Promise<Keyframe[]> {
 
     // Keyframe times: the opening frame plus one frame per detected cut
     // (the spike sample already sits just past the boundary).
-    let times = [0.1, ...cutTimes]
-    if (times.length > MAX_KEYFRAMES) {
-      // Keep the opening frame and an evenly-spread subset of the cuts so
-      // coverage stays chronological instead of front-loaded.
-      const kept: number[] = [times[0]]
-      const stride = (times.length - 1) / (MAX_KEYFRAMES - 1)
-      for (let i = 1; i < MAX_KEYFRAMES; i++) kept.push(times[Math.round(i * stride)])
-      times = [...new Set(kept)].sort((a, b) => a - b)
-    }
+    const times = evenlySpread([0.1, ...cutTimes], MAX_KEYFRAMES)
 
     // ── Pass 2: capture the chosen frames at readable resolution ──
     const scale = naturalW > CAPTURE_WIDTH ? CAPTURE_WIDTH / naturalW : 1
@@ -153,6 +145,21 @@ export async function extractCutKeyframes(file: File): Promise<Keyframe[]> {
   } finally {
     cleanup()
   }
+}
+
+// Trim a chronological list down to `max` entries by keeping the first and
+// spreading the rest evenly, so coverage stays spread across the ad instead of
+// front-loaded onto its opening seconds. Used both when detection finds more
+// cuts than we cap at, and when the request's payload budget can't carry every
+// frame we captured.
+export function evenlySpread<T>(items: T[], max: number): T[] {
+  if (max <= 0) return []
+  if (items.length <= max) return items
+  if (max === 1) return [items[0]]
+  const kept: T[] = [items[0]]
+  const stride = (items.length - 1) / (max - 1)
+  for (let i = 1; i < max; i++) kept.push(items[Math.round(i * stride)])
+  return [...new Set(kept)]
 }
 
 export function formatKeyframeTimestamp(seconds: number): string {

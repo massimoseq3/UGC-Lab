@@ -417,3 +417,17 @@ export interface VideoSourceClipPayload {
   durationSeconds?: number
   label?: string
 }
+
+// Payload for the Ad Analyzer → B-Roll handoff (targetField 'adBlueprint').
+// Deliberately carries STAGING, not the analysed prompts: `script` is the ad's
+// own transcript and `staging` is its beat map + shot craft, which rides the
+// same `BrollInput.sceneStaging` seam a Script Style format uses. B-Roll then
+// writes fresh prompts against the member's OWN product and character refs,
+// shot the way the analysed ad was shot. See services/adBlueprint.ts for why
+// the original identity must not travel with it.
+export interface AdBlueprintPayload {
+  // The analysed ad's title — labels the B-Roll input row and the toast.
+  title: string
+  script: string
+  staging: string
+}

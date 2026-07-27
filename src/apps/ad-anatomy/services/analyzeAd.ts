@@ -5,15 +5,24 @@ import {
   pollTask,
   kieChatCompletions,
   fileToDataUri,
+  CHAT_POLL_ATTEMPTS,
   type ChatMessage,
 } from '../../../utils/kie'
 import { getChatEndpointPath, CHAT_MODEL_DEFAULT } from '../../../utils/models'
-import { formatKeyframeTimestamp, type Keyframe } from '../utils/extractKeyframes'
+import { evenlySpread, formatKeyframeTimestamp, type Keyframe } from '../utils/extractKeyframes'
 
 const CHAT_MODEL_ID = CHAT_MODEL_DEFAULT
 // Streaming fallback timeout — kept generous since chat completions don't
 // have intermediate progress signals like the task-based flow.
 const STREAM_TIMEOUT_MS = 300_000
+
+// Every media part rides inline as base64, and Gemini rejects a request whose
+// inline payload runs past ~20MB — as a validation error from deep inside the
+// task, not as an upfront size complaint, so it reads like a mystery rejection.
+// The video is the subject and always rides whole; keyframes are a supplement,
+// so they get trimmed to whatever room is left over. Budgeted below the real
+// ceiling because the prompts and JSON envelope ride along too.
+const INLINE_MEDIA_BUDGET_BYTES = 17 * 1024 * 1024
 
 // The analysis runs as TWO passes so each gets the model's full attention:
 //   Pass 1 — PERCEPTION: video attached; pure observation. Transcript, a log
@@ -92,13 +101,6 @@ CREATIVE BREAKDOWN RULE: This is a marketing-strategy dissection of WHY the ad w
 
 3. structure: A beat-by-beat skeleton of the ENTIRE ad, one beat per line, each formatted exactly as: "MM:SS–MM:SS <BEAT NAME> — <what it does psychologically>". Name beats in direct-response terms (Hook, Problem, Agitation, Discovery, Mechanism, Demo, Proof, Objection Handle, Offer, Urgency, CTA...). Cover 00:00 to the end, using the shot log's timestamps.
 
-4. stylePrompt — THE REUSABLE ARTIFACT, TREAT WITH MAXIMUM CARE: A fully self-contained writing brief that a scriptwriter (human or AI) can paste in, together with any NEW product's details, to write a brand-new ad script from scratch in this ad's exact style. Requirements:
-   - Strip EVERY reference to the original brand, product, niche, and claims. Refer only to "the product", "the viewer", "the pain point". The prompt must work for a skincare serum and a dog toy equally.
-   - Open with one sentence stating what this style is and when to use it.
-   - Then short labeled sections, each label in CAPS on its own line: HOOK FORMULA (the opening line as a fill-in-the-blank template, e.g. "I did [common behaviour] for years before I realized [costly mistake]"), ANGLE (the positioning + awareness level to write for), STRUCTURE (the beat sequence with relative timing, e.g. "beats for a ~30s read: Hook 0-3s → Agitation 3-8s → ..."), PSYCHOLOGY (the ordered triggers to hit: e.g. curiosity → self-recognition → hope → proof → urgency), VOICE (tone, pacing, sentence-length rules, first/second person, energy), DTC FUNDAMENTALS (the direct-response rules this ad executes: one idea per beat, concrete specifics over claims, name the product late, undersell the result, CTA style — whichever this ad actually uses).
-   - NEVER open a line with "Scene 1", "--- Scene" or any numbered scene header — this is a writing brief, not a scene blueprint.
-   - No markdown syntax; plain text with the CAPS labels.
-
 SCENE RULES — CRITICAL (the recreation prompts):
 
 1. CHUNKING: Read totalDurationSeconds. If it is 15 seconds or less, produce a SINGLE scene that covers the whole ad. Otherwise break the ad into multiple scenes at natural shot boundaries. Each scene MUST be 15 seconds or less. Aim for 8–12 seconds per scene. Number scenes starting at 1.
@@ -128,8 +130,7 @@ AD TITLE: Produce a short (3–6 word) Title Case descriptor of the ad as a whol
   "creativeBreakdown": {
     "hook": "<2-4 sentences — the exact opening beat, the hook mechanism, the trigger, why it stops the scroll>",
     "angle": "<2-4 sentences — persuasion angle, target, awareness level>",
-    "structure": "<one beat per line: MM:SS–MM:SS BEAT NAME — psychological job, newline-separated>",
-    "stylePrompt": "<product-agnostic reusable writing brief with CAPS-labelled sections, per the CREATIVE BREAKDOWN RULE>"
+    "structure": "<one beat per line: MM:SS–MM:SS BEAT NAME — psychological job, newline-separated>"
   },
   "reverseEngineeredPrompt": {
     "totalDurationSeconds": <integer>,
@@ -148,7 +149,7 @@ AD TITLE: Produce a short (3–6 word) Title Case descriptor of the ad as a whol
 }`
 
 function synthesisUserPrompt(perception: PerceptionResult): string {
-  return `Here is the forensic shot log of a UGC ad. Produce (1) a brutally honest scorecard, (2) the creative breakdown — hook, angle, beat-by-beat structure, plus the product-agnostic reusable style prompt, and (3) the reverse-engineered scene prompts — scenes of ≤15 seconds covering the entire ad, with every logged shot described in chronological order inside its scene's timeline and the full character/product descriptions embedded in every scene prompt. Return as JSON.
+  return `Here is the forensic shot log of a UGC ad. Produce (1) a brutally honest scorecard, (2) the creative breakdown — hook, angle, beat-by-beat structure — and (3) the reverse-engineered scene prompts — scenes of ≤15 seconds covering the entire ad, with every logged shot described in chronological order inside its scene's timeline and the full character/product descriptions embedded in every scene prompt. Return as JSON.
 
 --- SHOT LOG ---
 ${JSON.stringify(perception, null, 2)}`
@@ -165,11 +166,12 @@ ${JSON.stringify(perception, null, 2)}`
 // sampled frames and vanish from the shot log.
 async function buildPerceptionMessages(videoFile: File, keyframes: Keyframe[] = []): Promise<ChatMessage[]> {
   const dataUri = await fileToDataUri(videoFile)
+  const frames = fitKeyframesToBudget(dataUri, keyframes)
 
   let userText = PERCEPTION_USER_PROMPT
-  if (keyframes.length > 0) {
-    const stamps = keyframes.map((k) => formatKeyframeTimestamp(k.time)).join(', ')
-    userText += `\n\nAfter the video, ${keyframes.length} still keyframes are attached in chronological order, captured at detected hard cuts: ${stamps}. Use them to catch shots the video sampling may have skipped, to pin exact shot boundaries, and to read on-screen text and product labels precisely. The video remains the authority for motion, pacing, and audio.`
+  if (frames.length > 0) {
+    const stamps = frames.map((k) => formatKeyframeTimestamp(k.time)).join(', ')
+    userText += `\n\nAfter the video, ${frames.length} still keyframes are attached in chronological order, captured at detected hard cuts: ${stamps}. Use them to catch shots the video sampling may have skipped, to pin exact shot boundaries, and to read on-screen text and product labels precisely. The video remains the authority for motion, pacing, and audio.`
   }
 
   return [
@@ -179,10 +181,30 @@ async function buildPerceptionMessages(videoFile: File, keyframes: Keyframe[] = 
       content: [
         { type: 'text', text: userText },
         { type: 'image_url', image_url: { url: dataUri } },
-        ...keyframes.map((k) => ({ type: 'image_url' as const, image_url: { url: k.dataUri } })),
+        ...frames.map((k) => ({ type: 'image_url' as const, image_url: { url: k.dataUri } })),
       ],
     },
   ]
+}
+
+// Drop keyframes until the whole inline payload fits INLINE_MEDIA_BUDGET_BYTES.
+// Thinning is even rather than truncating the tail, so what survives still
+// covers the whole ad. A long video can leave no room at all — the analysis
+// then runs video-only, which is the pre-keyframe behaviour, not a failure.
+function fitKeyframesToBudget(videoUri: string, keyframes: Keyframe[]): Keyframe[] {
+  if (keyframes.length === 0) return []
+  const room = INLINE_MEDIA_BUDGET_BYTES - videoUri.length
+  if (room <= 0) {
+    console.warn('[ad-anatomy] video fills the inline budget — analysing without keyframes')
+    return []
+  }
+  const total = keyframes.reduce((n, k) => n + k.dataUri.length, 0)
+  if (total <= room) return keyframes
+
+  const fits = Math.floor(room / (total / keyframes.length))
+  const kept = evenlySpread(keyframes, fits)
+  console.warn(`[ad-anatomy] inline budget trimmed keyframes ${keyframes.length} → ${kept.length}`)
+  return kept
 }
 
 function buildSynthesisMessages(perception: PerceptionResult): ChatMessage[] {
@@ -313,7 +335,7 @@ async function startChatTask(messages: ChatMessage[]): Promise<StartAnalysisOutc
 
 async function pollChatTaskText(taskId: string): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const record = await pollTask(apiKey, taskId)
+  const record = await pollTask(apiKey, taskId, { maxPollAttempts: CHAT_POLL_ATTEMPTS })
 
   // Parse resultJson — kie sometimes returns it as a JSON string holding the
   // chat envelope, sometimes as a string holding the raw model text.

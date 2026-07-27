@@ -11,6 +11,7 @@ import {
   Lightbulb,
 } from 'lucide-react'
 import type { AnalysisResult, Scene } from '../types'
+import { buildAdBlueprint } from '../services/adBlueprint'
 import { useAppStore } from '../../../stores/appStore'
 import { useBankStore } from '../../../stores/bankStore'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -156,48 +157,12 @@ function BreakdownBlock({ label, text, pre = false }: { label: string; text: str
 }
 
 // The merged Breakdown card: scorecard + analyst note on top, then (when the
-// analysis has one — legacy results don't) the creative breakdown blocks and
-// the reusable style prompt with its bank/Scripts actions.
-function BreakdownSection({ result, fileName }: { result: AnalysisResult; fileName: string }) {
+// analysis has one — legacy results don't) the creative breakdown blocks.
+// It has no bottom action row on purpose: the Script Style Prompt it used to
+// ship is gone, and hook/angle/structure are things you read, not artifacts
+// you send anywhere.
+function BreakdownSection({ result }: { result: AnalysisResult }) {
   const breakdown = result.creativeBreakdown ?? null
-  const { copied, copy } = useCopy()
-  const addToast = useAppStore((s) => s.addToast)
-  const sendToApp = useAppStore((s) => s.sendToApp)
-  const addScript = useBankStore((s) => s.addScript)
-
-  const adTitle = result.adTitle?.trim() || deriveFallbackTitle(fileName)
-  const scriptTitle = `${adTitle} — Script Style`
-
-  const saveStyleToBank = () => {
-    if (!breakdown) return
-    addScript({
-      title: scriptTitle,
-      scriptText: breakdown.stylePrompt,
-      linkedProductId: '',
-      source: 'manual',
-      kind: 'style',
-    })
-  }
-
-  const handleSaveToBank = () => {
-    saveStyleToBank()
-    addToast(`Saved "${scriptTitle}" to Script Bank`)
-  }
-
-  // Lands in the Remix source box — the remix pipeline reads the source for
-  // structure, pacing, and psychology, which is exactly what the style
-  // prompt encodes, so pairing it with a product writes new scripts from
-  // scratch in this ad's style.
-  const handleSendToScripts = () => {
-    if (!breakdown) return
-    saveStyleToBank()
-    sendToApp({
-      targetApp: 'script-architect',
-      targetField: 'winningTranscript',
-      data: breakdown.stylePrompt,
-    })
-    addToast('Sent to Scripts + saved to bank')
-  }
 
   return (
     <Section>
@@ -217,33 +182,7 @@ function BreakdownSection({ result, fileName }: { result: AnalysisResult; fileNa
             <BreakdownBlock label="Hook" text={breakdown.hook} />
             <BreakdownBlock label="Angle" text={breakdown.angle} />
             <BreakdownBlock label="Structure" text={breakdown.structure} pre />
-
-            {/* The reusable style prompt — the artifact the actions below ship. */}
-            <div className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 card-soft-shadow">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                  <span className="shrink-0 rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-tight text-sky-300 light:text-sky-700">
-                    Script Style Prompt
-                  </span>
-                  <span className="text-[11px] text-ink-500">
-                    Reusable — writes new scripts with this ad&apos;s psychology
-                  </span>
-                </div>
-                <button
-                  onClick={() => copy(breakdown.stylePrompt)}
-                  className="flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
-                >
-                  {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
-                  {copied ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-              <div className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-200">
-                {breakdown.stylePrompt}
-              </div>
-            </div>
           </div>
-
-          <ScriptActionRow onSave={handleSaveToBank} onSend={handleSendToScripts} />
         </>
       )}
     </Section>
@@ -397,6 +336,15 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
     addToast('Sent to Scripts + saved to bank')
   }
 
+  // Clone this ad with the member's own product. It deliberately does NOT ship these
+  // prompts — they describe the original creator and the original packaging —
+  // only the ad's transcript and its staging. See services/adBlueprint.ts.
+  const handleSendToBroll = () => {
+    const blueprint = buildAdBlueprint(result, fileName)
+    sendToApp({ targetApp: 'broll-studio', targetField: 'adBlueprint', data: blueprint })
+    addToast(`Sent to B-Roll — storyboard it with your own product`)
+  }
+
   return (
     <Section>
       <CardHeader
@@ -431,7 +379,20 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
         </div>
       </div>
 
-      <ScriptActionRow onSave={handleSaveToBank} onSend={handleSendToScripts} />
+      <ScriptActionRow
+        onSave={handleSaveToBank}
+        onSend={handleSendToScripts}
+        extra={
+          <button
+            onClick={handleSendToBroll}
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-broll-500/20 bg-broll-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-broll-300 light:text-broll-700 transition-colors hover:bg-broll-500/20"
+          >
+            <Film className="h-4 w-4" strokeWidth={1.75} />
+            Clone this with my product
+            <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
+          </button>
+        }
+      />
     </Section>
   )
 }
@@ -439,7 +400,9 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
 // Shared bottom action row for the Transcript + Scenes sections — the larger,
 // Scripts-styled "Save to Script Bank" (neutral) + "Send to Scripts" (orange
 // scripts accent, with a trailing arrow) buttons, matching the Scripts app.
-function ScriptActionRow({ onSave, onSend }: { onSave: () => void; onSend: () => void }) {
+// `extra` is the Scenes row's third button (Send to B-Roll); it wraps onto its
+// own line rather than squeezing three buttons into a narrow column.
+function ScriptActionRow({ onSave, onSend, extra }: { onSave: () => void; onSend: () => void; extra?: React.ReactNode }) {
   return (
     <div className="flex flex-wrap gap-2 border-t border-ink/5 p-3">
       <button
@@ -457,6 +420,7 @@ function ScriptActionRow({ onSave, onSend }: { onSave: () => void; onSend: () =>
         Send to Scripts
         <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
       </button>
+      {extra}
     </div>
   )
 }
@@ -552,7 +516,10 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
           min-h-0: in the phones' stacked column the scroller must be allowed
           to shrink below its content, or it clips instead of scrolling. */}
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="sticky top-0 z-10 flex h-[57px] shrink-0 items-center border-b border-ink/5 bg-surface-0/80 px-5 backdrop-blur-md">
+        {/* Opaque, not a tinted blur: the results column has no background of
+            its own, so a translucent bar let the cards scroll visibly through
+            it and the whole strip read as unpinned rather than sticky. */}
+        <div className="sticky top-0 z-10 flex h-[57px] shrink-0 items-center border-b border-ink/5 bg-surface-0 px-5">
           <SegmentedToggle<SectionKey>
             className="h-10 !p-1"
             value={active}
@@ -577,7 +544,7 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
             </div>
           )}
           <div ref={breakdownRef} data-section="breakdown" className="scroll-mt-20">
-            <BreakdownSection result={result} fileName={fileName} />
+            <BreakdownSection result={result} />
           </div>
           <div ref={transcriptRef} data-section="transcript" className="scroll-mt-20">
             <TranscriptSection result={result} fileName={fileName} />
