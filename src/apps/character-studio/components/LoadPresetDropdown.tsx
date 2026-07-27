@@ -188,20 +188,22 @@ export default function LoadPresetDropdown({ onLoadProfile }: LoadPresetDropdown
 
   return (
     <>
-      {/* "Full" is doing real work here: the scoped pickers further down the
-          column ("Physical Presets" / "Scene & Pose Presets") load one tab's
-          fields from the same saved recipes. Without it the two entry points
-          read as the same control in two places. */}
+      {/* "Character" is doing the work the word "Full" used to: the scoped
+          pickers further down the column ("Physical Presets" / "Scene & Pose
+          Presets") load one tab's fields from the same saved recipes, so this
+          one has to read as the whole-character load. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
         title="Load every field from a saved preset — physical, scene and pose"
-        className="flex h-12 w-full items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 text-left transition-colors hover:bg-ink/[0.05]"
+        className="flex w-full items-center gap-2.5 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-3 py-2 text-left transition-colors hover:bg-ink/[0.05]"
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-influencers-500/10 text-influencers-400">
-          <UserRound className="h-3.5 w-3.5" />
+          <UserRound className="h-4 w-4" strokeWidth={1.5} />
         </span>
-        <div className="min-w-0 flex-1 truncate text-[14px] font-medium text-ink-100">Load Full Preset</div>
+        {/* 13px — the B-Roll reference-row title size, so a picker row reads
+            the same weight in every app. No hint line: the title says it. */}
+        <div className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-300">Load Character Preset</div>
         <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
       </button>
 

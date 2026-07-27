@@ -22,7 +22,6 @@ import ModelPicker from '../../../components/ModelPicker'
 import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
 import SegmentedToggle from '../../../components/SegmentedToggle'
-import ModelWaitNotice from '../../../components/ModelWaitNotice'
 import BankPicker from '../../../components/BankPicker'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import { TileActionStack, TileActionButton } from '../../../components/tileActions'
@@ -840,7 +839,6 @@ export default function InfluencerEditModal({
                   )}
                 </button>
               )}
-              <ModelWaitNotice modelId={imageModelId} className="mt-2" />
             </div>
           </div>
 
@@ -906,9 +904,6 @@ export default function InfluencerEditModal({
         accent="ink"
       />
       <StyleModal
-        // Remount per open so the popup always lands on the browse view with a
-        // clean draft — it renders null while closed, so this costs nothing.
-        key={styleModalOpen ? 'open' : 'closed'}
         open={styleModalOpen}
         onClose={() => setStyleModalOpen(false)}
         styleId={styleId}

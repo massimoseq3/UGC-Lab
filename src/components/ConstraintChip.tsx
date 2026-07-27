@@ -93,13 +93,17 @@ export default function ConstraintChip({
           onMouseEnter={hover ? openNow : undefined}
           onMouseLeave={hover ? closeSoon : undefined}
         >
-          <div className="min-w-[140px] overflow-hidden rounded-2xl border border-ink/10 bg-surface-2/95 p-1 shadow-xl backdrop-blur-xl">
+          {/* Option rows are a real tap target: 36px tall at the trigger's own
+              13px, not the 11px/24px they used to be. These are the resolution
+              and aspect menus on every generate bar in the app — the pills
+              were fiddly to hit with a mouse and worse on a trackpad. */}
+          <div className="min-w-[160px] overflow-hidden rounded-2xl border border-ink/10 bg-surface-2/95 p-1.5 shadow-xl backdrop-blur-xl">
             {options.map((opt) => (
               <button
                 key={opt}
                 type="button"
                 onClick={() => { onChange(opt); setOpen(false) }}
-                className={`flex w-full items-center whitespace-nowrap rounded-full px-3 py-1.5 text-left text-[11px] transition-colors ${
+                className={`flex min-h-9 w-full items-center whitespace-nowrap rounded-full px-3.5 py-2 text-left text-[13px] transition-colors ${
                   opt === value ? 'bg-ink/[0.08] text-ink-100' : 'text-ink-300 hover:bg-ink/[0.05]'
                 }`}
               >

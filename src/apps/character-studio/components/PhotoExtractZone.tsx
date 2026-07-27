@@ -110,22 +110,22 @@ export default function PhotoExtractZone({
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`flex h-12 cursor-pointer items-center gap-3 rounded-full border border-dashed px-4 transition-all ${dragOver
+        className={`flex cursor-pointer items-center gap-2.5 rounded-full border border-dashed px-3 py-2 transition-all ${dragOver
             ? 'border-green-400/40 bg-green-400/5'
             : 'border-ink/10 bg-ink/[0.02] hover:border-ink/20 hover:bg-ink/[0.05]'
           }`}
       >
-        <div className={`shrink-0 rounded-full p-1.5 ${dragOver ? 'bg-green-400/10' : 'bg-ink/5'}`}>
+        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${dragOver ? 'bg-green-400/10' : 'bg-ink/5'}`}>
           {dragOver ? (
             <Dna className="h-4 w-4 text-green-400 light:text-green-600" strokeWidth={1.5} />
           ) : (
             <Upload className="h-4 w-4 text-ink-500" strokeWidth={1.5} />
           )}
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-medium text-ink-100">
-            {dragOver ? 'Drop to extract DNA' : 'Drop an image to autofill'}
-          </p>
+        {/* 13px — the B-Roll reference-row title size, matching the preset
+            button beside it. No hint line: the title says it. */}
+        <div className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-300">
+          {dragOver ? 'Drop to extract DNA' : 'Drop an image to autofill'}
         </div>
       </div>
 

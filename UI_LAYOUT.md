@@ -246,9 +246,10 @@ folder, and types keep the `character` naming.)
    Scene & Pose**). Below it, each field group renders as its own card: centered
    icon + title, then a two-column grid of `ChipField`s ("wide" fields span both).
 3. **Generate bar** (`components/GenerateBar.tsx`), pinned bottom, top→bottom:
-   - **Preset + photo row** — a **Load preset** dropdown (left, restores a full
-     saved recipe) + a dashed **"Drop an image to autofill"** zone (right,
-     vision-based DNA extraction). `GenerateBar.tsx:91`.
+   - **Preset + photo row** — a **"Load Character Preset"** row (left, restores a
+     full saved recipe) + a dashed **"Drop an image to autofill"** zone (right,
+     vision-based DNA extraction). Both are single-line rows, no hint text.
+     `GenerateBar.tsx:91`.
    - **Output toggle** — **Portrait** / **Character Sheet** (`GenerateBar.tsx:107`).
    - **Model picker row** — model picker (fills the left half) + a **resolution**
      chip + an **aspect-ratio** chip (9:16 / 16:9 / 1:1; sheets get their own
