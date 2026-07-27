@@ -8,14 +8,19 @@ export type SceneType =
   | 'B-ROLL REACTION'
   | 'B-ROLL ENVIRONMENT'
 
-// Shot role for a variation. Every scene now gets 3 SILENT b-roll variations,
-// each role picked by the LLM per line from the selectable menu (ALL_TAGS), so
-// the mix adapts to what each script line earns. No shot speaks — a voiceover is
-// laid over the footage in the edit.
+// Shot role for a variation.
 //
-// DIALOGUE (old talking-head anchor) and STATIC (old locked anchor take) are
-// retained in this union so legacy persisted cards still render, but neither is
-// offered to the model any more — they're absent from ALL_TAGS.
+// In B-Roll mode a scene gets 3 SILENT variations, each role picked by the LLM
+// per line from the selectable menu (ALL_TAGS), so the mix adapts to what each
+// script line earns. No shot speaks — a voiceover is laid over in the edit.
+//
+// In Dialogue mode all 3 are DIALOGUE: the character speaking that line, staged
+// three different ways. DIALOGUE is therefore not offered in ALL_TAGS (which is
+// the silent menu) but is emitted wholesale by the dialogue delivery override —
+// see PARSEABLE_TAGS.
+//
+// STATIC (the old locked anchor take) is retained in this union so legacy
+// persisted cards still render; nothing produces it any more.
 export type VariationTag =
   | 'DIALOGUE'
   | 'STATIC'
@@ -126,10 +131,15 @@ export interface BrollInput {
   styleName?: string
   // 'silent'   — every variation is silent b-roll (the default; a voiceover is
   //              laid over in the edit).
-  // 'dialogue' — one variation per scene is a talking-to-camera DIALOGUE shot
-  //              (the character speaks the exact line); the rest stay silent
-  //              b-roll.
+  // 'dialogue' — every variation is the character speaking the scene's exact
+  //              line, staged three different ways.
   delivery: BrollDelivery
+  // Scene staging for the picked Script Style, when that style is a FORMAT
+  // (podcast clip, street interview, green-screen reaction…). Comes straight
+  // from Scripts (sceneStagingFor) so the format shapes the shots here the same
+  // way it shapes a scene blueprint there. Absent for structures, which imply
+  // no camera, and when no style is picked.
+  sceneStaging?: string
 }
 
 export interface GeneratedImage {
@@ -269,12 +279,19 @@ export interface CardState {
   // pick and overridable in the modal's product photo strip. Absent → the hero
   // photo alone.
   productPhotos?: number[]
-  // DIALOGUE cards only (the "With Dialogue" talking-to-camera variation).
-  // When on — the default — the card's image gen attaches the previous scene's
-  // chosen dialogue still as its FIRST reference, so every talking clip is the
-  // same person in the same place at the same camera position and the ad reads
-  // as one piece to camera cut into pieces. Silent b-roll cards ignore it: their
-  // whole job is to look different from each other.
+  // DIALOGUE cards only. When on, the card's image gen attaches the previous
+  // dialogue card's chosen still as its FIRST reference, so the talking clips
+  // hold one room, one wardrobe and one camera position and the ad reads as a
+  // single piece to camera cut into pieces. Silent b-roll cards ignore it —
+  // their whole job is to look different from each other.
+  //
+  // Defaults OFF, and that flipped with the mode split: a Dialogue scene is now
+  // three genuinely different ways to deliver the line (different room,
+  // different activity), so anchoring each card to the last one's still fights
+  // the prompt it was written from. Identity is held by the character
+  // reference, which does that job better than a chain image can. Turn it on
+  // per card — the "Previous cut" slot on the Image tab — when you do want a
+  // run of cards locked to one sitting.
   chainLink: boolean
   // Video gen state for this card. The card produces at most one video at a time.
   videoStatus: 'idle' | 'generating' | 'error'
@@ -298,17 +315,52 @@ export interface CardState {
   videoPrompt: string | null
 }
 
-// The B-Roll workspace's two modes. One-Shot (whole script → one multi-cut
-// clip) was pulled in July 2026: no model on kie could hold a 30s ad together
-// well enough to ship, so it burned video credits for footage nobody used. Its
-// history rows are kept on disk untouched (BrollHistoryItem.oneShot*, hidden
-// from the History list) so the mode can come back with a model that can
-// actually do it. Do not reuse 'oneshot' for anything else.
-export type BrollMode = 'line' | 'continuous'
+// The B-Roll workspace's three modes.
+//
+// 'broll' and 'dialogue' both walk the script line by line and give each line
+// three cards; what differs is whether anyone speaks. They used to be ONE mode
+// ("Line-by-Line") with a delivery toggle underneath, but the choice decides
+// what the whole session is — silent footage you lay a voiceover over, or the
+// character delivering the lines on camera — so it belongs in the mode row
+// rather than buried in the settings band.
+//
+// One-Shot (whole script → one multi-cut clip) was pulled in July 2026: no
+// model on kie could hold a 30s ad together well enough to ship, so it burned
+// video credits for footage nobody used. Its history rows are kept on disk
+// untouched (BrollHistoryItem.oneShot*, hidden from the History list) so the
+// mode can come back with a model that can actually do it. Do not reuse
+// 'oneshot' for anything else.
+export type BrollMode = 'broll' | 'dialogue' | 'continuous'
 
 // 'dialogue' — the character speaks the actual script lines on camera.
 // 'silent'   — pure silent b-roll; a voiceover is laid over in the edit.
+//
+// Now fully determined by the mode (see deliveryForMode). It survives as its
+// own type because it's what the SERVICE and the persisted history rows speak:
+// `BrollHistoryItem` still stores `mode: 'line'` + `lineDelivery`, and those
+// rows are cloud-synced, so the storage shape is deliberately left alone.
 export type BrollDelivery = 'dialogue' | 'silent'
+
+// Whether anyone speaks in this mode. Continuous is silent narration-over-
+// footage like 'broll'.
+export function deliveryForMode(mode: BrollMode): BrollDelivery {
+  return mode === 'dialogue' ? 'dialogue' : 'silent'
+}
+
+// Only the two per-line modes run the scene/variation pipeline; Continuous has
+// its own storyboard shape.
+export function isLineMode(mode: BrollMode): boolean {
+  return mode === 'broll' || mode === 'dialogue'
+}
+
+// Coerces anything read from localStorage or a history row into a live mode.
+// Pre-split sessions stored 'line' with the delivery held separately, and
+// 'oneshot' is the retired mode — both land on a per-line mode, picking the
+// dialogue one only when that row actually ran with dialogue.
+export function sanitizeBrollMode(raw: unknown, delivery?: BrollDelivery): BrollMode {
+  if (raw === 'broll' || raw === 'dialogue' || raw === 'continuous') return raw
+  return delivery === 'dialogue' ? 'dialogue' : 'broll'
+}
 
 // ── Continuous mode (keyframe chain) ─────────────────────────────
 // Zack-D-Films-style continuous ads. The script splits into narration scenes;

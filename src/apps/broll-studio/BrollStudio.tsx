@@ -3,7 +3,7 @@ import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
 import type { Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
-import type { BrollResult, PromptVariation, ReferenceImage, VariationTag, VariationRefs, CardState, BrollMode, BrollDelivery, ContinuousResult, ContinuousConcept, ContinuousSelection, ContinuousFrameCardState, ContinuousClipCardState } from './types'
+import { deliveryForMode, isLineMode, sanitizeBrollMode, type BrollResult, type PromptVariation, type ReferenceImage, type VariationTag, type VariationRefs, type CardState, type BrollMode, type BrollDelivery, type ContinuousResult, type ContinuousConcept, type ContinuousSelection, type ContinuousFrameCardState, type ContinuousClipCardState } from './types'
 import { generateBroll } from './services/generateBroll'
 import { productPhotosOf } from './services/productAngles'
 import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, styleBriefFor, styleUsesRealism, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
@@ -29,8 +29,27 @@ import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersisted
 import { humanizeError } from '../../utils/friendlyError'
 import { fileToDataUri } from '../../utils/kie'
 import { getAsBase64, isAssetRef } from '../../utils/assetStore'
+import { isWriteStyle, isWriteLength, type WriteStyle, type WriteLength } from '../script-architect/types'
+import { sceneStagingFor } from '../script-architect/services/generateScript'
+import { writeAutoScript } from './services/autoScript'
+import { swapQuotedLine, swapScriptLine } from './services/scriptLineEdit'
 
 type PickerMode = 'products' | 'models' | 'scripts' | 'styleRefs' | null
+
+// The delivery a pre-split session was left on, read straight out of its own
+// localStorage slot. `usePersistedState`'s sanitize only sees its own value, and
+// resolving a stored 'line' mode needs the sibling key: it decides whether that
+// session reopens as B-Roll Clips or as Dialogue. The key is dead after this —
+// nothing writes it any more — so a missing/garbage value just means 'silent'.
+function readPersistedDelivery(baseKey: string): BrollDelivery {
+  try {
+    return JSON.parse(localStorage.getItem(`${baseKey}:lineDelivery`) ?? '""') === 'dialogue'
+      ? 'dialogue'
+      : 'silent'
+  } catch {
+    return 'silent'
+  }
+}
 
 // Map old slash-form tag values onto the new single-word union. Variations
 // generated before iteration 3 carry strings like 'CHARACTER / SPEAKING';
@@ -180,24 +199,49 @@ export default function BrollStudio() {
   )
 
   // ── Mode ─────────────────────────────────────────────────────
-  // Defaults keep existing users in line-by-line with zero change.
-  const [mode, setMode] = usePersistedState<BrollMode>(`${baseKey}:mode`, 'line', {
+  // 'broll' | 'dialogue' | 'continuous'. The first two were one mode
+  // ("Line-by-Line") with a delivery toggle underneath until the split, so a
+  // persisted 'line' resolves through whatever delivery that session was left
+  // on — someone who was working in With Dialogue reopens in Dialogue mode.
+  const [mode, setMode] = usePersistedState<BrollMode>(`${baseKey}:mode`, 'broll', {
     sanitize: (raw) => {
       // The keyframe-chain mode shipped briefly as 'animated' before the rename.
       if ((raw as string) === 'animated') return 'continuous'
-      // One-Shot was retired — anyone left standing in it lands in Line-by-Line
-      // rather than on a mode the toggle no longer offers.
-      if ((raw as string) === 'oneshot') return 'line'
-      return raw
+      return sanitizeBrollMode(raw, readPersistedDelivery(baseKey))
     },
   })
-  // Line-by-Line delivery: 'silent' (all cards silent b-roll — today's default)
-  // or 'dialogue' (one talking card per scene + silent b-roll cards).
-  const [lineDelivery, setLineDelivery] = usePersistedState<BrollDelivery>(`${baseKey}:lineDelivery`, 'silent')
+  // Whether the cards speak. Fully determined by the mode now that the delivery
+  // toggle is gone — kept as its own value because it's what the service and
+  // the persisted history rows speak.
+  const lineDelivery = deliveryForMode(mode)
+
+  // ── Script Style + length (write the script here) ──────────────
+  // For the member who opens B-Roll without a script. Picking a Script Style
+  // makes Generate write one first — the same Write New pipeline Scripts runs —
+  // and storyboard it in the same click. The style also stages the SHOTS when
+  // it's a format (see sceneStaging), so it's not only a writing choice.
+  //
+  // Kept even when a script IS present: the panel hides the row in that case,
+  // but the pick survives a paste-then-clear round trip, and the staging still
+  // rides into the storyboard call so a member who pasted a podcast-clip script
+  // gets podcast-clip shots.
+  const [autoScriptStyle, setAutoScriptStyle] = usePersistedState<WriteStyle | null>(
+    `${baseKey}:autoScriptStyle`,
+    null,
+    { sanitize: (raw) => (isWriteStyle(raw) ? raw : null) },
+  )
+  const [autoScriptLength, setAutoScriptLength] = usePersistedState<WriteLength>(
+    `${baseKey}:autoScriptLength`,
+    30,
+    { sanitize: (raw) => (isWriteLength(raw) ? raw : 30) },
+  )
+  // Undefined for a structure (an argument implies no camera) and when nothing
+  // is picked. Shared by both storyboard calls.
+  const sceneStaging = sceneStagingFor(autoScriptStyle)
 
   // ── Continuous mode (keyframe chain) state ─────────────────────
   // Until the user actively picks a style, the look falls back to a mode-
-  // specific default: UGC Realism for Line-by-Line, 3D Animated for
+  // specific default: UGC Realism for the per-line modes, 3D Animated for
   // Continuous. `styleChosen` (not the raw id) gates this so a legacy persisted
   // id from the old app-wide default doesn't masquerade as an explicit pick.
   const [continuousStyleId, setContinuousStyleId] = usePersistedState<string>(`${baseKey}:continuousStyle`, '')
@@ -295,7 +339,8 @@ export default function BrollStudio() {
   // same precedence as the history badge — and their row keeps updating.
   const [sessionMode, setSessionMode] = usePersistedState<BrollMode>(
     `${baseKey}:sessionMode`,
-    continuousResult ? 'continuous' : 'line',
+    continuousResult ? 'continuous' : 'broll',
+    { sanitize: (raw) => sanitizeBrollMode(raw, readPersistedDelivery(baseKey)) },
   )
 
   // The style the CURRENT session's content was actually generated with —
@@ -383,7 +428,7 @@ export default function BrollStudio() {
   useEffect(() => {
     // Only this session's own mode counts — a leftover sibling result in the
     // workspace must not keep an empty row alive or leak into the snapshot.
-    const sessionResult = sessionMode === 'line' ? result : null
+    const sessionResult = isLineMode(sessionMode) ? result : null
     const sessionContinuous = sessionMode === 'continuous' ? continuousResult : null
     if ((!sessionResult && !sessionContinuous) || !sessionIdRef.current) return
     const handle = setTimeout(() => {
@@ -417,8 +462,12 @@ export default function BrollStudio() {
         context: additionalContext || prev?.context,
         result: sessionResult ?? { scenes: [] },
         cardStates: sessionResult ? cardStates : {},
-        mode: sessionMode,
-        lineDelivery: sessionResult ? lineDelivery : undefined,
+        // The ROW's shape is deliberately unchanged by the mode split: a
+        // per-line session still stores mode 'line' plus its delivery, because
+        // these rows are cloud-synced and already on every member's account.
+        // The UI's three modes are reconstructed from the pair on read.
+        mode: sessionMode === 'continuous' ? 'continuous' : 'line',
+        lineDelivery: sessionResult ? deliveryForMode(sessionMode) : undefined,
         continuousResult: sessionContinuous ?? undefined,
         continuousFrameStates: sessionContinuous && Object.keys(continuousFrameStates).length > 0 ? continuousFrameStates : undefined,
         continuousClipStates: sessionContinuous && Object.keys(continuousClipStates).length > 0 ? continuousClipStates : undefined,
@@ -508,6 +557,67 @@ export default function BrollStudio() {
     setResult((prev) => (prev ? { ...prev, voiceProfile: text } : prev))
   }, [setResult])
 
+  // Retype a scene's spoken line. Free and instant: a dialogue prompt embeds
+  // the line verbatim in quotes, so the new words are swapped straight into
+  // every prompt of that scene and everything else about the shot survives.
+  // See services/scriptLineEdit.ts for why this isn't a regeneration.
+  //
+  // Three places hold a copy of the line and all three move together, or the
+  // card renders one sentence while the header shows another:
+  //   1. the scene itself (the header, and what a regen is briefed from)
+  //   2. each variation's original prompt
+  //   3. each card's editablePrompt — the one that actually gets generated
+  const handleEditSceneLine = useCallback((sceneNumber: number, nextLine: string) => {
+    const line = nextLine.trim()
+    if (!line) return
+    // Read the old line before touching anything: the updaters have to stay
+    // pure, and all three of them need the same value. Through the ref so this
+    // callback stays stable and doesn't re-render every memoized card row.
+    const previousLine = resultRef.current?.scenes.find((s) => s.number === sceneNumber)?.scriptLine ?? ''
+    if (!previousLine || previousLine.trim() === line) return
+    setResult((prev) => prev && ({
+      ...prev,
+      scenes: prev.scenes.map((s) =>
+        s.number === sceneNumber
+          ? {
+              ...s,
+              scriptLine: line,
+              variations: s.variations.map((v) => ({
+                ...v,
+                prompt: swapQuotedLine(v.prompt, previousLine, line),
+              })),
+            }
+          : s,
+      ),
+    }))
+    setCardStates((prev) => {
+      const next: Record<string, CardState> = {}
+      let changed = false
+      for (const [key, card] of Object.entries(prev)) {
+        // Positional key: `${sceneNumber}-${index}`.
+        const keyScene = Number(key.slice(0, key.lastIndexOf('-')))
+        const swapped = keyScene === sceneNumber
+          ? swapQuotedLine(card.editablePrompt, previousLine, line)
+          : card.editablePrompt
+        if (swapped !== card.editablePrompt) {
+          changed = true
+          // Deliberately NOT pushed onto promptHistory. Undo is for rewrites of
+          // the shot; the line has its own editor, and burying a line change in
+          // the prompt undo stack would let Undo desync the prompt from the
+          // scene header it's supposed to be speaking.
+          next[key] = { ...card, editablePrompt: swapped }
+        } else {
+          next[key] = card
+        }
+      }
+      return changed ? next : prev
+    })
+    // Keep the panel's script honest when the line is one of its lines. It
+    // often isn't — the storyboard may have split a sentence — and the helper
+    // no-ops rather than guessing.
+    setScriptText((prev) => swapScriptLine(prev, previousLine, line))
+  }, [setResult, setCardStates, setScriptText])
+
   const handleOpenCharacterPicker = useCallback(() => setPickerMode('models'), [])
   const handleOpenProductPicker = useCallback(() => setPickerMode('products'), [])
 
@@ -547,8 +657,7 @@ export default function BrollStudio() {
     ...(productRef ? [productRef] : []),
   ]
 
-  const handleGenerateContinuous = async () => {
-    if (!scriptText.trim()) return
+  const handleGenerateContinuous = async (script: string) => {
     // No kie.ai key yet → show the sample storyboard so the member sees what
     // Continuous mode produces before wiring billing.
     if (!useSettingsStore.getState().kieApiKey) {
@@ -562,11 +671,10 @@ export default function BrollStudio() {
       useAppStore.getState().addToast('Showing a sample storyboard — add your kie.ai key to storyboard your own script', 'info')
       return
     }
-    setIsGenerating(true)
     setError(null)
     try {
       const res = await generateContinuous({
-        scriptText,
+        scriptText: script,
         styleId: resolvedStyleId,
         styleBrief: continuousStyleBrief ?? undefined,
         modelId: continuousModelId,
@@ -574,6 +682,7 @@ export default function BrollStudio() {
         modelContext,
         additionalContext,
         productPhotos: productPhotoRefs,
+        sceneStaging,
       })
       // Same commit discipline as the other modes: only rotate the session
       // once a storyboard actually landed.
@@ -589,8 +698,6 @@ export default function BrollStudio() {
       const msg = humanizeError(err, 'Storyboard generation failed. Check your API key and try again.')
       setError(msg)
       useAppStore.getState().addToast(msg, 'error')
-    } finally {
-      setIsGenerating(false)
     }
   }
 
@@ -787,7 +894,7 @@ export default function BrollStudio() {
       setScriptText(parsed.recoveredScript.trim())
       setSelectedScriptId(null)
     }
-    if (parsed.mode === 'line') {
+    if (isLineMode(parsed.mode)) {
       setCardStates({})
       setResult(parsed.lineResult ?? null)
     } else {
@@ -799,17 +906,14 @@ export default function BrollStudio() {
     useAppStore.getState().addToast(`Imported ${parsed.summary}`, 'success')
   }
 
-  const handleGenerate = async () => {
-    if (mode === 'continuous') return handleGenerateContinuous()
-    if (!scriptText.trim()) return
-    setIsGenerating(true)
+  const handleGenerateLine = async (script: string) => {
     setError(null)
     try {
       const res = await generateBroll({
         productId: selectedProduct?.id ?? null,
         modelId: selectedModel?.id ?? null,
         scriptId: selectedScript?.id ?? null,
-        scriptText,
+        scriptText: script,
         additionalContext,
         productContext,
         modelContext,
@@ -819,6 +923,7 @@ export default function BrollStudio() {
         styleBrief: continuousStyleBrief ?? undefined,
         styleName: continuousStyleName ?? undefined,
         delivery: lineDelivery,
+        sceneStaging,
       })
       // Only now that we have scenes do we start a fresh session: rotating the
       // id and clearing cardStates up-front meant a failed call left the old
@@ -826,15 +931,68 @@ export default function BrollStudio() {
       // holding the old result with no card states). Batched into one commit,
       // so the rebuild effect sees the new result against empty cards.
       setSessionId(newSessionId())
-      setSessionMode('line')
+      setSessionMode(mode)
       stampSessionStyle()
       setCardStates({})
       setResult(res)
-      useAppStore.getState().addToast('B-roll image generated', 'success')
+      useAppStore.getState().addToast(
+        mode === 'dialogue' ? 'Dialogue scenes ready' : 'B-roll scenes ready',
+        'success',
+      )
     } catch (err) {
       const msg = humanizeError(err, 'B-Roll generation failed. Check your API key and try again.')
       setError(msg)
       useAppStore.getState().addToast(msg, 'error')
+    }
+  }
+
+  // The one Generate. Resolves the script first — writing one when the member
+  // hasn't brought their own but has picked a Script Style — then storyboards
+  // it in whichever mode is active. Two chained chat calls behind one click:
+  // the member who opens B-Roll with only a product in mind picks a style, a
+  // length and a look, and gets scenes.
+  //
+  // The written script lands in the panel's script box, so it's visible and
+  // editable straight away and names the history row. It is deliberately NOT
+  // pushed to the Scripts bank or Script History — it belongs to this session.
+  const handleGenerate = async () => {
+    if (isGenerating) return
+    let script = scriptText.trim()
+    setIsGenerating(true)
+    try {
+      if (!script) {
+        if (!autoScriptStyle) return
+        if (!useSettingsStore.getState().kieApiKey) {
+          useAppStore.getState().addToast('Add your kie.ai key in Settings to write a script here', 'info')
+          return
+        }
+        setError(null)
+        try {
+          script = await writeAutoScript({
+            product: selectedProduct ?? null,
+            style: autoScriptStyle,
+            length: autoScriptLength,
+            notes: additionalContext,
+          })
+        } catch (err) {
+          const msg = humanizeError(err, 'Writing the script failed. Check your API key and try again.')
+          setError(msg)
+          useAppStore.getState().addToast(msg, 'error')
+          return
+        }
+        if (!script) {
+          const msg = 'The script came back empty. Try again.'
+          setError(msg)
+          useAppStore.getState().addToast(msg, 'error')
+          return
+        }
+        // Show it before the storyboard call runs — this is the member's script
+        // now, and the second call takes a few seconds.
+        setScriptText(script)
+        setSelectedScriptId(null)
+      }
+      if (mode === 'continuous') await handleGenerateContinuous(script)
+      else await handleGenerateLine(script)
     } finally {
       setIsGenerating(false)
     }
@@ -875,8 +1033,6 @@ export default function BrollStudio() {
       )
     }
     setCardStates(restored)
-    // Restore the Line-by-Line delivery toggle (legacy rows => silent).
-    setLineDelivery(item.lineDelivery ?? 'silent')
 
     // Switch to the mode this row actually represents (derived from its content,
     // not the unreliable last-active `mode`) so the toggle + right panel land on
@@ -956,8 +1112,10 @@ export default function BrollStudio() {
           highlightField={highlightField}
           mode={mode}
           onModeChange={setMode}
-          lineDelivery={lineDelivery}
-          onLineDeliveryChange={setLineDelivery}
+          autoScriptStyle={autoScriptStyle}
+          onAutoScriptStyleChange={setAutoScriptStyle}
+          autoScriptLength={autoScriptLength}
+          onAutoScriptLengthChange={setAutoScriptLength}
           styleChosen={styleIsPicked}
           styleLabel={styleLabel}
           styleHint={styleHint}
@@ -986,6 +1144,7 @@ export default function BrollStudio() {
           error={error}
           onAddVariation={handleAddVariation}
           onDeleteVariation={handleDeleteVariation}
+          onEditSceneLine={handleEditSceneLine}
           onUpdateVoiceProfile={handleUpdateVoiceProfile}
           characterRef={characterRef}
           productRef={productRef}

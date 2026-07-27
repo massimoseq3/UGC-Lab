@@ -29,6 +29,7 @@ interface RightPanelProps {
   error?: string | null
   onAddVariation: (sceneNumber: number, variation: PromptVariation) => void
   onDeleteVariation: (sceneNumber: number, variationId: string) => void
+  onEditSceneLine?: (sceneNumber: number, line: string) => void
   onUpdateVoiceProfile?: (text: string) => void
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
@@ -76,6 +77,7 @@ export default function RightPanel(props: RightPanelProps) {
     error,
     onAddVariation,
     onDeleteVariation,
+    onEditSceneLine,
     onUpdateVoiceProfile,
     characterRef,
     productRef,
@@ -134,7 +136,7 @@ export default function RightPanel(props: RightPanelProps) {
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'scenes', label: isContinuous ? 'Continuous Storyboard' : 'Line by Line Storyboard', badge: sceneCount > 0 ? sceneCount : undefined },
+            { value: 'scenes', label: isContinuous ? 'Continuous Storyboard' : mode === 'dialogue' ? 'Dialogue Storyboard' : 'B-Roll Storyboard', badge: sceneCount > 0 ? sceneCount : undefined },
             { value: 'history', label: 'History', badge: historyCount > 0 ? historyCount : undefined },
           ]}
         />
@@ -202,6 +204,7 @@ export default function RightPanel(props: RightPanelProps) {
             error={error}
             onAddVariation={onAddVariation}
             onDeleteVariation={onDeleteVariation}
+            onEditSceneLine={onEditSceneLine}
             onUpdateVoiceProfile={onUpdateVoiceProfile}
             characterRef={characterRef}
             productRef={productRef}

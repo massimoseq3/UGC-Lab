@@ -1,3 +1,5 @@
+import type { Product } from '../../stores/types'
+
 // The pipeline discriminator. Persisted in scriptHistory rows and dispatched
 // on by the service, so all three values stay — but the UI only exposes two
 // modes ('remix' | 'write'); the remix source's format picks between the
@@ -214,6 +216,26 @@ export interface EditableProductContext {
   objections: string
   offer: string
   cta: string
+}
+
+// A product bank row as the script writer sees it. Lives here rather than in
+// the input panel because B-Roll writes scripts too now (see writeOneScript) and
+// both have to show the model the same fields — a product that reads one way in
+// Scripts and another in B-Roll is the same bug twice.
+export function createEditableContext(product: Product): EditableProductContext {
+  return {
+    productName: product.productName,
+    productDescription: product.productDescription,
+    targetMarket: product.targetMarket,
+    painPoints: product.painPoints,
+    usps: product.usps,
+    benefits: product.benefits,
+    keySpecs: product.keySpecs ?? '',
+    customerLanguage: product.customerLanguage ?? '',
+    objections: product.objections ?? '',
+    offer: product.offer,
+    cta: product.cta,
+  }
 }
 
 export interface GenerateScriptInput {

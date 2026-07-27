@@ -423,6 +423,9 @@ export interface ContinuousInput {
   // ride along as numbered vision inputs so each concept can name the state its
   // shot needs — see productPhotoInstruction.
   productPhotos?: ReferenceImage[]
+  // Scene staging for the picked Script Style, when that style is a FORMAT.
+  // Same block Scripts stages a blueprint with — see BrollInput.sceneStaging.
+  sceneStaging?: string
 }
 
 // The storyboard's system half. `productPhotoCount` is how many photos the
@@ -456,6 +459,13 @@ export function buildContinuousUserPrompt(input: ContinuousInput): string {
   }
   if (input.modelContext) {
     prompt += `\n${input.modelContext}\nIMPORTANT: never describe the character's physical appearance — say "the character"; a reference image fixes their look.\n`
+  }
+  // The picked format's staging, when it has one. Structures carry none — an
+  // argument doesn't imply a camera position. The token guard is because the
+  // block writes [CHARACTER] / [PRODUCT] for a format with reference slots, and
+  // a keyframe prompt is plain prose an image model reads literally.
+  if (input.sceneStaging) {
+    prompt += `\n${input.sceneStaging}\nStage every keyframe concept this way. Never write the words "[CHARACTER]" or "[PRODUCT]" in a prompt — say "the character" and name the product in plain words; the app attaches the real reference images at render time.\n`
   }
   if (input.additionalContext) prompt += `\nAdditional context and instructions:\n${input.additionalContext}\n`
   prompt += `\nWrite the full <STORYBOARD> now — exactly ${lines.length} scene${lines.length === 1 ? '' : 's'}, one per numbered line above, each <LINE> reproduced word for word. Every keyframe concept gets the same depth — no thinning out on the later scenes.

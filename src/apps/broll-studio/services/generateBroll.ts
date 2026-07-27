@@ -86,9 +86,9 @@ The footage is SILENT: no one speaks, mouths words, or addresses the viewer. A v
 
 // The talking-card format for "With Dialogue" delivery — the character speaks
 // the scene's line to camera. Used by the DIALOGUE regen/enhance paths.
-const PROMPT_FORMAT_DIALOGUE = `${PROMPT_FORMAT_CORE} The character looks into the lens and SPEAKS the scene's line — embed the exact words verbatim (the character … says: "…"). Audio is on: just them talking, no background music, no extra voiceover.
+const PROMPT_FORMAT_DIALOGUE = `${PROMPT_FORMAT_CORE} The character SPEAKS the scene's line — embed the exact words verbatim inside double quotes (the character … says: "…"), copied character for character so the app can rewrite them when the line is edited. Audio is on: just them talking, no background music, no extra voiceover.
 
-Every dialogue shot in this ad is ONE continuous take cut into pieces: the same room, the same spot in it, the same wardrobe and hair, the same light, the same camera distance and lens height as every other dialogue shot. Keep that setup exactly; only the moment changes — expression, gesture, head and hand position, posture.`
+Say where they are and what they're doing while they talk. It's the same person and the same ad throughout, but not the same chair: a dialogue shot can happen anywhere their life plausibly takes them, and the interesting ones happen mid-something.`
 
 const SYSTEM_INSTRUCTION = `# ROLE
 
@@ -219,27 +219,42 @@ Wrap every scene in this exact XML envelope. Do not include any text outside the
 </VAR_3>
 </SCENE>`
 
-// Delivery override appended to the system instruction ONLY in "With Dialogue"
-// mode. Read last, so it wins over the "every shot is SILENT" doctrine for VAR_1
-// while leaving the other variations untouched. The dialogue card is
-// deliberately light — a single independent clip, so no shared VOICE PROFILE
-// block per card; the character just speaks the scene's line.
+// Delivery override appended to the system instruction ONLY in Dialogue mode.
+// Read last, so it wins over the "every shot is SILENT" doctrine everywhere.
 //
-// The talking card takes VAR_1's slot: a scene still gets three cards total, so
-// dialogue delivery costs no more credits per line than silent does.
+// ALL THREE cards speak the line. This used to be one talking card plus two
+// silent b-roll ideas, locked to a single continuous take — same room, same
+// wardrobe, same lens height for the whole ad, with each card chained to the
+// previous one's still. Both halves were wrong for what this mode is: if you
+// wanted silent footage you'd be in B-Roll mode, and three angles on one sitting
+// is one idea filmed three times, which is exactly what the b-roll side of the
+// app spent its whole prompt learning not to do. So a Dialogue scene is now
+// three genuinely different ways to DELIVER the line — different room, different
+// activity, different staging — and the picked format (see the SCENE STAGING
+// block, when there is one) decides what "different" looks like: a street
+// interview moves down the street, a plain UGC ad moves around the house.
 const DIALOGUE_DELIVERY_ADDENDUM = `
 
-# DELIVERY OVERRIDE — WITH DIALOGUE (READ LAST, HIGHEST PRIORITY)
+# DELIVERY OVERRIDE — DIALOGUE MODE (READ LAST, HIGHEST PRIORITY)
 
-This ad is delivered WITH DIALOGUE. Every scene still gets exactly THREE variations. VAR_1 is NOT silent b-roll: it is a talking-to-camera DIALOGUE shot. VAR_2 and VAR_3 are silent b-roll ideas exactly as described above — two genuinely different lenses, two genuinely different concepts, judged by the same standard (no filler; if one is weaker, replace it). Two b-roll slots only, so they must be the two STRONGEST ways to show the line. Do NOT emit a VAR_4.
+Every clip in this ad is the character SPEAKING. There is no silent b-roll anywhere in this mode: the "footage is SILENT / no one speaks" rule in the PROMPT FORMAT and SHOW-DON'T-TELL sections is REPLACED by everything below. Every scene gets exactly THREE variations and all three are talking shots. Do NOT emit a VAR_4.
 
-VAR_1 rules, every scene:
-- <TAG>DIALOGUE</TAG> and <REFS>character</REFS>, always. The talking card is built from the character reference alone — never <REFS>both</REFS>, even when VISIBILITY is yes. It is a person speaking to the lens; the product gets its own shots in VAR_2/VAR_3, and the member can attach it by hand if they want it held up.
-- The character is on camera, looking into the lens, and SPEAKS the scene's exact <LINE> word-for-word. Write ONE flowing paragraph that embeds the line verbatim, e.g.: "the character, [expression/gesture], looks into the lens and says: \\"<the exact line>\\"". A real person talking to their phone — natural, not a news anchor.
-- The SUBJECT is the person talking, not the product. Don't stage the product in this shot — no holding it up, no unboxing it mid-sentence, no bottle parked on the counter behind them. The product reference is not attached to this card, so anything you put in their hands gets invented by the model. Showing the product is what VAR_2/VAR_3 are for.
-- Describe the delivery, expression, gesture, setting, and where the light comes from. This is the ONE variation that is NOT silent — the character speaks and audio is on. The "footage is SILENT / no one speaks" rule in the PROMPT FORMAT and SHOW-DON'T-TELL sections governs VAR_2 and VAR_3 only — it does NOT apply to VAR_1.
-- ONE CONTINUOUS TAKE, CUT UP. Every dialogue shot in this ad is the same person filming themselves in ONE sitting: the same room, the same spot in that room, the same wardrobe and hair, the same time of day and light, and the same distance and lens height. Decide that setup once, on VAR_1 of scene 1, and describe the SAME setup in every later scene's VAR_1 — never move them to another room, another outfit, or another part of the day between lines. What changes line to line is only the moment: the expression, the gesture, the head and hand position, a shift in posture. The app attaches the previous scene's dialogue still when it renders each of these, so a prompt that relocates the character fights the reference and produces a jump cut.
-- Still obey every other rule: camera is a viewpoint not a prop (never name the filming device), gender-neutral language ("the character", "they/them"), UGC realism, after-not-before.
+Every variation, every scene:
+- <TAG>DIALOGUE</TAG>, always, on all three.
+- The character is on camera and SPEAKS the scene's exact <LINE> word-for-word. Write ONE flowing paragraph that embeds the line verbatim inside double quotes, e.g.: the character, [expression/gesture], [where they're looking] and says: "<the exact line>". Copy the line character for character — the app rewrites those quoted words when the member edits the line, and it can only find them if they are the line. A real person talking, natural, never a news anchor.
+- Audio is on: just them talking. No background music, no added voiceover.
+- Describe the delivery, expression, gesture, what their hands are doing, the room, and where the light comes from.
+
+THE THREE VARIATIONS ARE THREE DIFFERENT IDEAS, NOT THREE ANGLES ON ONE:
+Same words, three genuinely different ways to say them. Change the SITUATION, not just the framing — a different room or location, a different thing they're doing while they talk, a different moment of the day, a different physical relationship to the camera. The character is the same person in the same ad, but they are not nailed to one chair.
+- WRONG: three shots of the character on the same sofa at chest height, differing only in expression and how close the frame is.
+- RIGHT: one at the kitchen counter mid-way through making something, hands busy, glancing up between words; one sat on the edge of the bed, quieter, closer, talking straight into the lens; one walking through the front door still holding a bag, talking over their shoulder.
+Each variation must be a shot you could actually cut to and feel a change. If two of them could be described by the same sentence, replace one.
+
+WHEN A SCENE STAGING BLOCK IS PRESENT, IT WINS: it says what kind of content this ad imitates, and every variation stages that — three different spots along the same street for a street interview, three moments of the same routine for a GRWM, three angles of the same recording session for a podcast clip. Vary WITHIN the format; never break it. When there is no staging block, the ad is a plain organic UGC video and the character moves around their own life.
+
+- Product: follow VISIBILITY exactly as the rules above describe. When VISIBILITY is yes the character may hold, use, or be near the product while they talk, and <REFS> must include product so it's built from the real packaging. When VISIBILITY is no, no product anywhere — not in a hand, not on a counter behind them.
+- Still obey every other rule: camera is a viewpoint not a prop (never name the filming device), gender-neutral language ("the character", "they/them"), UGC realism, after-not-before, constant motion.
 
 # VOICE PROFILE (emit ONCE, after the last scene)
 
@@ -249,7 +264,7 @@ After the final </SCENE>, output exactly ONE block — the ONLY content allowed 
 VOICE — describe, in rich and reproducible detail, HOW the character sounds: perceived age and gender of the voice, accent / region, pitch, pace, texture (warm, raspy, breathy, smooth), energy, and 1-2 signature quirks (uptalk, a slight vocal fry, a laugh living in the voice). One dense paragraph you could hand to a TTS engine and get the same person every time. Describe ONLY the sound, never appearance.
 </VOICE_PROFILE>
 
-This one voice is shared by every dialogue clip in the ad, so it must be self-contained and consistent.`
+This one voice is shared by every clip in the ad, so it must be self-contained and consistent.`
 
 // The system instruction the scene call runs on, with the dialogue override
 // appended in "With Dialogue" delivery. Exported so the Import-prompts brief
@@ -266,10 +281,21 @@ export function brollSystemInstruction(delivery: BrollDelivery, productPhotoCoun
 export function buildBrollUserPrompt(input: BrollInput): string {
   const withDialogue = input.delivery === 'dialogue'
   const variationBrief = withDialogue
-    ? `For EACH scene emit exactly three variations: VAR_1 is a DIALOGUE shot where the character speaks the exact line to camera (<TAG>DIALOGUE</TAG> and <REFS>character</REFS>, always — never both, even when VISIBILITY is yes), and VAR_2 and VAR_3 are two genuinely DIFFERENT silent b-roll ideas for showing what the line SAYS. Pick two distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF) for VAR_2 and VAR_3, declared in each <TAG> field. Two slots only, so both have to be the strongest ideas you have — no filler, and no VAR_4.`
+    ? `For EACH scene emit exactly three variations, and ALL THREE are the character speaking that line out loud — <TAG>DIALOGUE</TAG> on every one, with the line embedded verbatim in double quotes. They are three genuinely DIFFERENT ways to deliver it: different room or location, different thing they're doing while they talk, different physical relationship to the camera. Not one setup shot from three distances. Three slots only — no VAR_4.`
     : `For EACH scene emit exactly three variations: three genuinely DIFFERENT ideas for showing what that line SAYS — make metaphors literal, show the act, the feeling, the proof. Pick three distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF), declared in each <TAG> field. Every shot is silent — no one speaks (a voiceover is added later). Three slots only, so every one has to earn its place — no filler fourth idea.`
 
-  let prompt = `Break this script into B-Roll scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph, as long as the idea needs — no word limit, and never trim a detail to hit a length. Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation, erring toward attaching references whenever they could plausibly help. Two REFS rules are hard: VISIBILITY=no excludes the product from every variation, and VISIBILITY=yes includes it in every variation${withDialogue ? ' EXCEPT the DIALOGUE card, which is character-only either way' : ''}.\n\nScript:\n${input.scriptText}`
+  let prompt = `Break this script into ${withDialogue ? 'dialogue' : 'B-Roll'} scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph, as long as the idea needs — no word limit, and never trim a detail to hit a length. Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation, erring toward attaching references whenever they could plausibly help. Two REFS rules are hard: VISIBILITY=no excludes the product from every variation, and VISIBILITY=yes includes it in every variation.\n\nScript:\n${input.scriptText}`
+
+  // The picked Script Style's scene staging, when it's a FORMAT (podcast clip,
+  // street interview, green-screen reaction…). Structures carry none on
+  // purpose — an argument doesn't imply a camera position. This is the same
+  // block Scripts' scene-blueprint output uses, so the format shapes the SHOTS
+  // here as well as the words there; the token guard is because that block
+  // writes [CHARACTER] / [PRODUCT] for a format that has reference slots, and
+  // a B-Roll prompt is plain prose an image model reads literally.
+  if (input.sceneStaging) {
+    prompt += `\n\n${input.sceneStaging}\n\nStage every variation this way. Never write the words "[CHARACTER]" or "[PRODUCT]" in a prompt — describe the character as "the character" and the product in plain words; the app attaches the real reference images at render time.`
+  }
 
   if (input.productContext) {
     prompt += `\n\n${input.productContext}`
@@ -354,11 +380,13 @@ export function parseScenes(responseText: string, delivery: BrollDelivery = 'sil
 
   // Every variation carries the LLM's per-line role pick in <TAG>; these
   // defaults only apply when the tag is missing or unrecognised. In dialogue
-  // delivery VAR_1 is the talking card, so its fallback is DIALOGUE. Four
+  // delivery every card is a talking card, so every fallback is DIALOGUE. Four
   // entries, one more than we ask for, because the loop below still reads a
-  // VAR_4 when one is present (see MAX_PARSED_VARIATIONS).
+  // VAR_4 when one is present (see MAX_PARSED_VARIATIONS) — a storyboard
+  // written back when dialogue delivery emitted one talking card plus b-roll
+  // still carries its own <TAG>s, so those sessions keep their original mix.
   const FALLBACK_TAGS: VariationTag[] = delivery === 'dialogue'
-    ? ['DIALOGUE', 'ACTION', 'EMOTIONAL', 'PRODUCT']
+    ? ['DIALOGUE', 'DIALOGUE', 'DIALOGUE', 'DIALOGUE']
     : ['ACTION', 'EMOTIONAL', 'PRODUCT', 'POV']
 
   let number = 1
@@ -408,7 +436,7 @@ export function parseScenes(responseText: string, delivery: BrollDelivery = 'sil
       if (!cleanPrompt) continue
 
       const label = labelRaw || defaultLabelFor(tag)
-      const refs = clampRefsToVisibility(parseRefs(refsRaw) ?? defaultRefsFor(tag, productVisible), productVisible, tag)
+      const refs = clampRefsToVisibility(parseRefs(refsRaw) ?? defaultRefsFor(tag, productVisible), productVisible)
       // Which product photo this shot needs (the sealed wrapper, the unwrapped
       // bar). Absent → the card falls back to the hero photo alone.
       const productPhotos = parsePhotoPick(extractBlock(varBlock, 'PHOTOS'))
@@ -488,12 +516,14 @@ function parseRefs(raw: string | undefined): VariationRefs | undefined {
 // enough on lenses that "don't need" it (POV, ENVIRONMENT) that this can't be
 // left to the prompt alone. Still a per-card toggle afterwards.
 //
-// The DIALOGUE card is the one exception, in both directions: it's a person
-// talking to the lens, so it ships with the character reference and nothing else
-// — attaching the packaging to a talking head pulled the product into a shot
-// that only needed a face. The card's Product toggle turns it back on by hand.
-function clampRefsToVisibility(refs: VariationRefs, productVisible: boolean | undefined, tag: VariationTag): VariationRefs {
-  if (tag === 'DIALOGUE') return 'character'
+// DIALOGUE cards follow the same rule as everything else. They used to be
+// forced to 'character' whatever VISIBILITY said, because back when a scene had
+// ONE talking card and two b-roll cards, the product had its own shots to live
+// in and attaching packaging to a talking head just pulled it into a frame that
+// only needed a face. In Dialogue mode every card is a talking card, so that
+// exception would mean the product never appears in the whole ad — and a line
+// that names the product still has to be built from the real packaging.
+function clampRefsToVisibility(refs: VariationRefs, productVisible: boolean | undefined): VariationRefs {
   if (productVisible === false) return refs === 'both' || refs === 'character' ? 'character' : 'none'
   if (productVisible === true) return refs === 'product' || refs === 'none' ? 'product' : 'both'
   return refs
@@ -504,10 +534,11 @@ function clampRefsToVisibility(refs: VariationRefs, productVisible: boolean | un
 // likeness — so this errs ON. The only hard exclusion is the product when the
 // voiceover forbids it appearing (VISIBILITY=no), a deliberate creative rule.
 function defaultRefsFor(tag: VariationTag, productVisible: boolean | undefined): VariationRefs {
-  // A talking DIALOGUE card and a legacy STATIC anchor are sourced from the
-  // character reference alone — clampRefsToVisibility holds DIALOGUE there even
-  // when the line is about the product.
-  if (tag === 'STATIC' || tag === 'DIALOGUE') return 'character'
+  // The legacy STATIC anchor take is sourced from the character reference
+  // alone. DIALOGUE cards used to be too; they now follow VISIBILITY like
+  // everything else, since in Dialogue mode every card is a talking card and a
+  // line about the product still has to be built from the real packaging.
+  if (tag === 'STATIC') return 'character'
   // Product must not appear when VISIBILITY is no — keep the character ref on so
   // any person/hands stay consistent, drop only the product.
   if (productVisible === false) return 'character'
@@ -723,7 +754,7 @@ export async function generateNewVariation(
   // A DIALOGUE regen keeps the character speaking the line (dialogue format);
   // everything else is silent b-roll (the default doctrine).
   const deliveryClause = isDialogue
-    ? `This is a DIALOGUE shot: the character looks into the lens and SPEAKS the line above word-for-word. Embed it verbatim, e.g.: the character, [expression/gesture], looks into the lens and says: "${scriptLine}". Natural delivery — a real person talking to their phone, not a news anchor. Audio is on.`
+    ? `This is a DIALOGUE shot: the character SPEAKS the line above word-for-word. Embed it verbatim inside double quotes, e.g.: the character, [expression/gesture], [where they're looking] and says: "${scriptLine}". Natural delivery — a real person talking, not a news anchor. Audio is on. Give this take its own situation — a different room, a different task in their hands, a different moment — rather than another angle on a person sat still.`
     : `This is SILENT b-roll — no one speaks; a voiceover is laid over the footage later. The character never talks to camera or mouths words.`
 
   const prompt = `Generate a single new creative image generation prompt for this B-Roll scene:
@@ -785,7 +816,7 @@ one flowing paragraph
     id: nextId(),
     label: labelRaw || defaultLabelFor(finalTag),
     tag: finalTag,
-    refs: clampRefsToVisibility(parseRefs(refsRaw) ?? defaultRefsFor(finalTag, undefined), undefined, finalTag),
+    refs: clampRefsToVisibility(parseRefs(refsRaw) ?? defaultRefsFor(finalTag, undefined), undefined),
     prompt: promptRaw,
   }
 }

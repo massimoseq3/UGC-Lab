@@ -374,9 +374,11 @@ close (ChevronDown).
 
 ### Mode toggle (left panel header, 57px bar)
 
-Two-way `SegmentedToggle`, left→right: **Line-by-Line** (rows) ·
-**Continuous** (box). Both Generate buttons carry an estimated-credits pill.
-(A third mode, **One-Shot**, was retired — see `types.ts:BrollMode`.)
+Three-way `SegmentedToggle`, left→right: **B-Roll** (rows) · **Dialogue**
+(quote bubble) · **Continuous** (box). B-Roll and Dialogue are both per-line;
+they were one mode with a delivery toggle in the settings band until the split.
+All three Generate buttons carry an estimated-credits pill. (A fourth mode,
+**One-Shot**, was retired — see `types.ts:BrollMode`.)
 
 The **References** eyebrow row below it ends in a pair of matching grey pills,
 left→right: **Import prompts** · **+ New** (`ClearAllButton`). Import prompts
@@ -405,7 +407,7 @@ frame + "Keyframes ready", then the hover-play video). A closing **Final
 Frame** row holds concepts only.
 
 Concept cards open `ContinuousFrameModal` — the same controls as the
-Line-by-Line card's Image tab: image `ModelPicker` → style note →
+Per-line card's Image tab: image `ModelPicker` → style note →
 chain/character/product ref cards → extra-refs row → prompt with
 **Enhance · Regenerate · Undo · Redo** → footer resolution/aspect chips →
 **Generate Image** + credits; the right column is the image gallery, where
@@ -421,10 +423,18 @@ title — it already fills that row in this narrow 25% pane. Below it, inside th
 scroll area: a **REFERENCES** label + the **New** reset pill (`ClearAllButton` —
 clears the three ref slots, the script text and the instructions; every
 generated scene, clip and history row stays) → **Product** ref card →
-**Character** ref card → **Script** ref card (each: dashed "Click to select from
-bank" when empty, filled pill when set) → "or paste script manually" divider +
-script textarea → divider → **Additional Instructions** textarea → **Generate
-B-Roll Prompts** button (pinned bottom).
+**Character** ref card (each: dashed "Click to select from bank" when empty,
+filled pill when set) → **Script / Hooks** ref card, tagged OPTIONAL, + its
+paste textarea → **Brief / Additional Instructions** pill.
+
+The pinned settings band below holds the two decisions that shape the output,
+top→bottom: **Visual Style** row → an **AD FORMAT** block (Required tag until
+picked) — a format row opening the shared Formats/Structures slide-over, over a
+**10s / 15s / 20s / 30s / 60s** length toggle that appears only while the script
+box is empty → **Generate B-Roll / Dialogue / Storyboard Prompts** button. The
+line under the button reads "Pick an ad format to get started", then "Choose a
+visual style to get started", then "Writes a 30s script first, then storyboards
+it" while the script is still empty.
 
 ### Right scenes (`components/RightPanel.tsx` → `ScenesView.tsx`)
 
@@ -433,7 +443,9 @@ Top tabs: **Scenes / History**. Scenes view: a control bar with the scene count
 (`gap-10`). Each scene block:
 
 - Header: big italic scene number + "Line N" chip + the quoted script line (left);
-  a **Generate all** button for that scene (right).
+  a **Generate all** button for that scene (right). The quoted line is a button —
+  clicking it opens `SceneLineEditModal` (textarea + Cancel / **Save line**), and
+  saving swaps the quoted words in that scene's prompts with no LLM call.
 - A grid of **3 variation cards** plus an **Add option** card:
   `grid-cols-2 → md:3 → xl:4`. At `xl` the three cards plus Add option fill one row
   as four equal cells; Add option is a normal dashed card in the grid, not a strip.
@@ -442,9 +454,10 @@ Top tabs: **Scenes / History**. Scenes view: a control bar with the scene count
   Seven selectable variation tags (`ALL_TAGS` in `services/generateBroll.ts`):
   **Action · Emotional · Product shot · POV · Environment · Transition · Proof** — a
   colored chip top-left of each card (lime / pink / amber / violet / teal / sky /
-  orange). `Dialogue` and `Static` survive in the `VariationTag` union so older
-  persisted sessions still render, but they are **not** in `ALL_TAGS`, are never
-  offered to the model, and the parser no longer synthesizes them. The bottom-center
+  orange). In **Dialogue** mode all three cards carry the `Dialogue` tag instead —
+  it's outside `ALL_TAGS` (the silent menu) but emitted wholesale by the delivery
+  override. `Static` survives in the `VariationTag` union so older persisted
+  sessions still render; nothing produces it any more. The bottom-center
   caption reads **A-Roll** (the two legacy tags) or **B-Roll** (everything else).
   - Cards render in the LLM's per-line generation order, then any manually added
     cards. `displayOrder` (ScenesView) sorts the render only.
@@ -473,7 +486,7 @@ mute button. Clicking the card body opens the modal on Image, as before.
 ### Right history (`components/BrollHistoryView.tsx`)
 
 The other half of the Scenes / History tab pair. Header block: full-width search
-field, then mode filter pills (All · Line-by-Line · Continuous — only when more
+field, then mode filter pills (All · B-Roll · Dialogue · Continuous — only when more
 than one mode is present, preceded by an "N sessions rendering" chip while
 anything is in flight) on the left with the sort dropdown (Newest / Oldest /
 Recently updated) on the right.

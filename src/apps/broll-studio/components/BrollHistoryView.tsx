@@ -2,13 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, Film, ArrowDownUp, Check, ChevronDown, AlertCircle } from 'lucide-react'
 import { GeneratingChip, GeneratingPulseRing } from '../../../components/GeneratingChip'
 import type { BrollHistoryItem } from '../../../stores/types'
-import type {
-  BrollResult,
-  CardState,
-  ContinuousResult,
-  ContinuousFrameCardState,
-  ContinuousClipCardState,
-  BrollMode,
+import {
+  isLineMode,
+  type BrollResult,
+  type CardState,
+  type ContinuousResult,
+  type ContinuousFrameCardState,
+  type ContinuousClipCardState,
+  type BrollMode,
 } from '../types'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useBankStore } from '../../../stores/bankStore'
@@ -152,9 +153,13 @@ function activityLabel(a: RowActivity): string {
 // matches where a click takes you.
 export function brollHistoryMode(item: BrollHistoryItem): BrollMode {
   if (item.continuousResult) return 'continuous'
+  // Rows store the pre-split shape (mode 'line' + lineDelivery) — see the
+  // history snapshot in BrollStudio — so the per-line mode is reconstructed
+  // from the delivery the session actually ran with.
+  const perLine: BrollMode = item.lineDelivery === 'dialogue' ? 'dialogue' : 'broll'
   const line = item.result as BrollResult | null
-  if (line?.scenes?.length) return 'line'
-  return item.mode === 'continuous' ? 'continuous' : 'line'
+  if (line?.scenes?.length) return perLine
+  return item.mode === 'continuous' ? 'continuous' : perLine
 }
 
 // A session from the retired One-Shot mode, and nothing else — no keyframe
@@ -182,7 +187,7 @@ function historyStyleLabel(item: BrollHistoryItem, mode: BrollMode): string | nu
     const c = item.continuousResult as ContinuousResult | undefined
     if (c?.styleId) return getContinuousStyle(c.styleId).label
   }
-  if (mode === 'line') {
+  if (isLineMode(mode)) {
     const r = item.result as BrollResult | null
     if (r?.styleBrief) return customLabel
     if (r?.styleId) return getContinuousStyle(r.styleId).label
@@ -193,7 +198,8 @@ function historyStyleLabel(item: BrollHistoryItem, mode: BrollMode): string | nu
 }
 
 const MODE_BADGE: Record<BrollMode, string> = {
-  line: 'Line-by-Line',
+  broll: 'B-Roll',
+  dialogue: 'Dialogue',
   continuous: 'Continuous',
 }
 
@@ -201,7 +207,8 @@ const MODE_BADGE: Record<BrollMode, string> = {
 type ModeFilter = 'all' | BrollMode
 const MODE_FILTERS: { id: ModeFilter; label: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'line', label: 'Line-by-Line' },
+  { id: 'broll', label: 'B-Roll' },
+  { id: 'dialogue', label: 'Dialogue' },
   { id: 'continuous', label: 'Continuous' },
 ]
 function itemMode(it: BrollHistoryItem): Exclude<ModeFilter, 'all'> {

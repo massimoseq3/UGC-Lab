@@ -1,10 +1,13 @@
 import { useState } from 'react'
-import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput } from 'lucide-react'
+import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote, Video } from 'lucide-react'
 import type { Product, Model, Script } from '../../../stores/types'
-import type { BrollMode, BrollDelivery } from '../types'
+import { deliveryForMode, type BrollMode } from '../types'
+import { WRITE_LENGTHS, WRITE_STYLE_META, type WriteStyle, type WriteLength } from '../../script-architect/types'
+import ScriptStyleList from '../../script-architect/components/ScriptStyleList'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import SegmentedToggle from '../../../components/SegmentedToggle'
+import SlideOver from '../../../components/SlideOver'
 import ClearAllButton from '../../../components/ClearAllButton'
 import { estimatePromptCredits } from '../services/promptCost'
 import { formatCredits } from '../../../utils/models'
@@ -32,13 +35,18 @@ interface InputPanelProps {
   onImportPrompts: () => void
   isGenerating: boolean
   highlightField?: string | null
-  // Line-by-Line vs Continuous. Continuous swaps the right panel for the
-  // keyframe-chain storyboard.
+  // B-Roll / Dialogue (both per-line) vs Continuous, which swaps the right
+  // panel for the keyframe-chain storyboard.
   mode: BrollMode
   onModeChange: (mode: BrollMode) => void
-  // Line-by-Line delivery toggle. 'dialogue' adds one talking card per scene.
-  lineDelivery: BrollDelivery
-  onLineDeliveryChange: (delivery: BrollDelivery) => void
+  // The ad format — what kind of content this ad imitates. A required, primary
+  // input: it carries the scene staging every prompt is written against, so it
+  // decides how the ad is SHOT, and when no script is supplied it also decides
+  // how the words are written. The length only applies in that second case.
+  autoScriptStyle: WriteStyle | null
+  onAutoScriptStyleChange: (style: WriteStyle | null) => void
+  autoScriptLength: WriteLength
+  onAutoScriptLengthChange: (length: WriteLength) => void
   // Visual style — one row, one popup. The presets, the user's saved styles,
   // and the analyse-from-references flow all live in StyleModal (opened by the
   // parent), so this panel only shows what's picked. The video model is NOT
@@ -61,6 +69,8 @@ function BankCard({
   accentClass,
   selectedClass,
   isEmpty,
+  emptyHint,
+  optional,
   children,
   onSelect,
   onClear,
@@ -75,6 +85,12 @@ function BankCard({
   // populated card "lights up" the way a selected Script Style card does.
   selectedClass: string
   isEmpty: boolean
+  // Sub-label shown in the empty state, replacing the default bank prompt. Use
+  // when the slot's job needs saying — the Script slot is optional here, and a
+  // card that only says "click to select" reads as required.
+  emptyHint?: string
+  // Shows an OPTIONAL tag in the empty state, same shape as the Brief pill's.
+  optional?: boolean
   children?: React.ReactNode
   onSelect: () => void
   onClear?: () => void
@@ -99,10 +115,19 @@ function BankCard({
           <Icon className="h-5 w-5" strokeWidth={1.5} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-ink-300">{label}</p>
-          <p className="text-[11px] text-ink-600">Click to select from bank</p>
+          <p className="truncate text-sm font-medium text-ink-300">{label}</p>
+          <p className="truncate text-[11px] text-ink-600">{emptyHint ?? 'Click to select from bank'}</p>
         </div>
-        <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
+        {/* The OPTIONAL tag takes the chevron's slot rather than sitting beside
+            it — this column is 25% wide and three trailing elements wrapped the
+            label onto two lines and the hint onto five. */}
+        {optional ? (
+          <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
+            Optional
+          </span>
+        ) : (
+          <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
+        )}
       </button>
     )
   }
@@ -225,8 +250,10 @@ export default function InputPanel({
   highlightField,
   mode,
   onModeChange,
-  lineDelivery,
-  onLineDeliveryChange,
+  autoScriptStyle,
+  onAutoScriptStyleChange,
+  autoScriptLength,
+  onAutoScriptLengthChange,
   styleChosen,
   styleLabel,
   styleHint,
@@ -235,24 +262,38 @@ export default function InputPanel({
   onClearStyle,
 }: InputPanelProps) {
   const hasScript = scriptText.trim().length > 0
-  // Style is a required input, like the script: the look drives every prompt in
-  // every mode, so it's an explicit decision rather than a silent default.
-  const canGenerate = hasScript && styleChosen
+  // Two required inputs, and neither is the script. The FORMAT says what kind
+  // of ad gets shot (and writes the words when none are supplied); the VISUAL
+  // STYLE says what it looks like. A script is the optional override for the
+  // words only — bringing one doesn't tell us how to shoot it, so the format is
+  // still needed. The one exception is a session that predates the format
+  // picker: it had a script and no format, and it must stay generatable.
+  const canGenerate = (!!autoScriptStyle || hasScript) && styleChosen
+  // What's still missing, in the order the panel asks for it.
+  const missing = !autoScriptStyle && !hasScript ? 'format'
+    : !styleChosen ? 'look'
+    : null
   const [scriptExpanded, setScriptExpanded] = useState(false)
   const [instructionsExpanded, setInstructionsExpanded] = useState(false)
+  const [styleSlideOpen, setStyleSlideOpen] = useState(false)
   const isContinuous = mode === 'continuous'
 
   // Estimated cost of the prompt-writing call behind the Generate button. These
   // are chat completions, so it's fractions of a credit — the pill is there so
-  // nothing ever fires unpriced, not because the number is large.
-  const promptCredits = hasScript ? formatCredits(estimatePromptCredits(mode, scriptText, lineDelivery)) : null
+  // nothing ever fires unpriced, not because the number is large. With no
+  // script yet there's nothing to measure (the script itself is written first,
+  // and its length is what sets the storyboard's size), so the pill sits out.
+  const promptCredits = hasScript ? formatCredits(estimatePromptCredits(mode, scriptText, deliveryForMode(mode))) : null
 
   return (
     <div className="flex flex-col md:h-full">
-      {/* Mode toggle header — Line-by-Line (script → per-line b-roll stills) vs
-          Continuous (script → keyframe chain). Sits in a 57px bar so its
-          border-b lines up with the right panel's Storyboard/History strip,
-          matching every other app's aligned top rule. */}
+      {/* Mode toggle header — the three things this app can make. B-Roll Clips
+          and Dialogue both walk the script line by line; the difference is
+          whether anyone speaks, which decides the whole session, so it sits
+          here rather than in a second toggle further down. Continuous is the
+          keyframe chain. Sits in a 57px bar so its border-b lines up with the
+          right panel's Scenes/History strip, matching every other app's
+          aligned top rule. */}
       <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
         <SegmentedToggle<BrollMode>
           className="h-10 !p-1"
@@ -261,7 +302,8 @@ export default function InputPanel({
           onChange={onModeChange}
           accent="broll"
           options={[
-            { value: 'line', label: 'Line-by-Line', icon: Rows3 },
+            { value: 'broll', label: 'B-Roll', icon: Rows3 },
+            { value: 'dialogue', label: 'Dialogue', icon: MessageSquareQuote },
             { value: 'continuous', label: 'Continuous', icon: Box },
           ]}
         />
@@ -318,15 +360,21 @@ export default function InputPanel({
             {selectedModel && <ModelCard model={selectedModel} />}
           </BankCard>
 
-          {/* Script — select from bank (header) or paste manually (textarea),
-              merged into one rounded box so the two sources read as one input. */}
-          <div className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border transition-colors ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
+          {/* Script — optional, and labelled as such. Bring your own words from
+              the bank or a paste; leave it empty and the Ad Format below
+              writes them. Grows to fill the column once it holds a
+              script, stands down to two rows while it's empty (an empty
+              five-row box has nothing to show, and the column is narrow enough
+              that the leftover space pushed the brief below the fold). */}
+          <div className={`flex flex-col overflow-hidden rounded-3xl border transition-colors ${hasScript ? 'min-h-0 flex-1' : 'shrink-0'} ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
             <BankCard
               icon={FileText}
               label="Script / Hooks"
               accentClass="bg-scripts-500/15 text-scripts-400"
               selectedClass="border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10"
               isEmpty={!selectedScript}
+              emptyHint="Or let the format write it"
+              optional={!hasScript}
               onSelect={onSelectScript}
               onClear={selectedScript ? onClearScript : undefined}
               flat
@@ -337,9 +385,9 @@ export default function InputPanel({
               <textarea
                 value={scriptText}
                 onChange={(e) => onScriptTextChange(e.target.value)}
-                rows={5}
-                placeholder="…or paste your script text here"
-                className="min-h-[92px] w-full grow resize-none border-0 bg-transparent px-4 py-2.5 text-[13px] leading-relaxed text-ink-200 placeholder-ink-700 outline-none"
+                rows={hasScript ? 5 : 2}
+                placeholder="…or paste your own script here"
+                className={`w-full grow resize-none border-0 bg-transparent px-4 py-2.5 text-[13px] leading-relaxed text-ink-200 placeholder-ink-700 outline-none ${hasScript ? 'min-h-[92px]' : 'min-h-[52px]'}`}
               />
               <ExpandButton onClick={() => setScriptExpanded(true)} className="absolute bottom-2 right-2" />
             </div>
@@ -355,7 +403,9 @@ export default function InputPanel({
           >
             <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={1.5} />
             <span className={`min-w-0 flex-1 truncate text-[13px] ${additionalContext.trim() ? 'font-medium text-ink-100' : 'text-ink-400'}`}>
-              {additionalContext.trim() ? additionalContext.trim() : 'Additional Instructions'}
+              {/* Doubles as the creative brief when there's no script yet — the
+                  product row carries the rest, so blank stays a normal answer. */}
+              {additionalContext.trim() ? additionalContext.trim() : hasScript ? 'Additional Instructions' : 'Brief / Additional Instructions'}
             </span>
             {!additionalContext.trim() && (
               <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
@@ -375,24 +425,13 @@ export default function InputPanel({
       <div className="sticky bottom-0 z-30 border-t border-ink/5 bg-surface-0 px-5 py-3 md:static md:z-auto md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
         <div className="mb-2.5 flex flex-col gap-2">
 
-          {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
-              card silent; "With Dialogue" spends the first of the scene's three
-              cards on a talking-to-camera shot, leaving two silent b-roll ideas.
-              Default first, same as every other toggle in the app. */}
-          {mode === 'line' && (
-            <SegmentedToggle<BrollDelivery>
-              className="h-12 !p-1"
-              value={lineDelivery}
-              onChange={onLineDeliveryChange}
-              accent="broll"
-              options={[
-                { value: 'silent', label: 'B-Roll Clips' },
-                { value: 'dialogue', label: 'With Dialogue' },
-              ]}
-            />
-          )}
+          {/* The two decisions that shape the output, docked together above
+              Generate — and the two things Generate is gated on. The
+              References column above says what the ad is ABOUT (product,
+              character, words); this pair says what it IS: how it looks
+              (Visual Style) and how it's shot (Ad Format).
 
-          {/* Visual style — one row that opens the style popup (presets, your
+              Visual style — one row that opens the style popup (presets, your
               saved styles, and the analyse-from-references flow all live
               there). Same shape as Scripts' Script Style row: dashed and
               asking to be filled until a look is picked, accent-filled with a
@@ -450,6 +489,98 @@ export default function InputPanel({
               <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
             )}
           </div>
+
+          {/* Ad Format — what kind of content this ad imitates. NOT a
+              fallback for "I have no script": a format carries the scene
+              staging that every prompt is written against, so it decides how
+              the ad is SHOT whether or not the words come from here. When
+              there is no script it writes those too, at the length below.
+              That double job is why Formats lead its picker. */}
+          <div className="flex shrink-0 flex-col gap-2 rounded-3xl border border-ink/[0.07] bg-ink/[0.02] p-2.5">
+            <div className="flex items-center justify-between gap-2 px-1.5">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-ink-600">
+                Ad Format
+              </span>
+              {!autoScriptStyle && (
+                <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
+                  Required
+                </span>
+              )}
+            </div>
+
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setStyleSlideOpen(true)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
+              className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-3.5 py-3 text-left transition-colors ${
+                autoScriptStyle
+                  ? 'border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10'
+                  : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
+              }`}
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
+                {autoScriptStyle && WRITE_STYLE_META[autoScriptStyle].group === 'format'
+                  ? <Video className="h-5 w-5" strokeWidth={1.75} />
+                  : <FileText className="h-5 w-5" strokeWidth={1.75} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                {autoScriptStyle ? (
+                  <>
+                    <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">
+                      {WRITE_STYLE_META[autoScriptStyle].label}
+                    </div>
+                    <div className="truncate text-[11px] leading-snug text-ink-500">
+                      {WRITE_STYLE_META[autoScriptStyle].hint}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-sm font-medium text-ink-300">Pick a format</div>
+                    <div className="text-xs text-ink-600">Sets how the ad is shot</div>
+                  </>
+                )}
+              </div>
+              {autoScriptStyle ? (
+                <div className="flex shrink-0 items-center gap-1">
+                  <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
+                    <RefreshCw className="h-2.5 w-2.5" />
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onAutoScriptStyleChange(null) }}
+                    title="Clear format"
+                    aria-label="Clear format"
+                    className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
+              )}
+            </div>
+
+            {/* Length only exists to size a script we're about to write: it sets
+                the word budget, the budget sets how many lines come back, and
+                each line is one scene. A script you brought already has a
+                length, so the control goes away rather than sitting there
+                doing nothing. */}
+            {!hasScript && (
+              <SegmentedToggle<string>
+                // Five segments in a 25%-wide column: the dense preset's px-3
+                // truncates them to "2…" / "3…", so the per-segment padding is
+                // tightened here rather than in the shared component, which
+                // everything else sizes correctly against.
+                className="h-9 !p-1 [&>button]:!px-1.5"
+                dense
+                value={String(autoScriptLength)}
+                onChange={(v) => onAutoScriptLengthChange(Number(v) as WriteLength)}
+                accent="broll"
+                options={WRITE_LENGTHS.map((len) => ({ value: String(len), label: `${len}s` }))}
+              />
+            )}
+          </div>
         </div>
 
         <button
@@ -460,17 +591,25 @@ export default function InputPanel({
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{isContinuous ? 'Storyboarding...' : 'Generating Prompts...'}</span>
+              <span>
+                {!hasScript ? 'Writing your script...'
+                  : isContinuous ? 'Storyboarding...'
+                  : 'Generating Prompts...'}
+              </span>
             </>
           ) : (
             <>
               {isContinuous ? (
                 <Box className="h-4 w-4" strokeWidth={2.5} />
+              ) : mode === 'dialogue' ? (
+                <MessageSquareQuote className="h-4 w-4" strokeWidth={2.5} />
               ) : (
                 <Film className="h-4 w-4" strokeWidth={2.5} />
               )}
               <span>
-                {isContinuous ? 'Generate Storyboard' : 'Generate B-Roll Prompts'}
+                {isContinuous ? 'Generate Storyboard'
+                  : mode === 'dialogue' ? 'Generate Dialogue Prompts'
+                  : 'Generate B-Roll Prompts'}
               </span>
               {promptCredits && (
                 <span
@@ -484,9 +623,14 @@ export default function InputPanel({
             </>
           )}
         </button>
-        {!canGenerate && !isGenerating && (
+        {!isGenerating && (missing || !hasScript) && (
           <p className="mt-2 text-center text-[10px] text-ink-700">
-            {!hasScript ? 'Select or paste a script to get started' : 'Choose a visual style to get started'}
+            {missing === 'format' ? 'Pick an ad format to get started'
+              : missing === 'look' ? 'Choose a visual style to get started'
+              // Nothing missing but no script — say the extra step out loud,
+              // because Generate is about to spend a call writing one and the
+              // member should know that's what the click does.
+              : `Writes a ${autoScriptLength}s script first, then storyboards it`}
           </p>
         )}
       </div>
@@ -507,8 +651,31 @@ export default function InputPanel({
         onChange={onAdditionalContextChange}
         title="Additional Instructions"
         accent="broll"
-        placeholder="Optional notes for this generation (mood, style preferences, specific angles...)"
+        placeholder={hasScript
+          ? 'Optional notes for this generation (mood, style preferences, specific angles...)'
+          : "What's this ad about? Optional — the product's own details already drive the script (angle, audience, what to avoid...)"}
       />
+
+      {/* Script Style picker — the same sectioned list Scripts offers, so a
+          style means the same thing in both apps. Formats lead here: the pick
+          decides what kind of ad gets SHOT, and a format is the half that
+          carries scene staging, so it shapes the storyboard as well as the
+          words. Scripts leads with Structures, where the question is how the
+          argument is built. */}
+      <SlideOver
+        open={styleSlideOpen}
+        onClose={() => setStyleSlideOpen(false)}
+        title="Choose a style"
+        subtitle="What kind of content the ad looks like — and how it's built"
+        size="wide"
+      >
+        <ScriptStyleList
+          accent="broll"
+          formatsFirst
+          value={autoScriptStyle}
+          onSelect={(style) => { onAutoScriptStyleChange(style); setStyleSlideOpen(false) }}
+        />
+      </SlideOver>
     </div>
   )
 }
