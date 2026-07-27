@@ -1,3 +1,4 @@
+import { isWriteStyle, type WriteStyle } from '../script-architect/types'
 import type { VideoMode, ImageResolution } from '../../utils/models'
 
 export type SceneType =
@@ -340,6 +341,18 @@ export type BrollMode = 'broll' | 'dialogue' | 'continuous'
 // `BrollHistoryItem` still stores `mode: 'line'` + `lineDelivery`, and those
 // rows are cloud-synced, so the storage shape is deliberately left alone.
 export type BrollDelivery = 'dialogue' | 'silent'
+
+// What kind of ad the storyboard is shooting. Either one of Scripts' own styles
+// — a FORMAT (podcast clip, street interview…) or a STRUCTURE (PAS, story…) —
+// or 'standard', B-Roll's own "no format at all" option: plain organic UGC, no
+// staging appended. null means nothing is picked yet, which blocks Generate.
+export type AdFormat = WriteStyle | 'standard'
+
+// Guards a persisted / restored value. 'standard' predates nothing, but the
+// style slugs get trimmed over time, so a stored one may no longer be live.
+export function isAdFormat(value: unknown): value is AdFormat {
+  return value === 'standard' || isWriteStyle(value)
+}
 
 // Whether anyone speaks in this mode. Continuous is silent narration-over-
 // footage like 'broll'.
