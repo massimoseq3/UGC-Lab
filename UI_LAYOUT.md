@@ -423,15 +423,16 @@ title — it already fills that row in this narrow 25% pane. Below it, inside th
 scroll area: a **REFERENCES** label + the **New** reset pill (`ClearAllButton` —
 clears the three ref slots, the script text and the instructions; every
 generated scene, clip and history row stays) → **Product** ref card →
-**Character** ref card → **Script** ref card (each: dashed "Click to select from
-bank" when empty, filled pill when set) → "or paste script manually" divider +
-script textarea → a dashed **"No script? Write one here"** block, present ONLY
-while the script box is empty (a **Script Style** row opening the shared
-Structures/Formats slide-over, over a **10s / 15s / 20s / 30s / 60s** toggle) →
-**Brief / Additional Instructions** pill → the settings band: **Visual Style**
-row + **Generate B-Roll / Dialogue / Storyboard Prompts** button (pinned bottom),
-with a line under it reading "Writes a 30s script first, then storyboards it"
-whenever the script is still empty.
+**Character** ref card (each: dashed "Click to select from bank" when empty,
+filled pill when set) → an **AD FORMAT** block (Required tag until picked): a
+format row opening the shared Formats/Structures slide-over, over a
+**10s / 15s / 20s / 30s / 60s** length toggle that appears only while the script
+box is empty → **Script / Hooks** ref card, tagged OPTIONAL, + its paste
+textarea → **Brief / Additional Instructions** pill → the settings band:
+**Visual Style** row + **Generate B-Roll / Dialogue / Storyboard Prompts**
+button (pinned bottom). The line under the button reads "Pick an ad format to
+get started", then "Choose a visual style to get started", then "Writes a 30s
+script first, then storyboards it" while the script is still empty.
 
 ### Right scenes (`components/RightPanel.tsx` → `ScenesView.tsx`)
 

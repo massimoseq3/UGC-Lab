@@ -988,7 +988,7 @@ export default function InputPanel({
         open={styleSlideOpen}
         onClose={() => setStyleSlideOpen(false)}
         title="Choose a style"
-        subtitle="How the ad is built — and what kind of content it looks like"
+        subtitle="What kind of content the ad looks like — and how it's built"
         size="wide"
       >
         {/* Two sections: Structures (how the argument is built) and Formats
@@ -996,6 +996,7 @@ export default function InputPanel({
             in the Scenes output, so they're worth telling apart at the picker.
             Shared with B-Roll, which picks from the same list. */}
         <ScriptStyleList
+          formatsFirst
           value={styleChosen ? writeStyle : null}
           onSelect={(style) => { onWriteStyleChange(style); setStyleChosen(true); setStyleSlideOpen(false) }}
         />
