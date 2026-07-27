@@ -275,34 +275,38 @@ export default function VoiceStudio() {
           />
         </div>
 
-        {/* Right — editor */}
+        {/* Right — editor, with the player docked under it. The player belongs
+            to this column, not to the window: stretched across the bottom it
+            cut the side panel off short and left dead space under History. */}
         <div className="order-first flex flex-1 flex-col md:order-none md:min-h-0 md:overflow-hidden">
-          <EditorArea
-            scriptText={scriptText}
-            onScriptChange={(v) => { setScriptText(v); setSelectedScript(null) }}
-            onSelectScript={() => setScriptPickerOpen(true)}
-            selectedScript={selectedScript}
-            onClearScript={() => setSelectedScript(null)}
-            onClearInputs={() => { setSelectedScript(null); setScriptText('') }}
-            onGenerate={handleGenerate}
-            isGenerating={isGenerating}
-            canGenerate={scriptText.trim().length > 0}
-            onEnhance={handleEnhance}
-            isEnhancing={isEnhancing}
-            highlightField={highlightField}
-            error={error}
-          />
+          <div className="flex min-h-0 flex-1 flex-col">
+            <EditorArea
+              scriptText={scriptText}
+              onScriptChange={(v) => { setScriptText(v); setSelectedScript(null) }}
+              onSelectScript={() => setScriptPickerOpen(true)}
+              selectedScript={selectedScript}
+              onClearScript={() => setSelectedScript(null)}
+              onClearInputs={() => { setSelectedScript(null); setScriptText('') }}
+              onGenerate={handleGenerate}
+              isGenerating={isGenerating}
+              canGenerate={scriptText.trim().length > 0}
+              onEnhance={handleEnhance}
+              isEnhancing={isEnhancing}
+              highlightField={highlightField}
+              error={error}
+            />
+          </div>
+
+          {/* Player — slides in once a generation lands */}
+          {activePlayerItem && (
+            <BottomPlayer
+              item={activePlayerItem}
+              onClose={() => setActivePlayerItem(null)}
+              onShowDetails={setDetailsItem}
+            />
+          )}
         </div>
       </div>
-
-      {/* Bottom player — slides in once a generation lands */}
-      {activePlayerItem && (
-        <BottomPlayer
-          item={activePlayerItem}
-          onClose={() => setActivePlayerItem(null)}
-          onShowDetails={setDetailsItem}
-        />
-      )}
 
       {/* Script picker */}
       <BankPicker
