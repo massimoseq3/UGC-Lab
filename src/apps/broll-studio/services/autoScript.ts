@@ -12,7 +12,8 @@
 // pick, length pick and notes → the input shape that pipeline expects.
 
 import type { Product } from '../../../stores/types'
-import { createEditableContext, type WriteLength, type WriteStyle } from '../../script-architect/types'
+import { createEditableContext, isWriteStyle, type WriteLength } from '../../script-architect/types'
+import type { AdFormat } from '../types'
 import { writeOneScript } from '../../script-architect/services/generateScript'
 
 export interface AutoScriptInput {
@@ -22,11 +23,11 @@ export interface AutoScriptInput {
   // Which Script Style the ad is written in — a structure (the persuasion
   // mechanic) or a format (the kind of organic content it imitates).
   //
-  // null is "Standard UGC": no format to imitate and no mechanic imposed, which
-  // is the default and what most ads want. The write pipeline falls back to its
-  // own default shape, and no scene staging is appended — so the shots come out
-  // as plain organic UGC rather than staged as a podcast or a street interview.
-  style: WriteStyle | null
+  // 'standard' is B-Roll's own "no format at all" pick: the write pipeline
+  // falls back to its default shape and no scene staging is appended, so the
+  // shots come out as plain organic UGC rather than staged as a podcast or a
+  // street interview.
+  style: AdFormat
   // Target read-aloud length in seconds. Drives the word budget, which is what
   // decides how many lines come back — and therefore how many scenes the
   // storyboard has.
@@ -48,8 +49,8 @@ export async function writeAutoScript(input: AutoScriptInput): Promise<string> {
     // whole brief, which is the common case — the member picked a product, a
     // style and a length and expects that to be enough.
     brief: input.notes.trim() || briefFromProduct(input.product),
-    // Undefined lets runWrite use its own default shape (see Standard UGC above).
-    writeStyle: input.style ?? undefined,
+    // Undefined lets runWrite use its own default shape (see 'standard' above).
+    writeStyle: isWriteStyle(input.style) ? input.style : undefined,
     writeFormat: 'script',
     writeLength: input.length,
     productId: input.product?.id ?? null,

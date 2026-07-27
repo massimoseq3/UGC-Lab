@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote, Video } from 'lucide-react'
 import type { Product, Model, Script } from '../../../stores/types'
 import { deliveryForMode, type BrollMode } from '../types'
-import { WRITE_LENGTHS, WRITE_STYLE_META, type WriteStyle, type WriteLength } from '../../script-architect/types'
+import { WRITE_LENGTHS, WRITE_STYLE_META, isWriteStyle, type WriteLength } from '../../script-architect/types'
+import type { AdFormat } from '../types'
 import ScriptStyleList from '../../script-architect/components/ScriptStyleList'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
@@ -12,13 +13,13 @@ import ClearAllButton from '../../../components/ClearAllButton'
 import { estimatePromptCredits } from '../services/promptCost'
 import { formatCredits } from '../../../utils/models'
 
-// The Ad Format's default, and what `autoScriptStyle: null` means: no format to
-// imitate and no persuasion mechanic imposed, so the storyboard gets no scene
-// staging and the shots come out as plain organic UGC. Most ads want this — the
-// named formats are for when you're deliberately disguising the ad as a podcast
-// clip or a street interview. Lives here rather than in Scripts' WRITE_STYLE_META
-// because Scripts always writes in a named style; only B-Roll has a "just make
-// it normal" case.
+// One extra Ad Format option beyond Scripts' list: no format to imitate and no
+// persuasion mechanic imposed, so the storyboard gets no scene staging and the
+// shots come out as plain organic UGC. It is NOT the default — picking it is a
+// decision like any other, and an unpicked Ad Format stays empty.
+//
+// Lives here rather than in Scripts' WRITE_STYLE_META because Scripts always
+// writes in a named style; only B-Roll has a "just make it normal" case.
 const STANDARD_UGC = {
   label: 'Standard UGC',
   hint: 'Plain creator footage — no format imposed',
@@ -55,8 +56,8 @@ interface InputPanelProps {
   // input: it carries the scene staging every prompt is written against, so it
   // decides how the ad is SHOT, and when no script is supplied it also decides
   // how the words are written. The length only applies in that second case.
-  autoScriptStyle: WriteStyle | null
-  onAutoScriptStyleChange: (style: WriteStyle | null) => void
+  autoScriptStyle: AdFormat | null
+  onAutoScriptStyleChange: (style: AdFormat | null) => void
   autoScriptLength: WriteLength
   onAutoScriptLengthChange: (length: WriteLength) => void
   // Visual style — one row, one popup. The presets, the user's saved styles,
@@ -277,10 +278,10 @@ export default function InputPanel({
   onClearStyle,
 }: InputPanelProps) {
   const hasScript = scriptText.trim().length > 0
-  // The look is the only thing that must be chosen. The Ad Format always has a
-  // value — Standard UGC when nothing else is picked — and the script is
-  // optional, since the format writes one when it's blank.
-  const canGenerate = styleChosen
+  // Two picks gate the run: the look, and the ad format. The script doesn't —
+  // the format writes one when the box is blank. (A session that predates the
+  // format row had a script and no format, so a script alone still passes.)
+  const canGenerate = (!!autoScriptStyle || hasScript) && styleChosen
   const [scriptExpanded, setScriptExpanded] = useState(false)
   const [instructionsExpanded, setInstructionsExpanded] = useState(false)
   const [styleSlideOpen, setStyleSlideOpen] = useState(false)
@@ -527,41 +528,52 @@ export default function InputPanel({
             tabIndex={0}
             onClick={() => setStyleSlideOpen(true)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
-            className="group flex w-full cursor-pointer items-center gap-3 rounded-full border border-scripts-500/30 bg-scripts-500/[0.06] px-4 py-2.5 text-left transition-colors hover:bg-scripts-500/10"
+            className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
+              autoScriptStyle
+                ? 'border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10'
+                : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
+            }`}
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
-              {autoScriptStyle && WRITE_STYLE_META[autoScriptStyle].group === 'format'
+              {isWriteStyle(autoScriptStyle) && WRITE_STYLE_META[autoScriptStyle].group === 'format'
                 ? <Video className="h-5 w-5" strokeWidth={1.75} />
                 : <FileText className="h-5 w-5" strokeWidth={1.75} />}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">
-                {autoScriptStyle ? WRITE_STYLE_META[autoScriptStyle].label : STANDARD_UGC.label}
-              </div>
-              <div className="truncate text-[11px] leading-snug text-ink-500">
-                {autoScriptStyle ? WRITE_STYLE_META[autoScriptStyle].hint : STANDARD_UGC.hint}
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
-                <RefreshCw className="h-2.5 w-2.5" />
-              </span>
-              {/* Clearing goes back to Standard UGC, not to nothing — there is
-                  no "no format" state any more, because Standard IS one. */}
               {autoScriptStyle ? (
+                <>
+                  <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">
+                    {isWriteStyle(autoScriptStyle) ? WRITE_STYLE_META[autoScriptStyle].label : STANDARD_UGC.label}
+                  </div>
+                  <div className="truncate text-[11px] leading-snug text-ink-500">
+                    {isWriteStyle(autoScriptStyle) ? WRITE_STYLE_META[autoScriptStyle].hint : STANDARD_UGC.hint}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-[13px] font-medium text-ink-300">Ad Format</div>
+                  <div className="text-[11px] text-ink-600">Sets how the ad is shot</div>
+                </>
+              )}
+            </div>
+            {autoScriptStyle ? (
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
+                  <RefreshCw className="h-2.5 w-2.5" />
+                </span>
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onAutoScriptStyleChange(null) }}
-                  title="Back to Standard UGC"
-                  aria-label="Back to Standard UGC"
+                  title="Clear format"
+                  aria-label="Clear format"
                   className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
-              ) : (
-                <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
-              )}
-            </div>
+              </div>
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
+            )}
           </div>
 
           {/* Length only exists to size a script we're about to write: it sets
@@ -669,36 +681,34 @@ export default function InputPanel({
         subtitle="What kind of content the ad looks like — and how it's built"
         size="wide"
       >
-        {/* The default, pinned above the two sections: picking a named format
-            is opting IN to imitating something, and plenty of ads shouldn't. */}
+        {/* Pinned above the two sections: the "no format at all" option, for an
+            ad that shouldn't be imitating anything. Not a default — nothing is
+            picked until the member picks it. */}
         <div className="px-4 pt-4">
           <button
             type="button"
-            onClick={() => { onAutoScriptStyleChange(null); setStyleSlideOpen(false) }}
+            onClick={() => { onAutoScriptStyleChange('standard'); setStyleSlideOpen(false) }}
             className={`flex w-full items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
-              autoScriptStyle
-                ? 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'
-                : 'border-broll-500/30 bg-broll-500/10'
+              autoScriptStyle === 'standard'
+                ? 'border-broll-500/30 bg-broll-500/10'
+                : 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'
             }`}
           >
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${autoScriptStyle ? 'bg-ink/5 text-ink-500' : 'bg-broll-500/10 text-broll-400'}`}>
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${autoScriptStyle === 'standard' ? 'bg-broll-500/10 text-broll-400' : 'bg-ink/5 text-ink-500'}`}>
               <Film className="h-5 w-5" strokeWidth={1.75} />
             </div>
             <div className="min-w-0 flex-1">
-              <div className={`text-[13px] font-medium tracking-tight ${autoScriptStyle ? 'text-ink-200' : 'text-broll-300'}`}>
+              <div className={`text-[13px] font-medium tracking-tight ${autoScriptStyle === 'standard' ? 'text-broll-300' : 'text-ink-200'}`}>
                 {STANDARD_UGC.label}
               </div>
               <div className="text-[11px] leading-snug text-ink-500">{STANDARD_UGC.hint}</div>
             </div>
-            <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
-              Default
-            </span>
           </button>
         </div>
         <ScriptStyleList
           accent="broll"
           formatsFirst
-          value={autoScriptStyle}
+          value={isWriteStyle(autoScriptStyle) ? autoScriptStyle : null}
           onSelect={(style) => { onAutoScriptStyleChange(style); setStyleSlideOpen(false) }}
         />
       </SlideOver>

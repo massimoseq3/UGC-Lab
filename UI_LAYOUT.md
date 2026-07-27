@@ -431,12 +431,13 @@ tagged OPTIONAL, which is a plain textarea you type straight into.
 
 The pinned settings band below holds the two decisions that shape the output as
 plain rows, the same size as the reference cards above: **Visual Style** →
-**Ad Format** (defaults to *Standard UGC*) over a **10s / 15s / 20s / 30s / 60s**
-length toggle that appears only while the script box is empty → **Generate
-B-Roll / Dialogue / Storyboard Prompts** button. No Required tags — the button
-greys out until a visual style is picked, which is the only required input. The
-one line under the button, "Writes a 30s script first, then storyboards it",
-shows only while the script box is empty.
+**Ad Format** over a **10s / 15s / 20s / 30s / 60s** length toggle that appears
+only while the script box is empty → **Generate B-Roll / Dialogue / Storyboard
+Prompts** button. Both rows are dashed until picked; there are no Required tags,
+because the button greys out until both are chosen. The Ad Format slide-over
+pins a **Standard UGC** card above the Formats and Structures sections. The one
+line under the button, "Writes a 30s script first, then storyboards it", shows
+only while the script box is empty.
 
 ### Right scenes (`components/RightPanel.tsx` → `ScenesView.tsx`)
 

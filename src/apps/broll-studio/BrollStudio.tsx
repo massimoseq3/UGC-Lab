@@ -3,7 +3,7 @@ import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
 import type { Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
-import { deliveryForMode, isLineMode, sanitizeBrollMode, type BrollResult, type PromptVariation, type ReferenceImage, type VariationTag, type VariationRefs, type CardState, type BrollMode, type BrollDelivery, type ContinuousResult, type ContinuousConcept, type ContinuousSelection, type ContinuousFrameCardState, type ContinuousClipCardState } from './types'
+import { deliveryForMode, isLineMode, isAdFormat, sanitizeBrollMode, type AdFormat, type BrollResult, type PromptVariation, type ReferenceImage, type VariationTag, type VariationRefs, type CardState, type BrollMode, type BrollDelivery, type ContinuousResult, type ContinuousConcept, type ContinuousSelection, type ContinuousFrameCardState, type ContinuousClipCardState } from './types'
 import { generateBroll } from './services/generateBroll'
 import { productPhotosOf } from './services/productAngles'
 import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, styleBriefFor, styleUsesRealism, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
@@ -29,7 +29,7 @@ import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersisted
 import { humanizeError } from '../../utils/friendlyError'
 import { fileToDataUri } from '../../utils/kie'
 import { getAsBase64, isAssetRef } from '../../utils/assetStore'
-import { isWriteStyle, isWriteLength, type WriteStyle, type WriteLength } from '../script-architect/types'
+import { isWriteStyle, isWriteLength, type WriteLength } from '../script-architect/types'
 import { sceneStagingFor } from '../script-architect/services/generateScript'
 import { writeAutoScript } from './services/autoScript'
 import { swapQuotedLine, swapScriptLine } from './services/scriptLineEdit'
@@ -225,13 +225,13 @@ export default function BrollStudio() {
   // but the pick survives a paste-then-clear round trip, and the staging still
   // rides into the storyboard call so a member who pasted a podcast-clip script
   // gets podcast-clip shots.
-  // null IS a pick — "Standard UGC", the default: no format to imitate, no
-  // mechanic imposed, plain organic UGC shots. Every other value names a format
-  // or a structure from Scripts' own list.
-  const [autoScriptStyle, setAutoScriptStyle] = usePersistedState<WriteStyle | null>(
+  // A named format/structure from Scripts' list, or 'standard' — B-Roll's own
+  // "no format at all" option (plain organic UGC, no staging). null is unpicked
+  // and blocks Generate; nothing is chosen by default.
+  const [autoScriptStyle, setAutoScriptStyle] = usePersistedState<AdFormat | null>(
     `${baseKey}:autoScriptStyle`,
     null,
-    { sanitize: (raw) => (isWriteStyle(raw) ? raw : null) },
+    { sanitize: (raw) => (isAdFormat(raw) ? raw : null) },
   )
   const [autoScriptLength, setAutoScriptLength] = usePersistedState<WriteLength>(
     `${baseKey}:autoScriptLength`,
@@ -240,7 +240,7 @@ export default function BrollStudio() {
   )
   // Undefined for a structure (an argument implies no camera) and when nothing
   // is picked. Shared by both storyboard calls.
-  const sceneStaging = sceneStagingFor(autoScriptStyle)
+  const sceneStaging = sceneStagingFor(isWriteStyle(autoScriptStyle) ? autoScriptStyle : null)
 
   // ── Continuous mode (keyframe chain) state ─────────────────────
   // Until the user actively picks a style, the look falls back to a mode-
@@ -964,6 +964,7 @@ export default function BrollStudio() {
     setIsGenerating(true)
     try {
       if (!script) {
+        if (!autoScriptStyle) return
         if (!useSettingsStore.getState().kieApiKey) {
           useAppStore.getState().addToast('Add your kie.ai key in Settings to write a script here', 'info')
           return
