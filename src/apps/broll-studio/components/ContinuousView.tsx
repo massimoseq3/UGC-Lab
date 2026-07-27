@@ -1221,7 +1221,11 @@ export default function ContinuousView({
           reachable however far down the storyboard the member has scrolled. */}
       <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0/80 px-5 py-3.5 backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
-          <span>{result.scenes.length} {result.scenes.length === 1 ? 'scene' : 'scenes'}</span>
+          {/* Scene count matches the per-line storyboard's heading — 13px
+              sentence case; the pills beside it keep the small-caps look. */}
+          <span className="text-[13px] normal-case tracking-tight text-ink-200">
+            {result.scenes.length} {result.scenes.length === 1 ? 'Scene' : 'Scenes'}
+          </span>
           <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{style.label}</span>
           <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">~{totalSeconds}s</span>
           <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{framesPicked}/{result.frames.length} keyframes picked</span>

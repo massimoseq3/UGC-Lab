@@ -720,8 +720,10 @@ export default function ScenesView({
           runs edge to edge; the blur keeps scenes legible sliding under it. */}
       <div className="sticky top-0 z-20 -mx-5 mb-5 flex items-center justify-between gap-3 border-b border-ink/5 bg-surface-0/80 px-5 py-3.5 backdrop-blur-md">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-ink-400">
-            {result.scenes.length} scene{result.scenes.length === 1 ? '' : 's'}
+          {/* Same 13px sentence-case label as the input column's section
+              headings (and the Voiceovers side panel's). */}
+          <span className="shrink-0 text-[13px] font-medium text-ink-200">
+            {result.scenes.length} Scene{result.scenes.length === 1 ? '' : 's'}
           </span>
           {/* Style pill — parity with Continuous, so the member can see
               which look every b-roll clip is rendered in. */}
@@ -1285,12 +1287,15 @@ function SceneLineEditModal({
   const [line, setLine] = useState(scriptLine)
   useCloseOnEscape(true, onClose)
   useCloseOnAppSwitch(true, onClose)
+  // Selecting the line and releasing the mouse over the backdrop fires a click
+  // on the common ancestor — a bare onClick={onClose} would throw the edit away.
+  const backdrop = useBackdropClose(onClose)
 
   const trimmed = line.trim()
   const dirty = trimmed !== scriptLine.trim()
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" {...backdrop}>
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl border border-ink/10 bg-ink-950/95 p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>

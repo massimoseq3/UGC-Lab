@@ -63,7 +63,7 @@ export default function AuthScreen() {
           <div className="flex flex-col items-center gap-2">
             <AppLogo className="h-12 w-12" />
             <div className="space-y-1 text-center">
-              <h1 className="text-2xl font-semibold tracking-tight text-ink-100">UGC OS</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-ink-100">UGC OS</h1>
               <p className="text-sm text-ink-500">
                 {mode === 'login' ? 'Sign in to your workspace' : 'Create your account'}
               </p>
