@@ -3,6 +3,7 @@ import { Play, Pause, RotateCcw, RotateCw, Download, ChevronDown, AlignLeft } fr
 import type { VoiceHistoryItem } from '../../../stores/types'
 import { getUrl } from '../../../utils/assetStore'
 import { seedColor } from './seedColor'
+import { claimAudioSlot, releaseAudioSlot } from './audio'
 
 interface BottomPlayerProps {
   item: VoiceHistoryItem
@@ -41,6 +42,10 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const animRef = useRef<number>(0)
   const trackRef = useRef<HTMLDivElement>(null)
+
+  // Stable identity for the app-wide playback slot — a History card's play
+  // button pauses this player rather than talking over it.
+  const pauseSelf = useRef(() => { audioRef.current?.pause() }).current
 
   // Animate the progress bar while audio is playing. Named function expression
   // so the self-referential requestAnimationFrame(tick) binds to the function's
@@ -83,6 +88,7 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
         })
         audio.addEventListener('play', () => {
           if (audioRef.current !== audio) return
+          claimAudioSlot(pauseSelf)
           setIsPlaying(true)
           cancelAnimationFrame(animRef.current)
           animRef.current = requestAnimationFrame(tick)
@@ -110,13 +116,14 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
     return () => {
       cancelled = true
       cancelAnimationFrame(animRef.current)
+      releaseAudioSlot(pauseSelf)
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current.src = ''
         audioRef.current = null
       }
     }
-  }, [item.audioUrl, item.id, tick])
+  }, [item.audioUrl, item.id, tick, pauseSelf])
 
   const togglePlay = () => {
     const audio = audioRef.current
