@@ -181,7 +181,7 @@ export default function EditorArea({
             // Stays live while a voiceover renders — a second click queues
             // another one alongside it. The progress bar above is the feedback.
             disabled={!canGenerate || overLimit}
-            className="flex items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-10 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-16 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Mic className="h-4 w-4" strokeWidth={2.5} />
             <span>Generate Voiceover</span>

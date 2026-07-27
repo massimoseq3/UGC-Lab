@@ -1,11 +1,16 @@
 import { useEffect, useRef } from 'react'
 
 const BARS = 44
+const HALF = BARS / 2
 const REST = 0.06
-// Sample every other frame — ~30 readings a second, so the 44 bars hold about
-// a second and a half of the voice. Faster and the bars blur; slower and the
-// strip lags behind what you're hearing.
-const FRAMES_PER_SAMPLE = 2
+
+// Which FFT bin each half of the strip reads, low to high. Speech energy is
+// crowded into the bottom of the spectrum, so the bins are spread on a curve
+// and lifted by `TILT` — a linear map leaves the top of the range dead flat.
+const BIN_FOR = Array.from({ length: HALF }, (_, k) =>
+  Math.floor(1 + Math.pow(k / (HALF - 1), 1.8) * 44),
+)
+const TILT = Array.from({ length: HALF }, (_, k) => 1 + (k / (HALF - 1)) * 1.9)
 
 interface WaveformProps {
   // Live levels for the clip that's playing. Null when the Web Audio rig
@@ -16,14 +21,13 @@ interface WaveformProps {
   className?: string
 }
 
-// A scrolling amplitude envelope: each frame reads how loud the voice is right
-// now, pushes it onto the right edge and shifts the rest left, so the strip
-// draws the take as it plays. A frequency spectrum was tried first and read
-// wrong — speech piles its energy into the low bins, so the left of the strip
-// was always tall and the right always flat, whatever was being said.
+// Every bar keeps its place and only changes height with the sound. The bands
+// run outward from the middle — lows at the centre, highs at both edges — so
+// the strip holds the fat-in-the-middle shape of a waveform instead of the
+// tall-left, flat-right ramp a plain spectrum draws on a voice.
 //
-// The bars are driven by writing `transform` straight onto the DOM nodes — 44
-// React re-renders a frame is exactly the work a visualiser shouldn't do.
+// Heights are written as `transform` straight onto the DOM nodes: 44 React
+// re-renders a frame is exactly the work a visualiser shouldn't do.
 export default function Waveform({ analyser, playing, className = '' }: WaveformProps) {
   const barsRef = useRef<(HTMLSpanElement | null)[]>([])
   const rafRef = useRef(0)
@@ -36,34 +40,34 @@ export default function Waveform({ analyser, playing, className = '' }: Waveform
       return
     }
 
-    const samples = analyser ? new Uint8Array(analyser.fftSize) : null
-    const levels = new Array<number>(BARS).fill(REST)
+    const spectrum = analyser ? new Uint8Array(analyser.frequencyBinCount) : null
+    const levels = new Array<number>(HALF).fill(REST)
     let frame = 0
 
     const draw = () => {
       frame++
-      if (frame % FRAMES_PER_SAMPLE === 0) {
-        let level: number
-        if (samples && analyser) {
-          analyser.getByteTimeDomainData(samples)
-          let sum = 0
-          for (let i = 0; i < samples.length; i++) {
-            const v = (samples[i] - 128) / 128
-            sum += v * v
-          }
-          // RMS is quiet even on a loud take; the curve lifts normal speech
-          // into the top half of the strip without pinning it there.
-          level = Math.min(1, Math.pow(Math.sqrt(sum / samples.length) * 2.8, 0.7))
-        } else {
-          level = 0.3 + 0.2 * Math.sin(frame * 0.09) + 0.12 * Math.sin(frame * 0.031)
-        }
+      if (spectrum && analyser) analyser.getByteFrequencyData(spectrum)
 
-        levels.shift()
-        levels.push(Math.max(REST, level))
-        for (let i = 0; i < BARS; i++) {
-          const el = barsRef.current[i]
-          if (el) el.style.transform = `scaleY(${levels[i]})`
+      for (let k = 0; k < HALF; k++) {
+        let target: number
+        if (spectrum) {
+          const bin = BIN_FOR[k]
+          // Average with the neighbour so one hot bin can't spike alone.
+          const raw = (spectrum[bin] + spectrum[Math.min(spectrum.length - 1, bin + 1)]) / 510
+          target = Math.min(1, Math.pow(raw, 0.75) * TILT[k])
+        } else {
+          target = 0.28 + 0.2 * Math.sin(frame * 0.07 - k * 0.35) + 0.1 * Math.sin(frame * 0.026)
         }
+        // Jump to a peak, fall away from it — the asymmetry is what reads as
+        // syllables rather than as a shimmer.
+        const prev = levels[k]
+        levels[k] = prev + (target - prev) * (target > prev ? 0.55 : 0.14)
+
+        const height = `scaleY(${Math.max(REST, levels[k])})`
+        const left = barsRef.current[HALF - 1 - k]
+        const right = barsRef.current[HALF + k]
+        if (left) left.style.transform = height
+        if (right) right.style.transform = height
       }
       rafRef.current = requestAnimationFrame(draw)
     }
@@ -73,12 +77,7 @@ export default function Waveform({ analyser, playing, className = '' }: Waveform
   }, [playing, analyser])
 
   return (
-    <div
-      className={`flex h-9 items-center gap-[3px] ${className}`}
-      // Fade the oldest bars out so the envelope reads as streaming in from the
-      // right rather than as a fixed chart that happens to wobble.
-      style={{ maskImage: 'linear-gradient(to right, transparent, black 18%)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 18%)' }}
-    >
+    <div className={`flex h-9 items-center gap-[3px] ${className}`}>
       {Array.from({ length: BARS }, (_, i) => (
         <span
           key={i}
