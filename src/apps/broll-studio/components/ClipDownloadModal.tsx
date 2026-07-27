@@ -6,7 +6,7 @@
 // card's COVER take (the one its card face shows), and zips exactly what stays
 // ticked.
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Download, Loader2, Check, Star } from 'lucide-react'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
@@ -14,6 +14,7 @@ import { useAppStore } from '../../../stores/appStore'
 import { downloadAssetsZip } from '../../../utils/downloadZip'
 import { humanizeError } from '../../../utils/friendlyError'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
+import { useBackdropClose } from '../../../hooks/useBackdropClose'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 
 function aspectStyle(ar: string): React.CSSProperties {
@@ -57,9 +58,7 @@ export default function ClipDownloadModal({
   )
   const [zipping, setZipping] = useState(false)
 
-  // A text-selection drag that starts inside the panel and releases over the
-  // backdrop fires a `click` on the backdrop — same guard the detail modals use.
-  const pointerDownOnBackdrop = useRef(false)
+  const backdrop = useBackdropClose(onClose)
 
   const toggle = (id: string) =>
     setPicked((prev) => {
@@ -91,8 +90,7 @@ export default function ClipDownloadModal({
   return createPortal((
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm sm:px-6"
-      onMouseDown={(e) => { pointerDownOnBackdrop.current = e.target === e.currentTarget }}
-      onClick={(e) => { if (e.target === e.currentTarget && pointerDownOnBackdrop.current) onClose() }}
+      {...backdrop}
     >
       <div
         onClick={(e) => e.stopPropagation()}

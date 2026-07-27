@@ -41,6 +41,7 @@ import { fileToDataUri } from '../../../utils/kie'
 import { usePersistedState } from '../../../hooks/usePersistedState'
 import GeneratingTile from './GeneratingTile'
 import InfluencerLightbox from './InfluencerLightbox'
+import { useBackdropClose } from '../../../hooks/useBackdropClose'
 
 // A B-Roll-style editor for an influencer image. Clicking a portrait opens this:
 // the left column mirrors the B-Roll card editor — references, visual style and
@@ -308,6 +309,7 @@ export default function InfluencerEditModal({
   // Closing mid-generation is safe — the job lives on CharacterStudio and keeps
   // running (visible in the main gallery, and back here on reopen).
   useCloseOnAppSwitch(true, onClose)
+  const backdrop = useBackdropClose(onClose)
 
   function handlePickFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -507,7 +509,7 @@ export default function InfluencerEditModal({
   const modal = (
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-      onClick={onClose}
+      {...backdrop}
     >
       {/* Floating close — anchored to the screen corner (like every other
           pop-up) so it never overlaps an output tile. */}

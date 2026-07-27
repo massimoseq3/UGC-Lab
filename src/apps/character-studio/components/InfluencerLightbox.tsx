@@ -6,6 +6,7 @@ import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { getUrl } from '../../../utils/assetStore'
 import { downloadImage } from '../../../utils/downloadImage'
 import { copyToClipboard } from '../../../utils/clipboard'
+import { useBackdropClose } from '../../../hooks/useBackdropClose'
 
 // Full-screen image viewer for the Influencers tab — mirrors the Playground's
 // preview modal: the picture centered with its real aspect, the generation
@@ -38,6 +39,8 @@ export default function InfluencerLightbox({
     const resolved = (await getUrl(imageRef)) ?? url
     await downloadImage(resolved, `${isSheet ? 'character-sheet' : 'character'}-${imageRef}`)
   }
+  const backdrop = useBackdropClose(onClose)
+
   async function handleCopy() {
     if (await copyToClipboard(prompt)) {
       setCopied(true)
@@ -48,7 +51,7 @@ export default function InfluencerLightbox({
   return createPortal(
     <div
       className="fixed inset-0 z-[70] flex flex-col bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
+      {...backdrop}
     >
       <div className="absolute right-4 top-4 z-10" onClick={(e) => e.stopPropagation()}>
         <button

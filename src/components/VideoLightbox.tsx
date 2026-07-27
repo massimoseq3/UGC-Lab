@@ -12,6 +12,7 @@ import { downloadImage } from '../utils/downloadImage'
 import { copyToClipboard } from '../utils/clipboard'
 import { extractVideoFrame } from '../utils/videoFrames'
 import { TileActionButton } from './tileActions'
+import { useBackdropClose } from '../hooks/useBackdropClose'
 
 // The full-screen clip view: the video large on the left, and on the right its
 // first / last frame pulled straight out of the file (save either to the
@@ -58,6 +59,8 @@ export default function VideoLightbox({
   // Portaled to the body, so it would otherwise float over the next app.
   useCloseOnAppSwitch(true, onClose)
 
+  const backdrop = useBackdropClose(onClose)
+
   async function handleCopyPrompt() {
     if (!prompt) return
     if (await copyToClipboard(prompt)) {
@@ -69,7 +72,7 @@ export default function VideoLightbox({
   return createPortal(
     <div
       className="fixed inset-0 z-[80] flex flex-col bg-black/85 backdrop-blur-sm"
-      onClick={onClose}
+      {...backdrop}
     >
       <div className="absolute right-4 top-4 z-10" onClick={(e) => e.stopPropagation()}>
         <button
