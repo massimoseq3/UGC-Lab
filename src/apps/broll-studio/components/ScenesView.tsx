@@ -713,8 +713,12 @@ export default function ScenesView({
   )
 
   return (
-    <div className="flex-1 overflow-y-auto px-5 py-4">
-      <div className="mb-5 flex items-center justify-between gap-3">
+    <div className="flex-1 overflow-y-auto px-5 pb-4">
+      {/* The strip pins to the top of the scroll port and keeps its own hairline
+          so the meta + batch actions stay reachable however far down the
+          storyboard the member has scrolled. Full-bleed via -mx-5 so the rule
+          runs edge to edge; the blur keeps scenes legible sliding under it. */}
+      <div className="sticky top-0 z-20 -mx-5 mb-5 flex items-center justify-between gap-3 border-b border-ink/5 bg-surface-0/80 px-5 py-3.5 backdrop-blur-md">
         <div className="flex min-w-0 items-center gap-2">
           <span className="shrink-0 text-[11px] font-medium uppercase tracking-wider text-ink-400">
             {result.scenes.length} scene{result.scenes.length === 1 ? '' : 's'}
