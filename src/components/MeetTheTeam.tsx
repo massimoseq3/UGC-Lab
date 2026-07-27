@@ -1,43 +1,46 @@
-import type { CSSProperties } from 'react'
-import { X } from 'lucide-react'
+import { useState, type CSSProperties } from 'react'
+import { ArrowUpRight, Check, ChevronRight, Eye, EyeOff, Loader2, X } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
+import { useSettingsStore } from '../stores/settingsStore'
 import { getAppConfig } from '../utils/constants'
 import { TEAM } from '../utils/team'
 import type { TeamMember } from '../utils/team'
 import CrabSprite from './CrabSprite'
 import AppLogo from './AppLogo'
-import { API_KEY_STEPS } from './apiKeySteps'
+import { useKeyConnect } from './ApiKeyGuide'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useBackdropClose } from '../hooks/useBackdropClose'
 
-// "Meet the team" onboarding — frames the dock apps as a production crew,
-// one crab per role. Auto-opens once per browser (appStore.teamIntroOpen),
-// reopenable from the empty desktop. Clicking a row visits that teammate's
-// desk (opens the app) and dismisses the intro.
+// "Meet the team" — the first thing a new member sees. Auto-opens once per
+// browser (appStore.teamIntroOpen), reopenable from the wordmark.
 //
-// Laid out as a call sheet, not a tile grid: rows grouped by the app's own
-// `category`, with the Create chain numbered because that order is real —
-// Characters → Scripts → Voiceovers → B-Roll → Edit is the pipeline, and
-// teaching it is half the pitch. A grid of eight equal tiles taught nothing.
+// It does two jobs, in this order:
 //
-// Colour discipline: the crabs are the only colour at rest. The old
-// per-card accent-tinted panels put eight competing swatches on screen; the
-// accent now only appears on hover, as the row's own tint.
+//   1. Teach the production line. Characters → Scripts → Voiceovers → B-Roll →
+//      Edit is the pitch, so it's staged as a row of five crew cards with the
+//      flow running left to right, with Bank and the two on-call tools on a
+//      quieter second line. It used to be a call sheet — eight rows, eight
+//      blurbs — which is a reading task, not an introduction. The blurbs now
+//      live in ONE caption slot under the row that follows the cursor, so the
+//      screen stays scannable and the copy is still a hover away.
 //
-// The "fuel" callout doubles as the get-started checklist — the crew is
-// useless without a kie.ai key. Steps live in ./apiKeySteps so the
-// ApiKeyGuide modal stays in sync.
+//   2. Take the kie.ai key. Nothing in the workspace can generate without one,
+//      and this used to be a footnote pointing at Settings — so the member left
+//      the intro with the one blocking task undone. The field is here now, on
+//      the same verify-then-save path as the ApiKeyGuide (useKeyConnect), and
+//      the screen won't pretend the crew is ready until it's filled.
 
 const SERIF = { fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }
 
-// Groups follow the dock's own categories so this can't drift from
-// constants.ts. Only the Create chain is numbered — Bank and the Tools pair
-// aren't steps in a sequence and numbering them would say otherwise.
-const GROUPS: { category: string; label: string; numbered?: boolean }[] = [
-  { category: 'library', label: 'Shared' },
-  { category: 'create', label: 'The workflow', numbered: true },
-  { category: 'tools', label: 'Keep on call' },
-]
+const DEFAULT_CAPTION = 'Eight teammates, one workspace — and everything they make lands in the shared Bank.'
+
+// The Create chain, in dock order. Category comes from constants.ts so this
+// can't drift if an app moves group.
+const WORKFLOW = TEAM.filter((m) => getAppConfig(m.appId)?.category === 'create')
+const ON_CALL = TEAM.filter((m) => {
+  const category = getAppConfig(m.appId)?.category
+  return category === 'library' || category === 'tools'
+})
 
 export default function MeetTheTeam() {
   const open = useAppStore((s) => s.teamIntroOpen)
@@ -59,18 +62,20 @@ export default function MeetTheTeam() {
       className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm"
       {...backdrop}
     >
-      {/* Column layout, not a single scrolling box: the header and the
-          "Let's get to work" CTA stay pinned and only the roster scrolls.
-          The old `overflow-y-auto` on the whole card pushed the CTA below the
-          fold on short viewports, and the app hides scrollbars globally
-          (index.css) so there was no hint anything was down there. */}
+      {/* Column layout, not a single scrolling box: the header and the CTA stay
+          pinned and only the crew scrolls. The app hides scrollbars globally
+          (index.css), so anything pushed below the fold is invisible. */}
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="team-intro-title"
         onClick={(e) => e.stopPropagation()}
-        className="relative flex max-h-[94dvh] w-full max-w-3xl flex-col rounded-2xl border border-ink/10 bg-surface-1 shadow-2xl"
+        className="relative flex max-h-[94dvh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-ink/10 bg-surface-1 shadow-2xl shadow-black/50"
       >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(600px_220px_at_50%_-10%,rgba(5,150,105,0.14),transparent_75%)]"
+        />
         <button
           onClick={close}
           aria-label="Close"
@@ -79,10 +84,7 @@ export default function MeetTheTeam() {
           <X className="h-4 w-4" strokeWidth={2} />
         </button>
 
-        {/* Logo sits beside the title rather than above it — this modal opens
-            on top of the workspace, where the brand mark is already in the
-            menu bar, and the stacked version cost 45px of roster height. */}
-        <div className="shrink-0 px-6 pb-3.5 pt-5 text-center">
+        <div className="relative shrink-0 px-6 pb-1 pt-6 text-center">
           <div className="flex items-center justify-center gap-2.5">
             <AppLogo className="h-8 w-8" />
             <h2 id="team-intro-title" className="text-[26px] font-bold tracking-tight text-ink-100">
@@ -94,72 +96,13 @@ export default function MeetTheTeam() {
           </div>
         </div>
 
-        {/* Scroll region — the roster only. min-h-0 lets it actually shrink
-            inside the flex column instead of forcing the card taller. The
-            fuel callout is deliberately outside it: on a short viewport the
-            one thing that must not scroll out of sight is the to-do. */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 sm:px-6">
-          <div className="flex flex-col gap-2.5">
-            {GROUPS.map((group) => {
-              const members = TEAM.filter(
-                (m) => getAppConfig(m.appId)?.category === group.category,
-              )
-              if (!members.length) return null
-              return (
-                <section key={group.category}>
-                  {/* Section rule: label, then a hairline running out to the
-                      edge — the app's usual inset divider, doing double duty
-                      as a group header. */}
-                  <div className="mb-1 flex items-center gap-3 px-2">
-                    <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400">
-                      {group.label}
-                    </span>
-                    <span className="h-px flex-1 bg-ink/10" />
-                  </div>
-                  <div className="flex flex-col">
-                    {members.map((member, i) => (
-                      <TeamRow
-                        key={member.appId}
-                        member={member}
-                        index={group.numbered ? i + 1 : undefined}
-                        onVisit={visit}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )
-            })}
-          </div>
+        <div className="relative min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-7">
+          <Crew onVisit={visit} />
         </div>
 
-        {/* The fuel callout — the crew works for kie.ai credits; no credits,
-            no output. The one boxed element on the screen, because it's the
-            one thing the member still has to go and do. */}
-        <div className="shrink-0 px-4 pt-3 sm:px-6">
-          <div className="flex items-center gap-3.5 rounded-2xl border border-ink/10 bg-ink/[0.02] px-4 py-2">
-            <span className="flex h-11 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-400/10">
-              <CrabSprite variant="kie" className="h-8 w-11" />
-            </span>
-            <div className="min-w-0">
-              <span className="text-[12px] font-semibold tracking-tight text-ink-100">
-                kie.ai credits keep your team fed
-              </span>
-              <ol className="mt-1 flex flex-col gap-x-4 gap-y-1 md:flex-row">
-                {API_KEY_STEPS.map((step, i) => (
-                  <li key={i} className="flex items-center gap-1.5 text-[11px] leading-snug text-ink-500">
-                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-ink/[0.07] text-[9px] font-semibold text-ink-300 ring-1 ring-inset ring-ink/10">
-                      {i + 1}
-                    </span>
-                    <span>{step}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
-        </div>
-
-        <div className="shrink-0 px-6 pb-5 pt-3.5">
-          <div className="flex justify-center">
+        <div className="relative shrink-0 border-t border-ink/[0.07] px-5 py-4 sm:px-7">
+          <KeyBlock />
+          <div className="mt-4 flex justify-center">
             <button
               onClick={close}
               className="rounded-full bg-ink px-6 py-2.5 text-sm font-medium text-paper transition-colors hover:bg-ink-100"
@@ -173,17 +116,75 @@ export default function MeetTheTeam() {
   )
 }
 
-// One crew row: [step no.] [crab] [app + persona / blurb] [role].
-// The numeral column is reserved even in unnumbered groups so every crab
-// lines up down the left edge.
-function TeamRow({
+function Crew({ onVisit }: { onVisit: (appId: string) => void }) {
+  // One caption for the whole roster, driven by whatever the cursor is on.
+  const [hovered, setHovered] = useState<TeamMember | null>(null)
+
+  return (
+    <div onMouseLeave={() => setHovered(null)}>
+      <SectionLabel>The workflow</SectionLabel>
+      {/* Five cards with the pipeline running through them. The arrows carry
+          real information — this order is the order you work in — so they only
+          appear between the Create apps, never around Bank or the tools. */}
+      <div className="mt-2 flex flex-wrap items-stretch justify-center gap-1 sm:flex-nowrap">
+        {WORKFLOW.map((member, i) => (
+          <div key={member.appId} className="flex min-w-0 flex-1 items-center">
+            {i > 0 && (
+              <ChevronRight
+                aria-hidden
+                className="hidden h-4 w-4 shrink-0 text-ink-700 sm:block"
+                strokeWidth={2.5}
+              />
+            )}
+            <CrewCard member={member} onVisit={onVisit} onHover={setHovered} />
+          </div>
+        ))}
+      </div>
+
+      {/* The caption slot. Fixed height so a hover never nudges the layout. */}
+      <p className="mt-3 flex min-h-[34px] items-center justify-center px-4 text-center text-[12.5px] leading-snug text-ink-400">
+        {hovered ? (
+          <span>
+            <span className="font-medium text-ink-200">{hovered.name}</span>
+            <span className="mx-1.5 text-ink-700">·</span>
+            <span className="text-ink-500">{hovered.role}</span>
+            <span className="mx-1.5 text-ink-700">·</span>
+            {hovered.blurb}
+          </span>
+        ) : (
+          DEFAULT_CAPTION
+        )}
+      </p>
+
+      <SectionLabel className="mt-4">Always on call</SectionLabel>
+      <div className="mt-2 grid grid-cols-3 gap-1">
+        {ON_CALL.map((member) => (
+          <CrewCard key={member.appId} member={member} onVisit={onVisit} onHover={setHovered} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SectionLabel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`flex items-center gap-3 ${className}`}>
+      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400">{children}</span>
+      <span className="h-px flex-1 bg-ink/10" />
+    </div>
+  )
+}
+
+// One teammate. The crab is the card — big enough to read as a character
+// rather than a bullet glyph, which is what it was at 28px in the old list.
+function CrewCard({
   member,
-  index,
   onVisit,
+  onHover,
 }: {
   member: TeamMember
-  index?: number
   onVisit: (appId: string) => void
+  onHover: (member: TeamMember | null) => void
 }) {
   const app = getAppConfig(member.appId)
   if (!app) return null
@@ -191,45 +192,104 @@ function TeamRow({
   return (
     <button
       onClick={() => onVisit(member.appId)}
-      title={`Open ${app.name}`}
-      // --tint is the accent at 12% — the sprite well picks it up on hover, so
-      // each teammate's colour appears on demand instead of eight at once.
+      onMouseEnter={() => onHover(member)}
+      onFocus={() => onHover(member)}
+      title={`Open ${app.name} — ${member.blurb}`}
+      // --tint is the accent at 10%: each teammate's colour appears on demand
+      // instead of eight competing swatches at rest.
       style={{ '--tint': `${app.accent}1A` } as CSSProperties}
-      // focus-visible mirrors hover: the app has no global focus ring (see
-      // index.css), but a keyboard user still has to see which crew member
-      // they're on. Buttons only match :focus-visible on keyboard focus, so
-      // this can't fire on a plain click.
-      className="group grid w-full grid-cols-[1.5rem_2.5rem_1fr] items-center gap-x-3 rounded-xl px-2 py-1 text-left transition-colors duration-200 hover:bg-[var(--tint)] focus-visible:bg-[var(--tint)] sm:grid-cols-[1.5rem_2.5rem_1fr_auto]"
+      className="group relative flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-2xl px-2 py-3 transition-colors duration-200 hover:bg-[var(--tint)] focus-visible:bg-[var(--tint)]"
     >
-      <span
-        className="text-right text-lg italic tabular-nums leading-none text-ink-700 transition-colors duration-150 group-hover:text-ink-500"
-        style={SERIF}
-      >
-        {index ? String(index).padStart(2, '0') : ''}
-      </span>
-      {/* No tinted well behind the crab — the sprite is the only colour at
-          rest, and the accent arrives as the row's own hover tint. */}
-      <span className="flex h-8 items-center justify-center">
-        <CrabSprite
-          variant={member.appId}
-          body={member.roleColor ?? app.accent}
-          className="h-7 w-9 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-0.5"
-        />
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate text-[13px] font-semibold tracking-tight text-ink-100">
-          {app.name}
-          <span className="ml-1.5 font-normal text-ink-500">{member.name}</span>
-        </span>
-        <span className="block text-[11.5px] leading-snug text-ink-500">
-          {member.blurb}
-        </span>
-      </span>
-      {/* Role sits in the right gutter like a credits column — out from under
-          the name, where it used to crowd the app title. */}
-      <span className="hidden shrink-0 pl-4 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-600 sm:block">
-        {member.role}
+      <CrabSprite
+        variant={member.appId}
+        body={member.roleColor ?? app.accent}
+        className="h-10 w-[3.25rem] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-1"
+      />
+      <span className="w-full min-w-0">
+        <span className="block truncate text-[12.5px] font-semibold tracking-tight text-ink-100">{app.name}</span>
+        <span className="block truncate text-[11px] leading-tight text-ink-500">{member.name}</span>
       </span>
     </button>
+  )
+}
+
+// The one thing the member still has to do. Connected state included, because
+// the intro reopens from the wordmark long after setup.
+function KeyBlock() {
+  const savedKey = useSettingsStore((s) => s.kieApiKey)
+  const { draft, key, status, connected, connect, setDraft } = useKeyConnect()
+  const [reveal, setReveal] = useState(false)
+  const done = connected || savedKey.trim().length > 0
+
+  return (
+    <div className="rounded-2xl border border-ink/10 bg-ink/[0.02] p-3.5">
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-400/10">
+          <CrabSprite variant="kie" className="h-8 w-11" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 text-[12.5px] font-semibold tracking-tight text-ink-100">
+            {done && <Check className="h-3.5 w-3.5 text-dashboard-400" strokeWidth={3} />}
+            {done ? 'Your crew is fuelled' : 'Fuel the crew with a kie.ai key'}
+          </p>
+          <p className="mt-0.5 text-[11.5px] leading-snug text-ink-500">
+            {done
+              ? 'Top up anytime via Get Credits in the menu bar.'
+              : 'Every generation runs on your own key. Stored only in this browser — do not share it with anyone.'}
+          </p>
+        </div>
+        {!done && (
+          <a
+            href="https://kie.ai/api-key"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden h-8 shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] sm:flex"
+          >
+            Get a key
+            <ArrowUpRight className="h-3.5 w-3.5 text-ink-500" strokeWidth={2} />
+          </a>
+        )}
+      </div>
+
+      {!done && (
+        <div className="mt-3 flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <input
+              type={reveal ? 'text' : 'password'}
+              value={draft}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') connect()
+              }}
+              placeholder="Paste your key — sk-..."
+              className="w-full rounded-full border border-ink/10 bg-ink/5 py-2 pl-4 pr-10 text-[13px] text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
+            />
+            <button
+              type="button"
+              onClick={() => setReveal((v) => !v)}
+              aria-label={reveal ? 'Hide key' : 'Show key'}
+              className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full p-2 text-ink-500 transition-colors hover:text-ink-300"
+            >
+              {reveal ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+          <button
+            onClick={connect}
+            disabled={!key || status.phase === 'checking'}
+            className="flex h-9 shrink-0 items-center gap-2 rounded-full bg-ink px-4 text-[13px] font-medium text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {status.phase === 'checking' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {status.phase === 'checking' ? 'Checking…' : 'Connect'}
+          </button>
+        </div>
+      )}
+      {/* Infra surface: kie.ai's own message, not friendly copy — the member
+          (or whoever is helping them) needs the real reason. */}
+      {status.phase === 'error' && (
+        <p className="mt-2 text-[12px] leading-relaxed text-red-300 light:text-red-700">{status.message}</p>
+      )}
+    </div>
   )
 }

@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react'
 
-// The get-started checklist for connecting a kie.ai key — one short line each.
-// Shared source of truth so the Meet-your-team intro and the ApiKeyGuide modal
-// (menu bar alert + Dashboard connect row) always show the same three steps.
+// The get-started checklist for connecting a kie.ai key — one short line each,
+// shown in the Meet-your-team intro. The ApiKeyGuide modal used to render this
+// same list; it now takes the paste inline (see ApiKeyGuide.tsx), so this is the
+// read-only summary and that is the place the work actually happens. Keep the
+// wording in step with it.
 export const API_KEY_STEPS: ReactNode[] = [
   <>
     Grab your API key at{' '}

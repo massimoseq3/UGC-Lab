@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ArrowUpRight, Coins, ExternalLink, Flame, Moon, RefreshCw, Sun, X } from 'lucide-react'
+import { ArrowUpRight, Coins, Flame, Moon, RefreshCw, Sun } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useCreditsStore } from '../stores/creditsStore'
@@ -11,10 +11,8 @@ import { getAppConfig, SKOOL_COMMUNITY_URL } from '../utils/constants'
 import { computeUsageMetrics } from '../utils/usage'
 import { creditsToUsd } from '../utils/models'
 import AppLogo from './AppLogo'
-import CrabSprite from './CrabSprite'
 import SettingsModal from './SettingsModal'
-import { API_KEY_STEPS } from './apiKeySteps'
-import { useBackdropClose } from '../hooks/useBackdropClose'
+import ApiKeyGuide from './ApiKeyGuide'
 
 // Thin macOS-style menu bar: branding + the active app's name on the left,
 // credits balance + external quick links + the theme toggle on the right. Pure chrome —
@@ -224,72 +222,6 @@ function CreditsItem() {
         <span className="hidden text-ink-500 sm:inline"> credits left</span>
       </span>
     </button>
-  )
-}
-
-// Setup guide shown when the user clicks the "no API key" alert (also reused
-// by the Dashboard's get-started row). Explains where the key comes from and
-// hands off to Settings for the paste + test.
-export function ApiKeyGuide({ onClose, onOpenSettings }: { onClose: () => void; onOpenSettings: () => void }) {
-  const backdrop = useBackdropClose(onClose)
-  return (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      {...backdrop}
-    >
-      <div
-        className="mx-4 w-full max-w-md rounded-3xl border border-ink/10 bg-surface-1 p-5 shadow-2xl lg:mx-0 lg:p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <span className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-amber-400/10">
-              <CrabSprite variant="kie" className="h-8 w-[2.7rem]" />
-            </span>
-            <h2 className="text-lg font-semibold tracking-tight text-ink-100">Connect your kie.ai API key</h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-ink-500">
-              Every generation runs on your own kie.ai key. Add one to start generating.
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded-full p-1.5 text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <ol className="space-y-3">
-          {API_KEY_STEPS.map((step, i) => (
-            <li key={i} className="flex items-start gap-3 text-[13px] leading-relaxed text-ink-400">
-              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink/[0.06] text-[11px] font-semibold text-ink-300">
-                {i + 1}
-              </span>
-              <span>{step}</span>
-            </li>
-          ))}
-        </ol>
-
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <a
-            href="https://kie.ai/api-key"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex h-9 items-center gap-1.5 rounded-full border border-ink/10 px-4 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/[0.04]"
-          >
-            Get your key
-            <ExternalLink className="h-3.5 w-3.5 text-ink-500" />
-          </a>
-          <button
-            onClick={onOpenSettings}
-            className="flex h-9 items-center rounded-full bg-ink px-4 text-[13px] font-medium text-paper transition-opacity hover:opacity-90"
-          >
-            Open Settings
-          </button>
-        </div>
-      </div>
-    </div>
   )
 }
 
