@@ -173,18 +173,9 @@ export default function EditorArea({
           filter doesn't re-blur inside the already-blurred window frame, so
           any alpha lets the form underneath ghost through. */}
       <div className={`fixed bottom-0 left-0 right-0 z-30 flex items-center justify-between border-t border-ink/5 bg-surface-0 px-5 py-3 md:static md:left-auto md:right-auto md:z-auto md:bg-transparent ${isGenerating ? 'md:mt-0' : 'md:mt-4'}`}>
-        {/* Left — character count */}
-        <div className={`text-sm tabular-nums ${overLimit ? 'text-red-400 light:text-red-600' : 'text-ink-400'}`}>
-          <span className={overLimit ? 'text-red-300 light:text-red-700' : 'text-ink-200'}>{charCount.toLocaleString()}</span>
-          <span className="text-ink-500"> / {MAX_CHARACTERS.toLocaleString()} characters</span>
-        </div>
-
-        {/* Right — model chip + generate. The model indicator lives here (not
-            in the settings panel) since there's only one model. */}
+        {/* Left — generate, then the model chip beside it. The model indicator
+            lives here (not in the settings panel) since there's only one model. */}
         <div className="flex items-center gap-3">
-          <div className="hidden items-center rounded-full border border-ink/10 px-3.5 py-1.5 text-xs font-medium text-ink-400 md:flex">
-            {MODEL_NAME}
-          </div>
           <button
             onClick={onGenerate}
             // Stays live while a voiceover renders — a second click queues
@@ -201,6 +192,15 @@ export default function EditorArea({
               </span>
             )}
           </button>
+          <div className="hidden items-center rounded-full border border-ink/10 px-3.5 py-1.5 text-xs font-medium text-ink-400 md:flex">
+            {MODEL_NAME}
+          </div>
+        </div>
+
+        {/* Right — character count */}
+        <div className={`text-sm tabular-nums ${overLimit ? 'text-red-400 light:text-red-600' : 'text-ink-400'}`}>
+          <span className={overLimit ? 'text-red-300 light:text-red-700' : 'text-ink-200'}>{charCount.toLocaleString()}</span>
+          <span className="text-ink-500"> / {MAX_CHARACTERS.toLocaleString()} characters</span>
         </div>
       </div>
     </div>

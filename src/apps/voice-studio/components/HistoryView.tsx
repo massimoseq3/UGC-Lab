@@ -1,13 +1,22 @@
-import { useMemo, useState, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { Search, Volume2, Bookmark, Check, Trash2, Play, Pause, AlignLeft, Download } from 'lucide-react'
 import { useBankStore } from '../../../stores/bankStore'
 import type { VoiceHistoryItem } from '../../../stores/types'
-import { getUrl } from '../../../utils/assetStore'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
 import { seedColor } from './seedColor'
 import { GeneratingChip, GeneratingPulseRing } from '../../../components/GeneratingChip'
+import DayPill from '../../../components/DayPill'
+import Waveform from './Waveform'
+import {
+  attachAnalyser,
+  claimAudioSlot,
+  formatClock,
+  primeAudioContext,
+  releaseAudioSlot,
+  resolveAudioUrl,
+} from './audio'
 
-// A voiceover that's been fired but hasn't landed yet. Rendered as a row at the
+// A voiceover that's been fired but hasn't landed yet. Rendered as a card at the
 // top of History so a queued batch reads as a queue — several can run at once.
 export interface PendingVoice {
   id: string
@@ -25,47 +34,122 @@ interface HistoryViewProps {
   onShowDetails: (item: VoiceHistoryItem) => void
 }
 
-async function resolveAudioUrl(ref: string): Promise<string> {
-  if (ref.startsWith('asset-')) {
-    const url = await getUrl(ref)
-    if (!url) throw new Error('Audio asset not found')
-    return url
-  }
-  return ref
-}
-
 export default function HistoryView({ items, pending, activeId, onSelect, onDelete, onShowDetails }: HistoryViewProps) {
   const [query, setQuery] = useState('')
   const [saveFormId, setSaveFormId] = useState<string | null>(null)
   const [saveLabel, setSaveLabel] = useState('')
   const [savedId, setSavedId] = useState<string | null>(null)
-  const [previewingId, setPreviewingId] = useState<string | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
   const addVoice = useBankStore((s) => s.addVoice)
 
-  const togglePreview = async (item: VoiceHistoryItem) => {
-    if (audioRef.current && previewingId === item.id) {
+  // Playback — one card at a time. `loadedId` is the card holding the audio
+  // element (it keeps its waveform open while paused); `isPlaying` is whether
+  // that element is actually making noise.
+  const [loadedId, setLoadedId] = useState<string | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [position, setPosition] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const rafRef = useRef(0)
+  const loadTokenRef = useRef(0)
+
+  // Stable identity for the app-wide playback slot (see audio.ts).
+  const pauseSelf = useRef(() => { audioRef.current?.pause() }).current
+
+  // Keep the elapsed counter smooth between `timeupdate` events, which only
+  // fire ~4×/sec.
+  const tick = useCallback(function tick() {
+    const audio = audioRef.current
+    if (!audio) return
+    setPosition(audio.currentTime)
+    if (!audio.paused && !audio.ended) rafRef.current = requestAnimationFrame(tick)
+  }, [])
+
+  // Switching to the Settings tab unmounts this view — don't leave audio running
+  // behind it.
+  useEffect(() => () => {
+    cancelAnimationFrame(rafRef.current)
+    releaseAudioSlot(pauseSelf)
+    if (audioRef.current) {
       audioRef.current.pause()
+      audioRef.current.src = ''
       audioRef.current = null
-      setPreviewingId(null)
+    }
+  }, [pauseSelf])
+
+  const loadAndPlay = async (item: VoiceHistoryItem) => {
+    const token = ++loadTokenRef.current
+    cancelAnimationFrame(rafRef.current)
+    audioRef.current?.pause()
+    audioRef.current = null
+    setLoadedId(item.id)
+    setIsPlaying(false)
+    setPosition(0)
+    setDuration(item.duration || 0)
+    setAnalyser(null)
+
+    let url: string
+    try {
+      url = await resolveAudioUrl(item.audioUrl)
+    } catch {
+      if (loadTokenRef.current === token) setLoadedId(null)
       return
     }
-    audioRef.current?.pause()
+    // A newer click already claimed the player.
+    if (loadTokenRef.current !== token) return
+
+    const audio = new Audio(url)
+    audio.preload = 'metadata'
+    audioRef.current = audio
+    setAnalyser(attachAnalyser(audio))
+
+    audio.addEventListener('loadedmetadata', () => {
+      if (audioRef.current !== audio) return
+      if (isFinite(audio.duration)) setDuration(audio.duration)
+    })
+    audio.addEventListener('play', () => {
+      if (audioRef.current !== audio) return
+      claimAudioSlot(pauseSelf)
+      setIsPlaying(true)
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = requestAnimationFrame(tick)
+    })
+    audio.addEventListener('pause', () => {
+      if (audioRef.current !== audio) return
+      setIsPlaying(false)
+      cancelAnimationFrame(rafRef.current)
+      setPosition(audio.currentTime)
+    })
+    audio.addEventListener('ended', () => {
+      if (audioRef.current !== audio) return
+      setIsPlaying(false)
+      cancelAnimationFrame(rafRef.current)
+      audio.currentTime = 0
+      setPosition(0)
+    })
+
     try {
-      const url = await resolveAudioUrl(item.audioUrl)
-      const audio = new Audio(url)
-      audioRef.current = audio
-      audio.addEventListener('ended', () => {
-        if (audioRef.current === audio) {
-          audioRef.current = null
-          setPreviewingId(null)
-        }
-      })
       await audio.play()
-      setPreviewingId(item.id)
     } catch {
-      /* swallow */
+      /* autoplay refusal — the button is still armed */
     }
+  }
+
+  const togglePlay = (item: VoiceHistoryItem) => {
+    // Synchronous, inside the click: a context opened later can come up
+    // suspended, and attaching a suspended context would mute the clip.
+    primeAudioContext()
+    const audio = audioRef.current
+    if (audio && loadedId === item.id) {
+      if (audio.paused) {
+        setAnalyser((prev) => prev ?? attachAnalyser(audio))
+        void audio.play().catch(() => { /* ignored */ })
+      } else {
+        audio.pause()
+      }
+      return
+    }
+    void loadAndPlay(item)
   }
 
   const handleDownload = async (item: VoiceHistoryItem) => {
@@ -149,29 +233,24 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
             the search box: a pending row has no content to match on yet, and
             hiding the thing you just fired is the opposite of a queue. */}
         {pending.length > 0 && (
-          <div className="flex flex-col gap-0.5 px-2 pt-2">
-            <div className="my-2 flex items-center justify-center">
-              <span className="rounded-full bg-ink/[0.06] px-3 py-1 text-[11px] font-medium text-ink-300">
-                {pending.length === 1 ? 'In progress' : `In progress · ${pending.length}`}
-              </span>
-            </div>
+          <div className="flex flex-col gap-2 px-3 pt-3">
+            <DayPill label={pending.length === 1 ? 'In progress' : `In progress · ${pending.length}`} className="mb-0" />
             {pending.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 rounded-full px-4 py-3">
-                <span className="relative h-9 w-9 shrink-0">
-                  <span
-                    className="block h-full w-full rounded-full opacity-60"
-                    style={{ background: seedColor(p.voiceId) }}
-                  />
-                  <GeneratingPulseRing family="voice" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-sm leading-snug text-ink-300">{p.scriptPreview}</p>
-                  <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-500">
-                    <span className="text-ink-300">{p.voiceName}</span>
-                    <span>·</span>
+              <div key={p.id} className="rounded-3xl border border-ink/10 bg-ink/[0.02] p-3.5">
+                <div className="flex items-center gap-3">
+                  <span className="relative h-12 w-12 shrink-0">
+                    <span
+                      className="block h-full w-full rounded-full opacity-60"
+                      style={{ background: seedColor(p.voiceId) }}
+                    />
+                    <GeneratingPulseRing family="voice" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-ink-200">{p.voiceName}</p>
                     <GeneratingChip family="voice" label="Generating…" />
                   </div>
                 </div>
+                <p className="mt-3 line-clamp-2 text-[13px] leading-snug text-ink-400">{p.scriptPreview}</p>
               </div>
             ))}
           </div>
@@ -184,61 +263,62 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
             </div>
           )
         ) : (
-          <div className="flex flex-col gap-1 p-2">
+          <div className="flex flex-col gap-2 p-3">
             {groups.map(([dayTs, dayItems]) => (
-              <div key={dayTs} className="flex flex-col gap-0.5">
-                {/* Day section header — pill, centered */}
-                <div className="my-2 flex items-center justify-center">
-                  <span className="rounded-full bg-ink/[0.06] px-3 py-1 text-[11px] font-medium text-ink-300">
-                    {sectionLabel(dayTs)}
-                  </span>
-                </div>
+              <div key={dayTs} className="flex flex-col gap-2">
+                <DayPill label={sectionLabel(dayTs)} className="mb-0 mt-1" />
 
                 {dayItems.map((item) => {
                   const isActive = activeId === item.id
                   const isSaved = savedId === item.id
                   const inSaveForm = saveFormId === item.id
-                  const isPreviewing = previewingId === item.id
+                  const isLoaded = loadedId === item.id
+                  const isPlayingThis = isLoaded && isPlaying
+                  const clipDuration = (isLoaded && duration) || item.duration || 0
+                  // The waveform belongs to a clip that's actually running —
+                  // it opens on the first play and closes when the clip ends.
+                  const showWave = isLoaded && (isPlaying || position > 0)
 
                   return (
                     <div
                       key={item.id}
                       onClick={() => onSelect(item)}
-                      className={`group cursor-pointer px-4 py-3 transition-colors ${
+                      className={`group cursor-pointer rounded-3xl border p-3.5 transition-colors ${
                         isActive
-                          ? 'rounded-3xl bg-voice-500/15 ring-1 ring-voice-500/20'
-                          : 'rounded-full hover:bg-ink/[0.04]'
+                          ? 'border-voice-500/25 bg-voice-500/10'
+                          : 'border-ink/10 bg-ink/[0.02] hover:border-ink/15 hover:bg-ink/[0.04]'
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span
-                          className="h-9 w-9 shrink-0 rounded-full"
+                        {/* Play button doubles as the voice's avatar — one big
+                            target, and the colour still says which voice it is. */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); togglePlay(item) }}
+                          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white shadow-sm ring-2 transition-transform hover:scale-105 ${
+                            isPlayingThis ? 'ring-voice-400/60' : 'ring-transparent'
+                          }`}
                           style={{ background: seedColor(item.voiceId) }}
-                        />
+                          title={isPlayingThis ? 'Pause' : 'Play'}
+                        >
+                          {isPlayingThis
+                            ? <Pause className="h-5 w-5 fill-current" />
+                            : <Play className="h-5 w-5 translate-x-px fill-current" />}
+                        </button>
+
                         <div className="min-w-0 flex-1">
-                          <p className="line-clamp-2 text-sm leading-snug text-ink-100">
-                            {item.scriptPreview}
+                          <p className="truncate text-sm font-semibold text-ink-100">{item.voiceName}</p>
+                          <p className="text-[11px] text-ink-500">
+                            {formatRelative(item.createdAt)}
+                            {clipDuration > 0 && ` · ${formatClock(clipDuration)}`}
                           </p>
-                          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-ink-500">
-                            <span className="text-ink-300">{item.voiceName}</span>
-                            <span>·</span>
-                            <span>{formatRelative(item.createdAt)}</span>
-                          </div>
                         </div>
 
-                        {/* Hover-only action cluster: Play / Show details / Download */}
+                        {/* Hover-only action cluster: Show details / Download */}
                         <div
                           className={`flex items-center gap-0.5 transition-opacity ${
-                            isActive || isPreviewing ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                            isActive || isLoaded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                           }`}
                         >
-                          <button
-                            onClick={(e) => { e.stopPropagation(); togglePreview(item) }}
-                            className="flex h-7 w-7 items-center justify-center rounded-full text-ink-300 transition-colors hover:bg-ink/5 hover:text-ink-100"
-                            title={isPreviewing ? 'Pause' : 'Play'}
-                          >
-                            {isPreviewing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                          </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); onShowDetails(item) }}
                             className="flex h-7 w-7 items-center justify-center rounded-full text-ink-300 transition-colors hover:bg-ink/5 hover:text-ink-100"
@@ -253,6 +333,32 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
                           >
                             <Download className="h-3.5 w-3.5" />
                           </button>
+                        </div>
+                      </div>
+
+                      <p className="mt-3 line-clamp-2 text-[13px] leading-snug text-ink-200">
+                        {item.scriptPreview}
+                      </p>
+
+                      {/* Waveform — opens on play and moves with the voice.
+                          The grid-rows trick animates it in and out without a
+                          fixed height to keep in step with the bar row. */}
+                      <div
+                        className={`grid transition-all duration-300 ease-out ${
+                          showWave ? 'mt-3 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
+                        }`}
+                      >
+                        <div className="overflow-hidden">
+                          <div className="flex items-center gap-2 rounded-2xl border border-ink/[0.07] bg-ink/[0.02] px-3 py-1.5">
+                            <Waveform
+                              analyser={analyser}
+                              playing={isPlayingThis}
+                              className="min-w-0 flex-1"
+                            />
+                            <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] tabular-nums text-ink-400">
+                              {formatClock(position)}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
