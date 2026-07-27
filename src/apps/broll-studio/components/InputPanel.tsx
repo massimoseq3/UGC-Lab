@@ -324,7 +324,9 @@ export default function InputPanel({
             than in the header band because the three-way mode toggle already
             fills that row in this narrow (25%) pane. */}
         <div className="mb-2.5 flex items-center justify-between gap-2">
-          <span className="text-[11px] font-medium uppercase tracking-wider text-ink-600">References</span>
+          {/* Sentence-case 13px label — the Voiceovers side panel's subheading
+              size, so a section label reads the same in both apps. */}
+          <span className="text-[13px] font-medium text-ink-200">References</span>
           <div className="flex shrink-0 items-center gap-1.5">
             {/* Bring your own prompts — write them in Claude (or anywhere) and
                 paste them in, instead of paying for the prompt-writing call.
@@ -371,10 +373,11 @@ export default function InputPanel({
 
           {/* Script — optional, and labelled as such. Bring your own words from
               the bank or a paste; leave it empty and the Ad Format below
-              writes them. ALWAYS takes the column's leftover height: it's the
-              only input here you actually write prose into, so the blank space
-              under it belongs to it rather than sitting as a gap. */}
-          <div className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border transition-colors ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
+              writes them. It splits the column's leftover height evenly with
+              the Instructions box below (both `flex-1 basis-0`), so the two
+              writing surfaces read as a matched pair rather than one big box
+              over a strip. */}
+          <div className={`flex min-h-0 flex-1 basis-0 flex-col overflow-hidden rounded-3xl border transition-colors ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
             <BankCard
               icon={FileText}
               label="Script / Hooks"
@@ -411,16 +414,16 @@ export default function InputPanel({
               still one tap away on the expand button for anything longer.
               Doubles as the creative brief when there's no script yet — the
               product row carries the rest, so blank stays a normal answer. */}
-          <div className="relative flex shrink-0 flex-col overflow-hidden rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-ink/20">
+          <div className="relative flex min-h-0 flex-1 basis-0 flex-col overflow-hidden rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-ink/20">
             <div className="flex items-center justify-between gap-2 px-4 pt-2.5">
               <div className="flex min-w-0 items-center gap-1.5">
-                <Pencil className="h-3 w-3 shrink-0 text-ink-600" strokeWidth={2} />
-                <span className="truncate text-[10px] font-medium uppercase tracking-wider text-ink-600">
+                <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
+                <span className="truncate text-[13px] font-medium text-ink-200">
                   {hasScript ? 'Instructions' : 'Brief'}
                 </span>
               </div>
-              <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
-                Optional
+              <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
+                optional
               </span>
             </div>
             <textarea
@@ -430,7 +433,7 @@ export default function InputPanel({
               placeholder={hasScript
                 ? 'Mood, specific angles, things to avoid…'
                 : "What's this ad about? The product's own details already drive the script."}
-              className="min-h-[46px] w-full resize-none border-0 bg-transparent px-4 pb-2.5 pt-1.5 text-[13px] leading-relaxed text-ink-200 placeholder-ink-700 outline-none"
+              className="min-h-[46px] w-full grow resize-none border-0 bg-transparent px-4 pb-2.5 pt-1.5 text-[13px] leading-relaxed text-ink-200 placeholder-ink-700 outline-none"
             />
             <ExpandButton onClick={() => setInstructionsExpanded(true)} className="absolute bottom-2 right-2" />
           </div>
