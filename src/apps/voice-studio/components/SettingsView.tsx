@@ -47,7 +47,9 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
               style={{ background: voice ? seedColor(voice.id) : 'linear-gradient(135deg, #4f46e5, #6366f1)' }}
             />
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium text-ink-100">{settings.voiceName}</div>
+              {/* 13px: the same trigger text B-Roll's reference cards use, so
+                  a picked voice reads at the weight a picker row does app-wide. */}
+              <div className="truncate text-[13px] font-medium text-ink-100">{settings.voiceName}</div>
               {voice?.description && (
                 <div className="truncate text-xs text-ink-400">{voice.description}</div>
               )}
@@ -90,7 +92,7 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
 
         {/* Optional direction — overall tone + scene (always visible) */}
         <DirectionBox
-          label="Tone / context"
+          label="Tone / Context"
           value={settings.sampleContext}
           placeholder="e.g. An excited creator sharing a product they love with a friend."
           onChange={(sampleContext) => update({ sampleContext })}
@@ -148,7 +150,7 @@ function PresetRow({
           <Mic className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-ink-200">Preset</div>
+          <div className="text-[13px] font-medium text-ink-200">Preset</div>
           <div className="truncate text-xs text-ink-400">Load a saved voice from the bank</div>
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
@@ -168,7 +170,7 @@ function PresetRow({
         <Mic className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-ink-100">{label}</div>
+        <div className="truncate text-[13px] font-medium text-ink-100">{label}</div>
         <div className="truncate text-[11px] text-ink-500">Preset</div>
       </div>
       <button

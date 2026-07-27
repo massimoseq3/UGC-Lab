@@ -169,7 +169,7 @@ export default function HistoryDetailsView({ item, onClose, onRestoreText, onRes
             <SettingRow label="Accent" value={item.accent ?? '—'} />
             <SettingRow label="Expressiveness" value={(item.temperature ?? 1).toFixed(2)} />
             {item.scene && <SettingRow label="Scene" value={item.scene} />}
-            {item.sampleContext && <SettingRow label="Tone / context" value={item.sampleContext} />}
+            {item.sampleContext && <SettingRow label="Tone / Context" value={item.sampleContext} />}
           </div>
 
           <button
