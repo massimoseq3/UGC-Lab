@@ -31,7 +31,9 @@ export default function Dropdown({ value, options, onChange, compact }: Dropdown
         ref={anchorRef}
         type="button"
         onClick={toggle}
-        className={`flex w-full items-center justify-between gap-2 rounded-full border bg-ink/[0.03] text-left text-sm font-medium text-ink-100 outline-none transition-colors hover:bg-ink/[0.06] ${
+        // 13px, matching the Preset and Voice rows above — every trigger in the
+        // settings panel reads at one size.
+        className={`flex w-full items-center justify-between gap-2 rounded-full border bg-ink/[0.03] text-left text-[13px] font-medium text-ink-100 outline-none transition-colors hover:bg-ink/[0.06] ${
           open ? 'border-voice-500/40' : 'border-ink/10'
         } ${compact ? 'px-3 py-2' : 'px-3.5 py-2.5'}`}
       >
