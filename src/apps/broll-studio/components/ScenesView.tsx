@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Film, AlertCircle, Plus, Images, X, Palette, Download, Video as VideoIcon, Coins, Pencil } from 'lucide-react'
+import { Film, AlertCircle, Plus, Images, X, Palette, Download, Video as VideoIcon, Coins, Pencil, Check } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage, BatchVideoSettings } from '../types'
 import type { Product, Model } from '../../../stores/types'
@@ -70,6 +70,40 @@ const BATCH_VIDEO_DURATION = 5
 // animates a still perfectly well as a reference). A model with neither can't
 // use the still at all, which is what greys it out in the batch dialog.
 const STILL_CAPABLE_MODES: Mode[] = ['image-to-video', 'reference-to-video']
+
+// ─── Option columns ──────────────────────────────────────────────────────
+// The storyboard is a grid: one row per script line, one column per option.
+// A whole-storyboard batch walks that grid a COLUMN at a time by default —
+// every line's Option 1, then Option 2 — so the member sees a one-per-line
+// storyboard and can stop there. Committing all three options up front is
+// three times the credits for alternatives they may never cut with.
+type BatchColumn = number | 'all'
+
+interface BatchRequest {
+  // Every card the press covers. The column filter is applied inside the
+  // dialog, so switching columns re-scopes without reopening.
+  keys: string[]
+  scope: string
+  // Only a multi-scene batch offers columns; a single scene's row is one
+  // card per column, where the choice means nothing.
+  columnar: boolean
+}
+
+// Card keys are `${scene.number}-${variationIndex}` — the index IS the column.
+const columnOf = (key: string) => Number(key.split('-')[1])
+
+const columnsIn = (keys: string[]) =>
+  [...new Set(keys.map(columnOf))].filter((n) => Number.isFinite(n)).sort((a, b) => a - b)
+
+// Which column the dialog opens on: the leftmost that still has work. That's
+// what makes a second press pick up where the first left off, without a
+// stateful counter that a refresh (or a regenerated card) would get wrong.
+function firstOpenColumn(keys: string[], isFresh: (key: string) => boolean): BatchColumn {
+  for (const col of columnsIn(keys)) {
+    if (keys.some((k) => columnOf(k) === col && isFresh(k))) return col
+  }
+  return 'all'
+}
 
 // The still a card is currently showing — the user's pick if they made one,
 // otherwise the one on the card face. Used to resolve what the next dialogue
@@ -172,12 +206,8 @@ export default function ScenesView({
   // from "hasn't started yet").
   const [dialogueQueue, setDialogueQueue] = useState<string[]>([])
   const dialogueHead = useRef<{ key: string; startImages: number } | null>(null)
-  // `fresh` = prompt-ready cards with no image yet; `done` = cards already
-  // generated. Kept apart so a second press doesn't silently re-bill work the
-  // user already paid for and picked through — see includeExisting.
-  const [batchConfirm, setBatchConfirm] = useState<
-    { fresh: string[]; done: string[]; scope: string } | null
-  >(null)
+  const [batchConfirm, setBatchConfirm] = useState<BatchRequest | null>(null)
+  const [batchColumn, setBatchColumn] = useState<BatchColumn>('all')
   const [includeExisting, setIncludeExisting] = useState(false)
   const [downloadOpen, setDownloadOpen] = useState(false)
   // The confirm dialog portals to document.body, so it would outlive an app
@@ -206,13 +236,26 @@ export default function ScenesView({
       : batchAspectOptions.includes('9:16')
         ? '9:16'
         : batchAspectOptions[0]
+  // Only cards with a prompt can generate — everything else is skipped
+  // silently, here and in the target maths below.
+  const promptReady = (key: string) => (cardStates[key]?.editablePrompt ?? '').trim().length > 0
+  const hasImage = (key: string) => (cardStates[key]?.images.length ?? 0) > 0
+
+  // The cards this press covers, narrowed to the picked option column.
+  const batchColumns = batchConfirm?.columnar ? columnsIn(batchConfirm.keys) : []
+  const batchScoped = batchConfirm
+    ? batchConfirm.keys.filter(
+        (k) => promptReady(k) && (batchColumn === 'all' || columnOf(k) === batchColumn),
+      )
+    : []
+  // `fresh` = prompt-ready cards with no image yet; `done` = cards already
+  // generated. Kept apart so a second press doesn't silently re-bill work the
+  // user already paid for and picked through — see includeExisting.
+  const batchFresh = batchScoped.filter((k) => !hasImage(k))
+  const batchDone = batchScoped.filter(hasImage)
   // What this run will actually fire: the untouched cards, plus the already-
   // generated ones only when the user explicitly opts in.
-  const batchTargets = batchConfirm
-    ? includeExisting
-      ? [...batchConfirm.fresh, ...batchConfirm.done]
-      : batchConfirm.fresh
-    : []
+  const batchTargets = includeExisting ? [...batchFresh, ...batchDone] : batchFresh
   // A card with references attached doesn't fire on the picked text-to-image
   // model — startImageTask swaps in the image-to-image sibling, which can be
   // priced differently. Cost each card against the model that will really run,
@@ -234,20 +277,18 @@ export default function ScenesView({
     : null
   const batchOverBudget = batchTotalCredits != null && balance !== null && batchTotalCredits > balance
 
-  const requestBatch = (keys: string[], scope: string) => {
-    // Only cards with a prompt can generate; skip the rest silently.
-    const targets = keys.filter((k) => (cardStates[k]?.editablePrompt ?? '').trim())
+  const requestBatch = (keys: string[], scope: string, columnar = false) => {
+    const targets = keys.filter(promptReady)
     if (targets.length === 0) {
       useAppStore.getState().addToast('No prompts ready to generate.', 'error')
       return
     }
-    const fresh = targets.filter((k) => (cardStates[k]?.images.length ?? 0) === 0)
-    const done = targets.filter((k) => (cardStates[k]?.images.length ?? 0) > 0)
     // Default to skipping what's already generated. When everything is done the
     // dialog still opens — with the toggle as the only way forward — so
     // "regenerate the lot" stays possible but never accidental.
     setIncludeExisting(false)
-    setBatchConfirm({ fresh, done, scope })
+    setBatchColumn(columnar ? firstOpenColumn(targets, (k) => !hasImage(k)) : 'all')
+    setBatchConfirm({ keys, scope, columnar })
   }
 
   const confirmBatch = () => {
@@ -283,9 +324,8 @@ export default function ScenesView({
     useSettingsStore((s) => s.perAppModel['broll-studio:video']) ??
     getDefaultModel('broll-studio', 'video')?.id
   const [videoTokens, setVideoTokens] = useState<Record<string, number>>({})
-  const [videoConfirm, setVideoConfirm] = useState<
-    { fresh: string[]; done: string[]; scope: string } | null
-  >(null)
+  const [videoConfirm, setVideoConfirm] = useState<BatchRequest | null>(null)
+  const [videoColumn, setVideoColumn] = useState<BatchColumn>('all')
   const [includeExistingVideos, setIncludeExistingVideos] = useState(false)
   const [batchVideoOverride, setBatchVideoOverride] = useState<BatchVideoSettings | null>(null)
   const [batchVideoResolution, setBatchVideoResolution] = useState<string | undefined>(undefined)
@@ -311,11 +351,16 @@ export default function ScenesView({
       : batchVideoDurationOptions.length > 0
         ? snapVideoDuration(BATCH_VIDEO_DURATION, batchVideoDurationOptions)
         : BATCH_VIDEO_DURATION
-  const videoTargets = videoConfirm
-    ? includeExistingVideos
-      ? [...videoConfirm.fresh, ...videoConfirm.done]
-      : videoConfirm.fresh
+  const hasVideo = (key: string) => (cardStates[key]?.videos.length ?? 0) > 0
+  const videoColumns = videoConfirm?.columnar ? columnsIn(videoConfirm.keys) : []
+  const videoScoped = videoConfirm
+    ? videoConfirm.keys.filter(
+        (k) => promptReady(k) && (videoColumn === 'all' || columnOf(k) === videoColumn),
+      )
     : []
+  const videoFresh = videoScoped.filter((k) => !hasVideo(k))
+  const videoDone = videoScoped.filter(hasVideo)
+  const videoTargets = includeExistingVideos ? [...videoFresh, ...videoDone] : videoFresh
   // How many of this run animate a still they already have. The rest render
   // from the prompt alone — worth saying out loud, since those cost the same
   // but come back as something the member hasn't seen a frame of.
@@ -341,18 +386,17 @@ export default function ScenesView({
     !videoModelModes.includes('image-to-video') &&
     !videoModelModes.includes('reference-to-video')
 
-  const requestVideoBatch = (keys: string[], scope: string) => {
-    const targets = keys.filter((k) => (cardStates[k]?.editablePrompt ?? '').trim())
+  const requestVideoBatch = (keys: string[], scope: string, columnar = false) => {
+    const targets = keys.filter(promptReady)
     if (targets.length === 0) {
       useAppStore.getState().addToast('No prompts ready to generate.', 'error')
       return
     }
     // Cards that already have a clip are held back by default — a video is the
     // expensive half of this app, so re-billing one takes an explicit tick.
-    const fresh = targets.filter((k) => (cardStates[k]?.videos.length ?? 0) === 0)
-    const done = targets.filter((k) => (cardStates[k]?.videos.length ?? 0) > 0)
     setIncludeExistingVideos(false)
-    setVideoConfirm({ fresh, done, scope })
+    setVideoColumn(columnar ? firstOpenColumn(targets, (k) => !hasVideo(k)) : 'all')
+    setVideoConfirm({ keys, scope, columnar })
   }
 
   const confirmVideoBatch = () => {
@@ -687,8 +731,8 @@ export default function ScenesView({
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
-            onClick={() => requestBatch(allKeys, 'All scenes')}
-            title="Generate images for every variation across all scenes"
+            onClick={() => requestBatch(allKeys, 'All scenes', true)}
+            title="Generate images across all scenes — one option per line, or every variation"
             className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
           >
             <Images className="h-3.5 w-3.5" />
@@ -696,8 +740,8 @@ export default function ScenesView({
           </button>
           <button
             type="button"
-            onClick={() => requestVideoBatch(allKeys, 'All scenes')}
-            title="Generate a clip for every variation across all scenes"
+            onClick={() => requestVideoBatch(allKeys, 'All scenes', true)}
+            title="Generate clips across all scenes — one option per line, or every variation"
             className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400"
           >
             <VideoIcon className="h-3.5 w-3.5" />
@@ -780,14 +824,26 @@ export default function ScenesView({
                 : `Generate ${batchTargets.length} image${batchTargets.length === 1 ? '' : 's'}`}
             </h3>
             <p className="mt-1 text-xs text-ink-500">
-              {batchConfirm.scope} · all fire in parallel.
-              {batchConfirm.done.length > 0 && !includeExisting && (
-                <> {batchConfirm.done.length} card{batchConfirm.done.length === 1 ? '' : 's'} already
-                {batchConfirm.done.length === 1 ? ' has' : ' have'} an image and will be skipped.</>
+              {batchConfirm.scope}
+              {batchColumn !== 'all' && ` · Option ${batchColumn + 1}`} · all fire in parallel.
+              {batchDone.length > 0 && !includeExisting && (
+                <> {batchDone.length} card{batchDone.length === 1 ? '' : 's'} already
+                {batchDone.length === 1 ? ' has' : ' have'} an image and will be skipped.</>
               )}
             </p>
 
-            {batchConfirm.done.length > 0 && (
+            <ColumnChips
+              columns={batchColumns}
+              value={batchColumn}
+              onChange={setBatchColumn}
+              isDone={(col) =>
+                !!batchConfirm.keys.some((k) => columnOf(k) === col && promptReady(k)) &&
+                batchConfirm.keys.every((k) => columnOf(k) !== col || !promptReady(k) || hasImage(k))
+              }
+              hint="One image per line first — see the storyboard before paying for the alternatives."
+            />
+
+            {batchDone.length > 0 && (
               <label className="mt-3 flex cursor-pointer items-center gap-2.5 rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5">
                 <input
                   type="checkbox"
@@ -796,8 +852,8 @@ export default function ScenesView({
                   className="h-3.5 w-3.5 shrink-0 accent-broll-500"
                 />
                 <span className="text-xs text-ink-300">
-                  Also regenerate the {batchConfirm.done.length} card
-                  {batchConfirm.done.length === 1 ? '' : 's'} that already {batchConfirm.done.length === 1 ? 'has' : 'have'} an image
+                  Also regenerate the {batchDone.length} card
+                  {batchDone.length === 1 ? '' : 's'} that already {batchDone.length === 1 ? 'has' : 'have'} an image
                 </span>
               </label>
             )}
@@ -904,7 +960,8 @@ export default function ScenesView({
                 : `Generate ${videoTargets.length} video${videoTargets.length === 1 ? '' : 's'}`}
             </h3>
             <p className="mt-1 text-xs text-ink-500">
-              {videoConfirm.scope} · all render in parallel and survive a refresh.
+              {videoConfirm.scope}
+              {videoColumn !== 'all' && ` · Option ${videoColumn + 1}`} · all render in parallel and survive a refresh.
               {videoTargets.length > 0 && (
                 <>
                   {' '}
@@ -915,13 +972,24 @@ export default function ScenesView({
                   .
                 </>
               )}
-              {videoConfirm.done.length > 0 && !includeExistingVideos && (
-                <> {videoConfirm.done.length} card{videoConfirm.done.length === 1 ? '' : 's'} already
-                {videoConfirm.done.length === 1 ? ' has' : ' have'} a clip and will be skipped.</>
+              {videoDone.length > 0 && !includeExistingVideos && (
+                <> {videoDone.length} card{videoDone.length === 1 ? '' : 's'} already
+                {videoDone.length === 1 ? ' has' : ' have'} a clip and will be skipped.</>
               )}
             </p>
 
-            {videoConfirm.done.length > 0 && (
+            <ColumnChips
+              columns={videoColumns}
+              value={videoColumn}
+              onChange={setVideoColumn}
+              isDone={(col) =>
+                !!videoConfirm.keys.some((k) => columnOf(k) === col && promptReady(k)) &&
+                videoConfirm.keys.every((k) => columnOf(k) !== col || !promptReady(k) || hasVideo(k))
+              }
+              hint="One clip per line first — if a line's Option 1 works, the other two never cost you anything."
+            />
+
+            {videoDone.length > 0 && (
               <label className="mt-3 flex cursor-pointer items-center gap-2.5 rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5">
                 <input
                   type="checkbox"
@@ -930,8 +998,8 @@ export default function ScenesView({
                   className="h-3.5 w-3.5 shrink-0 accent-broll-500"
                 />
                 <span className="text-xs text-ink-300">
-                  Also regenerate the {videoConfirm.done.length} card
-                  {videoConfirm.done.length === 1 ? '' : 's'} that already {videoConfirm.done.length === 1 ? 'has' : 'have'} a clip
+                  Also regenerate the {videoDone.length} card
+                  {videoDone.length === 1 ? '' : 's'} that already {videoDone.length === 1 ? 'has' : 'have'} a clip
                 </span>
               </label>
             )}
@@ -1022,6 +1090,49 @@ export default function ScenesView({
           onClose={() => setDownloadOpen(false)}
         />
       )}
+    </div>
+  )
+}
+
+// The option-column picker inside both batch dialogs. Renders nothing for a
+// single-scene batch (one card per column — the choice would be meaningless).
+function ColumnChips({
+  columns,
+  value,
+  onChange,
+  isDone,
+  hint,
+}: {
+  columns: number[]
+  value: BatchColumn
+  onChange: (value: BatchColumn) => void
+  // Column has nothing left to generate — ticked, so a member walking the
+  // columns can see how far they've got.
+  isDone: (col: number) => boolean
+  hint: string
+}) {
+  if (columns.length < 2) return null
+  const chip = (active: boolean) =>
+    `flex items-center gap-1 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
+      active
+        ? 'border-broll-400/40 bg-broll-500/15 text-broll-200'
+        : 'border-ink/10 bg-ink/[0.03] text-ink-400 hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-200'
+    }`
+  return (
+    <div className="mt-3">
+      <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Options</span>
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        {columns.map((col) => (
+          <button key={col} type="button" onClick={() => onChange(col)} className={chip(value === col)}>
+            {isDone(col) && <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} />}
+            Option {col + 1}
+          </button>
+        ))}
+        <button type="button" onClick={() => onChange('all')} className={chip(value === 'all')}>
+          All options
+        </button>
+      </div>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-ink-500">{hint}</p>
     </div>
   )
 }
