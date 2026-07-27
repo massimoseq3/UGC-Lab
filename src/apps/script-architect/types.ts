@@ -73,10 +73,18 @@ export type WriteStyle =
 // line tagged with its family; no length/style controls). 'scenes' →
 // scene-by-scene visual blueprint with the dialogue embedded
 // ([CHARACTER]/[PRODUCT] tokens, same format the Remix Scenes pipeline emits
-// → B-Roll / Playground). 'prompt' → ONE structured cinematic master prompt
-// for a single premium AI commercial (STYLE/ENVIRONMENT/.../TIMELINE), with
-// @INFLUENCER / @PRODUCT reference tokens → Playground video mode.
-export type WriteFormat = 'script' | 'hooks' | 'scenes' | 'prompt'
+// → B-Roll / Playground).
+//
+// A retired 'prompt' (Cinematic) format is still persisted on older history
+// rows — see ScriptHistoryItem.writeFormat. It has no generation path anymore;
+// isWriteFormat coerces it back to 'script' wherever a row is restored.
+export type WriteFormat = 'script' | 'hooks' | 'scenes'
+
+// Guards persisted / history-restored formats. Formats get retired (Cinematic
+// was), so a value read from localStorage or a history row may no longer be a
+// live one — callers coerce a miss back to 'script'.
+export const isWriteFormat = (value: unknown): value is WriteFormat =>
+  value === 'script' || value === 'hooks' || value === 'scenes'
 
 export type WriteLength = 10 | 15 | 20 | 30 | 60
 export const WRITE_LENGTHS: WriteLength[] = [10, 15, 20, 30, 60]
@@ -142,7 +150,7 @@ export type HookCategoryChoice = 'auto' | HookCategory
 
 export const HOOK_COUNT = 10
 
-// How many takes a Script / Scenes / Cinematic / Remix generate returns.
+// How many takes a Script / Scenes / Remix generate returns.
 // User-picked, defaulting to 3: five parallel takes off one brief crowded each
 // other, and three long scripts is what most people actually read before
 // picking. 10 is there for when you want a wide net and don't mind the credits.

@@ -4,14 +4,7 @@ import GenerationProgress from '../../../components/GenerationProgress'
 import GridCanvas from '../../../components/GridCanvas'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
-import type { CinematicHandoffRef, CinematicVideoPayload, Model } from '../../../stores/types'
-import { REMIX_ANGLE_LABEL, remixAnglesForCount, HOOK_CATEGORY_META, HOOK_COUNT, parseHooks, hooksPlainText, type ParsedHook, type RemixAngle, type ScriptMode, type WriteFormat, type WriteLength } from '../types'
-
-// The cinematic handoff lands in Playground on a ref-capable, native-audio
-// model so the @INFLUENCER + @PRODUCT references actually lock and the VO bakes
-// in. Seedance 2.0 is the only registry model that does 15s multi-cut montage
-// with audio AND takes both refs (reference-to-video) — so it's the default.
-const CINEMATIC_MODEL_ID = 'bytedance/seedance-2'
+import { REMIX_ANGLE_LABEL, remixAnglesForCount, HOOK_CATEGORY_META, HOOK_COUNT, parseHooks, hooksPlainText, type ParsedHook, type RemixAngle, type ScriptMode, type WriteFormat } from '../types'
 
 interface OutputPanelProps {
   variations: string[]
@@ -27,10 +20,6 @@ interface OutputPanelProps {
   // Hooks format only — the family choice that produced the shown pack.
   hookCategoryLabel?: string
   linkedProductId: string | null
-  // Cinematic 'prompt' format only: the influencer + clip length that ride the
-  // Playground handoff. Ignored by the script / scene formats.
-  influencer?: Model | null
-  cinematicDuration?: WriteLength
   isGenerating?: boolean
   error?: string | null
   // Commits an inline edit of take `index` back to the persisted output state.
@@ -118,16 +107,9 @@ interface VariationCardProps {
   defaultSaveTitle: string
   linkedProductId: string | null
   mode: ScriptMode
-  // Cinematic 'prompt' format extras — drive the refs-aware Playground handoff.
-  isCinematic?: boolean
   // Hooks format: renders the tagged one-liners as per-hook rows; copy/save use
   // the clean spoken lines (tags stripped).
   isHooks?: boolean
-  productImage?: string
-  productName?: string
-  influencerImage?: string
-  influencerName?: string
-  cinematicDuration?: WriteLength
   // Commits an inline edit of this take's text back to the persisted output
   // state. Omitted → the edit affordance is hidden.
   onEdit?: (text: string) => void
@@ -142,13 +124,7 @@ function VariationCard({
   defaultSaveTitle,
   linkedProductId,
   mode,
-  isCinematic = false,
   isHooks = false,
-  productImage,
-  productName,
-  influencerImage,
-  influencerName,
-  cinematicDuration = 15,
   onEdit,
   cardRef,
 }: VariationCardProps) {
@@ -186,11 +162,11 @@ function VariationCard({
   // remaining text into scenes — otherwise the appended profile gets merged into
   // the last scene's body.
   const { scenes, voiceProfile } = useMemo(() => {
-    if (isCinematic || isHooks) return { scenes: null, voiceProfile: '' }
+    if (isHooks) return { scenes: null, voiceProfile: '' }
     const { body, rest } = splitVoiceProfile(text)
     const parsed = splitScenes(rest)
     return { scenes: parsed, voiceProfile: parsed ? body : '' }
-  }, [text, isCinematic, isHooks])
+  }, [text, isHooks])
 
   // Hooks: the raw text carries <FAMILY> tags — parse them into rows, and use
   // the clean spoken lines for copy / save-to-bank.
@@ -199,10 +175,9 @@ function VariationCard({
 
   // A plain spoken script (remix variation, or a write-mode 'script' output)
   // can be read aloud → Voiceovers. A scene blueprint (reverse-engineer, or a
-  // write-mode 'scenes' output) is a prompt asset → Playground. A cinematic
-  // master prompt is its own thing — never spoken, only the Playground handoff.
-  // A hooks pack is a list of standalone openers — copy/save only, no sends.
-  const isSpokenScript = !isCinematic && !isHooks && (mode === 'remix' || (mode === 'write' && !scenes))
+  // write-mode 'scenes' output) is a prompt asset → Playground. A hooks pack is
+  // a list of standalone openers — copy/save only, no sends.
+  const isSpokenScript = !isHooks && (mode === 'remix' || (mode === 'write' && !scenes))
 
   const startEdit = () => {
     setDraft(text)
@@ -300,32 +275,6 @@ function VariationCard({
     addToast('Prompt sent to Playground')
   }
 
-  // Cinematic handoff: resolve the @INFLUENCER / @PRODUCT tokens to readable
-  // names, attach both reference images, and open Playground in video mode on
-  // the Seedance default with the clip length prefilled. Auto-saves to the
-  // bank on first send (same pattern as the other send buttons).
-  const handleSendCinematic = () => {
-    const refs: CinematicHandoffRef[] = []
-    if (productImage) refs.push({ url: productImage, label: productName ?? 'product', source: 'product', slot: 'ref' })
-    if (influencerImage) refs.push({ url: influencerImage, label: influencerName ?? 'character', source: 'character', slot: 'ref' })
-
-    const resolved = text
-      .replace(/@INFLUENCER(?:_IMAGE)?\d*/gi, influencerName || 'the reference character')
-      .replace(/@PRODUCT(?:_IMAGE)?\d*/gi, productName || 'the reference product')
-
-    const payload: CinematicVideoPayload = {
-      prompt: resolved,
-      refs,
-      modelId: CINEMATIC_MODEL_ID,
-      durationSeconds: cinematicDuration,
-    }
-
-    const autoSaved = !savedOnce
-    if (autoSaved) saveToBank(defaultSaveTitle)
-    sendToApp({ targetApp: 'playground', targetField: 'cinematicVideo', data: payload })
-    addToast(autoSaved ? 'Saved to bank · sent to Playground' : 'Sent to Playground')
-  }
-
   return (
     <div ref={cardRef} className="flex shrink-0 flex-col rounded-3xl border border-ink/10 bg-ink/[0.06] light:bg-[#F1F1F2] overflow-hidden card-soft-shadow">
       <div className="relative flex items-center justify-center border-b border-ink/5 px-12 py-2.5">
@@ -390,7 +339,7 @@ function VariationCard({
       <div className="flex flex-col gap-3 p-4">
         {editing ? (
           // One textarea over the raw take text — works for every output shape
-          // (cinematic / scenes / plain script). Committing re-parses on render.
+          // (scenes / plain script). Committing re-parses on render.
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -403,11 +352,6 @@ function VariationCard({
           <>
             {hooks.map((hook, i) => <HookLineCard key={i} hook={hook} index={i} />)}
           </>
-        ) : isCinematic ? (
-          // One structured master prompt — preserve the section layout as-is.
-          <div className="whitespace-pre-wrap text-[13px] font-light leading-relaxed tracking-tight text-ink-100">
-            {text}
-          </div>
         ) : scenes ? (
           <>
             {scenes.map((scene, i) => <SceneChunkCard key={i} chunk={scene} />)}
@@ -483,18 +427,7 @@ function VariationCard({
             >
               {saved ? (<><Check className="h-3.5 w-3.5" /> Saved</>) : (<><Bookmark className="h-3.5 w-3.5" /> Save to Bank</>)}
             </button>
-            {isCinematic ? (
-              // Cinematic master prompt → straight to Playground video mode,
-              // refs attached, on the Seedance default. The only send target.
-              <button
-                onClick={handleSendCinematic}
-                className="flex flex-1 min-w-0 items-center justify-center gap-2 rounded-full border border-broll-500/20 bg-broll-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-broll-400 transition-colors hover:bg-broll-500/20"
-              >
-                <Film className="h-4 w-4" strokeWidth={1.75} />
-                Send to Playground
-                <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
-              </button>
-            ) : isHooks ? (
+            {isHooks ? (
               // A hook pack has no full-script send target — each line is a
               // different video's opener. Copy per row / save the pack.
               null
@@ -649,16 +582,13 @@ function SceneChunkCard({ chunk }: { chunk: SceneChunk }) {
   )
 }
 
-export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, linkedProductId, influencer, cinematicDuration, isGenerating, error, onEditVariation }: OutputPanelProps) {
+export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, linkedProductId, isGenerating, error, onEditVariation }: OutputPanelProps) {
   // Resolve the linked product so saved scripts get a meaningful default title
-  // ("<Product> — Hook-Led Script") and the cinematic handoff has its image.
+  // ("<Product> — Hook-Led Script").
   const products = useBankStore((s) => s.products)
   const product = linkedProductId ? products.find((p) => p.id === linkedProductId) : undefined
   const productName = product?.productName
 
-  // Cinematic master-prompt cards (write mode + 'prompt' format) get their own
-  // labels, body, and Playground-only handoff.
-  const isCinematic = mode === 'write' && writeFormat === 'prompt'
   // A hooks pack (write mode + 'hooks' format) renders as tagged one-liners.
   const isHooks = mode === 'write' && writeFormat === 'hooks'
 
@@ -715,11 +645,9 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
 
   if (isGenerating) {
     const message = copyMode === 'write'
-      ? (writeFormat === 'prompt'
-          ? ['Reading your brief...', 'Directing the cinematic concepts...', 'Building the world bible...', 'Laying out the timeline...']
-          : writeFormat === 'hooks'
-            ? ['Reading your brief...', 'Digging through the hook library...', `Writing ${HOOK_COUNT} hooks...`, 'Cutting the weak ones...']
-            : ['Reading your brief...', 'Writing the takes...', 'Making it sound human...', 'Tightening the hooks...'])
+      ? (writeFormat === 'hooks'
+          ? ['Reading your brief...', 'Digging through the hook library...', `Writing ${HOOK_COUNT} hooks...`, 'Cutting the weak ones...']
+          : ['Reading your brief...', 'Writing the takes...', 'Making it sound human...', 'Tightening the hooks...'])
       : copyMode === 'remix'
         ? ['Building the angles...', 'Sending parallel requests...', 'Writing variations...', 'Polishing final drafts...']
         : ['Reading scene blueprint...', 'Mapping product into structure...', 'Rewriting scenes...', 'Preserving structure...']
@@ -750,7 +678,7 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
           <PenLine className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
           <p className="text-sm text-ink-700">
             {copyMode === 'write'
-              ? (writeFormat === 'prompt' ? 'Your cinematic concepts will appear here' : writeFormat === 'hooks' ? `Your ${HOOK_COUNT} hooks will appear here` : 'Your takes will appear here')
+              ? (writeFormat === 'hooks' ? `Your ${HOOK_COUNT} hooks will appear here` : 'Your takes will appear here')
               : copyMode === 'remix' ? 'Your script variations will appear here' : 'Your scene prompts will appear here'}
           </p>
           {error && (
@@ -769,7 +697,7 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
   const angles = outputAngles?.length === variations.length
     ? outputAngles
     : remixAnglesForCount(variations.length)
-  const takeUnit = isCinematic ? 'Concept' : mode === 'remix' ? 'Variation' : 'Take'
+  const takeUnit = mode === 'remix' ? 'Variation' : 'Take'
 
   // No canvas once the takes are in: the grid marks an empty stage waiting for
   // work, and behind finished output it's just texture under the reading.
@@ -803,24 +731,20 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
           const angleLabel = isRemix && angles ? REMIX_ANGLE_LABEL[angles[i]] : null
           const cardTitle = isHooks
             ? `Hooks · ${hookCategoryLabel ?? 'Best Mix'}`
-            : isCinematic
-              ? `Concept ${i + 1} · Cinematic`
-              : isWrite
-                ? `Take ${i + 1}${writeStyleLabel ? ` · ${writeStyleLabel}` : ''}`
-                : angleLabel
-                  ? `Variation ${i + 1}: ${angleLabel}`
-                  : isRemix
-                    ? `Variation ${i + 1}`
-                    : 'Scene prompts'
+            : isWrite
+              ? `Take ${i + 1}${writeStyleLabel ? ` · ${writeStyleLabel}` : ''}`
+              : angleLabel
+                ? `Variation ${i + 1}: ${angleLabel}`
+                : isRemix
+                  ? `Variation ${i + 1}`
+                  : 'Scene prompts'
           const defaultSaveTitle = isHooks
             ? (productName ? `${productName} — Hooks (${hookCategoryLabel ?? 'Best Mix'})` : `Hooks — ${hookCategoryLabel ?? 'Best Mix'}`)
-            : isCinematic
-              ? (productName ? `${productName} — Cinematic Concept ${i + 1}` : `Cinematic Concept ${i + 1}`)
-              : isWrite && productName
-                ? `${productName} — ${writeStyleLabel ?? 'New'} Take ${i + 1}`
-                : isRemix && productName
-                  ? `${productName} — ${angleLabel ?? `Variation ${i + 1}`} Script`
-                  : deriveTitleFromContent(
+            : isWrite && productName
+              ? `${productName} — ${writeStyleLabel ?? 'New'} Take ${i + 1}`
+              : isRemix && productName
+                ? `${productName} — ${angleLabel ?? `Variation ${i + 1}`} Script`
+                : deriveTitleFromContent(
                       text,
                       mode === 'reverse-engineer' ? 'Reverse-engineered prompts' : 'Untitled script',
                     )
@@ -833,13 +757,7 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
               defaultSaveTitle={defaultSaveTitle}
               linkedProductId={linkedProductId}
               mode={mode}
-              isCinematic={isCinematic}
               isHooks={isHooks}
-              productImage={product?.productImage}
-              productName={productName}
-              influencerImage={influencer?.characterImage}
-              influencerName={influencer?.name}
-              cinematicDuration={cinematicDuration}
               onEdit={onEditVariation ? (newText) => onEditVariation(i, newText) : undefined}
             />
           )

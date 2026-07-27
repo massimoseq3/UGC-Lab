@@ -25,6 +25,8 @@ function historyBadge(item: ScriptHistoryItem): { label: string; className: stri
   if (item.mode === 'reverse-engineer' || (item.mode === 'write' && item.writeFormat === 'scenes')) {
     return { label: 'Scenes', className: 'bg-fuchsia-500/15 text-fuchsia-300 light:text-fuchsia-700 border-fuchsia-500/20' }
   }
+  // Rows from the retired Cinematic format keep their own badge — the run
+  // really was a cinematic concept, and the label shouldn't lie about it.
   if (item.mode === 'write' && item.writeFormat === 'prompt') {
     return { label: 'Cinematic', className: 'bg-sky-500/15 text-sky-300 light:text-sky-700 border-sky-500/20' }
   }
