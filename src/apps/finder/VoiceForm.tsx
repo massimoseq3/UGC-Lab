@@ -108,7 +108,7 @@ export default function VoiceForm({ item, onSave, onCancel }: VoiceFormProps) {
         placeholder="e.g. A bright, upbeat product demo in a sunny kitchen."
       />
       <TextAreaField
-        label="Tone / context"
+        label="Tone / Context"
         value={sampleContext}
         onChange={setSampleContext}
         placeholder="e.g. An excited creator sharing a product they love with a friend."

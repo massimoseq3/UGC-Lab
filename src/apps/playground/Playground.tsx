@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
-import type { CinematicVideoPayload, VideoSourceClipPayload, ImageHistoryItem } from '../../stores/types'
+import type { VideoSourceClipPayload, ImageHistoryItem } from '../../stores/types'
 import { isAssetRef, getAsBase64 } from '../../utils/assetStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import {
@@ -231,28 +231,6 @@ export default function Playground() {
           clipEnds: Math.round(ends * 10) / 10,
           durationSeconds: knownDuration,
         }],
-      }))
-    } else if (targetField === 'cinematicVideo' && data && typeof data === 'object') {
-      // Scripts cinematic concept → land in video mode on the Seedance default
-      // with the @INFLUENCER / @PRODUCT references already attached (slot 'ref'
-      // → reference-to-video) and audio on, so the VO bakes in.
-      const p = data as CinematicVideoPayload
-      const model = getModel(p.modelId)
-      const refs: PromptRef[] = (p.refs ?? []).map((r) => ({
-        url: r.url,
-        label: r.label,
-        source: r.source,
-        slot: r.slot,
-      }))
-      setState((s) => ({
-        ...s,
-        mode: 'video',
-        prompt: p.prompt,
-        modelId: p.modelId,
-        durationSeconds: p.durationSeconds,
-        resolution: model?.videoConstraints?.default ?? s.resolution,
-        audio: true,
-        refs,
       }))
     }
     consumePayload()
