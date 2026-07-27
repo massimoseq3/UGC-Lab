@@ -12,7 +12,7 @@ interface PresetPickerViewProps {
 }
 
 // Saved voices from the bank, picked the same way voices are: an in-panel view
-// that takes over the right panel, not a slide-over. Same header / search /
+// that takes over the side panel, not a slide-over. Same header / search /
 // row shape as VoicePickerView so the two steps read as one flow.
 export default function PresetPickerView({ selectedId, onSelect, onClose }: PresetPickerViewProps) {
   const presets = useBankStore((s) => s.voices)

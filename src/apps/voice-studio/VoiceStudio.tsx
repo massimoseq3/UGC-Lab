@@ -10,7 +10,7 @@ import { startVoiceTask, finishVoiceTask } from './services/generateVoice'
 import { enhanceScriptWithTags } from './services/enhanceScript'
 import { humanizeError } from '../../utils/friendlyError'
 import EditorArea from './components/EditorArea'
-import RightPanel from './components/RightPanel'
+import SidePanel from './components/SidePanel'
 import BottomPlayer from './components/BottomPlayer'
 import BankPicker from '../../components/BankPicker'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
@@ -253,8 +253,30 @@ export default function VoiceStudio() {
   return (
     <div className="relative flex flex-col pb-28 md:h-full md:pb-0">
       <div className="flex flex-1 flex-col md:min-h-0 md:flex-row">
-        {/* Center — editor */}
-        <div className="flex flex-1 flex-col md:min-h-0 md:overflow-hidden">
+        {/* Left — settings / voice picker / history. First in the DOM so the
+            desktop reading order matches the visual one (and so this app has the
+            same source shape as Scripts / B-Roll); the editor takes `order-first`
+            below to keep the mobile stack unchanged — settings are long, and
+            they'd push the script box off the first screen. */}
+        <div className="flex w-full md:w-[400px] shrink-0 flex-col border-t md:border-t-0 md:border-r border-ink/5">
+          <SidePanel
+            settings={settings}
+            onSettingsChange={setSettings}
+            history={history}
+            pending={pendingVoices}
+            activeHistoryId={activePlayerItem?.id ?? null}
+            detailsItem={detailsItem}
+            onSelectHistory={setActivePlayerItem}
+            onDeleteHistory={handleDeleteHistoryItem}
+            onShowDetails={setDetailsItem}
+            onCloseDetails={() => setDetailsItem(null)}
+            onRestoreText={handleRestoreText}
+            onRestoreSettings={handleRestoreSettings}
+          />
+        </div>
+
+        {/* Right — editor */}
+        <div className="order-first flex flex-1 flex-col md:order-none md:min-h-0 md:overflow-hidden">
           <EditorArea
             scriptText={scriptText}
             onScriptChange={(v) => { setScriptText(v); setSelectedScript(null) }}
@@ -269,24 +291,6 @@ export default function VoiceStudio() {
             isEnhancing={isEnhancing}
             highlightField={highlightField}
             error={error}
-          />
-        </div>
-
-        {/* Right — settings / voice picker / history */}
-        <div className="flex w-full md:w-[400px] shrink-0 flex-col border-t md:border-t-0 md:border-l border-ink/5">
-          <RightPanel
-            settings={settings}
-            onSettingsChange={setSettings}
-            history={history}
-            pending={pendingVoices}
-            activeHistoryId={activePlayerItem?.id ?? null}
-            detailsItem={detailsItem}
-            onSelectHistory={setActivePlayerItem}
-            onDeleteHistory={handleDeleteHistoryItem}
-            onShowDetails={setDetailsItem}
-            onCloseDetails={() => setDetailsItem(null)}
-            onRestoreText={handleRestoreText}
-            onRestoreSettings={handleRestoreSettings}
           />
         </div>
       </div>
