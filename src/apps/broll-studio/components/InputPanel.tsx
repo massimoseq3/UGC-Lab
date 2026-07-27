@@ -624,16 +624,21 @@ export default function InputPanel({
       />
 
       {/* Script Style picker — the same sectioned list Scripts offers, so a
-          style means the same thing in both apps. */}
+          style means the same thing in both apps. Formats lead here: the pick
+          decides what kind of ad gets SHOT, and a format is the half that
+          carries scene staging, so it shapes the storyboard as well as the
+          words. Scripts leads with Structures, where the question is how the
+          argument is built. */}
       <SlideOver
         open={styleSlideOpen}
         onClose={() => setStyleSlideOpen(false)}
         title="Choose a style"
-        subtitle="How the ad is built — and what kind of content it looks like"
+        subtitle="What kind of content the ad looks like — and how it's built"
         size="wide"
       >
         <ScriptStyleList
           accent="broll"
+          formatsFirst
           value={autoScriptStyle}
           onSelect={(style) => { onAutoScriptStyleChange(style); setStyleSlideOpen(false) }}
         />

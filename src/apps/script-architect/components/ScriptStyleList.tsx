@@ -16,17 +16,24 @@ import {
 // reordered, and the slugs are persisted, so a drifted list is a wrong label on
 // somebody's saved session rather than a cosmetic bug.
 //
-// `accent` is the only thing that differs between hosts (Scripts' orange,
-// B-Roll's purple), so it's a parameter rather than a fork.
+// `accent` and the section order are the only things that differ between hosts,
+// so they're parameters rather than a fork.
 export default function ScriptStyleList({
   value,
   onSelect,
   accent = 'scripts',
+  formatsFirst = false,
 }: {
   // The active style, or null when nothing has been picked yet.
   value: WriteStyle | null
   onSelect: (style: WriteStyle) => void
   accent?: 'scripts' | 'broll'
+  // Which section leads. B-Roll puts FORMATS on top: it's picking the kind of
+  // ad to shoot, and a format is the half that decides the shots (it carries
+  // the scene staging) as well as the words. Scripts leads with Structures,
+  // where the question is how the argument is built. Same list either way —
+  // only the reading order changes.
+  formatsFirst?: boolean
 }) {
   const activeRing = accent === 'broll'
     ? 'border-broll-500/30 bg-broll-500/10'
@@ -36,9 +43,17 @@ export default function ScriptStyleList({
     : 'bg-scripts-500/10 text-scripts-400'
   const activeText = accent === 'broll' ? 'text-broll-300' : 'text-scripts-300'
 
+  // Object key order IS the default order (see WRITE_STYLE_GROUP_META). Pulling
+  // 'format' to the front rather than reversing, so a third group added later
+  // keeps its place instead of being silently flipped.
+  const groups = Object.keys(WRITE_STYLE_GROUP_META) as WriteStyleGroup[]
+  const ordered = formatsFirst
+    ? [...groups].sort((a, b) => Number(b === 'format') - Number(a === 'format'))
+    : groups
+
   return (
     <div className="flex flex-col gap-5 p-4">
-      {(Object.keys(WRITE_STYLE_GROUP_META) as WriteStyleGroup[]).map((group) => {
+      {ordered.map((group) => {
         const GroupIcon = group === 'format' ? Video : FileText
         return (
           <div key={group} className="flex flex-col gap-2">
