@@ -39,7 +39,7 @@ interface WidgetProps {
   children: ReactNode
 }
 
-export default function Widget({ index = 0, className = '', pad = 'p-5', children }: WidgetProps) {
+export default function Widget({ index = 0, className = '', pad = 'p-4', children }: WidgetProps) {
   return (
     <section className={`widget-rise relative flex flex-col ${WIDGET_SHELL} ${pad} ${className}`} style={riseStyle(index)}>
       {children}

@@ -628,40 +628,41 @@ Centered `max-w-5xl`, two columns on `md:` (stacks below), vertically centered
 
 ## 10. Dashboard — `src/apps/dashboard/Dashboard.tsx`
 
-Single scrollable page (no panes/tabs), centered `max-w-5xl`. First tile in the
-dock (green) and the **default landing page** (`DEFAULT_SLUG = 'dashboard'`).
-Hero text (greeting + big stat values) is Instrument Serif italic; every card,
-pill, and tile carries a subtle drop shadow. Top→bottom:
+One page, no panes or tabs, staged as a **desktop in space**: a wallpaper of
+colour blooms + starfield (`DesktopWallpaper.tsx`), the widget wall on the left,
+the crew orbiting as a solar system on the right. First tile in the dock (green)
+and the **default landing page** (`DEFAULT_SLUG = 'dashboard'`). It is built to
+sit inside one window with the dock — **nothing here should make the page
+scroll**. Hero figures are Instrument Serif italic; every tile is cut from the
+one glass material in `Widget.tsx` (`WIDGET_SHELL`).
 
-- **Greeting header:** "Good morning, `<first name>`" (time-of-day phrase; name
-  from `profile.display_name` then `first_name`, omitted in local-only mode) +
-  a one-line sub. **No quick links** — the menu bar already carries Get Credits
-  and Community on every screen, so duplicating them here was the same two
-  links twice.
-- **Bento grid** (12-col on `md:`). While no kie.ai key is saved, a slim
-  full-width **red to-do row** (`ConnectKeyCard.tsx` — unchecked circle +
-  "Connect your kie.ai API key to get started") sits ABOVE the metric cards;
-  clicking opens the same 4-step `ApiKeyGuide` popup as the menu bar's red
-  alert (→ Open Settings), and the row removes itself once a key lands. Every
-  card in the first two rows is `md:h-[200px]` so the rows align. Cards:
-  - **Time saved** (6 cols): serif hero ("286 hrs"), a green "+N hrs this week"
-    delta (rolling 7 days, hidden at zero), workdays sub-line ("…of production
-    and tool-hopping…"). No hover tooltip — assumptions live in
-    `utils/usage.ts` (`MINUTES_SAVED_PER_GEN` + `TASK_SWITCH_MINUTES_PER_GEN`).
-  - **Money saved** (6 cols): serif hero USD, green "+$N this week" delta, sub
-    "vs official APIs & creator platforms · N credits used".
-  - **Streaks** (3 cols): three icon rows — current streak (flame, green),
-    longest streak (trophy), active days since first activity (calendar).
-  - **Activity** (6 cols): 26-week GitHub-style heatmap
-    (`ActivityHeatmap.tsx`) — Monday-first columns, month labels above, green
-    intensity ramp, native `title` tooltip per cell. Top-right caption reads
-    "`<n>` generations · last 6 months", or "Every generation lights up a day"
-    before there's any activity.
-  - **AI UGC Academy** (3 cols): an external link tile (graduation-cap glyph,
-    `ArrowUpRight` top-right) opening the community classroom.
-  - **Crew shortcut row** (8 tiles, dock order): crab sprite on an accent-tinted
-    chip, app name, "Name · Role" in the app accent (truncated), `ArrowUpRight`
-    top-right; clicking opens that app. No footer below the grid.
+- **Greeting header** (left column, top): "Good morning, `<first name>`"
+  (time-of-day phrase; name from `profile.display_name` then `first_name`) over
+  a date + one-line sub. **No quick links** — the menu bar already carries Get
+  Credits and Community on every screen.
+- **Connect banner:** while no kie.ai key is saved, a notification-style glass
+  row (`ConnectKeyCard.tsx` — amber key tile, chevron right) sits between the
+  header and the widgets; clicking opens `ApiKeyGuide`, which takes the key
+  inline. It removes itself the moment a key lands.
+- **Widget wall** — a 12-col grid, **two rows at `lg`**:
+  - Row 1: **Time saved** (5 cols — serif hero, green "+N this week" delta,
+    workdays sub-line, 14-day sparkline) · **Money saved** (4 cols — serif hero
+    USD, delta, "N credits" note top-right, kie-vs-elsewhere bar) · **Streak**
+    (3 cols — `StreakRing.tsx`, the closing ring, with "days in a row · best N"
+    under it).
+  - Row 2: **Activity** (9 cols — 26-week GitHub-style heatmap,
+    `ActivityHeatmap.tsx`, Monday-first columns, month labels above, native
+    `title` per cell, intensity legend on its right; caption top-right reads
+    "`<n>` generations · `<n>` active days since `<month>`") · **AI UGC
+    Academy** (3 cols — external link tile, graduation-cap glyph,
+    `ArrowUpRight` top-right).
+  - Below `lg` the two heroes go half-width and Streak / Activity / Academy each
+    take the full row.
+- **Solar system** (right column, `xl` and up — `SolarSystem.tsx`): eight apps
+  as planets orbiting a gold sun; click a planet to open its app, hover anywhere
+  in it to freeze every orbit. One caption slot under it names whatever the
+  cursor is on (app name + "Name · Role" + crab). Below `xl` it is replaced by
+  `DesktopIcons` — the plain 8-tile crew grid under the widgets.
 
 All values derive from `bankStore.usageDays` via `computeUsageMetrics`
 (`utils/usage.ts`); the page is read-only. Related: model pickers (ModelPicker +
