@@ -99,27 +99,27 @@ export default function ActivityHeatmap({ days }: { days: UsageDay[] }) {
   }, [days, now])
 
   return (
-    <div className="overflow-x-auto pb-1">
+    <div className="min-w-0 overflow-x-auto pb-1">
       <div className="inline-flex flex-col gap-1.5">
         {/* Month labels row */}
-        <div className="flex gap-[3px]">
+        <div className="flex gap-1">
           {weeks.map((week, i) => (
-            <span key={i} className="w-[11px] shrink-0 overflow-visible whitespace-nowrap text-[9px] leading-none text-ink-500">
+            <span key={i} className="w-3 shrink-0 overflow-visible whitespace-nowrap text-[9px] leading-none text-ink-500">
               {week.monthLabel ?? ''}
             </span>
           ))}
         </div>
-        <div className="flex gap-[3px]">
+        <div className="flex gap-1">
           {weeks.map((week, i) => (
-            <div key={i} className="flex flex-col gap-[3px]">
+            <div key={i} className="flex flex-col gap-1">
               {week.days.map((day) =>
                 day.future ? (
-                  <span key={day.id} className="h-[11px] w-[11px] rounded-[3px]" />
+                  <span key={day.id} className="h-3 w-3 rounded-[3px]" />
                 ) : (
                   <span
                     key={day.id}
                     title={day.label}
-                    className={`h-[11px] w-[11px] rounded-[3px] ${levelClass(day.count)}`}
+                    className={`h-3 w-3 rounded-[3px] ${levelClass(day.count)}`}
                   />
                 ),
               )}
@@ -127,6 +127,19 @@ export default function ActivityHeatmap({ days }: { days: UsageDay[] }) {
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Reads the intensity ramp: quiet day → batch day. Sits beside the grid. */
+export function HeatmapLegend() {
+  return (
+    <div className="hidden shrink-0 items-center gap-1.5 pb-1 text-[10px] text-ink-600 xl:flex">
+      <span>Less</span>
+      {[...LEVELS].reverse().map((level) => (
+        <span key={level.min} className={`h-2.5 w-2.5 rounded-[3px] ${level.className}`} />
+      ))}
+      <span>More</span>
     </div>
   )
 }

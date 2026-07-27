@@ -433,6 +433,124 @@ textarea,
   mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
 }
 
+/* ---- Dashboard desktop ----
+   The Dashboard is staged as a macOS desktop: a wallpaper with widgets sitting
+   on it. The wallpaper is three soft colour blooms in the workspace's OWN
+   accents — Dashboard emerald, B-Roll violet, the crab's gold — so it reads as
+   this product's desktop rather than a stock gradient. Painted as radial
+   gradients, not blurred divs: same softness, none of the filter/compositing
+   cost of a full-screen blur behind nine backdrop-blurred widgets. */
+.desktop-wallpaper {
+  background-image:
+    radial-gradient(820px 620px at 2% -12%, rgba(5, 150, 105, 0.30), transparent 70%),
+    radial-gradient(680px 560px at 99% 0%, rgba(113, 101, 255, 0.22), transparent 72%),
+    radial-gradient(940px 600px at 52% 116%, rgba(242, 178, 49, 0.14), transparent 70%);
+}
+[data-theme="light"] .desktop-wallpaper {
+  background-image:
+    radial-gradient(760px 560px at 4% -10%, rgba(5, 150, 105, 0.16), transparent 70%),
+    radial-gradient(620px 520px at 97% 2%, rgba(113, 101, 255, 0.13), transparent 72%),
+    radial-gradient(880px 560px at 55% 114%, rgba(242, 178, 49, 0.16), transparent 70%);
+}
+
+/* Starfield, dark mode only. Two tiled layers of dots at different densities,
+   each drifting and breathing on its own period — offset periods are what read
+   as twinkling; pulsing one layer alone just reads as flicker. Drift animates
+   `background-position` across exactly one tile, so it loops seamlessly with no
+   oversized element to hide the seam. Deliberately slow enough (3–5 min per
+   tile) that it registers as depth rather than motion.
+   Light mode has no starfield: white dots vanish and dark ones read as dust. */
+.desktop-stars-near {
+  background-image:
+    radial-gradient(1.4px 1.4px at 26px 42px, rgba(255, 255, 255, 0.75), transparent),
+    radial-gradient(1.2px 1.2px at 178px 118px, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.6px 1.6px at 92px 216px, rgba(220, 245, 235, 0.7), transparent),
+    radial-gradient(1.1px 1.1px at 254px 64px, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1.3px 1.3px at 210px 268px, rgba(235, 230, 255, 0.6), transparent);
+  background-size: 300px 300px;
+  animation: star-drift 210s linear infinite, star-breathe-a 7s ease-in-out infinite;
+}
+.desktop-stars-far {
+  background-image:
+    radial-gradient(1px 1px at 62px 88px, rgba(255, 255, 255, 0.42), transparent),
+    radial-gradient(0.9px 0.9px at 148px 24px, rgba(255, 255, 255, 0.34), transparent),
+    radial-gradient(1px 1px at 18px 164px, rgba(255, 255, 255, 0.38), transparent),
+    radial-gradient(0.8px 0.8px at 128px 132px, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 190px 186px, rgba(255, 255, 255, 0.36), transparent);
+  background-size: 200px 200px;
+  animation: star-drift-far 320s linear infinite, star-breathe-b 11s ease-in-out infinite;
+}
+@keyframes star-drift {
+  from { background-position: 0 0; }
+  to   { background-position: 300px 300px; }
+}
+@keyframes star-drift-far {
+  from { background-position: 0 0; }
+  to   { background-position: 200px 200px; }
+}
+@keyframes star-breathe-a {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+@keyframes star-breathe-b {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+
+/* One meteor every ~22s. The traverse is 5% of the cycle, so the layer is
+   invisible almost the whole time — a rare event you catch out of the corner of
+   your eye, not an effect running on the page. */
+@keyframes meteor {
+  0%      { opacity: 0; transform: translate3d(0, 0, 0) rotate(24deg); }
+  1%      { opacity: 0.55; }
+  5%      { opacity: 0; transform: translate3d(-460px, 205px, 0) rotate(24deg); }
+  100%    { opacity: 0; transform: translate3d(-460px, 205px, 0) rotate(24deg); }
+}
+.desktop-meteor {
+  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
+  animation: meteor 22s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desktop-stars-near,
+  .desktop-stars-far { animation: none; }
+  .desktop-meteor { display: none; }
+}
+
+/* Orbits. The arm carries a planet around the sun; the planet counter-rotates
+   on the same period so its glyph never turns upside down. Periods are minutes,
+   not seconds — at interaction speed a planet is a stationary target, and the
+   movement only registers if you sit and watch. Hovering anywhere in the system
+   freezes every orbit, so picking one is never a moving-target problem. */
+@keyframes orbit-arm {
+  to { transform: rotate(360deg); }
+}
+@keyframes orbit-counter {
+  to { transform: rotate(-360deg); }
+}
+.orbit-arm { animation: orbit-arm linear infinite; }
+.orbit-counter { animation: orbit-counter linear infinite; }
+.solar-system:hover .orbit-arm,
+.solar-system:hover .orbit-counter,
+.solar-system:focus-within .orbit-arm,
+.solar-system:focus-within .orbit-counter {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-arm, .orbit-counter { animation: none; }
+}
+
+/* Widgets land in a short stagger when the desktop opens — the one orchestrated
+   moment on the page. Delay is set per widget inline. */
+@keyframes widget-rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+.widget-rise { animation: widget-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .widget-rise { animation: none; }
+}
+
 /* Gemini-style generating backdrop — soft, blurred accent blobs that slowly
    drift and breathe behind a dark frosted surface, conveying "alive" without
    a harsh pulse. Used by GeneratingBackdrop. */

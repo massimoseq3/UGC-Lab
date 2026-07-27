@@ -78,6 +78,32 @@ function dayTotal(day: UsageDay): number {
   return Object.values(day.counts).reduce((sum, n) => sum + (n ?? 0), 0)
 }
 
+function dayMinutes(day: UsageDay): number {
+  let minutes = 0
+  for (const [kind, n] of Object.entries(day.counts) as Array<[UsageKind, number | undefined]>) {
+    minutes += ((MINUTES_SAVED_PER_GEN[kind] ?? 0) + TASK_SWITCH_MINUTES_PER_GEN) * (n ?? 0)
+  }
+  return minutes
+}
+
+/**
+ * Minutes saved on each of the last `n` calendar days, oldest → newest — the
+ * Dashboard's time-saved sparkline. Days are stepped as real calendar dates so
+ * the series stays one-cell-per-day across a DST switch.
+ */
+export function dailyMinutesSaved(days: UsageDay[], n: number): number[] {
+  const byDay = new Map<string, number>()
+  for (const day of days) {
+    const minutes = dayMinutes(day)
+    if (minutes > 0) byDay.set(day.id, minutes)
+  }
+  const today = new Date()
+  return Array.from({ length: n }, (_, i) => {
+    const cell = new Date(today.getFullYear(), today.getMonth(), today.getDate() - (n - 1 - i))
+    return byDay.get(usageDayId(cell.getTime())) ?? 0
+  })
+}
+
 export function computeUsageMetrics(days: UsageDay[], creditsToUsd: (credits: number) => number): UsageMetrics {
   const countsByKind = Object.fromEntries(ALL_USAGE_KINDS.map((k) => [k, 0])) as Record<UsageKind, number>
   let minutesSaved = 0
