@@ -84,7 +84,12 @@ export default function SolarSystem({ className = '' }: { className?: string }) 
             animationDelay: `${orbit.offset}s`,
           }
           return (
-            <div key={member.appId} className="orbit-arm absolute inset-0" style={spin}>
+            // Each arm is a full-size box stacked over the last, so every one of
+            // them has to be transparent to the cursor — otherwise the topmost
+            // arm (the outermost planet) swallows every hover and click meant
+            // for the seven planets underneath it. Only the planet itself takes
+            // pointer events back.
+            <div key={member.appId} className="orbit-arm pointer-events-none absolute inset-0" style={spin}>
               <div
                 className="absolute left-1/2 top-1/2"
                 style={{ transform: `translate(-50%, -50%) translateY(-${orbit.radius}px)` }}
@@ -97,7 +102,12 @@ export default function SolarSystem({ className = '' }: { className?: string }) 
                     onBlur={() => setHovered(null)}
                     title={`Open ${app.name} — ${member.name}, ${member.role}`}
                     aria-label={`Open ${app.name}`}
-                    className="group relative flex h-9 w-9 items-center justify-center rounded-full outline-none transition-transform duration-200 hover:scale-[1.18] focus-visible:scale-[1.18]"
+                    // The `before` ring is an invisible 44px hit area around a
+                    // 36px planet — a moving 36px target is a hard one, and the
+                    // system freezes the moment the cursor is anywhere near.
+                    // Kept under the 17px orbit spacing so it can't reach the
+                    // planet on the next ring out.
+                    className="group pointer-events-auto relative flex h-9 w-9 items-center justify-center rounded-full outline-none transition-transform duration-200 before:absolute before:-inset-1 before:rounded-full before:content-[''] hover:scale-[1.18] focus-visible:scale-[1.18]"
                   >
                     {/* Lit from the sun's side — top-left, where the sun is for
                         a planet drawn at the top of its orbit. */}

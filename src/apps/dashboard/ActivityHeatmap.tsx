@@ -102,24 +102,24 @@ export default function ActivityHeatmap({ days }: { days: UsageDay[] }) {
     <div className="min-w-0 overflow-x-auto pb-1">
       <div className="inline-flex flex-col gap-1.5">
         {/* Month labels row */}
-        <div className="flex gap-1">
+        <div className="flex gap-[3px]">
           {weeks.map((week, i) => (
-            <span key={i} className="w-3 shrink-0 overflow-visible whitespace-nowrap text-[9px] leading-none text-ink-500">
+            <span key={i} className="w-[11px] shrink-0 overflow-visible whitespace-nowrap text-[9px] leading-none text-ink-500">
               {week.monthLabel ?? ''}
             </span>
           ))}
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-[3px]">
           {weeks.map((week, i) => (
-            <div key={i} className="flex flex-col gap-1">
+            <div key={i} className="flex flex-col gap-[3px]">
               {week.days.map((day) =>
                 day.future ? (
-                  <span key={day.id} className="h-3 w-3 rounded-[3px]" />
+                  <span key={day.id} className="h-[11px] w-[11px] rounded-[3px]" />
                 ) : (
                   <span
                     key={day.id}
                     title={day.label}
-                    className={`h-3 w-3 rounded-[3px] ${levelClass(day.count)}`}
+                    className={`h-[11px] w-[11px] rounded-[3px] ${levelClass(day.count)}`}
                   />
                 ),
               )}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { Clock, PiggyBank, Flame, Trophy, CalendarCheck, GraduationCap, ArrowUpRight } from 'lucide-react'
+import { Clock, PiggyBank, Flame, CalendarCheck, GraduationCap, ArrowUpRight } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useBankStore, backfillUsageLedger } from '../../stores/bankStore'
@@ -74,6 +74,18 @@ export default function Dashboard() {
     : null
 
   const hasActivity = metrics.totalGenerations > 0
+
+  // One line under the ring, carrying the record the arc is measured against —
+  // and saying so outright on the day you match it, which is the whole point of
+  // drawing the streak as a closing ring.
+  const streakNote = metrics.currentStreak > 0
+    ? metrics.currentStreak >= metrics.longestStreak
+      ? `day${metrics.currentStreak === 1 ? '' : 's'} in a row · your best yet`
+      : `days in a row · best ${metrics.longestStreak}`
+    : metrics.longestStreak > 0
+      ? `Start one today · best ${metrics.longestStreak}`
+      : 'Start one today'
+
   // Widgets rise in reading order; the banner (when shown) takes slot 0.
   const slot = (n: number) => (needsKey ? n + 1 : n)
 
@@ -84,11 +96,11 @@ export default function Dashboard() {
       {/* `safe center` centres the desktop on a tall window without ever
           clipping the greeting off the top when the content outgrows it. */}
       <div
-        className="relative mx-auto flex w-full max-w-[1240px] flex-1 flex-col px-5 py-5 md:px-8"
+        className="relative mx-auto flex w-full max-w-[1240px] flex-1 flex-col px-5 py-4 md:px-8"
         style={{ justifyContent: 'safe center' }}
       >
         <div className="flex gap-7">
-          <div className="flex min-w-0 flex-1 flex-col gap-4">
+          <div className="flex min-w-0 flex-1 flex-col gap-3.5">
             <header>
               <h1 className="text-4xl italic font-normal tracking-tight text-ink-50 md:text-[46px] md:leading-[1.1]" style={DISPLAY_FONT}>
                 {greeting}
@@ -104,12 +116,17 @@ export default function Dashboard() {
 
             {needsKey && <ConnectKeyCard />}
 
-            {/* The widget wall. Two rows of equal-height tiles at lg: the pair
-                of hero figures with the streak ring and Academy beside them,
-                then activity across the bottom with two small counters. */}
+            {/* The widget wall — two rows, and deliberately no more: the whole
+                desktop has to sit inside one screen with the dock, so nothing
+                here is allowed to push the orrery or the heatmap below the fold.
+                Row 1 is the three figures (time, money, streak), row 2 is the
+                activity grid with the Academy card beside it. Best streak and
+                active days used to be tiles of their own — three streak-shaped
+                numbers in a row — and now ride as sub-lines on the widgets they
+                actually belong to. */}
             <div className="grid grid-cols-12 gap-3.5">
               {/* Time saved */}
-              <Widget index={slot(0)} className="col-span-12 sm:col-span-6 lg:min-h-[176px]">
+              <Widget index={slot(0)} className="col-span-12 sm:col-span-6 lg:col-span-5">
                 <WidgetLabel icon={Clock} label="Time saved" />
                 <div className="mt-auto pt-4">
                   <WidgetFigure
@@ -128,7 +145,7 @@ export default function Dashboard() {
               </Widget>
 
               {/* Money saved */}
-              <Widget index={slot(1)} className="col-span-12 sm:col-span-6 lg:min-h-[176px]">
+              <Widget index={slot(1)} className="col-span-12 sm:col-span-6 lg:col-span-4">
                 <WidgetLabel
                   icon={PiggyBank}
                   label="Money saved"
@@ -146,19 +163,35 @@ export default function Dashboard() {
                 </div>
               </Widget>
 
-              {/* Streak — the ring is the desktop's signature widget. */}
-              <Widget index={slot(2)} className="col-span-6 items-center text-center sm:col-span-3 lg:min-h-[176px]" pad="p-4">
+              {/* Streak — the ring is the desktop's signature widget. The record
+                  it's measured against reads under it rather than in a tile of
+                  its own; the ring already draws the comparison. */}
+              <Widget index={slot(2)} className="col-span-12 items-center text-center lg:col-span-3">
                 <div className="w-full">
                   <WidgetLabel icon={Flame} label="Streak" />
                 </div>
                 <div className="mt-auto pt-2">
                   <StreakRing current={metrics.currentStreak} best={metrics.longestStreak} />
                 </div>
-                <p className="mt-auto pt-2 text-[11px] leading-snug text-ink-500">
-                  {metrics.currentStreak > 0
-                    ? `day${metrics.currentStreak === 1 ? '' : 's'} in a row`
-                    : 'Start one today'}
-                </p>
+                <p className="mt-auto pt-2 text-[11px] leading-snug text-ink-500">{streakNote}</p>
+              </Widget>
+
+              {/* Activity */}
+              <Widget index={slot(3)} className="col-span-12 lg:col-span-9">
+                <div className="flex items-center justify-between gap-3">
+                  <WidgetLabel icon={CalendarCheck} label="Activity" />
+                  {/* The empty grid is 26 weeks of blank cells; without a caption
+                      it reads as a broken widget rather than a waiting one. */}
+                  <p className="truncate text-[11px] text-ink-500">
+                    {hasActivity
+                      ? `${metrics.totalGenerations.toLocaleString()} generations · ${metrics.activeDays.toLocaleString()} active days${sinceLabel ? ` since ${sinceLabel}` : ''}`
+                      : 'Every generation lights up a day'}
+                  </p>
+                </div>
+                <div className="mt-auto flex items-end justify-between gap-5 pt-3">
+                  <ActivityHeatmap days={usageDays} />
+                  <HeatmapLegend />
+                </div>
               </Widget>
 
               {/* Academy */}
@@ -166,8 +199,8 @@ export default function Dashboard() {
                 href={AI_UGC_ACADEMY_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={riseStyle(slot(3))}
-                className={`widget-rise group relative col-span-6 flex flex-col p-4 sm:col-span-3 lg:min-h-[176px] ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
+                style={riseStyle(slot(4))}
+                className={`widget-rise group relative col-span-12 flex flex-col p-4 lg:col-span-3 ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
               >
                 <ArrowUpRight
                   className="absolute right-3.5 top-3.5 h-4 w-4 text-ink-600 transition-colors group-hover:text-dashboard-400"
@@ -183,48 +216,6 @@ export default function Dashboard() {
                   <p className="mt-1 text-[11px] leading-snug text-ink-500">Trainings for every tool.</p>
                 </div>
               </a>
-
-              {/* Best streak. The two counters centre their content — small
-                  tiles hold a label and a number, and anchoring those to
-                  opposite edges leaves a hole down the middle. */}
-              <Widget index={slot(4)} className="col-span-6 justify-center sm:col-span-3 lg:min-h-[176px]" pad="p-4">
-                <WidgetLabel icon={Trophy} label="Best streak" />
-                <div className="pt-3">
-                  <WidgetFigure size="small" value={metrics.longestStreak > 0 ? `${metrics.longestStreak}` : '—'} />
-                  <p className="mt-1.5 text-[11px] leading-snug text-ink-500">
-                    {metrics.longestStreak === 1 ? 'day in a row' : 'days in a row'}
-                  </p>
-                </div>
-              </Widget>
-
-              {/* Active days */}
-              <Widget index={slot(5)} className="col-span-6 justify-center sm:col-span-3 lg:min-h-[176px]" pad="p-4">
-                <WidgetLabel icon={CalendarCheck} label="Active days" />
-                <div className="pt-3">
-                  <WidgetFigure size="small" value={metrics.activeDays.toLocaleString()} />
-                  <p className="mt-1.5 text-[11px] leading-snug text-ink-500">
-                    {sinceLabel ? `since ${sinceLabel}` : 'on the tools'}
-                  </p>
-                </div>
-              </Widget>
-              {/* Activity */}
-              <Widget index={slot(6)} className="col-span-12 lg:min-h-[176px]">
-                <div className="flex items-center justify-between gap-3">
-                  <WidgetLabel icon={CalendarCheck} label="Activity" />
-                  {/* The empty grid is 26 weeks of blank cells; without a caption
-                      it reads as a broken widget rather than a waiting one. */}
-                  <p className="text-[11px] text-ink-500">
-                    {hasActivity
-                      ? `${metrics.totalGenerations.toLocaleString()} generations · last 6 months`
-                      : 'Every generation lights up a day'}
-                  </p>
-                </div>
-                <div className="mt-auto flex items-end justify-between gap-5 pt-3">
-                  <ActivityHeatmap days={usageDays} />
-                  <HeatmapLegend />
-                </div>
-              </Widget>
-
             </div>
 
             {/* Below lg the icons can't sit in a right-hand column, so they run
@@ -246,7 +237,7 @@ function Sparkline({ values }: { values: number[] }) {
   const peak = Math.max(...values)
   if (peak === 0) return null
   return (
-    <div className="mt-3 flex h-7 items-end gap-[3px]" aria-hidden>
+    <div className="mt-2.5 flex h-6 items-end gap-[3px]" aria-hidden>
       {values.map((minutes, i) => {
         const last = i === values.length - 1
         return (
@@ -260,7 +251,7 @@ function Sparkline({ values }: { values: number[] }) {
                   : 'bg-dashboard-500/70'
             }`}
             // 3px floor so a quiet day still reads as a day, not a gap.
-            style={{ height: `${Math.max(3, Math.round((minutes / peak) * 28))}px` }}
+            style={{ height: `${Math.max(3, Math.round((minutes / peak) * 24))}px` }}
           />
         )
       })}
