@@ -953,15 +953,16 @@ export default function InputPanel({
   )
 }
 
-// Section heading for every field in the form — plain text-sm, no leading
-// number. An optional `tooltip` turns the label into a dotted-underline hint
-// that reveals guidance on hover (same pattern as the Voiceovers sliders),
-// keeping the form clean of always-on helper text.
+// Section heading for every field in the form — 13px, no leading number, the
+// same size as the Voiceovers settings subheadings (SETTING_LABEL). An optional
+// `tooltip` turns the label into a dotted-underline hint that reveals guidance
+// on hover (same pattern as the Voiceovers sliders), keeping the form clean of
+// always-on helper text.
 function StepLabel({ label, tooltip, optional }: { label: string; tooltip?: string; optional?: boolean }) {
   const [hover, setHover] = useState(false)
   return (
     <span
-      className={`relative inline-block text-sm font-medium text-ink-200 ${tooltip ? 'cursor-help' : ''}`}
+      className={`relative inline-block text-[13px] font-medium text-ink-200 ${tooltip ? 'cursor-help' : ''}`}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onFocus={() => setHover(true)}
