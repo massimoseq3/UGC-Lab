@@ -1205,9 +1205,9 @@ export default function ContinuousView({
   const openClipCard = openClipKey ? clipStates[openClipKey] : undefined
 
   return (
-    <div className="flex-1 overflow-y-auto px-5 py-4">
+    <div className="flex-1 overflow-y-auto px-5 pb-4">
       {result.demo && (
-        <div className="mb-4 flex items-start gap-2 rounded-2xl border border-broll-500/25 bg-broll-500/10 px-4 py-3">
+        <div className="mb-4 mt-4 flex items-start gap-2 rounded-2xl border border-broll-500/25 bg-broll-500/10 px-4 py-3">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-broll-300" />
           <p className="text-xs leading-relaxed text-ink-300">
             <span className="font-semibold text-broll-300">Sample storyboard.</span>{' '}
@@ -1216,8 +1216,10 @@ export default function ContinuousView({
         </div>
       )}
 
-      {/* Top strip — storyboard meta + the two batch actions. */}
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      {/* Top strip — storyboard meta + the two batch actions. Pinned to the top
+          of the scroll port with its own hairline, so the batch buttons stay
+          reachable however far down the storyboard the member has scrolled. */}
+      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0/80 px-5 py-3.5 backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
           <span>{result.scenes.length} {result.scenes.length === 1 ? 'scene' : 'scenes'}</span>
           <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{style.label}</span>
