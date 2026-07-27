@@ -17,6 +17,7 @@ import {
   STORAGE_CAP_BYTES,
   type OrphanAsset,
 } from '../utils/orphanCleanup'
+import { useBackdropClose } from '../hooks/useBackdropClose'
 
 interface SettingsModalProps {
   open: boolean
@@ -99,6 +100,8 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
     // changes (e.g. right after a save) would wipe the just-set `saved` flash.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  const backdrop = useBackdropClose(onClose)
 
   async function loadUsage() {
     setUsageLoading(true)
@@ -209,7 +212,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
+      {...backdrop}
     >
       <div
         role="dialog"

@@ -23,6 +23,7 @@ import GeneratingBackdrop from '../../../components/GeneratingBackdrop'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import type { PlaygroundMode, InFlightGen } from '../types'
 import { humanizeError } from '../../../utils/friendlyError'
+import { useBackdropClose } from '../../../hooks/useBackdropClose'
 export type { InFlightGen }
 
 // List-view size-slider bounds. The raw value drives the slider fill % and the
@@ -770,6 +771,7 @@ function PreviewModal({
   const videoUrl = useAssetUrl(entry.kind === 'video' ? entry.data.videoUrl : null)
   const addToast = useAppStore((s) => s.addToast)
   const [copied, setCopied] = useState(false)
+  const backdrop = useBackdropClose(onClose)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
@@ -815,7 +817,7 @@ function PreviewModal({
   return (
     <div
       className="fixed inset-0 z-[60] flex flex-col bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
+      {...backdrop}
     >
       {/* Top-right holds only Close now — Save + Download moved down to
           labeled buttons beside Copy prompt. Delete lives on the grid tile. */}

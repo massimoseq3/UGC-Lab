@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Maximize2, X } from 'lucide-react'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
+import { useBackdropClose } from '../hooks/useBackdropClose'
 
 // Per-app accent for the modal's focus ring + Done button. Literal class
 // strings (Tailwind can't build class names from props at runtime).
@@ -104,11 +105,7 @@ export default function ExpandTextModal({
   mono = false,
 }: ExpandTextModalProps) {
   const highlightRef = useRef<HTMLDivElement>(null)
-  // Backdrop-click closes the modal — but a text-selection drag that STARTS
-  // inside the panel and releases over the backdrop fires a `click` on their
-  // common ancestor (the backdrop), which would wrongly close it and lose the
-  // edit. Guard by remembering whether the press began on the backdrop itself.
-  const pointerDownOnBackdrop = useRef(false)
+  const backdrop = useBackdropClose(onClose)
 
   useCloseOnAppSwitch(open, onClose)
 
@@ -121,11 +118,11 @@ export default function ExpandTextModal({
   return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
-      onMouseDown={(e) => { pointerDownOnBackdrop.current = e.target === e.currentTarget }}
-      onClick={(e) => { if (e.target === e.currentTarget && pointerDownOnBackdrop.current) onClose() }}
+      {...backdrop}
     >
       <div
         className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink-950/95 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between gap-3 border-b border-ink/10 px-5 py-3.5">
           <span className="truncate text-sm font-semibold tracking-tight text-ink-100">{title}</span>

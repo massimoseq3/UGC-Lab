@@ -8,6 +8,7 @@ import CrabSprite from './CrabSprite'
 import AppLogo from './AppLogo'
 import { API_KEY_STEPS } from './apiKeySteps'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
+import { useBackdropClose } from '../hooks/useBackdropClose'
 
 // "Meet the team" onboarding — frames the dock apps as a production crew,
 // one crab per role. Auto-opens once per browser (appStore.teamIntroOpen),
@@ -44,6 +45,7 @@ export default function MeetTheTeam() {
   const openApp = useAppStore((s) => s.openApp)
 
   useCloseOnEscape(open, close)
+  const backdrop = useBackdropClose(close)
 
   if (!open) return null
 
@@ -55,7 +57,7 @@ export default function MeetTheTeam() {
   return (
     <div
       className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-3 backdrop-blur-sm"
-      onClick={close}
+      {...backdrop}
     >
       {/* Column layout, not a single scrolling box: the header and the
           "Let's get to work" CTA stay pinned and only the roster scrolls.

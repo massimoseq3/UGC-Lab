@@ -9,6 +9,7 @@ import { saveFromDataUrl } from '../utils/assetStore'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import { CONTINUOUS_STYLES } from '../utils/visualStyle'
+import { useBackdropClose } from '../hooks/useBackdropClose'
 
 // How many reference frames one style can be read from. Matches the cap the
 // parent enforces when adding refs.
@@ -169,6 +170,7 @@ export default function StyleModal({
 
   useCloseOnEscape(open, onClose)
   useCloseOnAppSwitch(open, onClose)
+  const backdrop = useBackdropClose(onClose)
 
   if (!open) return null
 
@@ -240,7 +242,7 @@ export default function StyleModal({
   return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
-      onClick={onClose}
+      {...backdrop}
     >
       <div
         className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-surface-1 shadow-2xl"

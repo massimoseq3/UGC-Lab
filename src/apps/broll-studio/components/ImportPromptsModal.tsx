@@ -7,6 +7,7 @@ import { copyToClipboard } from '../../../utils/clipboard'
 import { useAppStore } from '../../../stores/appStore'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
+import { useBackdropClose } from '../../../hooks/useBackdropClose'
 
 const MODE_LABEL: Record<BrollMode, string> = {
   line: 'Line-by-Line',
@@ -64,6 +65,8 @@ export default function ImportPromptsModal({
     [text, mode],
   )
 
+  const backdrop = useBackdropClose(onClose)
+
   if (!open) return null
 
   const readFile = async (file: File) => {
@@ -104,7 +107,7 @@ export default function ImportPromptsModal({
   return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
-      onClick={onClose}
+      {...backdrop}
     >
       <div
         className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-surface-1 shadow-2xl"

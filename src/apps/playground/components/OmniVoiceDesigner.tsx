@@ -8,6 +8,7 @@ import { humanizeError } from '../../../utils/friendlyError'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { OMNI_BASE_VOICES, omniVoicePreviewUrl } from '../omniVoices'
+import { useBackdropClose } from '../../../hooks/useBackdropClose'
 
 interface OmniVoiceDesignerProps {
   open: boolean
@@ -51,6 +52,7 @@ export default function OmniVoiceDesigner({ open, onClose, onCreated }: OmniVoic
   }, [open])
 
   useCloseOnAppSwitch(open, onClose)
+  const backdrop = useBackdropClose(onClose)
 
   if (!open) return null
 
@@ -108,7 +110,7 @@ export default function OmniVoiceDesigner({ open, onClose, onCreated }: OmniVoic
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" {...backdrop}>
       <div
         className="w-full max-w-md rounded-xl border border-ink/10 bg-surface-1 p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}

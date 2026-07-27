@@ -24,6 +24,7 @@ import { humanizeError } from '../../../utils/friendlyError'
 import ClipDownloadModal, { type ClipDownloadEntry } from './ClipDownloadModal'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
+import { useBackdropClose } from '../../../hooks/useBackdropClose'
 
 interface ScenesViewProps {
   result: BrollResult | null
@@ -178,6 +179,7 @@ export default function ScenesView({
   // The confirm dialog portals to document.body, so it would outlive an app
   // switch — dismiss it when the user docks away.
   useCloseOnAppSwitch(!!batchConfirm, () => setBatchConfirm(null))
+  const batchBackdrop = useBackdropClose(() => setBatchConfirm(null))
   useCloseOnEscape(!!batchConfirm, () => setBatchConfirm(null))
   // Resolution + aspect chosen for the run (model lives in the global setting).
   const [batchResolution, setBatchResolution] = useState<ImageResolution | undefined>(undefined)
@@ -286,6 +288,7 @@ export default function ScenesView({
   const [batchVideoDuration, setBatchVideoDuration] = useState<number | undefined>(undefined)
   useCloseOnAppSwitch(!!videoConfirm, () => setVideoConfirm(null))
   useCloseOnEscape(!!videoConfirm, () => setVideoConfirm(null))
+  const videoBackdrop = useBackdropClose(() => setVideoConfirm(null))
 
   // Clamp resolution + duration to the picked model, so swapping models inside
   // the dialog never leaves a value kie would reject (or silently re-tier).
@@ -760,7 +763,7 @@ export default function ScenesView({
       {batchConfirm && createPortal(
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
-          onClick={() => setBatchConfirm(null)}
+          {...batchBackdrop}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -884,7 +887,7 @@ export default function ScenesView({
       {videoConfirm && createPortal(
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
-          onClick={() => setVideoConfirm(null)}
+          {...videoBackdrop}
         >
           <div
             onClick={(e) => e.stopPropagation()}
