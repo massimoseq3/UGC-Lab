@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
-import { Loader2, Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown } from 'lucide-react'
+import { Loader2, Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil } from 'lucide-react'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState } from '../../../hooks/useAssetUrl'
 import { getUrl } from '../../../utils/assetStore'
@@ -679,6 +679,14 @@ function SingleCard({
           />
           <ActionPill icon={Download} label="Download" onClick={a.handleDownload} />
           <ActionPill icon={Copy} label="Copy prompt" onClick={onCopyPrompt} />
+          {/* Same destination as clicking the picture — spelled out, because in
+              this view the image reads as a still rather than a button. */}
+          <ActionPill
+            icon={Pencil}
+            label="Edit character"
+            title="Edit this character"
+            onClick={onClick}
+          />
           {!a.isSheet && (
             <ActionPill
               icon={LayoutGrid}
