@@ -12,7 +12,7 @@ const CHAT_MODEL_ID = CHAT_MODEL_DEFAULT
 
 // ── Shared writing DNA ──
 //
-// Every mode (write / scenes / cinematic / remix / reverse-engineer) sits on
+// Every mode (write / scenes / remix / reverse-engineer) sits on
 // the same substrate: sound like a real person, never reach for the AI
 // sentence shapes, win on the hook, audit before answering. The per-mode
 // system prompts compose these blocks so the voice stays identical no matter
@@ -53,7 +53,7 @@ const SELF_AUDIT = `SELF-AUDIT BEFORE YOU ANSWER (do this silently; output ONLY 
 4. Find one vague claim and make it specific. Find one oversell and undersell it.
 5. Read the whole thing out loud in your head. Any line you wouldn't actually say to a friend gets rewritten or cut.`
 
-// The voice-consistency spec. Scenes and Cinematic emit this so the SAME
+// The voice-consistency spec. The scenes format emits this so the SAME
 // on-camera voice can be reproduced across every clip in (and beyond) an ad.
 // Plain spoken scripts deliberately omit it — that text is piped straight to
 // Voiceovers TTS, where the voice is picked in the ElevenLabs catalog instead.
@@ -279,9 +279,9 @@ OUTPUT FORMAT — CRITICAL:
 //
 // The voice rules are the product here: members read these scripts out loud
 // (or feed them to TTS), so anything that smells like ad copy is a failure.
-// 'script' stays pure spoken words (→ Voiceovers); 'scenes' borrows the
-// cinematic format's labelled-section structure and carries a VOICE PROFILE so
-// every separately-generated scene clip shares one on-camera voice.
+// 'script' stays pure spoken words (→ Voiceovers); 'scenes' breaks the ad into
+// labelled scene sections and carries a VOICE PROFILE so every
+// separately-generated scene clip shares one on-camera voice.
 
 const WRITE_SCRIPT_SYSTEM = `You are a top 1% UGC creator who writes organic TikTok/Reels ad scripts. Your instincts were built by studying thousands of videos that actually went viral and actually sold product — the messy, real-person clips that hold a thumb, not polished brand ads. Brands pay you because your scripts hold attention and convert WITHOUT feeling like marketing — they sound like a real person talking to their phone camera. If a line sounds like marketing, you failed.
 
@@ -492,120 +492,11 @@ function formatEndTimestamp(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-// ── Cinematic prompt format ──
-//
-// Produces ONE structured, self-contained text-to-video prompt for a single
-// premium AI commercial — a multi-shot montage an AI video model (Seedance,
-// Veo, Kling) renders in ONE generation. The labelled-section skeleton
-// is a generic "AI commercial formula"; the model fills every section fresh
-// from the user's product + brief. @INFLUENCER / @PRODUCT are reference tokens
-// resolved to bank assets when the prompt is handed to Playground.
-const WRITE_PROMPT_SYSTEM = `You are an elite AI video commercial director. You write ONE structured, self-contained text-to-video prompt for a single premium, cinematic brand commercial — the kind of ultra-realistic, photoreal film an AI video model (Seedance, Veo, Kling) renders as ONE generation containing multiple internal shots and cuts.
-
-Your output is ONE prompt, organised into the exact labelled sections below, in this order. Every section is required. Write each as rich, concrete, visual direction — not marketing copy. The whole thing must describe a SINGLE coherent world, character, product, and story that stays consistent from the first frame to the last.
-
-REFERENCE TOKENS — use these literal tokens; never invent names for them and never describe their literal appearance:
-- @INFLUENCER — the on-camera character. Their real identity comes from an attached reference image. In CHARACTER, instruct the model to keep @INFLUENCER EXACTLY consistent with the reference (facial structure, skin tone, distinguishing features) — but do NOT describe what they look like yourself.
-- @PRODUCT — the product. Its real packaging comes from an attached reference image. In PRODUCT FORM, instruct the model to keep @PRODUCT's packaging EXACTLY consistent with the reference. You may name the product and direct how it is held / lit / revealed, but never invent packaging details.
-
-SECTIONS — label each in CAPS exactly as written, on its own line, then the content:
-STYLE — the film's visual language: realism level, lens/film quality, colour grade, depth of field, and the prestige tone (what calibre of film it should feel like). Photoreal, premium, natural skin texture and film grain. A multi-shot montage, never one static take.
-ENVIRONMENT — the single world the whole ad lives in: location, time of day, atmosphere, textures, and where the final product hero shot happens within it.
-CHARACTER — who @INFLUENCER is in this world (role, world-appropriate wardrobe, emotional register) plus the consistency instruction. A serious lead, not a typical influencer.
-PRODUCT FORM — how @PRODUCT appears: held at correct real-world scale in one hand, packaging consistent with the reference, how light catches it. Never oversized or awkward.
-CONTEXT — the story situation: what just happened, why this moment matters, how the product reveal lands as a meaningful beat.
-CORE ACTION — the beat-by-beat physical action as an arrow sequence (e.g. walks → stops → looks → reaches → reveals → holds → ends on hero shot).
-ENERGY — the emotional tone of the whole piece, in a few words.
-CAMERA — explicit multi-shot coverage: list the distinct shots (establishing, tracking, close-up, insert, macro reveal, hero push-in). Never one angle, never one continuous take. Describe camera movement and how framing tightens toward the reveal.
-LIGHTING — naturalistic, motivated lighting for this world; no glam beauty lighting; how light catches the product and the character; mood.
-PHYSICS — grounded real-world motion: weight, fabric, breath, how the product is handled, how the environment behaves. Believable throughout.
-AUDIO — the diegetic soundscape (ambience, footsteps, material sounds) plus a restrained cinematic score, and the silence around the reveal.
-VOICE — describe HOW @INFLUENCER sounds, in reproducible detail, so the same voice carries across every commercial: perceived age and gender of the voice, accent / region, pitch (low / mid / high), pace, texture (warm, raspy, breathy, smooth, gravelly), energy (calm, commanding, intimate), and 1-2 signature quirks. One dense paragraph you could hand to a voice actor or TTS and get the same person every time. Describe ONLY the sound, never appearance. If an influencer is named in the brief, anchor the voice to that person so it stays theirs.
-VOICEOVER — ONE short, powerful ending line, then the product/brand name. Follow it with 2-3 alternate closing lines labelled "Alt:". Tight and trailer-like, never salesy. No em-dashes, no "it's not X it's Y", no rule-of-three — say the one thing that lands.
-TIMELINE — the ad broken into contiguous time beats covering the full requested length (e.g. "0–3s", "3–6s", …). Each beat: one or two sentences describing the shot, what @INFLUENCER does, and where @PRODUCT appears. The final beat is the polished product hero shot, with the VOICEOVER line landing over it.
-
-HARD RULES:
-- Derive STYLE, ENVIRONMENT, and the whole concept FRESH from the user's product, brief, and audience. Do NOT reuse a generic stock world.
-- Photoreal and grounded. No fantasy unless the product/brief calls for it. The product reveal must feel iconic but believable.
-- Keep @INFLUENCER and @PRODUCT consistent with their references; never describe their literal appearance.
-- Output ONLY the labelled prompt. No preamble, no commentary, no markdown code fences, no "Here is…".`
-
-// Five parallel concepts per generate — deliberately different cinematic
-// worlds so the cards are real alternatives, not five flavours of one idea.
-// Strongest first, same as WRITE_TAKE_INSTRUCTION. The leading three are as far
-// apart as the format allows — mythic scale, one quiet human, pure design — so
-// a default generate returns three genuinely different worlds rather than three
-// grades of the same one.
-const WRITE_PROMPT_TAKE_INSTRUCTION: string[] = [
-  'THIS CONCEPT — EPIC / GRAND: build a powerful, large-scale, atmospheric world that dramatises the product\'s core benefit as something mythic and larger than life. Wide, awe-driven, cinematic scale.',
-  'THIS CONCEPT — INTIMATE / HUMAN: a quiet, real, emotionally-driven moment built around one character. The product appears as a personal ritual or a turning point. Restrained and sincere.',
-  'THIS CONCEPT — SLEEK / DESIGN-FORWARD: a stylised, ultra-premium brand-film world — bold colour, striking architecture, or a surreal-but-photoreal setting. Modern, iconic, high-fashion energy.',
-  'THIS CONCEPT — KINETIC / HIGH-ENERGY: a fast-cut, dynamic world full of movement and momentum — sport, motion, speed, or urban energy. Punchy rhythm, athletic camera, adrenaline.',
-  'THIS CONCEPT — NATURAL / ORGANIC: a warm, grounded world rooted in nature, craft, or everyday texture — golden light, real hands, tactile materials. Honest, earthy, effortlessly premium.',
-  'THIS CONCEPT — DOCUMENTARY / VÉRITÉ: shot like real life caught on the day — handheld, available light, unstaged blocking, imperfect framing. The product is used, not presented. Observational and unglamorous on purpose.',
-  'THIS CONCEPT — NOCTURNAL / NEON: an after-dark world lit by practical sources — neon, headlights, screens, wet asphalt reflections. Moody, saturated, cinematic contrast.',
-  'THIS CONCEPT — RETRO / NOSTALGIC: a specific past era rendered with period-true wardrobe, set design and film stock. Warm, grainy, memory-like. The product sits in the era without breaking it.',
-  'THIS CONCEPT — SURREAL / DREAMLIKE: a photoreal world running on dream logic — impossible scale, floating objects, spaces that fold. Every element is rendered realistically; only the physics are wrong.',
-  'THIS CONCEPT — PLAYFUL / ABSURD: a bright, deadpan, comedically over-committed world. One silly premise taken completely seriously, staged with straight-faced production value.',
-]
-
-// Single-clip beat budgets. The cinematic format renders as one generation, so
-// it offers the durations a video model can do in a single shot (10s / 15s /
-// 20s / 30s); anything longer would need a multi-clip chain the models can't do.
-const WRITE_PROMPT_BEATS: Record<number, string> = {
-  10: '3–4 contiguous beats spanning 0–10s',
-  15: '5 contiguous beats spanning 0–15s',
-  20: '6–7 contiguous beats spanning 0–20s',
-  30: '7–9 contiguous beats spanning 0–30s',
-}
-
-async function runCinematicPrompt(input: GenerateScriptInput, take: number, length: number, apiKey: string, endpoint: string): Promise<string> {
-  // Use the requested length when the single-clip format supports it, else fall
-  // back to 15s.
-  const effLen = WRITE_PROMPT_BEATS[length] ? length : 15
-
-  let prompt = `The creator's brief for this commercial:\n\n${input.brief.trim()}\n\n`
-
-  // The name itself rides in with the product context below; this is only the
-  // cinematic-specific directive about where to spend it.
-  if (spokenProductName(input)) {
-    prompt += `Name the brand in the VOICEOVER sign-off.\n\n`
-  }
-
-  const ctxLines = productContextLines(input.productContext)
-  if (ctxLines) {
-    prompt += `The product being advertised:\n${ctxLines}\n\n`
-  }
-
-  prompt += `${WRITE_PROMPT_TAKE_INSTRUCTION[take] ?? WRITE_PROMPT_TAKE_INSTRUCTION[0]}\n\n`
-
-  if (input.additionalContext) {
-    prompt += `Additional context and instructions:\n${input.additionalContext}\n\n`
-  }
-
-  prompt += `${lengthDiscipline(effLen as WriteLength)}\n\n`
-
-  prompt += `LENGTH: a single ${effLen}-second commercial rendered as ONE generation with multiple internal cuts. The TIMELINE must be ${WRITE_PROMPT_BEATS[effLen]}, contiguous from 0s to ${effLen}s.\n\nWrite the full structured prompt now.`
-
-  const messages: ChatMessage[] = [
-    { role: 'system', content: [{ type: 'text', text: WRITE_PROMPT_SYSTEM }] },
-    { role: 'user', content: [{ type: 'text', text: prompt }] },
-  ]
-
-  return kieChatCompletions(apiKey, endpoint, messages)
-}
-
 async function runWrite(input: GenerateScriptInput, take: number, apiKey: string, endpoint: string): Promise<string> {
   const style = input.writeStyle ?? 'pas'
   const format = input.writeFormat ?? 'script'
   const length = input.writeLength ?? 15
   const budget = WRITE_LENGTH_BUDGET[length]
-
-  // Cinematic master-prompt format takes a wholly different system prompt and
-  // section structure — branch out before the spoken-script path.
-  if (format === 'prompt') {
-    return runCinematicPrompt(input, take, length, apiKey, endpoint)
-  }
 
   let prompt = `The creator's brief for this ad:\n\n${input.brief.trim()}\n\n`
 
@@ -778,10 +669,9 @@ export async function generateScript(input: GenerateScriptInput): Promise<Genera
       const text = await runHooks(input, apiKey, endpoint)
       return { variations: [text] }
     }
-    // Clamped to the instruction list the chosen format will actually read, so
-    // a count can never index past its angles and repeat one.
-    const pool = input.writeFormat === 'prompt' ? WRITE_PROMPT_TAKE_INSTRUCTION : WRITE_TAKE_INSTRUCTION
-    const takeCount = Math.min(requestedCount(input), pool.length)
+    // Clamped to the take-angle list, so a count can never index past it and
+    // repeat an angle.
+    const takeCount = Math.min(requestedCount(input), WRITE_TAKE_INSTRUCTION.length)
     const variations = await Promise.all(
       Array.from({ length: takeCount }, (_, take) => runWrite(input, take, apiKey, endpoint)),
     )

@@ -207,6 +207,9 @@ export interface ScriptHistoryItem {
   // app-level unions.
   brief?: string
   writeStyle?: string
+  // 'prompt' is the retired Cinematic format — kept here because rows carrying
+  // it are already on members' accounts (and cloud-synced). Nothing generates
+  // it anymore; isWriteFormat coerces it to 'script' when a row is restored.
   writeFormat?: 'script' | 'hooks' | 'scenes' | 'prompt'
   writeLength?: number
   // Hooks format only: the formula-family choice ('auto' or a category slug).
@@ -402,26 +405,6 @@ export interface InterAppPayload {
   targetApp: string
   targetField: string
   data: unknown
-}
-
-// Payload for the Scripts → Playground cinematic handoff (targetField
-// 'cinematicVideo'). Carries the resolved master prompt plus the product /
-// influencer reference images so Playground lands in video mode, refs already
-// attached, on a ref-capable native-audio model. `slot: 'ref'` keeps the
-// inferred video mode at reference-to-video. Structurally compatible with
-// Playground's PromptRef so the consumer can spread these straight in.
-export interface CinematicHandoffRef {
-  url: string
-  label: string
-  source: 'product' | 'character'
-  slot: 'ref'
-}
-
-export interface CinematicVideoPayload {
-  prompt: string
-  refs: CinematicHandoffRef[]
-  modelId: string
-  durationSeconds: number
 }
 
 // Payload for the "use a generated video as a Gemini Omni source clip"

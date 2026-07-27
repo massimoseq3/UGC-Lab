@@ -2,12 +2,12 @@ import { useMemo, useState, useEffect } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
-import type { Model, Product, ScriptHistoryItem } from '../../stores/types'
+import type { Product, ScriptHistoryItem } from '../../stores/types'
 import InputPanel from './components/InputPanel'
 import RightPanel from './components/RightPanel'
 import { generateScript } from './services/generateScript'
 import { humanizeError } from '../../utils/friendlyError'
-import { WRITE_STYLE_META, HOOK_CATEGORY_META, detectSceneBlueprint, isWriteStyle, isWriteLength, isHookCategoryChoice, isVariationCount, parseHooks, DEFAULT_VARIATION_COUNT, type ScriptMode, type ScriptUiMode, type EditableProductContext, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount, type RemixAngle } from './types'
+import { WRITE_STYLE_META, HOOK_CATEGORY_META, detectSceneBlueprint, isWriteStyle, isWriteFormat, isWriteLength, isHookCategoryChoice, isVariationCount, parseHooks, DEFAULT_VARIATION_COUNT, type ScriptMode, type ScriptUiMode, type EditableProductContext, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount, type RemixAngle } from './types'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 
 interface ReverseEngineerPayload {
@@ -49,7 +49,9 @@ export default function ScriptArchitect() {
   const [writeStyle, setWriteStyle] = usePersistedState<WriteStyle>(`${baseKey}:writeStyle`, 'pas', {
     sanitize: (v) => (isWriteStyle(v) ? v : 'pas'),
   })
-  const [writeFormat, setWriteFormat] = usePersistedState<WriteFormat>(`${baseKey}:writeFormat`, 'script')
+  const [writeFormat, setWriteFormat] = usePersistedState<WriteFormat>(`${baseKey}:writeFormat`, 'script', {
+    sanitize: (v) => (isWriteFormat(v) ? v : 'script'),
+  })
   const [writeLength, setWriteLength] = usePersistedState<WriteLength>(`${baseKey}:writeLength`, 15)
   // How many takes a generate returns. Applies to both modes; Hooks ignores it.
   const [variationCount, setVariationCount] = usePersistedState<VariationCount>(`${baseKey}:variationCount`, DEFAULT_VARIATION_COUNT, {
@@ -60,10 +62,6 @@ export default function ScriptArchitect() {
     sanitize: (v) => (isHookCategoryChoice(v) ? v : 'auto'),
   })
   const [selectedProductId, setSelectedProductId] = usePersistedState<string | null>(`${baseKey}:productId`, null)
-  // Influencer (Bank → Influencers / models) for the cinematic 'prompt' format.
-  // Optional, only used by that format: its portrait rides the Playground
-  // handoff as the @INFLUENCER reference image.
-  const [selectedInfluencerId, setSelectedInfluencerId] = usePersistedState<string | null>(`${baseKey}:influencerId`, null)
   const [additionalContext, setAdditionalContext] = usePersistedState(`${baseKey}:context`, '')
 
   // Panel-level "New" — wipes the input column back to a blank slate. Inputs
@@ -73,7 +71,6 @@ export default function ScriptArchitect() {
     setSource('')
     setBrief('')
     setSelectedProductId(null)
-    setSelectedInfluencerId(null)
     setAdditionalContext('')
   }
   const [variations, setVariations] = usePersistedState<string[]>(`${baseKey}:variations`, [])
@@ -85,11 +82,11 @@ export default function ScriptArchitect() {
   const [outputStyle, setOutputStyle] = usePersistedState<WriteStyle>(`${baseKey}:outputStyle`, 'pas', {
     sanitize: (v) => (isWriteStyle(v) ? v : 'pas'),
   })
-  // Format + length pinned to the *currently shown* output, so the cinematic
-  // "Send to Playground" handoff uses the duration that actually produced the
-  // prompt — not whatever the live left-panel toggles read now.
-  const [outputFormat, setOutputFormat] = usePersistedState<WriteFormat>(`${baseKey}:outputFormat`, 'script')
-  const [outputLength, setOutputLength] = usePersistedState<WriteLength>(`${baseKey}:outputLength`, 15)
+  // Format pinned to the *currently shown* output, so the cards keep the labels
+  // of the run that produced them when the live left-panel toggle moves on.
+  const [outputFormat, setOutputFormat] = usePersistedState<WriteFormat>(`${baseKey}:outputFormat`, 'script', {
+    sanitize: (v) => (isWriteFormat(v) ? v : 'script'),
+  })
   // Remix only: the angle list that produced the *currently shown* cards, so
   // labels come from what actually ran rather than from re-deriving off a list
   // that may have been reordered or resized since.
@@ -110,7 +107,6 @@ export default function ScriptArchitect() {
   const activeApp = useAppStore((s) => s.activeApp)
   const getProductById = useBankStore((s) => s.getProductById)
   const products = useBankStore((s) => s.products)
-  const models = useBankStore((s) => s.models)
   const scriptHistory = useBankStore((s) => s.scriptHistory)
   const addScriptHistory = useBankStore((s) => s.addScriptHistory)
   const deleteScriptHistory = useBankStore((s) => s.deleteScriptHistory)
@@ -120,12 +116,6 @@ export default function ScriptArchitect() {
     [selectedProductId, products],
   )
   const handleProductSelect = (p: Product | null) => setSelectedProductId(p?.id ?? null)
-
-  const selectedInfluencer = useMemo<Model | null>(
-    () => (selectedInfluencerId ? models.find((m) => m.id === selectedInfluencerId) ?? null : null),
-    [selectedInfluencerId, models],
-  )
-  const handleInfluencerSelect = (m: Model | null) => setSelectedInfluencerId(m?.id ?? null)
 
   // The pipeline the next Generate will run. The UI toggle only offers
   // Remix / Write New; within Remix, a detected scene blueprint routes to the
@@ -185,7 +175,6 @@ export default function ScriptArchitect() {
     setOutputMode(resolvedMode)
     setOutputStyle(writeStyle)
     setOutputFormat(writeFormat)
-    setOutputLength(writeLength)
     setOutputHookCategory(hookCategory)
     // Route the merged source into the field the resolved pipeline reads.
     const winningTranscript = resolvedMode === 'remix' ? source : ''
@@ -238,7 +227,7 @@ export default function ScriptArchitect() {
       const n = result.variations.length
       useAppStore.getState().addToast(
         resolvedMode === 'write'
-          ? (writeFormat === 'hooks' ? `${hookCount || 'Your'} hooks generated` : writeFormat === 'prompt' ? `${n} cinematic concepts generated` : writeFormat === 'scenes' ? `${n} scene drafts generated` : `${n} scripts generated`)
+          ? (writeFormat === 'hooks' ? `${hookCount || 'Your'} hooks generated` : writeFormat === 'scenes' ? `${n} scene drafts generated` : `${n} scripts generated`)
           : resolvedMode === 'remix' ? `${n} script variations generated` : 'Script rewritten',
         'success',
       )
@@ -259,8 +248,8 @@ export default function ScriptArchitect() {
     // Pin the output labels to the run we're restoring.
     setOutputMode(item.mode)
     setOutputStyle(item.writeStyle && item.writeStyle in WRITE_STYLE_META ? (item.writeStyle as WriteStyle) : 'pas')
-    setOutputFormat(item.writeFormat ?? 'script')
-    setOutputLength(isWriteLength(item.writeLength) ? item.writeLength : 15)
+    // A row from the retired Cinematic format restores as a plain script take.
+    setOutputFormat(isWriteFormat(item.writeFormat) ? item.writeFormat : 'script')
     setOutputHookCategory(isHookCategoryChoice(item.hookCategory) ? item.hookCategory : 'auto')
     // Rows saved before the count was pickable carry no angle list; OutputPanel
     // falls back to matching them by variation count.
@@ -283,7 +272,7 @@ export default function ScriptArchitect() {
     if (item.mode === 'write') {
       setBrief(item.brief ?? item.inputSummary)
       if (item.writeStyle && item.writeStyle in WRITE_STYLE_META) setWriteStyle(item.writeStyle as WriteStyle)
-      if (item.writeFormat) setWriteFormat(item.writeFormat)
+      if (isWriteFormat(item.writeFormat)) setWriteFormat(item.writeFormat)
       if (isWriteLength(item.writeLength)) setWriteLength(item.writeLength)
       if (item.writeFormat === 'hooks' && isHookCategoryChoice(item.hookCategory)) {
         setHookCategory(item.hookCategory)
@@ -296,8 +285,7 @@ export default function ScriptArchitect() {
     if (activeHistoryId === id) setActiveHistoryId(null)
   }
 
-  // "New": clear the inputs only (source text + selected product/influencer +
-  // context). The generated variations stay on screen — they're the user's
+  // "New": clear the inputs only (source text + selected product + context). The generated variations stay on screen — they're the user's
   // working output / history, never wiped by starting a new draft. (Output
   // labels are pinned to outputMode/outputStyle snapshots, so leaving the
   // shown cards untouched is safe even as the live left-panel toggles reset.)
@@ -327,8 +315,6 @@ export default function ScriptArchitect() {
           onHookCategoryChange={setHookCategory}
           selectedProduct={selectedProduct}
           onProductSelect={handleProductSelect}
-          selectedInfluencer={selectedInfluencer}
-          onInfluencerSelect={handleInfluencerSelect}
           additionalContext={additionalContext}
           onAdditionalContextChange={setAdditionalContext}
           onGenerate={handleGenerate}
@@ -347,8 +333,6 @@ export default function ScriptArchitect() {
           writeStyleLabel={WRITE_STYLE_META[outputStyle].label}
           hookCategoryLabel={HOOK_CATEGORY_META[outputHookCategory].label}
           linkedProductId={selectedProduct?.id ?? null}
-          influencer={selectedInfluencer}
-          cinematicDuration={outputLength}
           isGenerating={isGenerating}
           error={error}
           onEditVariation={(index, text) =>

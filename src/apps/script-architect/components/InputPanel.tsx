@@ -1,11 +1,7 @@
 import { useState, type ComponentType } from 'react'
-import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Film, UserRound, Sparkles, Undo2, Redo2, Eraser, Shuffle, FishingHook, Video } from 'lucide-react'
-import type { Model, Product, Script } from '../../../stores/types'
+import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkles, Undo2, Redo2, Eraser, Shuffle, FishingHook, Video } from 'lucide-react'
+import type { Product, Script } from '../../../stores/types'
 import { WRITE_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNT, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount } from '../types'
-
-// The cinematic 'prompt' format is single-clip-capped, so it only offers the
-// shorter durations a video model can render in one generation.
-const PROMPT_LENGTHS: WriteLength[] = [10, 15, 20, 30]
 import { useBankStore } from '../../../stores/bankStore'
 import BankPicker from '../../../components/BankPicker'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -46,8 +42,6 @@ interface InputPanelProps {
   onHookCategoryChange: (value: HookCategoryChoice) => void
   selectedProduct: Product | null
   onProductSelect: (product: Product | null) => void
-  selectedInfluencer: Model | null
-  onInfluencerSelect: (model: Model | null) => void
   additionalContext: string
   onAdditionalContextChange: (value: string) => void
   onGenerate: (context: EditableProductContext | null) => void
@@ -78,8 +72,6 @@ export default function InputPanel({
   onHookCategoryChange,
   selectedProduct,
   onProductSelect,
-  selectedInfluencer,
-  onInfluencerSelect,
   additionalContext,
   onAdditionalContextChange,
   onGenerate,
@@ -87,7 +79,6 @@ export default function InputPanel({
   highlightField,
 }: InputPanelProps) {
   const [productPickerOpen, setProductPickerOpen] = useState(false)
-  const [influencerPickerOpen, setInfluencerPickerOpen] = useState(false)
   const [scriptPickerOpen, setScriptPickerOpen] = useState(false)
   // Which big text box is open in the full-screen editor (null = none).
   const [expandedField, setExpandedField] = useState<null | 'brief' | 'source' | 'additionalContext'>(null)
@@ -135,29 +126,17 @@ export default function InputPanel({
   const canUndoContext = contextIndex > 0
   const canRedoContext = contextIndex < contextHistory.length - 1
   const products = useBankStore((s) => s.products)
-  const models = useBankStore((s) => s.models)
   const updateProduct = useBankStore((s) => s.updateProduct)
   const openApp = useAppStore((s) => s.openApp)
   const sendToApp = useAppStore((s) => s.sendToApp)
   const addToast = useAppStore((s) => s.addToast)
   const resolvedProductImage = useAssetUrl(selectedProduct?.productImage)
-  const resolvedInfluencerImage = useAssetUrl(selectedInfluencer?.characterImage)
-  // Cinematic master-prompt format: swaps the Script Style picker for an
-  // Influencer picker and caps the length toggle to single-clip durations.
-  const isPromptFormat = writeFormat === 'prompt'
   // Hooks format: one-liners, so no length toggle; the Script Style picker is
   // swapped for the hook-family picker.
   const isHooksFormat = writeFormat === 'hooks'
   // The scene-rewrite pipeline will run (blueprint detected, no override) —
   // drives the source box chrome, the chip copy, and the button labels.
   const blueprintActive = isBlueprint && !forceTranscript
-
-  // Switching into the cinematic format clamps the length to one the single-clip
-  // format offers (10s / 15s / 20s / 30s).
-  const handleFormatChange = (f: WriteFormat) => {
-    if (f === 'prompt' && !PROMPT_LENGTHS.includes(writeLength)) onWriteLengthChange(15)
-    onWriteFormatChange(f)
-  }
 
   // Slide-over footer actions. The edits already live in `editableContext`
   // (used for this generation), so "save for this script" just dismisses;
@@ -300,11 +279,6 @@ export default function InputPanel({
     openApp('finder')
   }
 
-  const handleOpenInfluencerFinder = () => {
-    sendToApp({ targetApp: 'finder', targetField: 'activeBank', data: 'models' })
-    openApp('finder')
-  }
-
   const updateField = (field: keyof EditableProductContext, value: string) => {
     if (!editableContext) return
     setEditableContext({ ...editableContext, [field]: value })
@@ -319,7 +293,7 @@ export default function InputPanel({
   }
 
   const generateLabel = mode === 'write'
-    ? (writeFormat === 'prompt' ? `Generate ${variationCount} Cinematic Concepts` : writeFormat === 'scenes' ? `Generate ${variationCount} Scene Drafts` : writeFormat === 'hooks' ? `Generate ${HOOK_COUNT} Hooks` : `Generate ${variationCount} Scripts`)
+    ? (writeFormat === 'scenes' ? `Generate ${variationCount} Scene Drafts` : writeFormat === 'hooks' ? `Generate ${HOOK_COUNT} Hooks` : `Generate ${variationCount} Scripts`)
     : blueprintActive ? 'Rewrite Scene Prompts' : `Generate ${variationCount} Script Variations`
 
   // Product picker — step 2 in every mode, but rendered in a different spot
@@ -419,86 +393,6 @@ export default function InputPanel({
     </div>
   )
 
-  // Influencer picker — cinematic format only. Optional: its portrait rides
-  // the Playground handoff as the @INFLUENCER reference so the face stays
-  // consistent across the commercial. Mirrors the product card styling.
-  const influencerSection = (
-    <div className="mb-3">
-      {selectedInfluencer ? (
-        <div>
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setInfluencerPickerOpen(true)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setInfluencerPickerOpen(true) } }}
-            className="group flex w-full cursor-pointer items-center gap-3 rounded-full border border-influencers-500/30 bg-influencers-500/[0.06] px-4 py-3.5 text-left transition-colors hover:border-influencers-500/40 hover:bg-influencers-500/10"
-          >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-ink/5">
-              {resolvedInfluencerImage ? (
-                <img src={resolvedInfluencerImage} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <UserRound className="h-5 w-5 text-ink-600" />
-              )}
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm font-medium tracking-tight text-ink-200">
-                {selectedInfluencer.name}
-              </span>
-              <span className="truncate text-[11px] text-ink-500">Character</span>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
-                <RefreshCw className="h-2.5 w-2.5" />
-              </span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onInfluencerSelect(null) }}
-                title="Remove character"
-                aria-label="Remove character"
-                className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div>
-          {models.length > 0 ? (
-            <button
-              onClick={() => setInfluencerPickerOpen(true)}
-              className="flex w-full items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 py-3.5 text-left transition-colors hover:border-scripts-500/30 hover:bg-scripts-500/5"
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-scripts-500/10">
-                <UserRound className="h-5 w-5 text-scripts-400" />
-              </div>
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="text-sm font-medium text-ink-300">Character</span>
-                <span className="text-xs text-ink-600">Optional · adds a consistent face</span>
-              </div>
-              <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
-            </button>
-          ) : (
-            <div className="flex items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 py-3.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-ink/5">
-                <UserRound className="h-5 w-5 text-ink-700" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-sm text-ink-500">No characters yet</span>
-                <button
-                  onClick={handleOpenInfluencerFinder}
-                  className="text-left text-xs text-scripts-400 transition-colors hover:text-scripts-300"
-                >
-                  Add one in Bank
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-
   return (
     <div className="flex flex-col md:h-full">
       {/* Mode toggle — rounded segmented pill, mirrored by the Output/History
@@ -526,28 +420,23 @@ export default function InputPanel({
       <div className="flex flex-1 flex-col overflow-y-auto px-5 pb-5 pt-4">
         {mode === 'write' ? (
           <>
-            {/* Output sub-mode toggle — governs the form below (Style vs
-                Influencer picker, the length options, the artifact), so it
-                leads, right under the mode toggle. Sized to match the
-                Influencers Portrait/Character Sheet toggle (h-12, p-1). */}
+            {/* Output sub-mode toggle — governs the form below (which style
+                picker, the length options, the artifact), so it leads, right
+                under the mode toggle. Sized to match the Influencers
+                Portrait/Character Sheet toggle (h-12, p-1). */}
             <div className="mb-3">
               <SegmentedToggle<WriteFormat>
                 className="h-12 !p-1"
                 accent="scripts"
                 value={writeFormat}
-                onChange={handleFormatChange}
+                onChange={onWriteFormatChange}
                 options={[
                   { value: 'script', label: 'Script', icon: FileText },
                   { value: 'hooks', label: 'Hooks', icon: FishingHook },
                   { value: 'scenes', label: 'Scenes', icon: Clapperboard },
-                  { value: 'prompt', label: 'Cinematic', icon: Film },
                 ]}
               />
             </div>
-
-            {/* Cinematic format swaps the Script Style picker for an Influencer
-                picker — an optional consistent face for the @INFLUENCER ref. */}
-            {isPromptFormat && influencerSection}
 
             {/* Hook Style — the hooks format's replacement for the Script Style
                 picker. 'auto' (Best Mix) is the default and renders as the
@@ -605,10 +494,9 @@ export default function InputPanel({
             )}
 
             {/* Script Style — sits above the product picker. Tapping the button
-                opens the style picker slide-over. Hidden in the cinematic format
-                (no spoken-script structure) and the hooks format (which has its
-                own family picker above). */}
-            {!isPromptFormat && !isHooksFormat && (
+                opens the style picker slide-over. Hidden in the hooks format,
+                which has its own family picker above. */}
+            {!isHooksFormat && (
             <div className="mb-3">
               <div
                 role="button"
@@ -661,7 +549,7 @@ export default function InputPanel({
             </div>
             )}
 
-            {/* Product — sits below the style / influencer picker. */}
+            {/* Product — sits below the style picker. */}
             {productSection}
 
             {/* The brief — its section grows to absorb leftover column height so
@@ -897,7 +785,7 @@ export default function InputPanel({
               accent="scripts"
               value={String(writeLength)}
               onChange={(v) => onWriteLengthChange(Number(v) as WriteLength)}
-              options={(isPromptFormat ? PROMPT_LENGTHS : WRITE_LENGTHS).map((len) => ({ value: String(len), label: `${len}s` }))}
+              options={WRITE_LENGTHS.map((len) => ({ value: String(len), label: `${len}s` }))}
             />
           </div>
         )}
@@ -909,7 +797,7 @@ export default function InputPanel({
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{mode === 'write' ? (writeFormat === 'prompt' ? `Directing ${variationCount} Concepts...` : writeFormat === 'hooks' ? `Writing ${HOOK_COUNT} Hooks...` : `Writing ${variationCount} Takes...`) : blueprintActive ? 'Rewriting Scene Prompts...' : `Generating ${variationCount} Script Variations...`}</span>
+              <span>{mode === 'write' ? (writeFormat === 'hooks' ? `Writing ${HOOK_COUNT} Hooks...` : `Writing ${variationCount} Takes...`) : blueprintActive ? 'Rewriting Scene Prompts...' : `Generating ${variationCount} Script Variations...`}</span>
             </>
           ) : (
             <>
@@ -926,12 +814,6 @@ export default function InputPanel({
         isOpen={productPickerOpen}
         onSelect={(item) => onProductSelect(item as Product)}
         onClose={() => setProductPickerOpen(false)}
-      />
-      <BankPicker
-        bankType="models"
-        isOpen={influencerPickerOpen}
-        onSelect={(item) => onInfluencerSelect(item as Model)}
-        onClose={() => setInfluencerPickerOpen(false)}
       />
       <BankPicker
         bankType="scripts"

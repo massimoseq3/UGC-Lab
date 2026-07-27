@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
-import type { Model, ScriptHistoryItem } from '../../../stores/types'
-import type { RemixAngle, ScriptMode, WriteFormat, WriteLength } from '../types'
+import type { ScriptHistoryItem } from '../../../stores/types'
+import type { RemixAngle, ScriptMode, WriteFormat } from '../types'
 import OutputPanel from './OutputPanel'
 import HistoryView from './HistoryView'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -20,10 +20,6 @@ interface RightPanelProps {
   // Hooks format only — labels the pack's card ("Best Mix" / a family name).
   hookCategoryLabel: string
   linkedProductId: string | null
-  // Influencer + clip length for the cinematic 'prompt' format's Playground
-  // handoff (ignored by the other formats).
-  influencer: Model | null
-  cinematicDuration: WriteLength
   isGenerating: boolean
   error: string | null
   // Commits an inline edit of take `index` back to the persisted output state.
@@ -44,8 +40,6 @@ export default function RightPanel({
   writeStyleLabel,
   hookCategoryLabel,
   linkedProductId,
-  influencer,
-  cinematicDuration,
   isGenerating,
   error,
   onEditVariation,
@@ -106,8 +100,6 @@ export default function RightPanel({
             writeStyleLabel={writeStyleLabel}
             hookCategoryLabel={hookCategoryLabel}
             linkedProductId={linkedProductId}
-            influencer={influencer}
-            cinematicDuration={cinematicDuration}
             isGenerating={isGenerating}
             error={error}
             onEditVariation={onEditVariation}
