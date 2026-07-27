@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Copy, Check, Bookmark, ArrowUpRight, Mic, Film, PenLine, AlertCircle, ImagePlay, Pencil, X, Undo2, Redo2 } from 'lucide-react'
+import { Copy, Check, Bookmark, ArrowUpRight, Mic, Film, PenLine, AlertCircle, ImagePlay, Pencil, X, Undo2, Redo2, Quote } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import GridCanvas from '../../../components/GridCanvas'
 import { useBankStore } from '../../../stores/bankStore'
@@ -38,6 +38,34 @@ interface SceneChunk {
   body: string
 }
 
+const HEADER_PARTS = /^(?:---\s*)?scene\s*\d+\s*[—:–-]\s*(.*)$/i
+
+// A header line can carry the scene's prose on the SAME line — an Ad Analyzer
+// blueprint writes "SCENE 2 — B-ROLL DETAIL: extreme close-up of @PRODUCT…".
+// Treating the whole line as the header dropped that prose, and a scene whose
+// body came out empty was then filtered away entirely, so a blueprint of
+// single-line scenes rendered as a card reading "0 scenes".
+function splitHeaderLine(line: string): SceneChunk {
+  const trimmed = line.trim()
+  // The canonical "--- Scene 1: THE HOOK (00:00-00:04) ---" is a label only.
+  if (/---\s*$/.test(trimmed)) return { header: trimmed, body: '' }
+  const parts = HEADER_PARTS.exec(trimmed)
+  if (!parts) return { header: trimmed, body: '' }
+  const rest = parts[1]
+  const cut = (bodyText: string): SceneChunk => ({
+    header: trimmed.slice(0, trimmed.length - bodyText.length).replace(/[\s:]+$/, ''),
+    body: bodyText,
+  })
+  // "SCENE 2 — B-ROLL DETAIL: <prose>" — the shot label ends at its colon. The
+  // length floor keeps a bare timecode label ("THE HOOK (00:00-00:04)", whose
+  // own colons match) from being read as a label plus a body.
+  const labelled = /^[^:]{1,40}:\s*(.+)$/.exec(rest)
+  if (labelled && labelled[1].length > 24) return cut(labelled[1])
+  // "SCENE 2 — <prose>", no shot label at all.
+  if (!labelled && rest.length > 60) return cut(rest)
+  return { header: trimmed, body: '' }
+}
+
 function splitScenes(text: string): SceneChunk[] | null {
   if (!SCENE_REGEX.test(text)) return null
   const lines = text.split('\n')
@@ -46,7 +74,7 @@ function splitScenes(text: string): SceneChunk[] | null {
   for (const line of lines) {
     if (SCENE_HEADER.test(line.trim())) {
       if (current) chunks.push(current)
-      current = { header: line.trim(), body: '' }
+      current = splitHeaderLine(line)
     } else if (current) {
       current.body += (current.body ? '\n' : '') + line
     }
@@ -99,6 +127,124 @@ function splitVoiceProfile(text: string): { body: string; rest: string } {
   // The intro shape and the appended shape are mutually exclusive in practice,
   // but prefer whichever yielded a body so both shapes work.
   return { body: body || extractIntro(rest), rest }
+}
+
+// A scene body is one prose paragraph with the spoken line quoted inline — the
+// prompt contract is `[CHARACTER] says: "…"` for a written scene, and remix
+// preserves the source's own attribution (`She says: "…"`, `Voiceover: "…"`).
+// The quoted words are the only part the member reads aloud, records, and sends
+// to Voiceovers, so they're lifted out of the direction rather than left as the
+// tail clause of a paragraph about lens height.
+type SceneSegment =
+  | { kind: 'direction'; text: string }
+  | { kind: 'line'; speaker: string | null; text: string }
+
+const SPEECH_VERB_SRC = 'says?|said|adds?|continues?|whispers?|shouts?|asks?|replies'
+// The clause that hands off to a quote, anchored to the end of the preceding
+// prose so it can only ever eat the introduction itself. A speaker is a
+// [TOKEN], a pronoun, or a (optionally "the"-prefixed) name — never a
+// connective, which is how "…and says:" used to label the line "it over and".
+const NAMED_ATTRIBUTION = new RegExp(
+  `(?<=^|[\\s,;.!?—-])((?:\\[[A-Z_]+\\]|(?!(?:and|then|or|but|as|while)\\b)(?:the\\s+)?[\\w'’-]+)\\s+(?:${SPEECH_VERB_SRC})|voice\\s*ove?r|narrator)\\s*:\\s*$`,
+  'i',
+)
+// The model sometimes folds the cue into the sentence with no subject of its
+// own ("…turns it over and says:"). Still dialogue — just nobody to label.
+const BARE_ATTRIBUTION = new RegExp(`\\b(?:${SPEECH_VERB_SRC})\\s*:\\s*$`, 'i')
+const SPEECH_VERB = new RegExp(`\\s*\\b(?:${SPEECH_VERB_SRC})\\s*$`, 'i')
+// The connective left dangling on the direction once its attribution is cut.
+const TRAILING_CONNECTIVE = /[\s,;:]*\b(?:and|then|as|while)\s*$/i
+
+function splitSpokenLines(body: string): SceneSegment[] {
+  const segments: SceneSegment[] = []
+  const quoted = /["“]([^"”\n]{2,})["”]/g
+  let cursor = 0
+  let match: RegExpExecArray | null
+  while ((match = quoted.exec(body)) !== null) {
+    const before = body.slice(cursor, match.index)
+    const lead = before.replace(/\s+$/, '')
+    const named = NAMED_ATTRIBUTION.exec(lead)
+    const bare = named ? null : BARE_ATTRIBUTION.exec(lead)
+    // A quote nobody is introduced as speaking isn't dialogue — it's a scare
+    // quote living inside the direction ("has a visible "wait, what?"
+    // reaction"). Leaving `cursor` where it is keeps it in the prose instead of
+    // promoting it to a line and cutting the sentence in half around it.
+    if (!named && !bare) continue
+    // Peel the introduction off the direction so it doesn't trail off
+    // mid-sentence ("…leans in and [CHARACTER] says:").
+    const speaker = named ? named[1].replace(SPEECH_VERB, '').trim() || named[1].trim() : null
+    const direction = lead
+      .slice(0, (named ?? bare)!.index)
+      .replace(TRAILING_CONNECTIVE, '')
+      .replace(/^[\s,;:]+|[\s,;:]+$/g, '')
+    if (direction) segments.push({ kind: 'direction', text: direction })
+    segments.push({ kind: 'line', speaker, text: match[1].trim() })
+    cursor = match.index + match[0].length
+  }
+  const tail = body.slice(cursor).replace(/^[\s,;:]+|[\s,;:]+$/g, '')
+  if (tail) segments.push({ kind: 'direction', text: tail })
+  return segments
+}
+
+// Reference-image slots, not typos — B-Roll binds them to the real character
+// and packaging, so they read as deliberate placeholders rather than raw text.
+const TOKEN_SPLIT = /(\[(?:CHARACTER|PRODUCT|INFLUENCER)\])/g
+const IS_TOKEN = /^\[(?:CHARACTER|PRODUCT|INFLUENCER)\]$/
+
+function TokenText({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(TOKEN_SPLIT).map((part, i) =>
+        IS_TOKEN.test(part) ? (
+          // Tinted inline text, not a pill: a pill is an inline-block box, so
+          // it fractured the paragraph's line-breaking and orphaned the
+          // possessive in "[CHARACTER]'s hands". The brackets already say
+          // "slot"; the colour just stops it reading as a typo.
+          <span key={i} className="font-medium text-scripts-300/90">
+            [{part.slice(1, -1).toLowerCase()}]
+          </span>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  )
+}
+
+// The spoken line — the thing that gets read aloud. Tinted, set at reading
+// size, and separately copyable, because it's what leaves this app.
+function SpokenLine({ speaker, text }: { speaker: string | null; text: string }) {
+  const [copied, setCopied] = useState(false)
+  const addToast = useAppStore((s) => s.addToast)
+  const handleCopy = async () => {
+    const ok = await copyToClipboard(text)
+    if (ok) {
+      setCopied(true)
+      addToast('Line copied to clipboard')
+      setTimeout(() => setCopied(false), 2000)
+    } else {
+      addToast('Copy failed', 'error')
+    }
+  }
+  return (
+    <div className="relative rounded-xl border border-scripts-500/15 bg-scripts-500/[0.05] py-2.5 pl-3.5 pr-10">
+      {speaker && (
+        <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-tight text-scripts-300/80">
+          <Quote className="h-2.5 w-2.5" strokeWidth={2.5} />
+          {speaker.replace(/^\[|\]$/g, '').toLowerCase()}
+        </div>
+      )}
+      <p className="text-[15px] font-light leading-snug tracking-tight text-ink-100">“{text}”</p>
+      <button
+        onClick={handleCopy}
+        title="Copy line"
+        aria-label="Copy line"
+        className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
+      >
+        {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
+      </button>
+    </div>
+  )
 }
 
 interface VariationCardProps {
@@ -559,6 +705,11 @@ function SceneChunkCard({ chunk }: { chunk: SceneChunk }) {
       addToast('Copy failed', 'error')
     }
   }
+  // Split the paragraph into direction + spoken lines. A body with nothing in
+  // quotes (a silent scene, or a shape the parser doesn't recognise) falls back
+  // to the plain prose block, so nothing can render as an empty card.
+  const segments = useMemo(() => splitSpokenLines(chunk.body), [chunk.body])
+  const hasSpoken = segments.some((s) => s.kind === 'line')
   return (
     <div className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 card-soft-shadow">
       <div className="relative mb-2 flex items-center justify-center gap-2 px-8">
@@ -573,11 +724,27 @@ function SceneChunkCard({ chunk }: { chunk: SceneChunk }) {
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      {/* Body matches the Write/Remix script output: inherited Geist + white
-          (a div, not <pre>, so it doesn't fall back to UA monospace). */}
-      <div className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100">
-        {chunk.body}
-      </div>
+      {hasSpoken ? (
+        <div className="flex flex-col gap-2">
+          {segments.map((segment, i) =>
+            segment.kind === 'line' ? (
+              <SpokenLine key={i} speaker={segment.speaker} text={segment.text} />
+            ) : (
+              // Direction is context for the shot, not the script — set a step
+              // down in size and weight so the eye lands on the line first.
+              <p key={i} className="px-1 text-[12.5px] font-light leading-relaxed tracking-tight text-ink-400">
+                <TokenText text={segment.text} />
+              </p>
+            ),
+          )}
+        </div>
+      ) : (
+        // Body matches the Write/Remix script output: inherited Geist + white
+        // (a div, not <pre>, so it doesn't fall back to UA monospace).
+        <div className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100">
+          <TokenText text={chunk.body} />
+        </div>
+      )}
     </div>
   )
 }
@@ -594,7 +761,9 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
 
   // Take switcher — a 1/2/3 row above the cards that scrolls the matching take
   // into view. `activeTake` tracks which card is currently nearest the top so
-  // the row highlights as you scroll, not just on click.
+  // the row highlights as you scroll, not just on click. Deliberately a scroll
+  // rather than tabs: every take stays in one continuous column, so you can read
+  // straight through them instead of committing to one at a time.
   const scrollRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const [activeTake, setActiveTake] = useState(0)

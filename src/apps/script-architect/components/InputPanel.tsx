@@ -272,7 +272,17 @@ export default function InputPanel({
   // Write New's brief is optional (an empty brief lets the model invent the
   // angle), so that mode only needs a selected product to generate.
   const sourceFilled = mode === 'write' ? true : source.trim().length > 0
-  const canGenerate = sourceFilled && selectedProduct !== null
+  // What's still missing, in the order the column asks for it. A greyed
+  // Generate is supposed to say what it wants on its own — but this form has
+  // two dashed picker rows and only ONE of them (Product) actually gates the
+  // run, so an unexplained grey-out reads as "pick a Script Style too". The
+  // button names the real blocker instead.
+  const blocker = !sourceFilled
+    ? { label: 'Paste a script to remix', icon: FileText }
+    : !selectedProduct
+      ? { label: 'Pick a product to generate', icon: Package }
+      : null
+  const canGenerate = blocker === null
 
   const handleOpenFinder = () => {
     sendToApp({ targetApp: 'finder', targetField: 'activeBank', data: 'products' })
@@ -798,6 +808,11 @@ export default function InputPanel({
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               <span>{mode === 'write' ? (writeFormat === 'hooks' ? `Writing ${HOOK_COUNT} Hooks...` : `Writing ${variationCount} Takes...`) : blueprintActive ? 'Rewriting Scene Prompts...' : `Generating ${variationCount} Script Variations...`}</span>
+            </>
+          ) : blocker ? (
+            <>
+              <blocker.icon className="h-4 w-4" strokeWidth={2.5} />
+              <span>{blocker.label}</span>
             </>
           ) : (
             <>
