@@ -114,56 +114,6 @@ export const VOICE_ACCENTS = [
   'Australian',
 ] as const
 
-// Ready-made scene + tone pairs, offered as one-tap chips under those two
-// boxes. They're the directions UGC ad reads actually use — writing them from
-// scratch every time was the reason both fields sat empty. Tapping a chip fills
-// both boxes; the text stays editable afterwards.
-export interface DirectionPreset {
-  id: string
-  label: string
-  scene: string
-  sampleContext: string
-}
-
-export const DIRECTION_PRESETS: DirectionPreset[] = [
-  {
-    id: 'excited-find',
-    label: 'Excited find',
-    scene: 'A creator filming a quick selfie video in a sunny apartment, buzzing about something they just discovered.',
-    sampleContext: 'An excited creator sharing a product they love with a close friend.',
-  },
-  {
-    id: 'calm-explainer',
-    label: 'Calm explainer',
-    scene: 'A quiet, well-lit room; a steady walkthrough delivered straight to camera.',
-    sampleContext: 'A knowledgeable friend calmly explaining why this works. Clear, unhurried, no hype.',
-  },
-  {
-    id: 'real-talk',
-    label: 'Real talk',
-    scene: 'Filmed in the car after a long day, phone propped against the dash.',
-    sampleContext: 'Blunt and unfiltered — the honest take a friend gives you when nobody is selling anything.',
-  },
-  {
-    id: 'hype-promo',
-    label: 'Hype promo',
-    scene: 'A fast, punchy product ad that hits full energy on the first word.',
-    sampleContext: 'High-energy pitch. Big, confident claims and no dead air between them.',
-  },
-  {
-    id: 'late-night',
-    label: 'Late night',
-    scene: 'A dim bedroom late at night, talking quietly into the phone.',
-    sampleContext: 'Low, close and conspiratorial, like letting someone in on a secret.',
-  },
-  {
-    id: 'warm-review',
-    label: 'Warm review',
-    scene: 'A relaxed kitchen counter in mid-morning light.',
-    sampleContext: 'A grateful long-time user telling their story warmly and without rushing.',
-  },
-]
-
 export interface VoiceSettings {
   // For Gemini, voiceId === the voice_name (kept as `voiceId` so bank rows,
   // cloud sync, and seed colours don't have to change shape).

@@ -46,7 +46,7 @@ export default function Slider({
         <span
           // Matches SETTING_LABEL in SettingsView — the one size every setting
           // subheading in this panel reads at.
-          className="relative cursor-help text-xs font-medium text-ink-200"
+          className="relative cursor-help text-[13px] font-medium text-ink-200"
           onMouseEnter={() => setLabelHover(true)}
           onMouseLeave={() => setLabelHover(false)}
           onFocus={() => setLabelHover(true)}
