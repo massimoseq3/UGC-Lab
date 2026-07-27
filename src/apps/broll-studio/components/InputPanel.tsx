@@ -449,8 +449,8 @@ export default function InputPanel({
           {/* The two decisions that shape the output, docked together above
               Generate — and the two things Generate is gated on. The
               References column above says what the ad is ABOUT (product,
-              character, words); this pair says what it IS: how it's shot
-              (Ad Format) and how it looks (Visual Style). One bordered block
+              character, words); this pair says what it IS: how it looks
+              (Visual Style) and how it's shot (Ad Format). One bordered block
               rather than two stacked ones: that cost a border, a padding pair
               and a gap the column couldn't spare, and they read as a single
               decision anyway. They sit as plain rows in the band, the same
@@ -462,70 +462,7 @@ export default function InputPanel({
               your saved styles, and the analyse-from-references flow), the
               Formats/Structures slide-over for the format. Both are dashed and
               asking to be filled until picked, accent-filled with a clear X
-              after; a custom style shows its name with a Custom tag.
-
-              Ad Format leads: it's the primary creative input — it can write
-              the script, and it stages every shot — so it's the first of the
-              pair to decide. */}
-
-          {/* Ad Format — NOT a fallback for "I have no script": a format
-              carries the scene staging that every prompt is written against,
-              so it decides how the ad is SHOT whether or not the words come
-              from here. With no script it writes those too, at the length
-              below. That double job is why Formats lead its picker. */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setStyleSlideOpen(true)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
-            className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
-              autoScriptStyle
-                ? 'border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10'
-                : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
-            }`}
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
-              {isWriteStyle(autoScriptStyle) && WRITE_STYLE_META[autoScriptStyle].group === 'format'
-                ? <Video className="h-5 w-5" strokeWidth={1.75} />
-                : <FileText className="h-5 w-5" strokeWidth={1.75} />}
-            </div>
-            <div className="min-w-0 flex-1">
-              {autoScriptStyle ? (
-                <>
-                  <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">
-                    {isWriteStyle(autoScriptStyle) ? WRITE_STYLE_META[autoScriptStyle].label : STANDARD_UGC.label}
-                  </div>
-                  <div className="truncate text-[11px] leading-snug text-ink-500">
-                    {isWriteStyle(autoScriptStyle) ? WRITE_STYLE_META[autoScriptStyle].hint : STANDARD_UGC.hint}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="text-[13px] font-medium text-ink-300">Ad Format</div>
-                  <div className="text-[11px] text-ink-600">Sets how the ad is shot</div>
-                </>
-              )}
-            </div>
-            {autoScriptStyle ? (
-              <div className="flex shrink-0 items-center gap-1">
-                <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
-                  <RefreshCw className="h-2.5 w-2.5" />
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onAutoScriptStyleChange(null) }}
-                  title="Clear format"
-                  aria-label="Clear format"
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ) : (
-              <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
-            )}
-          </div>
-
+              after; a custom style shows its name with a Custom tag. */}
           <div
             role="button"
             tabIndex={0}
@@ -570,6 +507,65 @@ export default function InputPanel({
                   onClick={(e) => { e.stopPropagation(); onClearStyle() }}
                   title="Clear style"
                   aria-label="Clear style"
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
+            )}
+          </div>
+
+          {/* Ad Format — NOT a fallback for "I have no script": a format
+              carries the scene staging that every prompt is written against,
+              so it decides how the ad is SHOT whether or not the words come
+              from here. With no script it writes those too, at the length
+              below. That double job is why Formats lead its picker. */}
+
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setStyleSlideOpen(true)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
+            className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
+              autoScriptStyle
+                ? 'border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10'
+                : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
+            }`}
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
+              {isWriteStyle(autoScriptStyle) && WRITE_STYLE_META[autoScriptStyle].group === 'format'
+                ? <Video className="h-5 w-5" strokeWidth={1.75} />
+                : <FileText className="h-5 w-5" strokeWidth={1.75} />}
+            </div>
+            <div className="min-w-0 flex-1">
+              {autoScriptStyle ? (
+                <>
+                  <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">
+                    {isWriteStyle(autoScriptStyle) ? WRITE_STYLE_META[autoScriptStyle].label : STANDARD_UGC.label}
+                  </div>
+                  <div className="truncate text-[11px] leading-snug text-ink-500">
+                    {isWriteStyle(autoScriptStyle) ? WRITE_STYLE_META[autoScriptStyle].hint : STANDARD_UGC.hint}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-[13px] font-medium text-ink-300">Ad Format</div>
+                  <div className="text-[11px] text-ink-600">Sets how the ad is shot</div>
+                </>
+              )}
+            </div>
+            {autoScriptStyle ? (
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
+                  <RefreshCw className="h-2.5 w-2.5" />
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onAutoScriptStyleChange(null) }}
+                  title="Clear format"
+                  aria-label="Clear format"
                   className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
                 >
                   <X className="h-3.5 w-3.5" />
