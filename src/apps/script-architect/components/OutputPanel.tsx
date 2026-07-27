@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Copy, Check, Bookmark, ArrowUpRight, Mic, Film, PenLine, AlertCircle, ImagePlay, Pencil, X, Undo2, Redo2 } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
+import GridCanvas from '../../../components/GridCanvas'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import type { CinematicHandoffRef, CinematicVideoPayload, Model } from '../../../stores/types'
@@ -723,37 +724,43 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
         ? ['Building the angles...', 'Sending parallel requests...', 'Writing variations...', 'Polishing final drafts...']
         : ['Reading scene blueprint...', 'Mapping product into structure...', 'Rewriting scenes...', 'Preserving structure...']
     return (
-      <div className="flex h-full flex-col gap-2 p-5">
-        <GenerationProgress isActive color="bg-scripts-500" messages={message} showHelper={false} />
-        <div className="flex flex-1 min-h-0 flex-col gap-3 rounded-3xl border border-ink/5 bg-surface-1 p-5">
-          <div className="skeleton h-4 w-full" />
-          <div className="skeleton h-4 w-[90%]" />
-          <div className="skeleton h-4 w-[95%]" />
-          <div className="skeleton h-4 w-[70%]" />
-          <div className="mt-2 skeleton h-4 w-full" />
-          <div className="skeleton h-4 w-[85%]" />
-          <div className="skeleton h-4 w-[92%]" />
+      <GridCanvas className="h-full">
+        <div className="relative flex h-full flex-col gap-2 p-5">
+          <GenerationProgress isActive color="bg-scripts-500" messages={message} showHelper={false} />
+          {/* Accent glow while the words are being written — the same "this is
+              alive" cue the media apps get on a generating frame. */}
+          <div className="flex flex-1 min-h-0 flex-col gap-3 rounded-3xl border border-scripts-500/20 bg-surface-1 p-5 shadow-[0_0_90px_-24px_var(--color-scripts-500)]">
+            <div className="skeleton h-4 w-full" />
+            <div className="skeleton h-4 w-[90%]" />
+            <div className="skeleton h-4 w-[95%]" />
+            <div className="skeleton h-4 w-[70%]" />
+            <div className="mt-2 skeleton h-4 w-full" />
+            <div className="skeleton h-4 w-[85%]" />
+            <div className="skeleton h-4 w-[92%]" />
+          </div>
         </div>
-      </div>
+      </GridCanvas>
     )
   }
 
   if (variations.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-8">
-        <PenLine className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
-        <p className="text-sm text-ink-700">
-          {copyMode === 'write'
-            ? (writeFormat === 'prompt' ? 'Your cinematic concepts will appear here' : writeFormat === 'hooks' ? `Your ${HOOK_COUNT} hooks will appear here` : 'Your takes will appear here')
-            : copyMode === 'remix' ? 'Your script variations will appear here' : 'Your scene prompts will appear here'}
-        </p>
-        {error && (
-          <div className="mt-2 flex max-w-sm items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400 light:text-red-600" />
-            <p className="text-xs leading-relaxed text-red-300 light:text-red-700">{error}</p>
-          </div>
-        )}
-      </div>
+      <GridCanvas className="h-full">
+        <div className="relative flex h-full flex-col items-center justify-center gap-3 p-8">
+          <PenLine className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
+          <p className="text-sm text-ink-700">
+            {copyMode === 'write'
+              ? (writeFormat === 'prompt' ? 'Your cinematic concepts will appear here' : writeFormat === 'hooks' ? `Your ${HOOK_COUNT} hooks will appear here` : 'Your takes will appear here')
+              : copyMode === 'remix' ? 'Your script variations will appear here' : 'Your scene prompts will appear here'}
+          </p>
+          {error && (
+            <div className="mt-2 flex max-w-sm items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400 light:text-red-600" />
+              <p className="text-xs leading-relaxed text-red-300 light:text-red-700">{error}</p>
+            </div>
+          )}
+        </div>
+      </GridCanvas>
     )
   }
 
@@ -764,6 +771,8 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
     : remixAnglesForCount(variations.length)
   const takeUnit = isCinematic ? 'Concept' : mode === 'remix' ? 'Variation' : 'Take'
 
+  // No canvas once the takes are in: the grid marks an empty stage waiting for
+  // work, and behind finished output it's just texture under the reading.
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {variations.length > 1 && (

@@ -1,14 +1,14 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
-import { Loader2, Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2 } from 'lucide-react'
+import { Loader2, Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown } from 'lucide-react'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState } from '../../../hooks/useAssetUrl'
 import { getUrl } from '../../../utils/assetStore'
 import { useAppStore } from '../../../stores/appStore'
 import { usePersistedState } from '../../../hooks/usePersistedState'
 import { humanizeError } from '../../../utils/friendlyError'
-import { sectionLabel, groupByDay } from '../../../utils/history'
+import { sectionLabel, groupByDay, formatRelative } from '../../../utils/history'
 import type { CharacterHistoryItem } from '../../../stores/types'
-import type { InFlightCharacterGen, LaunchGenOptions } from '../types'
+import type { CharacterProfile, InFlightCharacterGen, LaunchGenOptions } from '../types'
 import { getModel } from '../../../utils/models'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
@@ -24,6 +24,8 @@ import { downloadImage } from '../../../utils/downloadImage'
 // height. Min → a 16:9 frame (landscape fills, no bars); max → a tall frame.
 const LIST_CARD_MIN = 200
 const LIST_CARD_MAX = 560
+
+type ViewMode = 'single' | 'list' | 'grid'
 
 interface GalleryPanelProps {
   inFlight: InFlightCharacterGen[]
@@ -41,9 +43,11 @@ export default function GalleryPanel({
   // into sheet mode so the user just hits Generate; a normal click is edit.
   const [previewMode, setPreviewMode] = useState<'edit' | 'sheet'>('edit')
 
-  // Grid (masonry) vs List (stacked rows). Persisted globally so the choice
-  // sticks across reloads — mirrors the Playground's List/Grid switch.
-  const [viewMode, setViewMode] = usePersistedState<'grid' | 'list'>('ai-ugc-lab:influencers:history-view', 'grid')
+  // Single (just the newest generation) vs Grid (masonry) vs List (stacked
+  // rows). Persisted globally so the choice sticks across reloads — Grid/List
+  // mirror the Playground's switch; Single is the distraction-free view for
+  // screen recording, where a full history of past characters is on camera.
+  const [viewMode, setViewMode] = usePersistedState<ViewMode>('ai-ugc-lab:influencers:history-view', 'grid')
   // List-view card size — the media frame height (px), set by the header slider.
   const [listCardHeight, setListCardHeight] = usePersistedState<number>('ai-ugc-lab:influencers:list-card-height', 300)
   const cardPct = ((listCardHeight - LIST_CARD_MIN) / (LIST_CARD_MAX - LIST_CARD_MIN)) * 100
@@ -79,6 +83,13 @@ export default function GalleryPanel({
 
   const isEmpty = characterHistory.length === 0 && inFlight.length === 0
 
+  // Single view's "clear the frame" state. Holds the id that was cleared, so a
+  // newer generation (or one still running) fills the frame again on its own —
+  // no effect, no stale flag to reset.
+  const [clearedId, setClearedId] = useState<string | null>(null)
+  const frameCleared = inFlight.length === 0 && clearedId === (characterHistory[0]?.id ?? 'none')
+  const singleItem = frameCleared ? undefined : characterHistory[0]
+
   return (
     <div className="flex h-full min-w-0 flex-col">
       {/* Header — card-size slider (list view only) + view switch (Grid / List).
@@ -88,6 +99,19 @@ export default function GalleryPanel({
       <div className="flex h-[57px] shrink-0 items-center justify-end gap-3 border-b border-ink/5 px-4">
         {!isEmpty && (
           <>
+            {/* Single view only: empty the frame back to "Awaiting generation".
+                Nothing is deleted — the history is one toggle away, and the next
+                generation fills the frame again. */}
+            {viewMode === 'single' && !frameCleared && (
+              <button
+                type="button"
+                title="Clear the frame"
+                onClick={() => setClearedId(characterHistory[0]?.id ?? 'none')}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            )}
             {viewMode === 'list' && (
               <div className="flex items-center gap-2.5" title="Card size">
                 <Maximize2 className="h-3.5 w-3.5 text-ink-500" />
@@ -121,6 +145,16 @@ export default function GalleryPanel({
             Every character you make lands here, sorted by day.
           </p>
         </div>
+      ) : viewMode === 'single' ? (
+        <SingleView
+          inFlight={inFlight}
+          item={singleItem}
+          onCancelGen={onCancelGen}
+          onClick={() => { setPreviewMode('edit'); setPreviewItem(characterHistory[0]) }}
+          onDelete={() => deleteCharacterHistory(characterHistory[0].id)}
+          onMakeSheet={() => { setPreviewMode('sheet'); setPreviewItem(characterHistory[0]) }}
+          onCopyPrompt={() => handleCopyPrompt(characterHistory[0])}
+        />
       ) : (
         <>
           {/* Scrollable gallery */}
@@ -200,16 +234,18 @@ export default function GalleryPanel({
 
 // ── View toggle ─────────────────────────────────────────────────
 
-// Grid / List switch in the gallery header. Same shape as the Playground's so
-// the two tabs read as a matched pair across the app.
-function ViewToggle({ value, onChange }: { value: 'grid' | 'list'; onChange: (v: 'grid' | 'list') => void }) {
+// Single / List / Grid switch in the gallery header. List and Grid keep the
+// Playground's shape so the two tabs read as a matched pair; Single sits first
+// because it's the narrowest view of the same feed.
+function ViewToggle({ value, onChange }: { value: ViewMode; onChange: (v: ViewMode) => void }) {
   return (
-    <SegmentedToggle<'grid' | 'list'>
+    <SegmentedToggle<ViewMode>
       fitContent
       className="h-10 !p-1"
       value={value}
       onChange={onChange}
       options={[
+        { value: 'single', label: 'Single', icon: RectangleVertical },
         { value: 'list', label: 'List', icon: List },
         { value: 'grid', label: 'Grid', icon: LayoutGrid },
       ]}
@@ -414,6 +450,324 @@ function NameEditor({
       >
         {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
       </button>
+    </div>
+  )
+}
+
+// ── Single view ─────────────────────────────────────────────────
+
+function ratioOf(ar: string): number {
+  if (ar.includes('16:9')) return 16 / 9
+  if (ar.includes('1:1')) return 1
+  return 9 / 16
+}
+
+// Sizes the single view's media frame so it hugs the picture exactly: the frame
+// keeps the output's aspect ratio and fills whichever axis runs out first, which
+// puts the badge and the glow on the image's own edges instead of stranding them
+// in letterbox space. CSS alone can't do it — `aspect-ratio` needs one definite
+// axis, and a fixed choice either distorts the box (a 16:9 sheet in a tall
+// panel) or overflows it. Measures the container, never the frame, so setting
+// the frame's size can't feed back into the measurement.
+function useFitFrame(aspectRatio: string) {
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [fit, setFit] = useState<'width' | 'height'>('height')
+  const ratio = ratioOf(aspectRatio)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const measure = () => {
+      const { width, height } = el.getBoundingClientRect()
+      if (width === 0 || height === 0) return
+      setFit(width / height < ratio ? 'width' : 'height')
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ratio])
+
+  const frameStyle: React.CSSProperties = fit === 'width'
+    ? { width: '100%', aspectRatio: ratio }
+    : { height: '100%', aspectRatio: ratio }
+
+  return { containerRef, frameStyle }
+}
+
+// The graph-paper stage every single-view frame sits on: the picture floats on
+// a faint grid instead of butting against the panel, which is what makes one
+// image on an otherwise empty column read as a deliberate composition. Hands
+// its children the fitted frame style (see `useFitFrame`).
+function Stage({
+  aspectRatio,
+  children,
+}: {
+  aspectRatio: string
+  children: (frameStyle: React.CSSProperties) => React.ReactNode
+}) {
+  const { containerRef, frameStyle } = useFitFrame(aspectRatio)
+  return (
+    <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.02] p-4">
+      <div aria-hidden className="stage-grid pointer-events-none absolute inset-0" />
+      <div ref={containerRef} className="relative flex h-full w-full items-center justify-center">
+        {children(frameStyle)}
+      </div>
+    </div>
+  )
+}
+
+// The distraction-free view: one generation, nothing else. Whatever is
+// happening right now — the newest in-flight gen if one is running, otherwise
+// the newest finished character — fills the panel, so a screen recording shows
+// the character being made and not the reel of everything made before it. The
+// history is untouched; the toggle brings it back.
+function SingleView({
+  inFlight,
+  item,
+  onCancelGen,
+  onClick,
+  onDelete,
+  onMakeSheet,
+  onCopyPrompt,
+}: {
+  inFlight: InFlightCharacterGen[]
+  item: CharacterHistoryItem | undefined
+  onCancelGen: (id: string) => void
+  onClick: () => void
+  onDelete: () => void | Promise<unknown>
+  onMakeSheet: () => void
+  onCopyPrompt: () => void
+}) {
+  // Parallel gens are allowed, so show the one started last and only count the
+  // rest — a queue of tiles is exactly the clutter this view exists to avoid.
+  const active = inFlight.length > 0 ? inFlight[inFlight.length - 1] : undefined
+  const others = Math.max(0, inFlight.length - 1)
+
+  return (
+    // min-h carries the mobile layout, where the column isn't height-constrained
+    // and a flex-1 media frame sized by `height: 100%` would collapse to nothing.
+    <div className="flex min-h-[420px] flex-1 flex-col gap-3 px-4 py-4">
+      {active ? (
+        <>
+          <SingleInFlight gen={active} onCancel={() => onCancelGen(active.id)} />
+          <PromptData profile={active.profile as CharacterProfile | undefined} />
+          <p className="text-center text-[10px] font-medium tracking-wider text-influencers-300">
+            {others > 0 ? `Generating · +${others} more in the queue` : 'Generating…'}
+          </p>
+        </>
+      ) : item ? (
+        <SingleCard
+          item={item}
+          onClick={onClick}
+          onDelete={onDelete}
+          onMakeSheet={onMakeSheet}
+          onCopyPrompt={onCopyPrompt}
+        />
+      ) : (
+        <AwaitingFrame />
+      )}
+    </div>
+  )
+}
+
+// The cleared frame: what the + button leaves behind, and what the view shows
+// before the first generation of a recording session.
+function AwaitingFrame() {
+  return (
+    <Stage aspectRatio="9:16">
+      {() => (
+        <div className="flex flex-col items-center justify-center gap-2">
+          <UserRound className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
+          <p className="text-sm text-ink-500">Awaiting generation</p>
+          <p className="max-w-[280px] text-center text-xs leading-relaxed text-ink-600">
+            The next character lands here. Nothing was deleted — switch to List
+            or Grid for the full history.
+          </p>
+        </div>
+      )}
+    </Stage>
+  )
+}
+
+// The running generation, at the shape it will land in: the frame is already
+// the output's aspect ratio, and the scanning sweep + accent glow read as the
+// picture being developed inside it.
+function SingleInFlight({ gen, onCancel }: { gen: InFlightCharacterGen; onCancel: () => void }) {
+  return (
+    <Stage aspectRatio={gen.aspectRatio}>
+      {(frameStyle) => (
+        <div
+          className="relative overflow-hidden rounded-xl shadow-[0_0_90px_-24px_rgba(247,79,158,0.6)]"
+          style={frameStyle}
+        >
+          <GeneratingTile
+            modelId={gen.modelId}
+            kind={gen.kind}
+            aspectRatio={gen.aspectRatio}
+            onCancel={onCancel}
+            fill
+          />
+        </div>
+      )}
+    </Stage>
+  )
+}
+
+// The newest finished character, as large as the panel allows, over its prompt
+// data and a row of named actions. The grid and list views hide the same actions
+// behind hover icons — here they're spelled out, because this is the view that's
+// on camera and the one where there's room for them.
+function SingleCard({
+  item,
+  onClick,
+  onDelete,
+  onMakeSheet,
+  onCopyPrompt,
+}: {
+  item: CharacterHistoryItem
+  onClick: () => void
+  onDelete: () => void | Promise<unknown>
+  onMakeSheet: () => void
+  onCopyPrompt: () => void
+}) {
+  const a = useHistoryTileActions(item, onDelete)
+
+  return (
+    <>
+      <Stage aspectRatio={item.aspectRatio}>
+        {(frameStyle) => (
+          <div
+            onClick={onClick}
+            className="group relative cursor-pointer overflow-hidden rounded-xl border border-ink/10 bg-black light:bg-zinc-200 shadow-[0_24px_60px_-24px_rgba(0,0,0,0.75)]"
+            style={frameStyle}
+          >
+            {a.status === 'ready' && a.url ? (
+              <img src={a.url} alt="" className="absolute inset-0 h-full w-full object-contain" />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                {a.status === 'loading'
+                  ? <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+                  : <ImageIcon className="h-7 w-7 text-zinc-700" />}
+              </div>
+            )}
+            <SourceBadge isSheet={a.isSheet} savedAsModel={a.savedAsModel} />
+          </div>
+        )}
+      </Stage>
+
+      {a.nameDraft !== null ? (
+        <div className="mx-auto w-full max-w-[340px]">
+          <NameEditor
+            nameDraft={a.nameDraft}
+            setNameDraft={a.setNameDraft}
+            onCommit={a.commitSave}
+            onCancel={() => a.setNameDraft(null)}
+            saving={a.savingToBank}
+          />
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          <ActionPill
+            icon={a.savingToBank ? Loader2 : a.savedAsModel ? Check : Bookmark}
+            label={a.savedAsModel ? 'Saved' : 'Save to Bank'}
+            title={a.savedAsModel ? 'Saved — click to remove from Bank' : 'Save to Bank'}
+            tone={a.savedAsModel ? 'saved' : 'default'}
+            spin={a.savingToBank}
+            onClick={a.toggleSave}
+          />
+          <ActionPill icon={Download} label="Download" onClick={a.handleDownload} />
+          <ActionPill icon={Copy} label="Copy prompt" onClick={onCopyPrompt} />
+          {!a.isSheet && (
+            <ActionPill
+              icon={LayoutGrid}
+              label="Character sheet"
+              title="Make a character sheet from this portrait"
+              onClick={onMakeSheet}
+            />
+          )}
+          <TileDeleteButton variant="chrome" onDelete={a.confirmDelete} busy={a.deleting} />
+        </div>
+      )}
+
+      <PromptData profile={item.profile} />
+
+      <p className="truncate text-center text-[10px] font-medium tracking-wider text-ink-500">
+        {a.modelLabel} · {formatRelative(item.createdAt)}
+      </p>
+    </>
+  )
+}
+
+// Named pill button — the single view's spelled-out version of a tile action.
+function ActionPill({
+  icon: Icon,
+  label,
+  title,
+  onClick,
+  tone = 'default',
+  spin = false,
+}: {
+  icon: React.ElementType
+  label: string
+  title?: string
+  onClick: () => void
+  tone?: 'default' | 'saved'
+  spin?: boolean
+}) {
+  const toneClass = tone === 'saved'
+    ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-300 light:text-emerald-700'
+    : 'border-ink/10 bg-ink/[0.03] text-ink-300 hover:bg-ink/[0.08] hover:text-ink-100'
+  return (
+    <button
+      type="button"
+      title={title ?? label}
+      onClick={onClick}
+      className={`flex h-8 items-center gap-1.5 rounded-full border px-3 text-[12px] font-medium tracking-tight transition-colors ${toneClass}`}
+    >
+      <Icon className={`h-3.5 w-3.5 shrink-0 ${spin ? 'animate-spin' : ''}`} />
+      {label}
+    </button>
+  )
+}
+
+// The generation's parameters as JSON, folded away behind a row. Collapsed by
+// default — the picture is what this view is for — and open it to read or copy
+// the exact object the prompt was built from.
+function PromptData({ profile }: { profile: CharacterProfile | undefined }) {
+  const [open, setOpen] = useState(false)
+  if (!profile) return null
+
+  const json = JSON.stringify(buildJsonPrompt(profile), null, 2)
+
+  async function copyJson() {
+    try {
+      await navigator.clipboard.writeText(json)
+      useAppStore.getState().addToast('Prompt JSON copied', 'success')
+    } catch {
+      useAppStore.getState().addToast('Could not copy the JSON', 'error')
+    }
+  }
+
+  return (
+    <div className="shrink-0">
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-3 text-[12px] font-medium tracking-tight text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
+        >
+          <Braces className="h-3.5 w-3.5 shrink-0 text-ink-500" />
+          <span className="truncate">Prompt data</span>
+          <ChevronDown className={`ml-auto h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        </button>
+        {open && <ActionPill icon={Copy} label="Copy JSON" onClick={copyJson} />}
+      </div>
+      {open && (
+        <pre className="mt-1.5 max-h-44 overflow-auto rounded-2xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5 font-mono text-[11px] leading-relaxed text-ink-400">
+          {json}
+        </pre>
+      )}
     </div>
   )
 }

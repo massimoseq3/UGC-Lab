@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { Film, Plus } from 'lucide-react'
 import type { BrollResult, PromptVariation, CardState, ReferenceImage, BrollMode, ContinuousResult, ContinuousSelection, ContinuousFrameCardState, ContinuousClipCardState } from '../types'
 import type { Product, Model, BrollHistoryItem } from '../../../stores/types'
 import type { ContinuousStoryboardOp } from '../continuousEdits'
@@ -8,6 +9,7 @@ import ScenesView from './ScenesView'
 import ContinuousView from './ContinuousView'
 import BrollHistoryView, { isRetiredOneShotRow } from './BrollHistoryView'
 import SegmentedToggle from '../../../components/SegmentedToggle'
+import GridCanvas, { AwaitingBody } from '../../../components/GridCanvas'
 
 interface RightPanelProps {
   mode: BrollMode
@@ -45,6 +47,10 @@ interface RightPanelProps {
   setCardStates: React.Dispatch<React.SetStateAction<Record<string, CardState>>>
   activeHistoryId: string | null
   onSelectHistory: (item: BrollHistoryItem) => void
+  // Canvas-clear state, owned by BrollStudio so the left panel's "New" can
+  // trigger it too. Never touches data — the session stays a History row.
+  canvasCleared: boolean
+  onClearCanvas: () => void
 }
 
 type Tab = 'scenes' | 'history'
@@ -88,6 +94,8 @@ export default function RightPanel(props: RightPanelProps) {
     setCardStates,
     activeHistoryId,
     onSelectHistory,
+    canvasCleared,
+    onClearCanvas,
   } = props
 
   const baseKey = useProjectScopedKey('broll-studio')
@@ -106,11 +114,21 @@ export default function RightPanel(props: RightPanelProps) {
     : (result?.scenes.length ?? 0)
   const historyCount = brollHistory.length
 
+  // "Clear the canvas" — the header's + and the left panel's New both empty the
+  // storyboard so the last session isn't on camera while a new one is filmed.
+  // Nothing is deleted (the session is a History row); the state lives in
+  // BrollStudio because New fires from the other column.
+  const cleared = !isGenerating && sceneCount > 0 && canvasCleared
+
+  // The grid canvas marks a stage with nothing on it yet. Once the storyboard
+  // renders, it goes — behind a wall of cards it's just noise.
+  const showCanvas = cleared || !!isGenerating || sceneCount === 0
+
   return (
     <div className="flex h-full flex-col">
       {/* Toggle strip — no global Settings popover anymore: each card owns its
           own settings inside its detail modal. */}
-      <div className="flex h-[57px] items-center border-b border-ink/5 px-5">
+      <div className="flex h-[57px] items-center justify-between gap-3 border-b border-ink/5 px-5">
         <SegmentedToggle<Tab>
           className="h-10 !p-1 min-w-0"
           value={tab}
@@ -120,10 +138,41 @@ export default function RightPanel(props: RightPanelProps) {
             { value: 'history', label: 'History', badge: historyCount > 0 ? historyCount : undefined },
           ]}
         />
+        {tab === 'scenes' && !cleared && !isGenerating && sceneCount > 0 && (
+          <button
+            type="button"
+            title="Clear the canvas"
+            onClick={onClearCanvas}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        {tab === 'scenes' && isContinuous ? (
+        {/* The storyboard works on the same graph-paper canvas as the other
+            apps' output panels. History keeps the plain surface — it's the
+            reel, not the stage. */}
+        {tab === 'history' ? (
+          <BrollHistoryView
+            items={brollHistory}
+            activeId={activeHistoryId}
+            onSelect={(item) => {
+              onSelectHistory(item)
+              setTab('scenes')
+            }}
+            onDelete={(id) => { deleteBrollHistory(id) }}
+          />
+        ) : (
+        <CanvasFrame active={showCanvas}>
+        {cleared ? (
+          <AwaitingBody
+            icon={Film}
+            title="Awaiting storyboard"
+            hint="Your next storyboard lands here. Nothing was deleted — this session is saved in History."
+          />
+        ) : isContinuous ? (
           <ContinuousView
             result={continuousResult}
             isGenerating={isGenerating}
@@ -146,7 +195,7 @@ export default function RightPanel(props: RightPanelProps) {
             onAddConcept={onAddContinuousConcept}
             onEditStoryboard={onEditContinuousStoryboard}
           />
-        ) : tab === 'scenes' ? (
+        ) : (
           <ScenesView
             result={result}
             isGenerating={isGenerating}
@@ -170,18 +219,17 @@ export default function RightPanel(props: RightPanelProps) {
             cardStates={cardStates}
             setCardStates={setCardStates}
           />
-        ) : (
-          <BrollHistoryView
-            items={brollHistory}
-            activeId={activeHistoryId}
-            onSelect={(item) => {
-              onSelectHistory(item)
-              setTab('scenes')
-            }}
-            onDelete={(id) => { deleteBrollHistory(id) }}
-          />
+        )}
+        </CanvasFrame>
         )}
       </div>
     </div>
   )
+}
+
+// The storyboard column, with or without the grid behind it. Both branches keep
+// the same flex shape so toggling the canvas never reflows the view.
+function CanvasFrame({ active, children }: { active: boolean; children: React.ReactNode }) {
+  if (active) return <GridCanvas>{children}</GridCanvas>
+  return <div className="flex min-h-0 flex-1 flex-col">{children}</div>
 }
