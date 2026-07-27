@@ -225,6 +225,9 @@ export default function BrollStudio() {
   // but the pick survives a paste-then-clear round trip, and the staging still
   // rides into the storyboard call so a member who pasted a podcast-clip script
   // gets podcast-clip shots.
+  // null IS a pick — "Standard UGC", the default: no format to imitate, no
+  // mechanic imposed, plain organic UGC shots. Every other value names a format
+  // or a structure from Scripts' own list.
   const [autoScriptStyle, setAutoScriptStyle] = usePersistedState<WriteStyle | null>(
     `${baseKey}:autoScriptStyle`,
     null,
@@ -961,7 +964,6 @@ export default function BrollStudio() {
     setIsGenerating(true)
     try {
       if (!script) {
-        if (!autoScriptStyle) return
         if (!useSettingsStore.getState().kieApiKey) {
           useAppStore.getState().addToast('Add your kie.ai key in Settings to write a script here', 'info')
           return

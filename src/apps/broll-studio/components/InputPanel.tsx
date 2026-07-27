@@ -12,6 +12,18 @@ import ClearAllButton from '../../../components/ClearAllButton'
 import { estimatePromptCredits } from '../services/promptCost'
 import { formatCredits } from '../../../utils/models'
 
+// The Ad Format's default, and what `autoScriptStyle: null` means: no format to
+// imitate and no persuasion mechanic imposed, so the storyboard gets no scene
+// staging and the shots come out as plain organic UGC. Most ads want this — the
+// named formats are for when you're deliberately disguising the ad as a podcast
+// clip or a street interview. Lives here rather than in Scripts' WRITE_STYLE_META
+// because Scripts always writes in a named style; only B-Roll has a "just make
+// it normal" case.
+const STANDARD_UGC = {
+  label: 'Standard UGC',
+  hint: 'Plain creator footage — no format imposed',
+}
+
 interface InputPanelProps {
   selectedProduct: Product | null
   selectedModel: Model | null
@@ -114,8 +126,11 @@ function BankCard({
         <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${accentClass}`}>
           <Icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
         </div>
+        {/* 13px: the same trigger text every ModelPicker uses, so a picker
+            row reads the same weight wherever it appears in the app. The two
+            settings-band rows below match it. */}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-ink-300">{label}</p>
+          <p className="truncate text-[13px] font-medium text-ink-300">{label}</p>
           <p className="truncate text-[11px] text-ink-600">{emptyHint ?? 'Click to select from bank'}</p>
         </div>
         {/* The OPTIONAL tag takes the chevron's slot rather than sitting beside
@@ -184,7 +199,7 @@ function ProductCard({ product }: { product: Product }) {
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-ink-200">{product.productName}</p>
+        <p className="truncate text-[13px] font-medium text-ink-200">{product.productName}</p>
         <p className="truncate text-[11px] text-ink-500">Product</p>
       </div>
     </div>
@@ -207,7 +222,7 @@ function ModelCard({ model }: { model: Model }) {
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-ink-200">{model.name}</p>
+        <p className="truncate text-[13px] font-medium text-ink-200">{model.name}</p>
         <p className="truncate text-[11px] text-ink-500">Character</p>
       </div>
     </div>
@@ -222,7 +237,7 @@ function ScriptCard({ script }: { script: Script | null }) {
         <FileText className="h-[18px] w-[18px]" strokeWidth={1.5} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-ink-200">{title}</p>
+        <p className="truncate text-[13px] font-medium text-ink-200">{title}</p>
         <p className="truncate text-[11px] text-ink-500">Script</p>
       </div>
     </div>
@@ -262,17 +277,10 @@ export default function InputPanel({
   onClearStyle,
 }: InputPanelProps) {
   const hasScript = scriptText.trim().length > 0
-  // Two required inputs, and neither is the script. The FORMAT says what kind
-  // of ad gets shot (and writes the words when none are supplied); the VISUAL
-  // STYLE says what it looks like. A script is the optional override for the
-  // words only — bringing one doesn't tell us how to shoot it, so the format is
-  // still needed. The one exception is a session that predates the format
-  // picker: it had a script and no format, and it must stay generatable.
-  const canGenerate = (!!autoScriptStyle || hasScript) && styleChosen
-  // What's still missing, in the order the panel asks for it.
-  const missing = !autoScriptStyle && !hasScript ? 'format'
-    : !styleChosen ? 'look'
-    : null
+  // The look is the only thing that must be chosen. The Ad Format always has a
+  // value — Standard UGC when nothing else is picked — and the script is
+  // optional, since the format writes one when it's blank.
+  const canGenerate = styleChosen
   const [scriptExpanded, setScriptExpanded] = useState(false)
   const [instructionsExpanded, setInstructionsExpanded] = useState(false)
   const [styleSlideOpen, setStyleSlideOpen] = useState(false)
@@ -444,167 +452,137 @@ export default function InputPanel({
               (Visual Style) and how it's shot (Ad Format). One bordered block
               rather than two stacked ones: that cost a border, a padding pair
               and a gap the column couldn't spare, and they read as a single
-              decision anyway.
+              decision anyway. They sit as plain rows in the band, the same
+              size and width as the reference cards above, rather than boxed
+              inside their own bordered card — and with no uppercase eyebrow
+              labels, which only repeated what the rows already say.
 
               Each row opens its own picker — StyleModal for the look (presets,
               your saved styles, and the analyse-from-references flow), the
               Formats/Structures slide-over for the format. Both are dashed and
               asking to be filled until picked, accent-filled with a clear X
               after; a custom style shows its name with a Custom tag. */}
-          <div className="flex shrink-0 flex-col gap-1.5 rounded-3xl border border-ink/[0.07] bg-ink/[0.02] p-2">
-            <div className="flex items-center justify-between gap-2 px-1.5">
-              <span className="text-[10px] font-medium uppercase tracking-wider text-ink-600">
-                Visual Style
-              </span>
-              {!styleChosen && (
-                <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
-                  Required
-                </span>
-              )}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={onOpenStyle}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenStyle() } }}
+            className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
+              styleChosen
+                ? 'border-broll-500/25 bg-broll-500/[0.07] hover:border-broll-500/35 hover:bg-broll-500/10'
+                : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-broll-500/30 hover:bg-broll-500/5'
+            }`}
+          >
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${styleIsCustom ? 'bg-broll-500/20 text-broll-300' : 'bg-broll-500/10 text-broll-400 light:text-broll-600'}`}>
+              {styleIsCustom ? <Sparkles className="h-5 w-5" strokeWidth={1.75} /> : <Palette className="h-5 w-5" strokeWidth={1.5} />}
             </div>
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={onOpenStyle}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenStyle() } }}
-              className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-3.5 py-2.5 text-left transition-colors ${
-                styleChosen
-                  ? 'border-broll-500/25 bg-broll-500/[0.07] hover:border-broll-500/35 hover:bg-broll-500/10'
-                  : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-broll-500/30 hover:bg-broll-500/5'
-              }`}
-            >
-              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${styleIsCustom ? 'bg-broll-500/20 text-broll-300' : 'bg-broll-500/10 text-broll-400 light:text-broll-600'}`}>
-                {styleIsCustom ? <Sparkles className="h-5 w-5" strokeWidth={1.75} /> : <Palette className="h-5 w-5" strokeWidth={1.5} />}
-              </div>
-              <div className="min-w-0 flex-1">
-                {styleChosen ? (
-                  <>
-                    <div className="flex items-center gap-1.5">
-                      <span className="truncate text-[13px] font-medium tracking-tight text-broll-200 light:text-broll-700">{styleLabel}</span>
-                      {styleIsCustom && (
-                        <span className="shrink-0 rounded-full bg-broll-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-broll-300 light:text-broll-700">
-                          Custom
-                        </span>
-                      )}
-                    </div>
-                    <div className="truncate text-[11px] leading-snug text-ink-500">{styleHint}</div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-sm font-medium text-ink-300">Pick a look</div>
-                    <div className="text-xs text-ink-600">How every clip is rendered</div>
-                  </>
-                )}
-              </div>
+            <div className="min-w-0 flex-1">
               {styleChosen ? (
-                <div className="flex shrink-0 items-center gap-1">
-                  <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
-                    <RefreshCw className="h-2.5 w-2.5" />
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onClearStyle() }}
-                    title="Clear style"
-                    aria-label="Clear style"
-                    className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-[13px] font-medium tracking-tight text-broll-200 light:text-broll-700">{styleLabel}</span>
+                    {styleIsCustom && (
+                      <span className="shrink-0 rounded-full bg-broll-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-broll-300 light:text-broll-700">
+                        Custom
+                      </span>
+                    )}
+                  </div>
+                  <div className="truncate text-[11px] leading-snug text-ink-500">{styleHint}</div>
+                </>
               ) : (
-                <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
+                <>
+                  <div className="text-[13px] font-medium text-ink-300">Visual Style</div>
+                  <div className="text-[11px] text-ink-600">How every clip looks</div>
+                </>
               )}
             </div>
-
-            {/* Ad Format — NOT a fallback for "I have no script": a format
-                carries the scene staging that every prompt is written against,
-                so it decides how the ad is SHOT whether or not the words come
-                from here. With no script it writes those too, at the length
-                below. That double job is why Formats lead its picker. */}
-            <div className="flex items-center justify-between gap-2 px-1.5">
-              <span className="text-[10px] font-medium uppercase tracking-wider text-ink-600">
-                Ad Format
-              </span>
-              {!autoScriptStyle && (
-                <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
-                  Required
+            {styleChosen ? (
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
+                  <RefreshCw className="h-2.5 w-2.5" />
                 </span>
-              )}
-            </div>
-
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => setStyleSlideOpen(true)}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
-              className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-3.5 py-2.5 text-left transition-colors ${
-                autoScriptStyle
-                  ? 'border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10'
-                  : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
-              }`}
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
-                {autoScriptStyle && WRITE_STYLE_META[autoScriptStyle].group === 'format'
-                  ? <Video className="h-5 w-5" strokeWidth={1.75} />
-                  : <FileText className="h-5 w-5" strokeWidth={1.75} />}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onClearStyle() }}
+                  title="Clear style"
+                  aria-label="Clear style"
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <div className="min-w-0 flex-1">
-                {autoScriptStyle ? (
-                  <>
-                    <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">
-                      {WRITE_STYLE_META[autoScriptStyle].label}
-                    </div>
-                    <div className="truncate text-[11px] leading-snug text-ink-500">
-                      {WRITE_STYLE_META[autoScriptStyle].hint}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-sm font-medium text-ink-300">Pick a format</div>
-                    <div className="text-xs text-ink-600">Sets how the ad is shot</div>
-                  </>
-                )}
-              </div>
-              {autoScriptStyle ? (
-                <div className="flex shrink-0 items-center gap-1">
-                  <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
-                    <RefreshCw className="h-2.5 w-2.5" />
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onAutoScriptStyleChange(null) }}
-                    title="Clear format"
-                    aria-label="Clear format"
-                    className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
-              )}
-            </div>
-
-            {/* Length only exists to size a script we're about to write: it sets
-                the word budget, the budget sets how many lines come back, and
-                each line is one scene. A script you brought already has a
-                length, so the control goes away rather than sitting there
-                doing nothing. */}
-            {!hasScript && (
-              <SegmentedToggle<string>
-                // Five segments in a 25%-wide column: the dense preset's px-3
-                // truncates them to "2…" / "3…", so the per-segment padding is
-                // tightened here rather than in the shared component, which
-                // everything else sizes correctly against.
-                className="h-9 !p-1 [&>button]:!px-1.5"
-                dense
-                value={String(autoScriptLength)}
-                onChange={(v) => onAutoScriptLengthChange(Number(v) as WriteLength)}
-                accent="broll"
-                options={WRITE_LENGTHS.map((len) => ({ value: String(len), label: `${len}s` }))}
-              />
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
             )}
           </div>
+
+          {/* Ad Format — NOT a fallback for "I have no script": a format
+              carries the scene staging that every prompt is written against,
+              so it decides how the ad is SHOT whether or not the words come
+              from here. With no script it writes those too, at the length
+              below. That double job is why Formats lead its picker. */}
+
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setStyleSlideOpen(true)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
+            className="group flex w-full cursor-pointer items-center gap-3 rounded-full border border-scripts-500/30 bg-scripts-500/[0.06] px-4 py-2.5 text-left transition-colors hover:bg-scripts-500/10"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
+              {autoScriptStyle && WRITE_STYLE_META[autoScriptStyle].group === 'format'
+                ? <Video className="h-5 w-5" strokeWidth={1.75} />
+                : <FileText className="h-5 w-5" strokeWidth={1.75} />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">
+                {autoScriptStyle ? WRITE_STYLE_META[autoScriptStyle].label : STANDARD_UGC.label}
+              </div>
+              <div className="truncate text-[11px] leading-snug text-ink-500">
+                {autoScriptStyle ? WRITE_STYLE_META[autoScriptStyle].hint : STANDARD_UGC.hint}
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-1">
+              <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
+                <RefreshCw className="h-2.5 w-2.5" />
+              </span>
+              {/* Clearing goes back to Standard UGC, not to nothing — there is
+                  no "no format" state any more, because Standard IS one. */}
+              {autoScriptStyle ? (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onAutoScriptStyleChange(null) }}
+                  title="Back to Standard UGC"
+                  aria-label="Back to Standard UGC"
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              ) : (
+                <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
+              )}
+            </div>
+          </div>
+
+          {/* Length only exists to size a script we're about to write: it sets
+              the word budget, the budget sets how many lines come back, and
+              each line is one scene. A script you brought already has a
+              length, so the control goes away rather than sitting there
+              doing nothing. */}
+          {!hasScript && (
+            <SegmentedToggle<string>
+              // Five segments in a 25%-wide column: the dense preset's px-3
+              // truncates them to "2…" / "3…", so the per-segment padding is
+              // tightened here rather than in the shared component, which
+              // everything else sizes correctly against.
+              className="h-9 !p-1 [&>button]:!px-1.5"
+              dense
+              value={String(autoScriptLength)}
+              onChange={(v) => onAutoScriptLengthChange(Number(v) as WriteLength)}
+              accent="broll"
+              options={WRITE_LENGTHS.map((len) => ({ value: String(len), label: `${len}s` }))}
+            />
+          )}
         </div>
 
         <button
@@ -647,14 +625,12 @@ export default function InputPanel({
             </>
           )}
         </button>
-        {!isGenerating && (missing || !hasScript) && (
+        {/* No "pick a style first" prompt — a greyed-out Generate says that on
+            its own. This line stays because the button doesn't say it: with an
+            empty script box, the click spends an extra call writing one. */}
+        {!isGenerating && styleChosen && !hasScript && (
           <p className="mt-2 text-center text-[10px] text-ink-700">
-            {missing === 'format' ? 'Pick an ad format to get started'
-              : missing === 'look' ? 'Choose a visual style to get started'
-              // Nothing missing but no script — say the extra step out loud,
-              // because Generate is about to spend a call writing one and the
-              // member should know that's what the click does.
-              : `Writes a ${autoScriptLength}s script first, then storyboards it`}
+            Writes a {autoScriptLength}s script first, then storyboards it
           </p>
         )}
       </div>
@@ -693,6 +669,32 @@ export default function InputPanel({
         subtitle="What kind of content the ad looks like — and how it's built"
         size="wide"
       >
+        {/* The default, pinned above the two sections: picking a named format
+            is opting IN to imitating something, and plenty of ads shouldn't. */}
+        <div className="px-4 pt-4">
+          <button
+            type="button"
+            onClick={() => { onAutoScriptStyleChange(null); setStyleSlideOpen(false) }}
+            className={`flex w-full items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
+              autoScriptStyle
+                ? 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'
+                : 'border-broll-500/30 bg-broll-500/10'
+            }`}
+          >
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${autoScriptStyle ? 'bg-ink/5 text-ink-500' : 'bg-broll-500/10 text-broll-400'}`}>
+              <Film className="h-5 w-5" strokeWidth={1.75} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className={`text-[13px] font-medium tracking-tight ${autoScriptStyle ? 'text-ink-200' : 'text-broll-300'}`}>
+                {STANDARD_UGC.label}
+              </div>
+              <div className="text-[11px] leading-snug text-ink-500">{STANDARD_UGC.hint}</div>
+            </div>
+            <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
+              Default
+            </span>
+          </button>
+        </div>
         <ScriptStyleList
           accent="broll"
           formatsFirst

@@ -21,7 +21,12 @@ export interface AutoScriptInput {
   product: Product | null
   // Which Script Style the ad is written in — a structure (the persuasion
   // mechanic) or a format (the kind of organic content it imitates).
-  style: WriteStyle
+  //
+  // null is "Standard UGC": no format to imitate and no mechanic imposed, which
+  // is the default and what most ads want. The write pipeline falls back to its
+  // own default shape, and no scene staging is appended — so the shots come out
+  // as plain organic UGC rather than staged as a podcast or a street interview.
+  style: WriteStyle | null
   // Target read-aloud length in seconds. Drives the word budget, which is what
   // decides how many lines come back — and therefore how many scenes the
   // storyboard has.
@@ -43,7 +48,8 @@ export async function writeAutoScript(input: AutoScriptInput): Promise<string> {
     // whole brief, which is the common case — the member picked a product, a
     // style and a length and expects that to be enough.
     brief: input.notes.trim() || briefFromProduct(input.product),
-    writeStyle: input.style,
+    // Undefined lets runWrite use its own default shape (see Standard UGC above).
+    writeStyle: input.style ?? undefined,
     writeFormat: 'script',
     writeLength: input.length,
     productId: input.product?.id ?? null,

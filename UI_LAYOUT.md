@@ -429,14 +429,14 @@ own paste textarea — that box is `flex-1`, so it takes every spare pixel the
 column has → a **BRIEF** box (labelled **INSTRUCTIONS** once a script exists),
 tagged OPTIONAL, which is a plain textarea you type straight into.
 
-The pinned settings band below holds ONE bordered block with the two decisions
-that shape the output, each under its own label: **VISUAL STYLE** row →
-**AD FORMAT** row (both tagged Required until picked) over a
-**10s / 15s / 20s / 30s / 60s** length toggle that appears only while the script
-box is empty → **Generate B-Roll / Dialogue / Storyboard Prompts** button. The
-line under the button reads "Pick an ad format to get started", then "Choose a
-visual style to get started", then "Writes a 30s script first, then storyboards
-it" while the script is still empty.
+The pinned settings band below holds the two decisions that shape the output as
+plain rows, the same size as the reference cards above: **Visual Style** →
+**Ad Format** (defaults to *Standard UGC*) over a **10s / 15s / 20s / 30s / 60s**
+length toggle that appears only while the script box is empty → **Generate
+B-Roll / Dialogue / Storyboard Prompts** button. No Required tags — the button
+greys out until a visual style is picked, which is the only required input. The
+one line under the button, "Writes a 30s script first, then storyboards it",
+shows only while the script box is empty.
 
 ### Right scenes (`components/RightPanel.tsx` → `ScenesView.tsx`)
 
