@@ -18,7 +18,8 @@ import {
   type PerceptionParseOutcome,
 } from './analyzeAd'
 import { captureFirstFrame } from '../utils/captureFirstFrame'
-import { extractCutKeyframes } from '../utils/extractKeyframes'
+import { extractCutKeyframes, type Keyframe } from '../utils/extractKeyframes'
+import { isPollTimeout } from '../../../utils/kie'
 import { saveAsset, deleteAsset } from '../../../utils/assetStore'
 // `deleteAsset` is still used by applyFailure below.
 import { useBankStore } from '../../../stores/bankStore'
@@ -69,6 +70,9 @@ async function applyFailure(historyId: string, err: unknown) {
   const { updateAdAnatomyHistory, getAdAnatomyHistoryById } = useBankStore.getState()
   const current = getAdAnatomyHistoryById(historyId)
   if (!current) return
+  // The row only ever keeps the friendly copy, so without this the raw kie
+  // message — the one that says WHICH rejection this was — is gone for good.
+  console.error('[ad-anatomy] analysis failed', err)
   const errorMessage = humanizeError(err, 'Analysis failed.')
   await updateAdAnatomyHistory(historyId, {
     status: 'error',
@@ -100,6 +104,34 @@ async function completePerception(historyId: string, outcome: PerceptionParseOut
     taskId: undefined,
   })
   await runSynthesis(historyId, outcome.perception, fileName)
+}
+
+// Pass 1 — createTask first (refresh-safe), streaming fallback otherwise.
+async function runPerception(historyId: string, file: File, keyframes: Keyframe[]): Promise<PerceptionParseOutcome | null> {
+  const { updateAdAnatomyHistory } = useBankStore.getState()
+  const started = await startPerceptionTask(file, keyframes)
+  if (!rowExists(historyId)) return null
+
+  if (started.kind === 'task') {
+    await updateAdAnatomyHistory(historyId, { taskId: started.taskId })
+    return pollPerceptionTask(started.taskId)
+  }
+  // Streaming fallback — can't resume across refresh.
+  return streamPerceptionFallback(file, keyframes)
+}
+
+// Keyframes are declared best-effort by their own extractor, but attaching
+// them makes pass 1's request several MB heavier and its media-part count ~20×
+// bigger — enough for the model to reject the whole call. So a failure with
+// frames attached costs one video-only retry rather than the whole analysis.
+// Skipped when the failure is clearly about the account or the clock, since
+// neither changes on a second identical call.
+const ACCOUNT_ERROR = /\b(401|402|403|433)\b|api key|insufficient credit|usage limit/i
+
+function worthRetryingWithoutKeyframes(err: unknown): boolean {
+  if (isPollTimeout(err)) return false
+  const raw = err instanceof Error ? err.message : String(err)
+  return !ACCOUNT_ERROR.test(raw)
 }
 
 // Pass 2 — createTask first (refresh-safe), streaming fallback otherwise.
@@ -146,20 +178,16 @@ export function enqueueAnalysis(historyId: string, file: File): void {
     const keyframes = await extractCutKeyframes(file)
     if (!rowExists(historyId)) return
 
-    // Pass 1 — try the createTask transport first; if kie's chat endpoint
-    // doesn't support it for this model, fall back to streaming.
     try {
-      const started = await startPerceptionTask(file, keyframes)
-      if (!rowExists(historyId)) return
-
-      let outcome: PerceptionParseOutcome
-      if (started.kind === 'task') {
-        await updateAdAnatomyHistory(historyId, { taskId: started.taskId })
-        outcome = await pollPerceptionTask(started.taskId)
-      } else {
-        // Streaming fallback — can't resume across refresh.
-        outcome = await streamPerceptionFallback(file, keyframes)
+      let outcome: PerceptionParseOutcome | null
+      try {
+        outcome = await runPerception(historyId, file, keyframes)
+      } catch (err) {
+        if (keyframes.length === 0 || !worthRetryingWithoutKeyframes(err)) throw err
+        console.warn('[ad-anatomy] pass 1 failed with keyframes attached — retrying video-only', err)
+        outcome = await runPerception(historyId, file, [])
       }
+      if (!outcome) return // row was deleted mid-flight
       await completePerception(historyId, outcome, file.name)
     } catch (err) {
       await applyFailure(historyId, err)

@@ -18,6 +18,7 @@ const MAX_POLL_ATTEMPTS = 60 // 5 minutes — default for short tasks
 export const IMAGE_POLL_ATTEMPTS = 120 // 10 minutes — GPT Image 2 can run long on complex prompts
 export const VIDEO_POLL_ATTEMPTS = 240 // 20 minutes — Seedance 2 / Veo Quality routinely run 10–15+ min
 export const MUSIC_POLL_ATTEMPTS = 120 // 10 minutes — Suno can stall on busy days
+export const CHAT_POLL_ATTEMPTS = 120 // 10 minutes — a video read at high reasoning effort runs well past the 5-minute default
 
 // ── Types ───────────────────────────────────────────────────────
 
