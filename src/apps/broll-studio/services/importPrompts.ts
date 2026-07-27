@@ -7,7 +7,7 @@
 // the outside model is assembled from the SAME system + user prompts the live
 // call sends, so the two can't drift apart when either is edited.
 
-import type { BrollDelivery, BrollMode, BrollResult, ContinuousResult } from '../types'
+import { isLineMode, type BrollDelivery, type BrollMode, type BrollResult, type ContinuousResult } from '../types'
 import {
   brollSystemInstruction,
   buildBrollUserPrompt,
@@ -67,14 +67,21 @@ export type ImportOutcome =
 // Each mode's envelope has a tag the other never uses, so a paste into the
 // wrong mode can say which mode it actually belongs to instead of just failing.
 
+// Only tells the two ENVELOPES apart: B-Roll and Dialogue share the
+// <SCENE>/<VAR_N> shape, so a per-line paste resolves to 'broll' as the
+// representative and the caller compares with isLineMode. What distinguishes
+// the two is whether the cards speak, which is the member's pick, not the
+// paste's — importing a silent storyboard into Dialogue is a legitimate thing
+// to do, since the prompts are what get rendered either way.
 export function detectImportMode(text: string): BrollMode | null {
   if (/<STORYBOARD>/i.test(text) || /<SCENE_1>/i.test(text)) return 'continuous'
-  if (/<SCENE>/i.test(text) && /<VAR_1>/i.test(text)) return 'line'
+  if (/<SCENE>/i.test(text) && /<VAR_1>/i.test(text)) return 'broll'
   return null
 }
 
 const MODE_LABEL: Record<BrollMode, string> = {
-  line: 'Line-by-Line',
+  broll: 'B-Roll',
+  dialogue: 'Dialogue',
   continuous: 'Continuous',
 }
 
@@ -84,23 +91,22 @@ function wrongModeError(detected: BrollMode, wanted: BrollMode): string {
 
 // ── Per-mode parse ─────────────────────────────────────────────
 
-function importLine(text: string, ctx: ImportContext): ImportOutcome {
+function importLine(mode: BrollMode, text: string, ctx: ImportContext): ImportOutcome {
   const scenes = parseScenes(text, ctx.lineDelivery)
   if (scenes.length === 0) {
     const detected = detectImportMode(text)
     return {
       ok: false,
-      error: detected && detected !== 'line'
-        ? wrongModeError(detected, 'line')
+      error: detected && !isLineMode(detected)
+        ? wrongModeError(detected, mode)
         : `No <SCENE> blocks found. Each scene needs <SCENE>…</SCENE> wrapping a <LINE> and its <VAR_1>…<VAR_${variationsForDelivery(ctx.lineDelivery)}> prompts.`,
     }
   }
 
   const promptCount = scenes.reduce((n, s) => n + s.variations.length, 0)
   const notes: string[] = []
-  // Both deliveries expect three prompts per scene — dialogue just spends the
-  // first slot on the talking card. Read through the helper anyway, so the bar
-  // follows the count if either mode's shape changes again.
+  // Both modes expect three prompts per scene. Read through the helper anyway,
+  // so the bar follows the count if either mode's shape changes again.
   const expected = variationsForDelivery(ctx.lineDelivery)
   const thin = scenes.filter((s) => s.variations.length < expected).map((s) => s.number)
   if (thin.length > 0) {
@@ -114,7 +120,7 @@ function importLine(text: string, ctx: ImportContext): ImportOutcome {
   return {
     ok: true,
     parsed: {
-      mode: 'line',
+      mode,
       lineResult: {
         scenes,
         style: styleBriefFor({ styleId: ctx.styleId, styleBrief: ctx.styleBrief }),
@@ -186,7 +192,7 @@ function importContinuous(text: string, ctx: ImportContext): ImportOutcome {
 
 export function parseImport(mode: BrollMode, text: string, ctx: ImportContext): ImportOutcome {
   if (!text.trim()) return { ok: false, error: 'Paste the prompts first.' }
-  if (mode === 'line') return importLine(text, ctx)
+  if (isLineMode(mode)) return importLine(mode, text, ctx)
   return importContinuous(text, ctx)
 }
 
@@ -197,11 +203,13 @@ export function parseImport(mode: BrollMode, text: string, ctx: ImportContext): 
 // Only the tail changes: the reply is going into a parser, not into a chat.
 
 function importTail(mode: BrollMode): string {
-  const envelope =
-    mode === 'line'
-      ? 'the <SCENE>…</SCENE> blocks (one per line of the script)'
-      : 'the single <STORYBOARD>…</STORYBOARD> envelope'
-  const filename = mode === 'line' ? 'line-by-line-prompts.txt' : 'continuous-storyboard.txt'
+  const perLine = isLineMode(mode)
+  const envelope = perLine
+    ? 'the <SCENE>…</SCENE> blocks (one per line of the script)'
+    : 'the single <STORYBOARD>…</STORYBOARD> envelope'
+  const filename = perLine
+    ? (mode === 'dialogue' ? 'dialogue-prompts.txt' : 'broll-prompts.txt')
+    : 'continuous-storyboard.txt'
 
   return `# HOW YOUR ANSWER IS USED — READ THIS LAST, IT OVERRIDES ANY HABIT TO EXPLAIN YOURSELF
 
@@ -216,7 +224,7 @@ If it's easier to hand me a file than a long message, write the same output to a
 }
 
 export function buildImportBrief(mode: BrollMode, ctx: ImportContext): string {
-  if (mode === 'line') {
+  if (isLineMode(mode)) {
     const input = {
       productId: null,
       modelId: null,
@@ -231,7 +239,7 @@ export function buildImportBrief(mode: BrollMode, ctx: ImportContext): string {
       styleName: ctx.styleName,
       delivery: ctx.lineDelivery,
     }
-    return [brollSystemInstruction(ctx.lineDelivery, ctx.productPhotoCount), buildBrollUserPrompt(input), importTail('line')].join('\n\n')
+    return [brollSystemInstruction(ctx.lineDelivery, ctx.productPhotoCount), buildBrollUserPrompt(input), importTail(mode)].join('\n\n')
   }
 
   const input: ContinuousInput = {

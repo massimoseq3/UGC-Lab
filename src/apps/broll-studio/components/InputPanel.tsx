@@ -1,10 +1,13 @@
 import { useState } from 'react'
-import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput } from 'lucide-react'
+import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote, Video, Wand2 } from 'lucide-react'
 import type { Product, Model, Script } from '../../../stores/types'
-import type { BrollMode, BrollDelivery } from '../types'
+import { deliveryForMode, type BrollMode } from '../types'
+import { WRITE_LENGTHS, WRITE_STYLE_META, type WriteStyle, type WriteLength } from '../../script-architect/types'
+import ScriptStyleList from '../../script-architect/components/ScriptStyleList'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import SegmentedToggle from '../../../components/SegmentedToggle'
+import SlideOver from '../../../components/SlideOver'
 import ClearAllButton from '../../../components/ClearAllButton'
 import { estimatePromptCredits } from '../services/promptCost'
 import { formatCredits } from '../../../utils/models'
@@ -32,13 +35,17 @@ interface InputPanelProps {
   onImportPrompts: () => void
   isGenerating: boolean
   highlightField?: string | null
-  // Line-by-Line vs Continuous. Continuous swaps the right panel for the
-  // keyframe-chain storyboard.
+  // B-Roll / Dialogue (both per-line) vs Continuous, which swaps the right
+  // panel for the keyframe-chain storyboard.
   mode: BrollMode
   onModeChange: (mode: BrollMode) => void
-  // Line-by-Line delivery toggle. 'dialogue' adds one talking card per scene.
-  lineDelivery: BrollDelivery
-  onLineDeliveryChange: (delivery: BrollDelivery) => void
+  // "I don't have a script yet" — pick a Script Style and a length and Generate
+  // writes one before it storyboards. Only offered while the script box is
+  // empty; a pasted or bank-picked script is always what gets storyboarded.
+  autoScriptStyle: WriteStyle | null
+  onAutoScriptStyleChange: (style: WriteStyle | null) => void
+  autoScriptLength: WriteLength
+  onAutoScriptLengthChange: (length: WriteLength) => void
   // Visual style — one row, one popup. The presets, the user's saved styles,
   // and the analyse-from-references flow all live in StyleModal (opened by the
   // parent), so this panel only shows what's picked. The video model is NOT
@@ -225,8 +232,10 @@ export default function InputPanel({
   highlightField,
   mode,
   onModeChange,
-  lineDelivery,
-  onLineDeliveryChange,
+  autoScriptStyle,
+  onAutoScriptStyleChange,
+  autoScriptLength,
+  onAutoScriptLengthChange,
   styleChosen,
   styleLabel,
   styleHint,
@@ -235,24 +244,31 @@ export default function InputPanel({
   onClearStyle,
 }: InputPanelProps) {
   const hasScript = scriptText.trim().length > 0
-  // Style is a required input, like the script: the look drives every prompt in
+  // No script? A picked Script Style is the other way in — Generate writes one
+  // first. Either route needs a visual style: the look drives every prompt in
   // every mode, so it's an explicit decision rather than a silent default.
-  const canGenerate = hasScript && styleChosen
+  const canGenerate = (hasScript || !!autoScriptStyle) && styleChosen
   const [scriptExpanded, setScriptExpanded] = useState(false)
   const [instructionsExpanded, setInstructionsExpanded] = useState(false)
+  const [styleSlideOpen, setStyleSlideOpen] = useState(false)
   const isContinuous = mode === 'continuous'
 
   // Estimated cost of the prompt-writing call behind the Generate button. These
   // are chat completions, so it's fractions of a credit — the pill is there so
-  // nothing ever fires unpriced, not because the number is large.
-  const promptCredits = hasScript ? formatCredits(estimatePromptCredits(mode, scriptText, lineDelivery)) : null
+  // nothing ever fires unpriced, not because the number is large. With no
+  // script yet there's nothing to measure (the script itself is written first,
+  // and its length is what sets the storyboard's size), so the pill sits out.
+  const promptCredits = hasScript ? formatCredits(estimatePromptCredits(mode, scriptText, deliveryForMode(mode))) : null
 
   return (
     <div className="flex flex-col md:h-full">
-      {/* Mode toggle header — Line-by-Line (script → per-line b-roll stills) vs
-          Continuous (script → keyframe chain). Sits in a 57px bar so its
-          border-b lines up with the right panel's Storyboard/History strip,
-          matching every other app's aligned top rule. */}
+      {/* Mode toggle header — the three things this app can make. B-Roll Clips
+          and Dialogue both walk the script line by line; the difference is
+          whether anyone speaks, which decides the whole session, so it sits
+          here rather than in a second toggle further down. Continuous is the
+          keyframe chain. Sits in a 57px bar so its border-b lines up with the
+          right panel's Scenes/History strip, matching every other app's
+          aligned top rule. */}
       <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
         <SegmentedToggle<BrollMode>
           className="h-10 !p-1"
@@ -261,7 +277,8 @@ export default function InputPanel({
           onChange={onModeChange}
           accent="broll"
           options={[
-            { value: 'line', label: 'Line-by-Line', icon: Rows3 },
+            { value: 'broll', label: 'B-Roll', icon: Rows3 },
+            { value: 'dialogue', label: 'Dialogue', icon: MessageSquareQuote },
             { value: 'continuous', label: 'Continuous', icon: Box },
           ]}
         />
@@ -320,7 +337,12 @@ export default function InputPanel({
 
           {/* Script — select from bank (header) or paste manually (textarea),
               merged into one rounded box so the two sources read as one input. */}
-          <div className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border transition-colors ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
+          {/* Grows to fill the column when it holds the script, but stands down
+              to its natural height while the write-it-for-me block is showing —
+              an empty five-row box has nothing to show, and the column is
+              narrow enough that giving it the leftover space pushed the block
+              and the brief below the fold. */}
+          <div className={`flex flex-col overflow-hidden rounded-3xl border transition-colors ${hasScript ? 'min-h-0 flex-1' : 'shrink-0'} ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
             <BankCard
               icon={FileText}
               label="Script / Hooks"
@@ -337,13 +359,99 @@ export default function InputPanel({
               <textarea
                 value={scriptText}
                 onChange={(e) => onScriptTextChange(e.target.value)}
-                rows={5}
+                rows={hasScript ? 5 : 2}
                 placeholder="…or paste your script text here"
-                className="min-h-[92px] w-full grow resize-none border-0 bg-transparent px-4 py-2.5 text-[13px] leading-relaxed text-ink-200 placeholder-ink-700 outline-none"
+                className={`w-full grow resize-none border-0 bg-transparent px-4 py-2.5 text-[13px] leading-relaxed text-ink-200 placeholder-ink-700 outline-none ${hasScript ? 'min-h-[92px]' : 'min-h-[52px]'}`}
               />
               <ExpandButton onClick={() => setScriptExpanded(true)} className="absolute bottom-2 right-2" />
             </div>
           </div>
+
+          {/* Write it for me — only while there's no script. Pick the kind of ad
+              and how long it runs and Generate writes the script before it
+              storyboards, in the same click. Sits directly under the script box
+              because it IS the third way to fill it, after the bank and a paste.
+              Disappears the moment a script exists: a script in the box is
+              always what gets storyboarded, and leaving a "write me one" control
+              beside it would read as a competing input. */}
+          {!hasScript && (
+            <div className="flex flex-col gap-2 rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] p-2.5">
+              <div className="flex items-center gap-1.5 px-1.5">
+                <Wand2 className="h-3 w-3 shrink-0 text-ink-600" strokeWidth={2} />
+                <span className="text-[10px] font-medium uppercase tracking-wider text-ink-600">
+                  No script? Write one here
+                </span>
+              </div>
+
+              {/* Script Style — the same Structures + Formats list Scripts
+                  offers, in a slide-over. A format also stages the shots, so
+                  this pick shapes the storyboard as well as the words. */}
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setStyleSlideOpen(true)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
+                className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-3.5 py-3 text-left transition-colors ${
+                  autoScriptStyle
+                    ? 'border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10'
+                    : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
+                }`}
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
+                  {autoScriptStyle && WRITE_STYLE_META[autoScriptStyle].group === 'format'
+                    ? <Video className="h-5 w-5" strokeWidth={1.75} />
+                    : <FileText className="h-5 w-5" strokeWidth={1.75} />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  {autoScriptStyle ? (
+                    <>
+                      <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">
+                        {WRITE_STYLE_META[autoScriptStyle].label}
+                      </div>
+                      <div className="truncate text-[11px] leading-snug text-ink-500">
+                        {WRITE_STYLE_META[autoScriptStyle].hint}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-sm font-medium text-ink-300">Script Style</div>
+                      <div className="text-xs text-ink-600">A structure to argue with, or a format to hide in</div>
+                    </>
+                  )}
+                </div>
+                {autoScriptStyle ? (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
+                      <RefreshCw className="h-2.5 w-2.5" />
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); onAutoScriptStyleChange(null) }}
+                      title="Clear script style"
+                      aria-label="Clear script style"
+                      className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
+                )}
+              </div>
+
+              {/* How long the ad runs. This is the only number the member has to
+                  pick: it sets the script's word budget, which sets how many
+                  lines come back, which IS how many scenes the storyboard has. */}
+              <SegmentedToggle<string>
+                className="h-9 !p-1"
+                dense
+                value={String(autoScriptLength)}
+                onChange={(v) => onAutoScriptLengthChange(Number(v) as WriteLength)}
+                accent="broll"
+                options={WRITE_LENGTHS.map((len) => ({ value: String(len), label: `${len}s` }))}
+              />
+            </div>
+          )}
 
           {/* Additional instructions — a slim, fully-rounded dashed pill; a tap
               opens a centered editor popup (ExpandTextModal) to write in. Shows
@@ -355,7 +463,9 @@ export default function InputPanel({
           >
             <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={1.5} />
             <span className={`min-w-0 flex-1 truncate text-[13px] ${additionalContext.trim() ? 'font-medium text-ink-100' : 'text-ink-400'}`}>
-              {additionalContext.trim() ? additionalContext.trim() : 'Additional Instructions'}
+              {/* Doubles as the creative brief when there's no script yet — the
+                  product row carries the rest, so blank stays a normal answer. */}
+              {additionalContext.trim() ? additionalContext.trim() : hasScript ? 'Additional Instructions' : 'Brief / Additional Instructions'}
             </span>
             {!additionalContext.trim() && (
               <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
@@ -374,23 +484,6 @@ export default function InputPanel({
           static rounded-top card on desktop. */}
       <div className="sticky bottom-0 z-30 border-t border-ink/5 bg-surface-0 px-5 py-3 md:static md:z-auto md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
         <div className="mb-2.5 flex flex-col gap-2">
-
-          {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
-              card silent; "With Dialogue" spends the first of the scene's three
-              cards on a talking-to-camera shot, leaving two silent b-roll ideas.
-              Default first, same as every other toggle in the app. */}
-          {mode === 'line' && (
-            <SegmentedToggle<BrollDelivery>
-              className="h-12 !p-1"
-              value={lineDelivery}
-              onChange={onLineDeliveryChange}
-              accent="broll"
-              options={[
-                { value: 'silent', label: 'B-Roll Clips' },
-                { value: 'dialogue', label: 'With Dialogue' },
-              ]}
-            />
-          )}
 
           {/* Visual style — one row that opens the style popup (presets, your
               saved styles, and the analyse-from-references flow all live
@@ -460,17 +553,25 @@ export default function InputPanel({
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{isContinuous ? 'Storyboarding...' : 'Generating Prompts...'}</span>
+              <span>
+                {!hasScript ? 'Writing your script...'
+                  : isContinuous ? 'Storyboarding...'
+                  : 'Generating Prompts...'}
+              </span>
             </>
           ) : (
             <>
               {isContinuous ? (
                 <Box className="h-4 w-4" strokeWidth={2.5} />
+              ) : mode === 'dialogue' ? (
+                <MessageSquareQuote className="h-4 w-4" strokeWidth={2.5} />
               ) : (
                 <Film className="h-4 w-4" strokeWidth={2.5} />
               )}
               <span>
-                {isContinuous ? 'Generate Storyboard' : 'Generate B-Roll Prompts'}
+                {isContinuous ? 'Generate Storyboard'
+                  : mode === 'dialogue' ? 'Generate Dialogue Prompts'
+                  : 'Generate B-Roll Prompts'}
               </span>
               {promptCredits && (
                 <span
@@ -486,7 +587,17 @@ export default function InputPanel({
         </button>
         {!canGenerate && !isGenerating && (
           <p className="mt-2 text-center text-[10px] text-ink-700">
-            {!hasScript ? 'Select or paste a script to get started' : 'Choose a visual style to get started'}
+            {!hasScript && !autoScriptStyle
+              ? 'Add a script, or pick a script style to have one written'
+              : 'Choose a visual style to get started'}
+          </p>
+        )}
+        {/* Says the extra step out loud when there's no script — Generate is
+            about to spend a call writing one, and the member should know that's
+            what the click does before it happens. */}
+        {canGenerate && !hasScript && !isGenerating && (
+          <p className="mt-2 text-center text-[10px] text-ink-700">
+            Writes a {autoScriptLength}s script first, then storyboards it
           </p>
         )}
       </div>
@@ -507,8 +618,26 @@ export default function InputPanel({
         onChange={onAdditionalContextChange}
         title="Additional Instructions"
         accent="broll"
-        placeholder="Optional notes for this generation (mood, style preferences, specific angles...)"
+        placeholder={hasScript
+          ? 'Optional notes for this generation (mood, style preferences, specific angles...)'
+          : "What's this ad about? Optional — the product's own details already drive the script (angle, audience, what to avoid...)"}
       />
+
+      {/* Script Style picker — the same sectioned list Scripts offers, so a
+          style means the same thing in both apps. */}
+      <SlideOver
+        open={styleSlideOpen}
+        onClose={() => setStyleSlideOpen(false)}
+        title="Choose a style"
+        subtitle="How the ad is built — and what kind of content it looks like"
+        size="wide"
+      >
+        <ScriptStyleList
+          accent="broll"
+          value={autoScriptStyle}
+          onSelect={(style) => { onAutoScriptStyleChange(style); setStyleSlideOpen(false) }}
+        />
+      </SlideOver>
     </div>
   )
 }

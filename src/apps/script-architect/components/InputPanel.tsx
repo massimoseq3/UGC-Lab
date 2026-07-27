@@ -1,7 +1,7 @@
 import { useState, type ComponentType } from 'react'
 import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Film, UserRound, Sparkles, Undo2, Redo2, Eraser, Shuffle, FishingHook, Video } from 'lucide-react'
 import type { Model, Product, Script } from '../../../stores/types'
-import { WRITE_LENGTHS, WRITE_STYLE_META, WRITE_STYLE_GROUP_META, writeStylesInGroup, HOOK_CATEGORY_META, HOOK_COUNT, VARIATION_COUNTS, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteStyleGroup, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount } from '../types'
+import { WRITE_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNT, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount } from '../types'
 
 // The cinematic 'prompt' format is single-clip-capped, so it only offers the
 // shorter durations a video model can render in one generation.
@@ -15,23 +15,8 @@ import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableTex
 import { useAppStore } from '../../../stores/appStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { enhanceBrief } from '../services/generateScript'
+import ScriptStyleList from './ScriptStyleList'
 import { humanizeError } from '../../../utils/friendlyError'
-
-function createEditableContext(product: Product): EditableProductContext {
-  return {
-    productName: product.productName,
-    productDescription: product.productDescription,
-    targetMarket: product.targetMarket,
-    painPoints: product.painPoints,
-    usps: product.usps,
-    benefits: product.benefits,
-    keySpecs: product.keySpecs ?? '',
-    customerLanguage: product.customerLanguage ?? '',
-    objections: product.objections ?? '',
-    offer: product.offer,
-    cta: product.cta,
-  }
-}
 
 interface InputPanelProps {
   mode: ScriptUiMode
@@ -1008,49 +993,12 @@ export default function InputPanel({
       >
         {/* Two sections: Structures (how the argument is built) and Formats
             (the kind of content the ad imitates). Formats also stage the shots
-            in the Scenes output, so they're worth telling apart at the picker. */}
-        <div className="flex flex-col gap-5 p-4">
-          {(Object.keys(WRITE_STYLE_GROUP_META) as WriteStyleGroup[]).map((group) => {
-            const GroupIcon = group === 'format' ? Video : FileText
-            return (
-              <div key={group} className="flex flex-col gap-2">
-                <div className="px-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-widest text-ink-500">
-                    {WRITE_STYLE_GROUP_META[group].label}
-                  </div>
-                  <div className="mt-0.5 text-[11px] leading-snug text-ink-600">
-                    {WRITE_STYLE_GROUP_META[group].hint}
-                  </div>
-                </div>
-                {writeStylesInGroup(group).map((style) => {
-                  const active = styleChosen && style === writeStyle
-                  return (
-                    <button
-                      key={style}
-                      type="button"
-                      onClick={() => { onWriteStyleChange(style); setStyleChosen(true); setStyleSlideOpen(false) }}
-                      className={`flex items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
-                        active
-                          ? 'border-scripts-500/30 bg-scripts-500/10'
-                          : 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'
-                      }`}
-                    >
-                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${active ? 'bg-scripts-500/10 text-scripts-400' : 'bg-ink/5 text-ink-500'}`}>
-                        <GroupIcon className="h-5 w-5" strokeWidth={1.75} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className={`text-[13px] font-medium tracking-tight ${active ? 'text-scripts-300' : 'text-ink-200'}`}>
-                          {WRITE_STYLE_META[style].label}
-                        </div>
-                        <div className="text-[11px] leading-snug text-ink-500">{WRITE_STYLE_META[style].hint}</div>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          })}
-        </div>
+            in the Scenes output, so they're worth telling apart at the picker.
+            Shared with B-Roll, which picks from the same list. */}
+        <ScriptStyleList
+          value={styleChosen ? writeStyle : null}
+          onSelect={(style) => { onWriteStyleChange(style); setStyleChosen(true); setStyleSlideOpen(false) }}
+        />
       </SlideOver>
 
       {/* Hook family picker — mirrors the style slide-over. 'auto' leads. */}

@@ -417,7 +417,9 @@ const WRITE_STYLE_INSTRUCTION: Record<WriteStyle, string> = {
 // these shape the SHOTS, so a "Podcast Clip" blueprint actually stages a
 // podcast instead of the default selfie-to-camera. Structures carry no entry on
 // purpose — an argument doesn't imply a camera position, so the concept stays
-// free to pick the shots. Read only by the 'scenes' format.
+// free to pick the shots. Read by the 'scenes' format here, and by B-Roll's two
+// storyboard calls via sceneStagingFor — one block, so a format stages the same
+// way wherever it's picked.
 const WRITE_STYLE_SCENE_DIRECTION: Partial<Record<WriteStyle, string>> = {
   podcast: `SCENE STAGING — PODCAST CLIP: stage every scene as a podcast recording. [CHARACTER] sits at a table or in a studio chair with a large boom-arm microphone in frame between them and the lens, headphones on or slung round the neck, warm practical lighting, and a dressed background (acoustic panels, a shelf, a plant, a lamp). Cut between a fixed studio angle framing [CHARACTER] from the chest up and a second angle from roughly 45 degrees off to the side, so it reads as a multi-cam episode. [CHARACTER] speaks to someone just off-lens, not into the lens. A second person may sit opposite — describe them only as a listener seen from behind or half out of frame, never with any identity detail, and they never speak. [PRODUCT] sits on the table and gets picked up mid-answer, turned once, put back down; it is never held up and presented. One scene may be a tight insert of hands and [PRODUCT] on the table while the answer continues over it.`,
   interview: `SCENE STAGING — STREET INTERVIEW: stage every scene outdoors in a real public place — a pavement, a market, a park path, outside a shop — in daylight, with passers-by and traffic in the background. A handheld microphone enters frame from the edge of the shot, held by an interviewer who stays off camera; describe them only as an arm and a mic, never with identity details. The camera is handheld at eye level with a little natural drift, framing [CHARACTER] from the chest up with the street legible behind them. [CHARACTER] answers whoever is holding the mic and only glances at the lens by accident. When the interviewer speaks, write it as its own line — An off-camera voice asks: "..." — and keep it to a handful of words; the VOICE PROFILE describes [CHARACTER] only. [PRODUCT] comes out of a bag or a coat pocket at the moment it's mentioned.`,
@@ -426,6 +428,14 @@ const WRITE_STYLE_SCENE_DIRECTION: Partial<Record<WriteStyle, string>> = {
   expert: `SCENE STAGING — EXPERT EXPLAINER: stage every scene in the professional's own workplace — a treatment room, a workshop, a kitchen pass, a salon chair, a workbench — with the tools of that trade visible around them and the wardrobe of the job on. Lighting is whatever that room really has. Hold a steady, unhurried frame from chest height, and cut to tight inserts of the hands demonstrating the thing being explained. [CHARACTER] demonstrates on a real object or a real surface while talking; never a scene of someone only describing. [PRODUCT] sits among the professional tools and gets picked up as one of them.`,
   tutorial: `SCENE STAGING — HOW-TO / TUTORIAL: one scene per step, and every step is shown being done. Shoot the steps overhead or over the shoulder, on the hands and the surface, and cut back to a chest-up frame of [CHARACTER] between them. Each step scene catches the physical action in motion — the pour, the wipe, the click, the fold — with [PRODUCT] in the hands at the step where it's actually used. Leave the real clutter of the room in frame; nothing is styled or cleared. If the last step has a visible result, the final scene is a tight shot of that result.`,
   grwm: `SCENE STAGING — GRWM / ROUTINE: every scene sits inside the routine and the routine never stops. A bathroom mirror, a bedroom, a kitchen at the hour this would really happen, with the props of that hour around (a towel, a kettle, a half-packed bag). [CHARACTER] is always mid-task, hands busy, talking while doing — never standing still to deliver a line. Hold one fixed camera position they move in and out of, cut with close inserts of the task itself, and let time move forward across the scenes. [PRODUCT] enters at exactly the point in the routine it would be used, taken from wherever it lives — a shelf, a bag, a drawer.`,
+}
+
+// How a picked style stages its shots, or undefined when it stages nothing (a
+// structure, or no style picked at all). B-Roll reads this so a format picked
+// there shapes the storyboard's shots the same way it shapes a scene blueprint
+// here — see BrollInput.sceneStaging.
+export function sceneStagingFor(style: WriteStyle | null | undefined): string | undefined {
+  return style ? WRITE_STYLE_SCENE_DIRECTION[style] : undefined
 }
 
 // A format style dictates HOW the ad is filmed and spoken; the take dictates
@@ -781,6 +791,19 @@ export async function generateScript(input: GenerateScriptInput): Promise<Genera
   const angles = REMIX_ANGLES.slice(0, Math.min(requestedCount(input), REMIX_ANGLES.length))
   const variations = await Promise.all(angles.map((angle) => runRemix(input, angle, apiKey, endpoint)))
   return { variations, angles }
+}
+
+// ONE spoken script from a brief + style + length — the strongest take, not a
+// batch. B-Roll calls this when the member has no script yet: it writes one,
+// drops it in the script box, and storyboards it in the same click. Everything
+// (the human-voice rules, the hook library, the style instruction, the length
+// budget) is the same pipeline Scripts' Write New runs, so a script written in
+// B-Roll is the same script Scripts would have written.
+export async function writeOneScript(input: GenerateScriptInput): Promise<string> {
+  const apiKey = useSettingsStore.getState().getKieApiKey()
+  const endpoint = getChatEndpointPath(CHAT_MODEL_ID)
+  // Take 0 is the strongest angle in the list (see WRITE_TAKE_INSTRUCTION).
+  return runWrite({ ...input, mode: 'write', writeFormat: 'script' }, 0, apiKey, endpoint)
 }
 
 // ── Brief enhancement ──

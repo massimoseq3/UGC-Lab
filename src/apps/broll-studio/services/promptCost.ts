@@ -1,5 +1,5 @@
 // Credit estimate for the "write me prompts" LLM call behind B-Roll's Generate
-// button (Line-by-Line, Continuous).
+// button (B-Roll, Dialogue, Continuous).
 //
 // These are chat completions, billed per 1k tokens rather than per call, so
 // there is no exact number to show before the model answers. The estimate below
@@ -20,7 +20,9 @@ const CHARS_PER_TOKEN = 4
 // to the nearest 500. Re-measure if a system prompt changes materially — being
 // out by a few hundred tokens moves the estimate by hundredths of a credit.
 const SYSTEM_TOKENS: Record<BrollMode, number> = {
-  line: 5000,
+  broll: 5000,
+  // Same base instruction plus the dialogue delivery override.
+  dialogue: 5500,
   continuous: 4000,
 }
 
@@ -42,7 +44,7 @@ function sentenceCount(scriptText: string): number {
 export function estimatePromptCredits(
   mode: BrollMode,
   scriptText: string,
-  // Line-by-Line only. Both deliveries write three prompts per scene, so this
+  // Per-line modes only. Both deliveries write three prompts per scene, so this
   // costs the same either way — kept as an input because the count comes from
   // variationsForDelivery, which is where a future change would land.
   delivery: BrollDelivery = 'silent',
@@ -51,25 +53,16 @@ export function estimatePromptCredits(
   if (!chatModelId) return null
   const scriptTokens = Math.ceil(scriptText.length / CHARS_PER_TOKEN)
   const scenes = sentenceCount(scriptText)
+  const inputTokens = SYSTEM_TOKENS[mode] + scriptTokens
 
-  let inputTokens: number
-  let outputTokens: number
-
-  switch (mode) {
-    case 'line':
-      // One call: every scene gets this delivery's variation count.
-      inputTokens = SYSTEM_TOKENS.line + scriptTokens
-      outputTokens = scenes * variationsForDelivery(delivery) * TOKENS_PER_VARIATION
-      break
-    case 'continuous':
-      // One call: N+1 frames × concepts, plus a motion block per scene.
-      inputTokens = SYSTEM_TOKENS.continuous + scriptTokens
-      outputTokens =
-        TOKENS_PER_STYLE_BLOCK +
-        (scenes + 1) * CONCEPTS_PER_FRAME * TOKENS_PER_CONCEPT +
-        scenes * TOKENS_PER_MOTION
-      break
-  }
+  // One call either way; what differs is the shape of what comes back.
+  const outputTokens = mode === 'continuous'
+    // N+1 frames × concepts, plus a motion block per scene.
+    ? TOKENS_PER_STYLE_BLOCK +
+      (scenes + 1) * CONCEPTS_PER_FRAME * TOKENS_PER_CONCEPT +
+      scenes * TOKENS_PER_MOTION
+    // Every scene gets this delivery's variation count.
+    : scenes * variationsForDelivery(delivery) * TOKENS_PER_VARIATION
 
   return estimateCredits(chatModelId, { tokenCount: inputTokens + outputTokens })
 }

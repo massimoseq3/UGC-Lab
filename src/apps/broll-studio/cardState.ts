@@ -64,8 +64,12 @@ export function createDefaultCardState(variation: PromptVariation): CardState {
     // The product photo(s) the storyboard picked for this shot — the state it's
     // actually in. Absent → the card falls back to the hero packshot alone.
     ...(variation.productPhotos ? { productPhotos: variation.productPhotos } : {}),
-    // Only read by DIALOGUE cards — see CardState.chainLink.
-    chainLink: true,
+    // Only read by DIALOGUE cards, and off by default — see CardState.chainLink.
+    // A Dialogue scene's three cards are three different situations, so
+    // anchoring each to the previous card's still would undo the variety they
+    // were written for. Sessions generated before the split stored an explicit
+    // `true` and keep their chain (see backfillCardState).
+    chainLink: false,
     cardImageAspectRatio: '9:16',
     cardImageResolution: '1K',
     cardVideoAspectRatio: '9:16',
@@ -156,6 +160,10 @@ export function backfillCardState(card: Partial<CardState> & Record<string, unkn
     pendingStartedAt: (card.pendingStartedAt as number | null) ?? null,
     refsCharacter: card.refsCharacter !== false,
     refsProduct: card.refsProduct !== false,
+    // A pre-split "With Dialogue" session wrote an explicit `true` here, so it
+    // keeps its chain; anything generated since writes an explicit `false`. Only
+    // a card from before the field existed lands on the `true` fallback, and
+    // those sessions were all chained.
     chainLink: card.chainLink !== false,
     cardImageAspectRatio: (card.cardImageAspectRatio as string) ?? '9:16',
     cardImageResolution: (card.cardImageResolution as ImageResolution) ?? '1K',

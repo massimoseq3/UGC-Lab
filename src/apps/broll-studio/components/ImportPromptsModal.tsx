@@ -9,17 +9,20 @@ import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 
 const MODE_LABEL: Record<BrollMode, string> = {
-  line: 'Line-by-Line',
+  broll: 'B-Roll',
+  dialogue: 'Dialogue',
   continuous: 'Continuous',
 }
 
 const MODE_WHAT: Record<BrollMode, string> = {
-  line: 'three shot prompts per script line',
+  broll: 'three silent shot prompts per script line',
+  dialogue: 'three ways of delivering each script line on camera',
   continuous: 'a keyframe chain — scenes, keyframe concepts and their motion',
 }
 
 const BRIEF_FILENAME: Record<BrollMode, string> = {
-  line: 'line-by-line-brief.txt',
+  broll: 'broll-brief.txt',
+  dialogue: 'dialogue-brief.txt',
   continuous: 'continuous-brief.txt',
 }
 

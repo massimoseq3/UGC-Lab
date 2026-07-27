@@ -62,7 +62,7 @@ function rekeyAfterDelete(set: Set<number>, removed: number): Set<number> {
   return next
 }
 
-export type Tab = 'video' | 'image' | 'animate'
+export type Tab = 'image' | 'video' | 'animate'
 
 interface CardDetailModalProps {
   sceneNumber: number
@@ -120,8 +120,9 @@ interface CardDetailModalProps {
 }
 
 // Playground-faithful per-variation workspace.
-// Tab order: Video first, Image second (matches the Playground reflexively
-// landing on video gens). Sections in the LEFT column run top-down:
+// Tab order: Image first, Video second, Animate last — the order the work
+// actually happens in (render the still, then the clip, then animate a still).
+// Sections in the LEFT column run top-down:
 //   1. Model picker + constraint chips
 //   2. Reference Images (Character / Product toggle pills, orange)
 //   3. Prompt (always editable textarea + Enhance / Undo / Redo / Regenerate)
@@ -174,9 +175,9 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   // won't fire with.
   const styleNote = appliedStyleNote({ style: resultStyle, realism: resultRealism })
 
-  // Video leads: a clip is what the card is ultimately for, and it's the tab
-  // members open the card on. Image and Animate follow.
-  const [tab, setTab] = useState<Tab>(initialTab ?? 'video')
+  // Image leads: the still is the first thing a card needs, and the clip is
+  // rendered (or animated) off it. Video and Animate follow.
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'image')
   // Video-model picker is a slide-in side panel (like the ref-image bank
   // picker) rather than an inline dropdown.
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
@@ -464,11 +465,11 @@ export default function CardDetailModal(props: CardDetailModalProps) {
           {/* LEFT 50% — scrollable body (model + refs + prompt) over a pinned
               footer (output settings + Generate), mirroring the Playground panel. */}
           <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 md:border-b-0 md:border-r">
-            {/* Sticky header — the Video / Image / Animate toggle, pulled out of
+            {/* Sticky header — the Image / Video / Animate toggle, pulled out of
                 the scroll area so it stays put while the body scrolls. Mirrors
                 the right panel's identity header (same px-5 pt-3, h-12 row, and
-                hairline) so the two line up across the modal. Video leads: the
-                clip is the deliverable, and it's the landing tab. */}
+                hairline) so the two line up across the modal. Image leads: the
+                still comes first, and it's the landing tab. */}
             <div className="flex flex-col gap-3 px-5 pt-3">
               <div className="flex h-12 items-center">
                 <SegmentedToggle<Tab>
@@ -476,8 +477,8 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                   value={tab}
                   onChange={setTab}
                   options={[
-                    { value: 'video', label: 'Video', icon: VideoIcon },
                     { value: 'image', label: 'Image', icon: ImageIcon },
+                    { value: 'video', label: 'Video', icon: VideoIcon },
                     { value: 'animate', label: 'Animate', icon: Film },
                   ]}
                 />

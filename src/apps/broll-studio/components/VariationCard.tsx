@@ -158,9 +158,9 @@ export default function VariationCard(props: VariationCardProps) {
   const resolvedImageUrl = useAssetUrl(coverImage?.imageUrl)
   const resolvedVideoUrl = useAssetUrl(coverVideo?.url)
   const [detailOpen, setDetailOpen] = useState(false)
-  // Which tab the modal lands on. The card body opens on Video — the clip is
-  // what the card is for — and the hover shortcuts jump straight to any tab.
-  const [detailTab, setDetailTab] = useState<DetailTab>('video')
+  // Which tab the modal lands on. The card body opens on Image — the still is
+  // the first thing the card needs — and the hover shortcuts jump to any tab.
+  const [detailTab, setDetailTab] = useState<DetailTab>('image')
   const openDetail = (tab: DetailTab) => {
     setDetailTab(tab)
     setDetailOpen(true)
@@ -847,7 +847,7 @@ export default function VariationCard(props: VariationCardProps) {
     <>
       <div className="group flex flex-col gap-1.5">
         <div
-          onClick={() => openDetail('video')}
+          onClick={() => openDetail('image')}
           {...cardVideo.hoverProps}
           className="relative aspect-[9/16] cursor-pointer overflow-hidden rounded-xl border border-ink/[0.08] bg-ink/[0.02] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
         >
@@ -1044,8 +1044,8 @@ export default function VariationCard(props: VariationCardProps) {
           )}
 
           {/* Hover shortcuts into the card's workspace — one per tab, in the
-              modal's own tab order (Video, Image, Animate), so a tap lands on
-              the control it names. Clicking the card face itself opens Video.
+              modal's own tab order (Image, Video, Animate), so a tap lands on
+              the control it names. Clicking the card face itself opens Image.
               Full-bleed row split three ways, with the modal's own tab icons and
               labels so each button reads as the control it lands on.
               The row spans the whole width, so it can't sit beside anything
@@ -1062,21 +1062,21 @@ export default function VariationCard(props: VariationCardProps) {
           >
             <button
               type="button"
-              title="Open this card on the Video tab"
-              onClick={(e) => { e.stopPropagation(); openDetail('video') }}
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
-            >
-              <VideoIcon className="h-3.5 w-3.5" />
-              Video
-            </button>
-            <button
-              type="button"
               title="Open this card on the Image tab"
               onClick={(e) => { e.stopPropagation(); openDetail('image') }}
               className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
             >
               <ImageIcon className="h-3.5 w-3.5" />
               Image
+            </button>
+            <button
+              type="button"
+              title="Open this card on the Video tab"
+              onClick={(e) => { e.stopPropagation(); openDetail('video') }}
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
+            >
+              <VideoIcon className="h-3.5 w-3.5" />
+              Video
             </button>
             <button
               type="button"

@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Film, AlertCircle, Plus, Images, X, Palette, Download, Video as VideoIcon, Coins } from 'lucide-react'
+import { Film, AlertCircle, Plus, Images, X, Palette, Download, Video as VideoIcon, Coins, Pencil } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage, BatchVideoSettings } from '../types'
 import type { Product, Model } from '../../../stores/types'
@@ -31,6 +31,9 @@ interface ScenesViewProps {
   error?: string | null
   onAddVariation: (sceneNumber: number, variation: PromptVariation) => void
   onDeleteVariation: (sceneNumber: number, variationId: string) => void
+  // Retype a scene's spoken line. Swaps the quoted words in that scene's
+  // prompts — no LLM call, no credits. See services/scriptLineEdit.ts.
+  onEditSceneLine?: (sceneNumber: number, line: string) => void
   // Edit the ad's shared dialogue voice profile (from a dialogue card's modal).
   onUpdateVoiceProfile?: (text: string) => void
   characterRef?: ReferenceImage
@@ -82,6 +85,7 @@ export default function ScenesView({
   error,
   onAddVariation,
   onDeleteVariation,
+  onEditSceneLine,
   onUpdateVoiceProfile,
   characterRef,
   productRef,
@@ -719,6 +723,7 @@ export default function ScenesView({
             onUpdateCardStateFn={handleUpdateCardStateFn}
             onAddVariation={onAddVariation}
             onDeleteVariation={onDeleteVariation}
+            onEditSceneLine={onEditSceneLine}
             characterRef={characterRef}
             productRef={productRef}
             productPhotos={productPhotos}
@@ -1135,6 +1140,92 @@ const VariationCardRow = memo(function VariationCardRow({
   )
 })
 
+// Retype a scene's spoken line. Same shape as Continuous' SceneEditModal, with
+// none of its structural operations: a per-line storyboard's scenes come from
+// the LLM's own segmentation of the script, so there's nothing to split or
+// merge here — just the words.
+//
+// Saving is instant and free. A dialogue prompt embeds the line verbatim in
+// quotes, so the new words are swapped into every prompt of the scene without
+// an LLM call; the room, the gesture and the light stay exactly as written.
+function SceneLineEditModal({
+  sceneNumber,
+  scriptLine,
+  speaks,
+  onSave,
+  onClose,
+}: {
+  sceneNumber: number
+  scriptLine: string
+  // Whether this scene's cards actually say the line. Only changes the copy —
+  // in silent b-roll the line is the voiceover laid over the footage, so
+  // editing it changes what the shots are meant to illustrate, not their words.
+  speaks: boolean
+  onSave: (line: string) => void
+  onClose: () => void
+}) {
+  const [line, setLine] = useState(scriptLine)
+  useCloseOnEscape(true, onClose)
+  useCloseOnAppSwitch(true, onClose)
+
+  const trimmed = line.trim()
+  const dirty = trimmed !== scriptLine.trim()
+
+  return createPortal(
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl border border-ink/10 bg-ink-950/95 p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-medium text-ink-100">Line {sceneNumber}</h3>
+            <p className="mt-1 text-xs text-ink-500">
+              {speaks
+                ? 'What the character says in this scene.'
+                : 'The voiceover heard over this scene, and what its shots have to show.'}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full p-1 text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-200">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <textarea
+          value={line}
+          onChange={(e) => setLine(e.target.value)}
+          rows={3}
+          autoFocus
+          className="mt-4 w-full resize-none rounded-2xl border border-ink/10 bg-ink/[0.03] px-3.5 py-3 text-sm leading-relaxed text-ink-100 placeholder:text-ink-600 focus:border-ink/20 focus:outline-none"
+          placeholder={speaks ? 'What the character says here' : 'What the voiceover says over this scene'}
+        />
+
+        <p className="mt-2 text-[11px] leading-relaxed text-ink-500">
+          {speaks
+            ? 'Saving rewrites the spoken words in all three prompts — free and instant. Everything else about each shot stays as it is; use a card’s Regenerate prompt if the new line needs a different shot.'
+            : 'These shots are silent, so saving updates the line without touching the prompts. Use a card’s Regenerate prompt to rewrite a shot against the new line.'}
+        </p>
+
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-ink/10 bg-ink/[0.03] px-4 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!dirty || !trimmed}
+            onClick={() => { onSave(trimmed); onClose() }}
+            className="rounded-full bg-broll-500 px-4 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Save line
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 function SceneSection({
   scene,
   cardStates,
@@ -1142,6 +1233,7 @@ function SceneSection({
   onUpdateCardStateFn,
   onAddVariation,
   onDeleteVariation,
+  onEditSceneLine,
   characterRef,
   productRef,
   productPhotos,
@@ -1173,6 +1265,7 @@ function SceneSection({
   onUpdateCardStateFn: (key: string, updater: (prev: CardState) => Partial<CardState>) => void
   onAddVariation: (sceneNumber: number, variation: PromptVariation) => void
   onDeleteVariation: (sceneNumber: number, variationId: string) => void
+  onEditSceneLine?: (sceneNumber: number, line: string) => void
   characterRef?: ReferenceImage
   productRef?: ReferenceImage
   productPhotos?: string[]
@@ -1200,6 +1293,7 @@ function SceneSection({
   resultVoiceProfile?: string
   onUpdateVoiceProfile?: (text: string) => void
 }) {
+  const [lineEditorOpen, setLineEditorOpen] = useState(false)
   return (
     // `content-visibility: auto` brings paint containment, which clips the
     // cards' soft drop shadow at this box's edges. The `-m-4 p-4` bleed gives
@@ -1221,12 +1315,33 @@ function SceneSection({
             <span className="inline-flex w-fit rounded-full border border-ink/10 bg-ink/[0.03] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-400">
               Line {scene.number}
             </span>
-            <p
-              className="text-lg font-normal not-italic leading-relaxed text-ink-400"
-              style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
-            >
-              &ldquo;{scene.scriptLine}&rdquo;
-            </p>
+            {/* The line itself, and the place you retype it. Clicking it opens
+                the editor; saving swaps the quoted words in this scene's
+                prompts, so a dialogue card says the new sentence without a
+                regeneration. Read-only when the host doesn't hand us a handler. */}
+            {onEditSceneLine ? (
+              <button
+                type="button"
+                onClick={() => setLineEditorOpen(true)}
+                title="Edit this line"
+                className="group/line -mx-1.5 flex items-start gap-2 rounded-lg px-1.5 py-0.5 text-left transition-colors hover:bg-ink/[0.04]"
+              >
+                <p
+                  className="text-lg font-normal not-italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200"
+                  style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
+                >
+                  &ldquo;{scene.scriptLine}&rdquo;
+                </p>
+                <Pencil className="mt-2 h-3 w-3 shrink-0 text-ink-600 opacity-0 transition-opacity group-hover/line:opacity-100" strokeWidth={2} />
+              </button>
+            ) : (
+              <p
+                className="text-lg font-normal not-italic leading-relaxed text-ink-400"
+                style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
+              >
+                &ldquo;{scene.scriptLine}&rdquo;
+              </p>
+            )}
           </div>
         </div>
         {/* Per-scene batches — one row's worth of images or clips, so a member
@@ -1302,6 +1417,16 @@ function SceneSection({
         })}
         <AddNewCard onAdd={(variation) => onAddVariation(scene.number, variation)} productVisible={scene.productVisible} />
       </div>
+
+      {lineEditorOpen && onEditSceneLine && (
+        <SceneLineEditModal
+          sceneNumber={scene.number}
+          scriptLine={scene.scriptLine}
+          speaks={scene.variations.some((v) => v.tag === 'DIALOGUE')}
+          onSave={(line) => onEditSceneLine(scene.number, line)}
+          onClose={() => setLineEditorOpen(false)}
+        />
+      )}
     </div>
   )
 }
