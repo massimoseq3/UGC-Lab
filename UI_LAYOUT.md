@@ -93,21 +93,31 @@ Note the **two namespaces**: dock display names vs the internal app/folder ids
 
 ### 1.3 Settings modal — `src/components/SettingsModal.tsx`
 
-A single centered scrolling modal (NOT tabbed), opened from the dock's Settings
-tile. Header ("Settings" + ✕ top-right, `SettingsModal.tsx:196`), then top→bottom:
+A **two-pane** centered modal (max-w-3xl, fixed 520px tall so the rail doesn't
+jump between panes), opened from the dock's Settings tile. LEFT: a recessed
+(`bg-surface-0`) nav rail — "Settings" heading over rounded-full section pills,
+one per pane, each icon + label; the kie.ai row carries an amber dot while no
+key is saved. RIGHT: an `h-[57px]` header (active pane's icon + name, ✕ at the
+right) over the scrolling pane body. Below `sm`, the rail becomes a horizontal
+scrolling pill strip above the pane and the modal grows to its content.
 
-1. **kie.ai API key** — label + "Get key" link, masked input, "Test connection"
-   button + result, full-width **Save** button.
-2. **Appearance** — Dark / Light / System segmented toggle.
-3. **Your team** — a "Meet your team" button that closes Settings and replays
-   the Meet your team intro (§1.4).
-4. **Storage** (cloud mode only) — usage bar + manual orphan-cleanup flow
-   (confirm → scan → purge).
-5. **Legal** footer links (Terms · Privacy · AUP · DMCA), open in a new tab.
-6. **Account** (cloud + signed-in) — email + avatar, **Sign out** button.
-7. **Admin** (admins only) — an "Open Admin panel" row; the **only** entry point
-   to the Admin app now that it's out of the dock.
-8. **Demo-data** tool (admin / local-only), tiny + low-contrast at the very bottom.
+Panes, in rail order — each is built only when it applies, and the active id
+falls back to the first pane when one disappears (sign-out drops Account):
+
+1. **kie.ai key** (landing pane) — card with "API key" label + "Get key" link,
+   masked input with eye toggle, saved/not-saved status dot, then a row of
+   **Test connection** + **Save**; test result banner under it. One line of
+   "stored only in this browser" copy below the card.
+2. **Account** (cloud + signed-in) — avatar + name + email card, "What should
+   we call you?" field with inline Save, **Sign out**.
+3. **Appearance** — the Dark / Light / System segmented toggle, nothing else.
+4. **Storage** (cloud mode only) — usage bar card + cleanup card (confirm →
+   scan → purge).
+5. **Admin** / **Advanced** (admins, or local/localhost dev) — the "Open Admin
+   panel" row, the **only** entry point to the Admin app now that it's out of
+   the dock, plus the demo-data load/remove tool.
+6. **About** — the legal links (Terms · Privacy · AUP · DMCA) as a stacked
+   list, each opening in a new tab.
 
 ### 1.4 Meet your team intro — `src/components/MeetTheTeam.tsx`
 
