@@ -34,61 +34,87 @@ export async function resolveAudioUrl(ref: string): Promise<string> {
   return ref
 }
 
-// --- Live levels -----------------------------------------------------------
-// Routing an <audio> element through an AnalyserNode is what makes the card's
-// waveform move with the voice. The catch: once an element feeds a graph, its
-// sound comes out of that graph — so if the AudioContext is suspended the clip
-// goes SILENT. Everything below is built around not letting that happen.
+// --- Waveform peaks --------------------------------------------------------
+// The card's waveform is the WHOLE clip, decoded once and drawn at rest, with
+// playback filling it left to right. Nothing here touches the playing element:
+// the old live-spectrum version routed it through an AnalyserNode, and an
+// element feeding a Web Audio graph plays SILENTLY whenever that context is
+// suspended. Decoding is read-only, so the whole hazard is gone with it.
 
-let ctx: AudioContext | null = null
-const sources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>()
-const analysers = new WeakMap<HTMLMediaElement, AnalyserNode>()
+export const WAVEFORM_BARS = 56
 
-function audioContext(): AudioContext | null {
-  const Ctor: typeof AudioContext | undefined =
+// Decoding the same clip on every replay is wasted work — one entry per asset
+// ref, plus the in-flight promise so two cards can't decode it twice.
+const peakCache = new Map<string, number[]>()
+const decoding = new Map<string, Promise<number[] | null>>()
+
+function decodeContext(): BaseAudioContext | null {
+  const Offline: typeof OfflineAudioContext | undefined =
+    window.OfflineAudioContext ?? (window as unknown as { webkitOfflineAudioContext?: typeof OfflineAudioContext }).webkitOfflineAudioContext
+  try {
+    // Offline, not a live AudioContext: decoding needs no output device, and a
+    // live context opened outside a user gesture only comes up suspended.
+    if (Offline) return new Offline(1, 1, 44100)
+  } catch { /* fall through to a live context */ }
+  const Live: typeof AudioContext | undefined =
     window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-  if (!Ctor) return null
   try {
-    ctx ??= new Ctor()
+    return Live ? new Live() : null
   } catch {
     return null
   }
-  return ctx
 }
 
-// Call this SYNCHRONOUSLY from the play click. A context created or resumed
-// inside a user gesture starts running; one created later (after the await on
-// the asset URL) can come up suspended — and a suspended context is exactly the
-// case where attaching would mute the clip.
-export function primeAudioContext() {
-  const context = audioContext()
-  if (context && context.state !== 'running') void context.resume()
-}
-
-// Returns null whenever the rig can't be built or the context isn't running —
-// the waveform falls back to its idle drift and the audio keeps playing through
-// the element untouched. Never trade the sound for a visual.
-export function attachAnalyser(audio: HTMLMediaElement): AnalyserNode | null {
-  const cached = analysers.get(audio)
-  if (cached) return cached
-  const context = audioContext()
-  if (!context || context.state !== 'running') return null
-
-  try {
-    let source = sources.get(audio)
-    if (!source) {
-      // Once per element, ever — a second call on the same element throws.
-      source = context.createMediaElementSource(audio)
-      sources.set(audio, source)
-      source.connect(context.destination)
+// Peak amplitude per bar, normalised so the loudest bar is full height — a
+// quiet recording still fills the strip, and a loud one can't sit clipped flat.
+function peaksFrom(buffer: AudioBuffer, bars: number): number[] {
+  const data = buffer.getChannelData(0)
+  const per = Math.floor(data.length / bars) || 1
+  const out = new Array<number>(bars).fill(0)
+  let loudest = 0
+  for (let i = 0; i < bars; i++) {
+    const start = i * per
+    let peak = 0
+    // Every 4th sample: a peak that survives thinning by 4 is still a peak, and
+    // it keeps a long clip from holding the main thread for a visible beat.
+    for (let j = start; j < start + per && j < data.length; j += 4) {
+      const v = Math.abs(data[j])
+      if (v > peak) peak = v
     }
-    const analyser = context.createAnalyser()
-    analyser.fftSize = 256
-    analyser.smoothingTimeConstant = 0.7
-    source.connect(analyser)
-    analysers.set(audio, analyser)
-    return analyser
-  } catch {
-    return null
+    out[i] = peak
+    if (peak > loudest) loudest = peak
   }
+  if (loudest <= 0) return out.fill(0)
+  // Square-root curve: raw amplitude leaves everything but the loudest syllable
+  // near the floor, which reads as a flat line with a couple of spikes.
+  return out.map((v) => Math.min(1, Math.sqrt(v / loudest)))
+}
+
+// Returns null when the clip can't be decoded (unsupported codec, missing
+// asset) — the strip then just sits at rest. It's never worth an error.
+export async function waveformPeaks(ref: string, bars = WAVEFORM_BARS): Promise<number[] | null> {
+  const cached = peakCache.get(ref)
+  if (cached) return cached
+  const running = decoding.get(ref)
+  if (running) return running
+
+  const job = (async () => {
+    try {
+      const url = await resolveAudioUrl(ref)
+      const bytes = await (await fetch(url)).arrayBuffer()
+      const context = decodeContext()
+      if (!context) return null
+      const peaks = peaksFrom(await context.decodeAudioData(bytes), bars)
+      peakCache.set(ref, peaks)
+      return peaks
+    } catch (err) {
+      console.warn('[voice] waveform decode failed', err)
+      return null
+    } finally {
+      decoding.delete(ref)
+    }
+  })()
+
+  decoding.set(ref, job)
+  return job
 }

@@ -1221,9 +1221,9 @@ export default function ContinuousView({
           reachable however far down the storyboard the member has scrolled. */}
       <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0/80 px-5 py-3.5 backdrop-blur-md">
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
-          {/* Scene count matches the per-line storyboard's heading — 13px
-              sentence case; the pills beside it keep the small-caps look. */}
-          <span className="text-[13px] normal-case tracking-tight text-ink-200">
+          {/* Scene count matches the per-line storyboard's — small-caps and dim,
+              the same eyebrow treatment as the pills beside it. */}
+          <span className="font-semibold text-ink-500">
             {result.scenes.length} {result.scenes.length === 1 ? 'Scene' : 'Scenes'}
           </span>
           <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{style.label}</span>
@@ -1344,17 +1344,14 @@ export default function ContinuousView({
           >
             {confirmGen.kind === 'clips' ? (
               <>
-                <h3 className="text-sm font-medium text-ink-100">
-                  Generate {confirmGen.sceneIndices.length} video{confirmGen.sceneIndices.length === 1 ? '' : 's'}?
-                </h3>
-                <p className="mt-1 text-xs text-ink-500">
-                  {confirmGen.scope} · all render in parallel and survive a refresh.
-                </p>
+                {/* The count and the price ride on the Generate button, same
+                    as Line-by-Line's batch dialogs. */}
+                <h3 className="text-sm font-medium text-ink-100">Generate videos</h3>
+                <p className="mt-1 text-xs text-ink-500">{confirmGen.scope}</p>
 
                 {/* Model — the frames-to-video model every video in this batch
-                    uses. Swapping it here re-costs the run below. */}
+                    uses. Swapping it here re-costs the run. */}
                 <div className="mt-4 flex flex-col gap-2.5">
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Model</span>
                   <button
                     type="button"
                     onClick={() => setConfirmModelPanelOpen(true)}
@@ -1378,32 +1375,19 @@ export default function ContinuousView({
                   </button>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5 text-xs">
-                  <span className="text-ink-400">Estimated cost</span>
-                  <span className="flex items-center gap-1 font-medium text-ink-100">
-                    <Coins className="h-3 w-3" strokeWidth={2} />
-                    {formatCredits(confirmCredits) ?? '— credits'}
-                  </span>
-                </div>
-                {balance !== null && (
-                  <p className={`mt-1.5 text-[11px] ${overBudget ? 'text-red-400 light:text-red-600' : 'text-ink-500'}`}>
-                    Your balance: {balance.toLocaleString()} credits{overBudget ? ' — not enough' : ''}
+                {balance !== null && overBudget && (
+                  <p className="mt-3 text-[11px] text-red-400 light:text-red-600">
+                    Not enough credits — your balance is {balance.toLocaleString()}.
                   </p>
                 )}
               </>
             ) : (
               <>
                 <h3 className="text-sm font-medium text-ink-100">
-                  {frameTargets.length === 0
-                    ? 'Nothing to generate'
-                    : `Generate ${frameImageCount} image${frameImageCount === 1 ? '' : 's'} across ${frameTargets.length} frame${frameTargets.length === 1 ? '' : 's'}?`}
+                  {frameTargets.length === 0 ? 'Nothing to generate' : 'Generate keyframes'}
                 </h3>
                 <p className="mt-1 text-xs text-ink-500">
-                  Every concept of each frame renders so you have a real choice; the leftmost one that lands becomes the keyframe until you click another. All parallel — any frame set to Chained waits for the one before it instead.
-                  {confirmGen.done.length > 0 && !includeExisting && (
-                    <> {confirmGen.done.length} frame{confirmGen.done.length === 1 ? '' : 's'} already
-                    {confirmGen.done.length === 1 ? ' has' : ' have'} a keyframe and will be skipped.</>
-                  )}
+                  {frameTargets.length > 0 && `${frameTargets.length} frame${frameTargets.length === 1 ? '' : 's'} · every concept renders, and the first one that lands becomes the keyframe until you pick another.`}
                 </p>
 
                 {confirmGen.done.length > 0 && (
@@ -1424,7 +1408,6 @@ export default function ContinuousView({
                 {/* Model + run settings — the image model, resolution and aspect
                     every keyframe in this batch uses. Mirrors Line-by-Line. */}
                 <div className="mt-4 flex flex-col gap-2.5">
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Model</span>
                   <ModelPicker appId="broll-studio" task="image" mode="text-to-image" />
                   {(frameAspectOptions.length > 0 || frameResOptions.length > 0) && (
                     <div className="flex flex-wrap items-center gap-2">
@@ -1465,16 +1448,9 @@ export default function ContinuousView({
                   )}
                 </div>
 
-                <div className="mt-3 flex items-center justify-between rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5 text-xs">
-                  <span className="text-ink-400">Estimated cost</span>
-                  <span className="flex items-center gap-1 font-medium text-ink-100">
-                    <Coins className="h-3 w-3" strokeWidth={2} />
-                    {framesCredits != null ? (formatCredits(framesCredits) ?? '— credits') : '— credits'}
-                  </span>
-                </div>
-                {balance !== null && (
-                  <p className={`mt-1.5 text-[11px] ${framesOverBudget ? 'text-red-400 light:text-red-600' : 'text-ink-500'}`}>
-                    Your balance: {balance.toLocaleString()} credits{framesOverBudget ? ' — not enough' : ''}
+                {balance !== null && framesOverBudget && (
+                  <p className="mt-3 text-[11px] text-red-400 light:text-red-600">
+                    Not enough credits — your balance is {balance.toLocaleString()}.
                   </p>
                 )}
               </>
@@ -1492,10 +1468,21 @@ export default function ContinuousView({
                 type="button"
                 onClick={confirmGenerate}
                 disabled={confirmGen.kind === 'frames' && frameTargets.length === 0}
-                className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-4 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-broll-500"
+                className="flex items-center gap-2 rounded-full border border-white/15 bg-broll-500 py-1.5 pl-4 pr-2 text-[12px] font-medium text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-broll-500"
               >
                 {confirmGen.kind === 'clips' ? <VideoIcon className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
-                Generate
+                {confirmGen.kind === 'clips'
+                  ? `Generate ${confirmGen.sceneIndices.length} video${confirmGen.sceneIndices.length === 1 ? '' : 's'}`
+                  : frameTargets.length === 0
+                    ? 'Generate'
+                    : `Generate ${frameImageCount} image${frameImageCount === 1 ? '' : 's'}`}
+                {/* The price sits on the button that spends it. */}
+                <span className="flex items-center gap-1 rounded-full bg-black/25 px-2 py-0.5 text-[11px] tabular-nums">
+                  <Coins className="h-3 w-3" strokeWidth={2} />
+                  {confirmGen.kind === 'clips'
+                    ? formatCredits(confirmCredits) ?? '—'
+                    : frameTargets.length === 0 || framesCredits == null ? '—' : formatCredits(framesCredits) ?? '—'}
+                </span>
               </button>
             </div>
           </div>

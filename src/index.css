@@ -433,6 +433,15 @@ textarea,
   mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
 }
 
+/* Bottom-edge fade for a vertical scroller (the Product form's field column).
+   Applied ONLY while there is content below the fold — a fade that's always
+   there is decoration, one that appears and clears is the affordance: it says
+   the column keeps going, and stops saying it at the end. */
+.scroll-fade-b {
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent 100%);
+}
+
 /* ---- Dashboard desktop ----
    The Dashboard is staged as a macOS desktop: a wallpaper with widgets sitting
    on it. The wallpaper is three soft colour blooms in the workspace's OWN

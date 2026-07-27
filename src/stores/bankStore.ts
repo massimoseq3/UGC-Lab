@@ -43,9 +43,10 @@ interface BankState {
   addUsageDays: (rows: UsageDay[]) => string[]
   deleteUsageDays: (ids: string[]) => void
 
-  // Product CRUD
-  addProduct: (product: Omit<Product, 'id' | 'createdAt'>) => Promise<string>
-  updateProduct: (id: string, updates: Partial<Product>) => Promise<BankActionResult>
+  // Product CRUD. `silent` suppresses the confirmation toast — the Product
+  // form autosaves as you type, and a toast per keystroke is noise, not news.
+  addProduct: (product: Omit<Product, 'id' | 'createdAt'>, opts?: { silent?: boolean }) => Promise<string>
+  updateProduct: (id: string, updates: Partial<Product>, opts?: { silent?: boolean }) => Promise<BankActionResult>
   deleteProduct: (id: string) => Promise<BankActionResult>
   getProductById: (id: string) => Product | undefined
 
@@ -462,7 +463,7 @@ export const useBankStore = create<BankState>((set, get) => ({
   // soon as the local write lands, and the outbox guarantees the row reaches the
   // cloud eventually. This is what keeps the "Save to Bank" / "Add Product"
   // buttons from hanging when Supabase is slow or unreachable.
-  addProduct: async (product) => {
+  addProduct: async (product, opts) => {
     const newProduct: Product = { ...product, id: generateId(), createdAt: Date.now() }
     set((state) => {
       const next = { products: [...state.products, newProduct] }
@@ -470,11 +471,11 @@ export const useBankStore = create<BankState>((set, get) => ({
       return next
     })
     pushRow('products', newProduct)
-    reportSuccess('Product saved')
+    if (!opts?.silent) reportSuccess('Product saved')
     return newProduct.id
   },
 
-  updateProduct: async (id, updates) => {
+  updateProduct: async (id, updates, opts) => {
     const old = get().products.find((p) => p.id === id)
     if (!old) return
     const updated: Product = { ...old, ...updates }
@@ -494,7 +495,7 @@ export const useBankStore = create<BankState>((set, get) => ({
       return next
     })
     pushRow('products', updated)
-    reportSuccess('Product updated')
+    if (!opts?.silent) reportSuccess('Product updated')
   },
 
   deleteProduct: async (id) => {

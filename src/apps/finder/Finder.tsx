@@ -29,6 +29,21 @@ const SIDEBAR_ICONS: Record<BankType, React.ElementType> = {
 
 const BANK_TYPES: BankType[] = ['products', 'models', 'scripts', 'voices', 'brolls', 'styles']
 
+// Photos arrive from the Product form as data URIs on first add; already-saved
+// ones come back as asset:// refs and pass through untouched.
+async function persistProductImages(data: Omit<Product, 'id' | 'createdAt'>) {
+  const saved: Omit<Product, 'id' | 'createdAt'> = { ...data }
+  if (saved.productImage && saved.productImage.startsWith('data:')) {
+    saved.productImage = await saveFromDataUrl(saved.productImage)
+  }
+  if (saved.extraImages?.length) {
+    saved.extraImages = await Promise.all(
+      saved.extraImages.map((src) => (src.startsWith('data:') ? saveFromDataUrl(src) : Promise.resolve(src))),
+    )
+  }
+  return saved
+}
+
 // Influencers bank sub-filter. An entry is a "sheet" when `sheetImage` is set,
 // otherwise a portrait. Local-only UI state — not persisted.
 export type ModelFilter = 'all' | 'portraits' | 'sheets'
@@ -113,36 +128,60 @@ export default function Finder() {
 
   const [sort, setSort, sortOptions] = useBankSort(activeBank)
 
+  // Row the autosave created for a product that didn't exist yet. Deliberately
+  // NOT `editingId`: promoting it would swap a real `item` under the open form
+  // and reset the fields out from under whoever is typing in them.
+  const autosavedIdRef = useRef<string | null>(null)
+
+  // Everything that WRITES this ref stays above the memoized callbacks that
+  // read it — the compiler won't allow a value captured by a hook to be
+  // modified afterwards, and none of these need memoizing anyway.
+
+  // Both of these start a fresh row: pressing Add (or opening another product)
+  // with a form already open must not keep writing into the last one.
   const handleAdd = () => {
     setEditingId(null)
+    autosavedIdRef.current = null
     setShowForm(true)
   }
 
   const handleEdit = (id: string) => {
     setEditingId(id)
+    autosavedIdRef.current = null
     setShowForm(true)
+  }
+
+  const forgetAutosavedId = () => { autosavedIdRef.current = null }
+
+  // Autosave. Runs on a debounce from the form and on the way out of it, so
+  // dropping an extra angle and clicking away can never lose the work. A
+  // product that doesn't exist yet is created as an unconfirmed draft (the same
+  // orange-dot state a bulk-added photo lands in) and confirmed by Save.
+  // Returns the row as persisted, so the form can adopt the asset refs and stop
+  // re-uploading the same data URI on every pass.
+  const handleAutosaveProduct = async (data: Omit<Product, 'id' | 'createdAt'>) => {
+    const saved = await persistProductImages(data)
+    const id = editingId ?? autosavedIdRef.current
+    if (id) {
+      await updateProduct(id, saved, { silent: true })
+    } else {
+      autosavedIdRef.current = await addProduct({ ...saved, confirmed: false }, { silent: true })
+    }
+    return saved
   }
 
   // Memoized — captured by the useCallback save handlers below, so it must
   // be referentially stable for the React Compiler to keep their memoization.
   const closeForm = useCallback(() => {
     setEditingId(null)
+    forgetAutosavedId()
     setShowForm(false)
   }, [])
 
   const handleSaveProduct = useCallback(async (data: Omit<Product, 'id' | 'createdAt'>) => {
-    const saved: Omit<Product, 'id' | 'createdAt'> = { ...data, confirmed: true }
-    if (saved.productImage && saved.productImage.startsWith('data:')) {
-      saved.productImage = await saveFromDataUrl(saved.productImage)
-    }
-    // Extra angles arrive from the form as data URIs on first add; already-saved
-    // ones come back as asset:// refs and pass through untouched.
-    if (saved.extraImages?.length) {
-      saved.extraImages = await Promise.all(
-        saved.extraImages.map((src) => (src.startsWith('data:') ? saveFromDataUrl(src) : Promise.resolve(src))),
-      )
-    }
-    if (editingId) await updateProduct(editingId, saved)
+    const saved = { ...(await persistProductImages(data)), confirmed: true }
+    const id = editingId ?? autosavedIdRef.current
+    if (id) await updateProduct(id, saved)
     else await addProduct(saved)
     closeForm()
   }, [editingId, updateProduct, addProduct, closeForm])
@@ -157,18 +196,22 @@ export default function Finder() {
   }, [])
 
   const handleCancelDuringExtraction = useCallback((file: File, partial: Omit<Product, 'id' | 'createdAt'>, listingText?: string) => {
+    // The form autosaves, so the row it was editing (or created on the way)
+    // usually already exists — finish the extraction into that one.
+    const existingId = editingId ?? autosavedIdRef.current ?? undefined
     closeForm()
     saveProductDraft({
       file,
       listingText,
       initial: partial,
+      existingId,
       onStart: (id) => trackInFlight(id, true),
       onFinish: (id, ok) => {
         trackInFlight(id, false)
         addToast(ok ? 'Draft product saved' : 'Saved as draft (extraction failed)', ok ? 'success' : 'info')
       },
     })
-  }, [trackInFlight, addToast, closeForm])
+  }, [editingId, trackInFlight, addToast, closeForm])
 
   const handleBulkFiles = useCallback(async (files: File[]) => {
     const valid = files.filter(isValidImageFile)
@@ -328,8 +371,16 @@ export default function Finder() {
           <div className={`mx-auto ${['products', 'models', 'brolls', 'scripts', 'styles'].includes(activeBank) ? 'max-w-5xl' : 'max-w-md'} ${fixedFormLayout ? 'w-full lg:flex lg:min-h-0 lg:flex-1 lg:flex-col' : ''}`}>
             {activeBank === 'products' && (
               <ProductForm
+                // Remount when the form is pointed at a different row (or at a
+                // new product): its fields are local state, and without this
+                // pressing Add with a form already open kept the last
+                // product's values — which autosave would then write to a row
+                // of its own. `editingId` doesn't change while autosaving, so
+                // typing never remounts the form.
+                key={editingId ?? 'new'}
                 item={editingProduct}
                 onSave={handleSaveProduct}
+                onAutosave={handleAutosaveProduct}
                 onCancel={closeForm}
                 onCancelDuringExtraction={handleCancelDuringExtraction}
               />

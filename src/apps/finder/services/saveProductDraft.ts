@@ -10,6 +10,10 @@ export interface DraftSaveOptions {
   // authoritative source for claims/specs/offer.
   listingText?: string
   initial?: Partial<Omit<Product, 'id' | 'createdAt'>>
+  // Row to write into instead of creating one. The Product form autosaves, so
+  // by the time it's dismissed mid-extraction the product usually already
+  // exists — adding another would leave the member with two of it.
+  existingId?: string
   onStart?: (productId: string) => void
   onFinish?: (productId: string, ok: boolean) => void
 }
@@ -27,7 +31,7 @@ function placeholderNameFor(file: File, initial?: Partial<Product>): string {
 }
 
 export async function saveProductDraft(opts: DraftSaveOptions): Promise<DraftSaveResult> {
-  const { file, listingText, initial, onStart, onFinish } = opts
+  const { file, listingText, initial, existingId, onStart, onFinish } = opts
 
   const dataUrl = await fileToDataUri(file)
   const assetRef = await saveFromDataUrl(dataUrl)
@@ -41,30 +45,40 @@ export async function saveProductDraft(opts: DraftSaveOptions): Promise<DraftSav
   const placeholderName = placeholderNameFor(file, initial)
   const store = useBankStore.getState()
 
-  const id = await store.addProduct({
-    productName: placeholderName,
-    productDescription: '',
-    targetMarket: '',
-    painPoints: '',
-    usps: '',
-    benefits: '',
-    offer: '',
-    cta: '',
-    ...initial,
-    // Override anything in `initial` so the row always points to persisted assets.
-    productImage: assetRef,
-    extraImages,
-    confirmed: false,
-  })
+  let id: string
+  if (existingId) {
+    // Leave `confirmed` alone — the row may be a product the member already
+    // saved, and dropping a new photo on it doesn't demote it to a draft.
+    await store.updateProduct(existingId, { ...initial, productImage: assetRef, extraImages }, { silent: true })
+    id = existingId
+  } else {
+    id = await store.addProduct({
+      productName: placeholderName,
+      productDescription: '',
+      targetMarket: '',
+      painPoints: '',
+      usps: '',
+      benefits: '',
+      offer: '',
+      cta: '',
+      ...initial,
+      // Override anything in `initial` so the row always points to persisted assets.
+      productImage: assetRef,
+      extraImages,
+      confirmed: false,
+    }, { silent: true })
+  }
 
   onStart?.(id)
 
   try {
     const extracted = await extractProductInfo(file, listingText, extraImages)
+    // Silent: this runs in the background, sometimes many at a time from a bulk
+    // add — `onFinish` is what reports the outcome, once.
     await store.updateProduct(id, {
       ...extracted,
       productName: extracted.productName?.trim() || placeholderName,
-    })
+    }, { silent: true })
     onFinish?.(id, true)
     return { id, ok: true }
   } catch (err) {
