@@ -343,21 +343,21 @@ counter (leading) · model chip + **Generate Voiceover** button (trailing).
 
 ### Side panel (`components/SidePanel.tsx`)
 
-Header band: **Settings / History** tab strip + a **Reset values** pill (Settings
-tab only, sized like Scripts' "New" pill). Settings (`SettingsView.tsx`), top→bottom:
+Header band: **Settings / History** tab strip + a **Reset** pill (Settings tab
+only, sized like Scripts' "New" pill). Settings (`SettingsView.tsx`), top→bottom:
 
-1. **Preset** row — pinned over the scroll (the Characters controls pattern:
-   opaque backdrop + a feathered gradient, so the fields dissolve underneath).
+1. **Preset** row — loads a saved `voices` bank entry (scrolls with the column).
 2. **Voice** selector (avatar + name + description; opens the voice picker
    slide-over).
 3. **Style** dropdown (Vocal Smile / Newscaster / Whisper / Empathetic /
    Promo·Hype / Deadpan).
 4. **Pace** + **Accent** dropdowns, side by side.
 5. **Expressiveness** slider (the `temperature` param, Focused → Creative).
-6. **Tone / context** then **Scene** textareas, both tagged with an `OPTIONAL` pill.
-7. One-tap **direction chips**.
+6. **Tone / context** then **Scene** textareas, both tagged with an `OPTIONAL`
+   pill. They close the column — the one-tap direction presets under them are
+   retired.
 
-Subheadings are one shared size (`SETTING_LABEL`, 12px) over 13px value text and
+Subheadings are one shared size (`SETTING_LABEL`, 13px) over 13px value text and
 11px subtext — the editor's Script card matches those same three sizes.
 
 The engine is **Gemini 3.1 Flash TTS**, not ElevenLabs — the model name shows on

@@ -1,15 +1,16 @@
 import { ChevronRight, Mic, X } from 'lucide-react'
 import type { VoiceSettings } from '../types'
-import { DIRECTION_PRESETS, getVoiceById, VOICE_STYLES, VOICE_PACES, VOICE_ACCENTS } from '../types'
+import { getVoiceById, VOICE_STYLES, VOICE_PACES, VOICE_ACCENTS } from '../types'
 import { seedColor } from './seedColor'
 import Slider from './Slider'
 import Dropdown from './Dropdown'
 
 // One size for every setting subheading (Voice / Style / Pace / Accent /
-// Expressiveness / Tone / Scene). 12px sits a step under the 13px value text
-// it labels, so the column reads as a stack of controls rather than headings.
-// Slider carries the same class on its own label — keep the two in step.
-const SETTING_LABEL = 'text-xs font-medium text-ink-200'
+// Expressiveness / Tone / Scene). 13px — a step down from the 14px they were,
+// so the column reads as controls rather than headings, without shrinking to
+// the 11px subtext register. Slider carries the same class on its own label —
+// keep the two in step.
+const SETTING_LABEL = 'text-[13px] font-medium text-ink-200'
 
 interface SettingsViewProps {
   settings: VoiceSettings
@@ -30,19 +31,15 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="flex flex-col gap-4 px-5 pb-6 pt-2">
         {/* Preset — loads a saved voice from the bank in one click (voice,
-            delivery params, scene and tone all together). Pinned over the
-            scroll (the Characters controls pattern): an opaque backdrop
-            stretched across the column's padding by -mx-5/px-5, plus a
-            feathered gradient below it so the fields dissolve underneath
-            instead of clipping against a hard edge. */}
-        <div className="sticky top-0 z-10 -mx-5 bg-surface-0 px-5 pt-2">
-          <PresetRow
-            label={settings.presetLabel}
-            onOpen={onOpenPresetPicker}
-            onClear={() => onSettingsChange({ ...settings, presetId: undefined, presetLabel: undefined })}
-          />
-          <div className="pointer-events-none absolute inset-x-0 top-full h-5 bg-gradient-to-b from-surface-0 to-transparent" />
-        </div>
+            delivery params, scene and tone all together). Scrolls with the rest
+            of the column: pinning it over the scroll (the Characters controls
+            pattern) was tried and reverted — it's one row among the settings
+            here, not a header. */}
+        <PresetRow
+          label={settings.presetLabel}
+          onOpen={onOpenPresetPicker}
+          onClear={() => onSettingsChange({ ...settings, presetId: undefined, presetLabel: undefined })}
+        />
 
         {/* Voice — clickable, slides into picker */}
         <div>
@@ -113,13 +110,6 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
           onChange={(scene) => update({ scene })}
         />
 
-        {/* One-tap direction presets — fill both boxes above. Tapping the
-            active chip clears them again. */}
-        <DirectionChips
-          scene={settings.scene}
-          sampleContext={settings.sampleContext}
-          onApply={(scene, sampleContext) => update({ scene, sampleContext })}
-        />
       </div>
     </div>
   )
@@ -211,43 +201,6 @@ function DirectionBox({
         placeholder={placeholder}
         className="resize-none rounded-2xl border border-ink/10 bg-ink/[0.03] px-3.5 py-2.5 text-sm text-ink-100 placeholder-ink-600 outline-none transition-colors focus:border-voice-500/40"
       />
-    </div>
-  )
-}
-
-// Tap-to-fill direction presets. A chip reads as active only when BOTH boxes
-// still match it exactly — edit either one by hand and the chip lets go, so it
-// can never claim direction the settings no longer hold.
-function DirectionChips({
-  scene,
-  sampleContext,
-  onApply,
-}: {
-  scene: string
-  sampleContext: string
-  onApply: (scene: string, sampleContext: string) => void
-}) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {DIRECTION_PRESETS.map((p) => {
-        const active = scene === p.scene && sampleContext === p.sampleContext
-        return (
-          <button
-            key={p.id}
-            type="button"
-            // Tapping the active chip clears both boxes — the same click undoes it.
-            onClick={() => (active ? onApply('', '') : onApply(p.scene, p.sampleContext))}
-            title={p.sampleContext}
-            className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
-              active
-                ? 'border-voice-500/40 bg-voice-500/15 text-voice-300'
-                : 'border-ink/10 bg-ink/[0.03] text-ink-400 hover:bg-ink/[0.06] hover:text-ink-200'
-            }`}
-          >
-            {p.label}
-          </button>
-        )
-      })}
     </div>
   )
 }

@@ -25,7 +25,7 @@ function ResetValuesButton({ onReset }: { onReset: () => void }) {
       className="flex shrink-0 items-center gap-1 rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-300"
     >
       <RotateCcw className="h-2.5 w-2.5" strokeWidth={2.5} />
-      Reset values
+      Reset
     </button>
   )
 }
