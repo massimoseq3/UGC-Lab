@@ -1,15 +1,12 @@
-import { useState, useRef } from 'react'
-import { createPortal } from 'react-dom'
-import { X, Palette, Sparkles, Loader2, Check, ChevronLeft, ImagePlus, Package, Bookmark, Trash2 } from 'lucide-react'
+import { useState, useRef, useLayoutEffect } from 'react'
+import { X, Palette, Sparkles, Loader2, Check, ImagePlus, Package, Bookmark, Trash2 } from 'lucide-react'
 import type { StylePreset } from '../stores/types'
 import { useBankStore } from '../stores/bankStore'
 import { useAppStore } from '../stores/appStore'
 import { useAssetUrl } from '../hooks/useAssetUrl'
 import { saveFromDataUrl } from '../utils/assetStore'
-import useCloseOnEscape from '../hooks/useCloseOnEscape'
-import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import { CONTINUOUS_STYLES } from '../utils/visualStyle'
-import { useBackdropClose } from '../hooks/useBackdropClose'
+import SlideOver from './SlideOver'
 
 // How many reference frames one style can be read from. Matches the cap the
 // parent enforces when adding refs.
@@ -168,11 +165,19 @@ export default function StyleModal({
   const [dragging, setDragging] = useState(false)
   const dragDepth = useRef(0)
 
-  useCloseOnEscape(open, onClose)
-  useCloseOnAppSwitch(open, onClose)
-  const backdrop = useBackdropClose(onClose)
-
-  if (!open) return null
+  // Every open lands on the browse view with a clean draft. The panel stays
+  // mounted (SlideOver animates it in and out), so this replaces the remount-
+  // on-open key the hosts used to pass; a layout effect runs before paint, so
+  // the previous session's create view never flashes.
+  const wasOpen = useRef(open)
+  useLayoutEffect(() => {
+    if (open && !wasOpen.current) {
+      setView('browse')
+      setDraftBrief('')
+      setDraftName('')
+    }
+    wasOpen.current = open
+  }, [open])
 
   const usingCustom = !!styleBrief?.trim()
 
@@ -239,281 +244,27 @@ export default function StyleModal({
     if (images.length > 0) onAddStyleRefs(images)
   }
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
-      {...backdrop}
-    >
-      <div
-        className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-surface-1 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center gap-3 border-b border-ink/10 px-5 py-3.5">
-          {view === 'create' && (
-            <button
-              type="button"
-              onClick={backToBrowse}
-              aria-label="Back to styles"
-              className="-ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/10 hover:text-ink-100"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-          )}
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold tracking-tight text-ink-100">
-              {view === 'create' ? 'New style from references' : 'Visual style'}
-            </p>
-            <p className="truncate text-[11px] text-ink-500">
-              {view === 'create'
-                ? 'The look is read from these frames — never their subjects'
-                : `The look every ${subjectLabel} is rendered in`}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/10 hover:text-ink-100"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {view === 'browse' ? (
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-            {/* A one-off analysed brief isn't in the bank, so no card can carry
-                its selected state — surface it here with a way back out. */}
-            {usingCustom && !styleBankId && (
-              <div className={`mb-4 rounded-2xl border px-4 py-3 ${accent.banner}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${accent.bannerLabel}`}>Custom style in use</span>
-                  <button
-                    type="button"
-                    onClick={() => { setDraftBrief(styleBrief ?? ''); setDraftName(''); setView('create') }}
-                    className="shrink-0 rounded-full bg-ink/10 px-2.5 py-0.5 text-[11px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.16]"
-                  >
-                    Name & save it
-                  </button>
-                </div>
-                <p className="mt-1.5 line-clamp-3 text-[11px] leading-relaxed text-ink-400">{styleBrief}</p>
-              </div>
-            )}
-
-            <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-ink-600">Presets</p>
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-              {CONTINUOUS_STYLES.map((s) => {
-                const active = !usingCustom && s.id === styleId
-                return (
-                  <StyleCardShell key={s.id} active={active} accent={accent} onClick={() => { onPickPreset(s.id); onClose() }}>
-                    <span className={`flex h-8 w-8 items-center justify-center rounded-full ${active ? accent.iconOn : 'bg-ink/5 text-ink-500'}`}>
-                      <Palette className="h-4 w-4" strokeWidth={1.75} />
-                    </span>
-                    <span className={`mt-2.5 text-[13px] font-semibold tracking-tight ${active ? accent.titleOn : 'text-ink-100'}`}>{s.label}</span>
-                    <span className="mt-1 line-clamp-3 text-[11px] leading-snug text-ink-500">{s.hint}</span>
-                  </StyleCardShell>
-                )
-              })}
-            </div>
-
-            <p className="mb-2.5 mt-6 text-[11px] font-medium uppercase tracking-wider text-ink-600">Your styles</p>
-            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-              {savedStyles.map((s) => (
-                <SavedStyleCard
-                  key={s.id}
-                  item={s}
-                  active={usingCustom && styleBankId === s.id}
-                  accent={accent}
-                  onUse={() => { onUseCustom({ brief: s.brief, name: s.name, bankId: s.id }); onClose() }}
-                  onDelete={() => void deleteStyle(s.id)}
-                />
-              ))}
-              {/* Dashed create card — always last, so the row reads "…and one
-                  more of your own". */}
-              <button
-                type="button"
-                onClick={openCreate}
-                className="flex min-h-[124px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-ink/10 bg-ink/[0.02] p-3.5 text-center transition-colors hover:border-ink/25 hover:bg-ink/[0.05]"
-              >
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/5 text-ink-500">
-                  <Sparkles className="h-4 w-4" strokeWidth={1.75} />
-                </span>
-                <span className="text-[13px] font-semibold tracking-tight text-ink-200">New from images</span>
-                <span className="text-[11px] leading-snug text-ink-600">Upload frames of an ad whose look you want</span>
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div
-            className="min-h-0 flex-1 overflow-y-auto px-5 py-4"
-            onDragEnter={(e) => {
-              if (!Array.from(e.dataTransfer.types).includes('Files')) return
-              dragDepth.current += 1
-              setDragging(true)
-            }}
-            onDragOver={(e) => { if (Array.from(e.dataTransfer.types).includes('Files')) e.preventDefault() }}
-            onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDragging(false) }}
-            onDrop={(e) => {
-              if (!Array.from(e.dataTransfer.types).includes('Files')) return
-              e.preventDefault()
-              dragDepth.current = 0
-              setDragging(false)
-              handleFiles(Array.from(e.dataTransfer.files))
-            }}
-          >
-            {/* Reference frames. Dashed only while empty — once frames are in,
-                the panel goes solid so the dashed Add tile is the only dashed
-                thing left and reads as the affordance it is. */}
-            <div
-              className={`rounded-2xl border p-4 transition-colors ${
-                dragging
-                  ? `border-dashed ${accent.dropActive}`
-                  : styleRefs.length === 0
-                    ? 'border-dashed border-ink/10 bg-ink/[0.02]'
-                    : 'border-ink/[0.07] bg-ink/[0.02]'
-              }`}
-            >
-              {styleRefs.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 py-4 text-center">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink/5 text-ink-500">
-                    <ImagePlus className="h-5 w-5" strokeWidth={1.5} />
-                  </span>
-                  <p className="text-[12px] leading-relaxed text-ink-500">
-                    Drop up to {MAX_REFS} frames here, or pick them from your banks.
-                  </p>
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    <label className="flex cursor-pointer items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-[12px] font-semibold text-paper transition-colors hover:bg-ink/90">
-                      <ImagePlus className="h-3.5 w-3.5" />
-                      Upload images
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => {
-                          handleFiles(Array.from(e.target.files ?? []))
-                          e.target.value = ''
-                        }}
-                      />
-                    </label>
-                    {onPickStyleRefsFromBank && (
-                      <button
-                        type="button"
-                        onClick={onPickStyleRefsFromBank}
-                        className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.04] px-4 py-2 text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.08]"
-                      >
-                        <Package className="h-3.5 w-3.5" />
-                        Choose from Bank
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3.5">
-                  {/* Caption row — the count on the left, the two secondary
-                      actions as quiet links on the right, so the primary CTA
-                      below is the only button competing for attention. */}
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-ink-600">
-                      Reference frames · {styleRefs.length} of {MAX_REFS}
-                    </span>
-                    <div className="flex shrink-0 items-center gap-1">
-                      {onPickStyleRefsFromBank && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={onPickStyleRefsFromBank}
-                            className="rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-200"
-                          >
-                            Choose from Bank
-                          </button>
-                          <span className="h-3 w-px bg-ink/10" />
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        onClick={onClearStyleRefs}
-                        className="rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-200"
-                      >
-                        Clear
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {styleRefs.map((ref, i) => (
-                      <div key={i} className="group/ref relative h-20 w-20 overflow-hidden rounded-xl border border-ink/10">
-                        <img src={ref} alt={`Style reference ${i + 1}`} className="h-full w-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => onRemoveStyleRef(i)}
-                          title="Remove"
-                          className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover/ref:opacity-100"
-                        >
-                          <X className="h-4 w-4 text-white" />
-                        </button>
-                      </div>
-                    ))}
-                    {styleRefs.length < MAX_REFS && (
-                      <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-ink/15 text-ink-500 transition-colors hover:border-ink/30 hover:text-ink-300">
-                        <ImagePlus className="h-4 w-4" strokeWidth={1.5} />
-                        <span className="text-[10px] font-medium">Add</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => {
-                            handleFiles(Array.from(e.target.files ?? []))
-                            e.target.value = ''
-                          }}
-                        />
-                      </label>
-                    )}
-                  </div>
-                  <div className="flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => void handleAnalyze()}
-                      disabled={isAnalyzing}
-                      className={`flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[12px] font-semibold tracking-tight text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${accent.button}`}
-                    >
-                      {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                      {isAnalyzing ? 'Reading the style…' : draftBrief ? 'Re-read the style' : `Read the style from ${styleRefs.length} image${styleRefs.length === 1 ? '' : 's'}`}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* The distilled brief — editable before it's used or saved. */}
-            {draftBrief && (
-              <div className="mt-4 flex flex-col gap-3">
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-ink-600">Style brief</span>
-                  <textarea
-                    value={draftBrief}
-                    onChange={(e) => setDraftBrief(e.target.value)}
-                    rows={7}
-                    className="resize-y rounded-2xl border border-ink/10 bg-ink/[0.03] px-4 py-3 text-[13px] leading-relaxed text-ink-200 outline-none transition-colors focus:border-ink/20"
-                  />
-                </label>
-                <label className="flex flex-col gap-1.5">
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-ink-600">Name</span>
-                  <input
-                    value={draftName}
-                    onChange={(e) => setDraftName(e.target.value)}
-                    placeholder='e.g. "Warm 90s Camcorder"'
-                    className="rounded-full border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-[13px] text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
-                  />
-                </label>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Footer — only the create view commits anything. */}
-        {view === 'create' && draftBrief && (
-          <div className="flex items-center justify-end gap-2 border-t border-ink/10 px-5 py-3">
+  return (
+    <SlideOver
+      open={open}
+      onClose={onClose}
+      onBack={view === 'create' ? backToBrowse : undefined}
+      title={view === 'create' ? 'New style from references' : 'Visual style'}
+      subtitle={
+        view === 'create'
+          ? 'The look is read from these frames — never their subjects'
+          : `The look every ${subjectLabel} is rendered in`
+      }
+      // 560px, same as BankPicker — the style cards carry a name plus a
+      // three-line brief, which 380px squeezes to a word a line.
+      size="wide"
+      // The create view routes to the host's own BankPicker for reference
+      // frames, and that picker has to land on top of this panel.
+      layer="below-pickers"
+      footer={
+        // Only the create view commits anything.
+        view === 'create' && draftBrief ? (
+          <div className="flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={handleUseOnce}
@@ -532,10 +283,242 @@ export default function StyleModal({
               Save to bank & use
             </button>
           </div>
-        )}
-      </div>
-    </div>,
-    document.body,
+        ) : undefined
+      }
+    >
+      {view === 'browse' ? (
+        <div className="px-5 py-4">
+          {/* A one-off analysed brief isn't in the bank, so no card can carry
+              its selected state — surface it here with a way back out. */}
+          {usingCustom && !styleBankId && (
+            <div className={`mb-4 rounded-2xl border px-4 py-3 ${accent.banner}`}>
+              <div className="flex items-start justify-between gap-3">
+                <span className={`text-[10px] font-semibold uppercase tracking-wider ${accent.bannerLabel}`}>Custom style in use</span>
+                <button
+                  type="button"
+                  onClick={() => { setDraftBrief(styleBrief ?? ''); setDraftName(''); setView('create') }}
+                  className="shrink-0 rounded-full bg-ink/10 px-2.5 py-0.5 text-[11px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.16]"
+                >
+                  Name & save it
+                </button>
+              </div>
+              <p className="mt-1.5 line-clamp-3 text-[11px] leading-relaxed text-ink-400">{styleBrief}</p>
+            </div>
+          )}
+
+          <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-ink-600">Presets</p>
+          <div className="grid grid-cols-2 gap-2.5">
+            {CONTINUOUS_STYLES.map((s) => {
+              const active = !usingCustom && s.id === styleId
+              return (
+                <StyleCardShell key={s.id} active={active} accent={accent} onClick={() => { onPickPreset(s.id); onClose() }}>
+                  <span className={`flex h-8 w-8 items-center justify-center rounded-full ${active ? accent.iconOn : 'bg-ink/5 text-ink-500'}`}>
+                    <Palette className="h-4 w-4" strokeWidth={1.75} />
+                  </span>
+                  <span className={`mt-2.5 text-[13px] font-semibold tracking-tight ${active ? accent.titleOn : 'text-ink-100'}`}>{s.label}</span>
+                  <span className="mt-1 line-clamp-3 text-[11px] leading-snug text-ink-500">{s.hint}</span>
+                </StyleCardShell>
+              )
+            })}
+          </div>
+
+          <p className="mb-2.5 mt-6 text-[11px] font-medium uppercase tracking-wider text-ink-600">Your styles</p>
+          <div className="grid grid-cols-2 gap-2.5">
+            {savedStyles.map((s) => (
+              <SavedStyleCard
+                key={s.id}
+                item={s}
+                active={usingCustom && styleBankId === s.id}
+                accent={accent}
+                onUse={() => { onUseCustom({ brief: s.brief, name: s.name, bankId: s.id }); onClose() }}
+                onDelete={() => void deleteStyle(s.id)}
+              />
+            ))}
+            {/* Dashed create card — always last, so the row reads "…and one
+                more of your own". */}
+            <button
+              type="button"
+              onClick={openCreate}
+              className="flex min-h-[124px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-ink/10 bg-ink/[0.02] p-3.5 text-center transition-colors hover:border-ink/25 hover:bg-ink/[0.05]"
+            >
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/5 text-ink-500">
+                <Sparkles className="h-4 w-4" strokeWidth={1.75} />
+              </span>
+              <span className="text-[13px] font-semibold tracking-tight text-ink-200">New from images</span>
+              <span className="text-[11px] leading-snug text-ink-600">Upload frames of an ad whose look you want</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        // min-h-full so the drop zone covers the whole scroll area, not just
+        // the height the (initially short) create view happens to occupy.
+        <div
+          className="min-h-full px-5 py-4"
+          onDragEnter={(e) => {
+            if (!Array.from(e.dataTransfer.types).includes('Files')) return
+            dragDepth.current += 1
+            setDragging(true)
+          }}
+          onDragOver={(e) => { if (Array.from(e.dataTransfer.types).includes('Files')) e.preventDefault() }}
+          onDragLeave={() => { dragDepth.current = Math.max(0, dragDepth.current - 1); if (dragDepth.current === 0) setDragging(false) }}
+          onDrop={(e) => {
+            if (!Array.from(e.dataTransfer.types).includes('Files')) return
+            e.preventDefault()
+            dragDepth.current = 0
+            setDragging(false)
+            handleFiles(Array.from(e.dataTransfer.files))
+          }}
+        >
+          {/* Reference frames. Dashed only while empty — once frames are in,
+              the panel goes solid so the dashed Add tile is the only dashed
+              thing left and reads as the affordance it is. */}
+          <div
+            className={`rounded-2xl border p-4 transition-colors ${
+              dragging
+                ? `border-dashed ${accent.dropActive}`
+                : styleRefs.length === 0
+                  ? 'border-dashed border-ink/10 bg-ink/[0.02]'
+                  : 'border-ink/[0.07] bg-ink/[0.02]'
+            }`}
+          >
+            {styleRefs.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 py-4 text-center">
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink/5 text-ink-500">
+                  <ImagePlus className="h-5 w-5" strokeWidth={1.5} />
+                </span>
+                <p className="text-[12px] leading-relaxed text-ink-500">
+                  Drop up to {MAX_REFS} frames here, or pick them from your banks.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <label className="flex cursor-pointer items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-[12px] font-semibold text-paper transition-colors hover:bg-ink/90">
+                    <ImagePlus className="h-3.5 w-3.5" />
+                    Upload images
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        handleFiles(Array.from(e.target.files ?? []))
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                  {onPickStyleRefsFromBank && (
+                    <button
+                      type="button"
+                      onClick={onPickStyleRefsFromBank}
+                      className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.04] px-4 py-2 text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.08]"
+                    >
+                      <Package className="h-3.5 w-3.5" />
+                      Choose from Bank
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3.5">
+                {/* Caption row — the count on the left, the two secondary
+                    actions as quiet links on the right, so the primary CTA
+                    below is the only button competing for attention. */}
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[11px] font-medium uppercase tracking-wider text-ink-600">
+                    Reference frames · {styleRefs.length} of {MAX_REFS}
+                  </span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {onPickStyleRefsFromBank && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={onPickStyleRefsFromBank}
+                          className="rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-200"
+                        >
+                          Choose from Bank
+                        </button>
+                        <span className="h-3 w-px bg-ink/10" />
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={onClearStyleRefs}
+                      className="rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-200"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {styleRefs.map((ref, i) => (
+                    <div key={i} className="group/ref relative h-20 w-20 overflow-hidden rounded-xl border border-ink/10">
+                      <img src={ref} alt={`Style reference ${i + 1}`} className="h-full w-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => onRemoveStyleRef(i)}
+                        title="Remove"
+                        className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover/ref:opacity-100"
+                      >
+                        <X className="h-4 w-4 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                  {styleRefs.length < MAX_REFS && (
+                    <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-ink/15 text-ink-500 transition-colors hover:border-ink/30 hover:text-ink-300">
+                      <ImagePlus className="h-4 w-4" strokeWidth={1.5} />
+                      <span className="text-[10px] font-medium">Add</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          handleFiles(Array.from(e.target.files ?? []))
+                          e.target.value = ''
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => void handleAnalyze()}
+                    disabled={isAnalyzing}
+                    className={`flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[12px] font-semibold tracking-tight text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${accent.button}`}
+                  >
+                    {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    {isAnalyzing ? 'Reading the style…' : draftBrief ? 'Re-read the style' : `Read the style from ${styleRefs.length} image${styleRefs.length === 1 ? '' : 's'}`}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* The distilled brief — editable before it's used or saved. */}
+          {draftBrief && (
+            <div className="mt-4 flex flex-col gap-3">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-ink-600">Style brief</span>
+                <textarea
+                  value={draftBrief}
+                  onChange={(e) => setDraftBrief(e.target.value)}
+                  rows={7}
+                  className="resize-y rounded-2xl border border-ink/10 bg-ink/[0.03] px-4 py-3 text-[13px] leading-relaxed text-ink-200 outline-none transition-colors focus:border-ink/20"
+                />
+              </label>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-ink-600">Name</span>
+                <input
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  placeholder='e.g. "Warm 90s Camcorder"'
+                  className="rounded-full border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-[13px] text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
+                />
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+    </SlideOver>
   )
 }
 

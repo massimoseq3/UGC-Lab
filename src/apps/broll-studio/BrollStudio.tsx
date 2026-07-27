@@ -1215,12 +1215,9 @@ export default function BrollStudio() {
         onImport={handleImportPrompts}
       />
 
-      {/* Visual style popup — presets, the user's saved styles, and the
+      {/* Visual style slide-over — presets, the user's saved styles, and the
           analyse-from-references flow, all in one place. */}
       <StyleModal
-        // Remount per open so the popup always lands on the browse view with a
-        // clean draft — it renders null while closed, so this costs nothing.
-        key={styleModalOpen ? 'open' : 'closed'}
         open={styleModalOpen}
         onClose={() => setStyleModalOpen(false)}
         // Empty until a look is actually chosen, so nothing in the picker reads

@@ -4,7 +4,6 @@ import ModelPicker from '../../../components/ModelPicker'
 import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
 import SegmentedToggle from '../../../components/SegmentedToggle'
-import ModelWaitNotice from '../../../components/ModelWaitNotice'
 import { estimateCredits, formatCredits, getDefaultModel, getModel, type ImageResolution } from '../../../utils/models'
 
 interface GenerateBarProps {
@@ -166,11 +165,6 @@ export default function GenerateBar({
           </span>
         )}
       </button>
-
-      {/* Wait notice (when shown) sits centered under the Generate button. */}
-      <div className="!mt-1 flex items-center justify-center px-1">
-        <ModelWaitNotice modelId={selectedModelId} />
-      </div>
     </div>
   )
 }

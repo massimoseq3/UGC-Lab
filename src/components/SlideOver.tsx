@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { X, ChevronLeft } from 'lucide-react'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 
@@ -14,12 +14,20 @@ interface SlideOverProps {
   // 'wide' matches BankPicker's 560px panel — for card grids where 380px
   // squeezes the tiles too small to read.
   size?: 'default' | 'wide'
+  // Optional back arrow left of the title, for a panel with a second view
+  // inside it (StyleModal's "New style from references").
+  onBack?: () => void
+  // Stacking tier. 'default' (backdrop z-70 / panel z-80) matches BankPicker
+  // and ModelSidePanel. 'below-pickers' sits under those but still above the
+  // z-60 modals — for a slide-over that opens a BankPicker on top of itself,
+  // which on the shared tier would land behind it (equal z, later in <body>).
+  layer?: 'default' | 'below-pickers'
 }
 
 // Right-edge slide-over panel — the same chrome as BankPicker (portal at
 // document root, backdrop, 380px panel — or 560px on `size='wide'`, matching
 // BankPicker exactly) so pickers and preset browsers read as one pattern.
-export default function SlideOver({ open, onClose, title, subtitle, children, footer, size = 'default' }: SlideOverProps) {
+export default function SlideOver({ open, onClose, title, subtitle, children, footer, size = 'default', onBack, layer = 'default' }: SlideOverProps) {
   useCloseOnAppSwitch(open, onClose)
 
   useCloseOnEscape(open, onClose)
@@ -30,20 +38,29 @@ export default function SlideOver({ open, onClose, title, subtitle, children, fo
   return createPortal(
     <>
       <div
-        className={`fixed inset-0 z-[70] bg-black/50 transition-opacity duration-300 ${
+        className={`fixed inset-0 ${layer === 'below-pickers' ? 'z-[64]' : 'z-[70]'} bg-black/50 transition-opacity duration-300 ${
           open ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
       />
       <div
-        className={`fixed bottom-0 right-0 top-0 z-[80] flex ${
+        className={`fixed bottom-0 right-0 top-0 ${layer === 'below-pickers' ? 'z-[66]' : 'z-[80]'} flex ${
           size === 'wide' ? 'w-[560px]' : 'w-[380px]'
         } max-w-full flex-col border-l border-ink/5 bg-surface-1/95 backdrop-blur-2xl transition-transform duration-300 ease-out ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         <div className="flex items-center justify-between gap-3 border-b border-ink/5 px-5 py-3.5">
-          <div className="min-w-0">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="-ml-1 shrink-0 rounded-full p-1 text-ink-400 transition-colors hover:bg-ink/10 hover:text-ink-100"
+              aria-label="Back"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          )}
+          <div className="min-w-0 flex-1">
             <h3 className="truncate text-sm font-semibold tracking-tight text-ink-200">{title}</h3>
             {subtitle && <p className="truncate text-[11px] text-ink-500">{subtitle}</p>}
           </div>

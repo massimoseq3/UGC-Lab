@@ -311,17 +311,17 @@ export default function InputPanel({
             tabIndex={0}
             onClick={() => setProductPickerOpen(true)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProductPickerOpen(true) } }}
-            className="group flex w-full cursor-pointer items-center gap-3 rounded-full border border-gold-500/25 bg-gold-500/[0.06] px-4 py-3.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-inset ring-gold-500/10 transition-colors hover:bg-gold-500/10"
+            className="group flex w-full cursor-pointer items-center gap-3 rounded-full border border-gold-500/25 bg-gold-500/[0.06] px-4 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-inset ring-gold-500/10 transition-colors hover:bg-gold-500/10"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gold-500/15">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gold-500/15">
               {resolvedProductImage ? (
                 <img src={resolvedProductImage} alt="" className="h-full w-full object-cover" />
               ) : (
-                <Package className="h-5 w-5 text-gold-400 light:text-gold-600" />
+                <Package className="h-[18px] w-[18px] text-gold-400 light:text-gold-600" />
               )}
             </div>
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-sm font-medium tracking-tight text-ink-200">
+              <span className="truncate text-[13px] font-medium tracking-tight text-ink-200">
                 {selectedProduct.productName}
               </span>
               <span className="truncate text-[11px] text-ink-500">Product</span>
@@ -361,27 +361,27 @@ export default function InputPanel({
           {products.length > 0 ? (
             <button
               onClick={() => setProductPickerOpen(true)}
-              className="flex w-full items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 py-3.5 text-left transition-colors hover:border-scripts-500/30 hover:bg-scripts-500/5"
+              className="flex w-full items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-left transition-colors hover:border-scripts-500/30 hover:bg-scripts-500/5"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold-500/10">
-                <Package className="h-5 w-5 text-gold-400 light:text-gold-600" />
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-500/10">
+                <Package className="h-[18px] w-[18px] text-gold-400 light:text-gold-600" />
               </div>
               <div className="flex min-w-0 flex-1 flex-col">
-                <span className="text-sm font-medium text-ink-300">Product</span>
-                <span className="text-xs text-ink-600">Choose from your Product Bank</span>
+                <span className="text-[13px] font-medium text-ink-300">Product</span>
+                <span className="text-[11px] text-ink-600">Choose from your Product Bank</span>
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
             </button>
           ) : (
-            <div className="flex items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 py-3.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-ink/5">
-                <Package className="h-5 w-5 text-ink-700" />
+            <div className="flex items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 py-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-ink/5">
+                <Package className="h-[18px] w-[18px] text-ink-700" />
               </div>
               <div className="flex flex-col">
-                <span className="text-sm text-ink-500">No products yet</span>
+                <span className="text-[13px] text-ink-500">No products yet</span>
                 <button
                   onClick={handleOpenFinder}
-                  className="text-left text-xs text-scripts-400 transition-colors hover:text-scripts-300"
+                  className="text-left text-[11px] text-scripts-400 transition-colors hover:text-scripts-300"
                 >
                   Add one in Bank
                 </button>
@@ -449,14 +449,14 @@ export default function InputPanel({
                 tabIndex={0}
                 onClick={() => setHookSlideOpen(true)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHookSlideOpen(true) } }}
-                className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-4 py-3.5 text-left transition-colors ${
+                className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
                   hookCategory !== 'auto'
                     ? 'border-scripts-500/20 bg-scripts-500/[0.06] hover:border-scripts-500/30 hover:bg-scripts-500/10'
                     : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
                 }`}
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
-                  <FishingHook className="h-5 w-5" strokeWidth={1.75} />
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
+                  <FishingHook className="h-[18px] w-[18px]" strokeWidth={1.75} />
                 </div>
                 <div className="min-w-0 flex-1">
                   {hookCategory !== 'auto' ? (
@@ -466,8 +466,8 @@ export default function InputPanel({
                     </>
                   ) : (
                     <>
-                      <div className="text-sm font-medium text-ink-300">Hook Style</div>
-                      <div className="text-xs text-ink-600">Auto picks the best mix — or lock one category</div>
+                      <div className="text-[13px] font-medium text-ink-300">Hook Style</div>
+                      <div className="text-[11px] text-ink-600">Auto picks the best mix — or lock one category</div>
                     </>
                   )}
                 </div>
@@ -503,16 +503,16 @@ export default function InputPanel({
                 tabIndex={0}
                 onClick={() => setStyleSlideOpen(true)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
-                className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-4 py-3.5 text-left transition-colors ${
+                className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
                   styleChosen
                     ? 'border-scripts-500/20 bg-scripts-500/[0.06] hover:border-scripts-500/30 hover:bg-scripts-500/10'
                     : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
                 }`}
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
                   {styleChosen && WRITE_STYLE_META[writeStyle].group === 'format'
-                    ? <Video className="h-5 w-5" strokeWidth={1.75} />
-                    : <FileText className="h-5 w-5" strokeWidth={1.75} />}
+                    ? <Video className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                    : <FileText className="h-[18px] w-[18px]" strokeWidth={1.75} />}
                 </div>
                 <div className="min-w-0 flex-1">
                   {styleChosen ? (
@@ -522,8 +522,8 @@ export default function InputPanel({
                     </>
                   ) : (
                     <>
-                      <div className="text-sm font-medium text-ink-300">Script Style</div>
-                      <div className="text-xs text-ink-600">A structure to argue with, or a format to hide in</div>
+                      <div className="text-[13px] font-medium text-ink-300">Script Style</div>
+                      <div className="text-[11px] text-ink-600">A structure to argue with, or a format to hide in</div>
                     </>
                   )}
                 </div>

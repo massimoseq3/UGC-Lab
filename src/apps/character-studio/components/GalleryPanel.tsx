@@ -13,6 +13,7 @@ import { getModel } from '../../../utils/models'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
+import { AwaitingCanvas } from '../../../components/GridCanvas'
 import InfluencerEditModal from './InfluencerEditModal'
 import GeneratingTile from './GeneratingTile'
 import { buildJsonPrompt, buildImagePrompt } from '../services/generateCharacter'
@@ -137,14 +138,14 @@ export default function GalleryPanel({
       </div>
 
       {isEmpty ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
-          <UserRound className="h-9 w-9 text-ink-800" strokeWidth={1.5} />
-          <p className="text-sm text-ink-500">No generations yet</p>
-          <p className="max-w-[300px] text-xs leading-relaxed text-ink-600">
-            Configure parameters on the left and hit Generate.
-            Every character you make lands here, sorted by day.
-          </p>
-        </div>
+        // Same graph-paper stage the Single view and the other apps' output
+        // panels use while they hold nothing — an empty column reads as a
+        // waiting stage rather than a dead panel.
+        <AwaitingCanvas
+          icon={UserRound}
+          title="No generations yet"
+          hint="Configure parameters on the left and hit Generate. Every character you make lands here, sorted by day."
+        />
       ) : viewMode === 'single' ? (
         <SingleView
           inFlight={inFlight}
