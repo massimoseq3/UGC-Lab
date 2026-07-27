@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
-import type { CinematicVideoPayload, VideoSourceClipPayload } from '../../stores/types'
+import type { CinematicVideoPayload, VideoSourceClipPayload, ImageHistoryItem } from '../../stores/types'
+import { isAssetRef, getAsBase64 } from '../../utils/assetStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import {
   startPlaygroundImageTask,
@@ -90,16 +91,16 @@ function resolveVideoModelForMode(pickedId: string, inferred: VideoMode): string
 }
 
 function initialState(): PromptPanelState {
-  // Playground opens on the Video tab — this is a video-first workspace, so a
-  // fresh visit should land on video, not image. Seed the model from the
-  // user's last video pick (or the registry's video default) so the picker
-  // isn't briefly out of sync with the mode on first paint.
-  const defaultVideo = getDefaultModel('playground', 'video')?.id ?? 'gemini-omni-video'
-  const persistedVideo = useSettingsStore.getState().getAppModel('playground:video')
+  // Playground opens on the Image tab — the workflow it's used for starts with
+  // a still, which the Animate button then carries into Video. Seed the model
+  // from the user's last image pick (or the registry's image default) so the
+  // picker isn't briefly out of sync with the mode on first paint.
+  const defaultImage = getDefaultModel('playground', 'image', 'text-to-image')?.id ?? 'nano-banana-2'
+  const persistedImage = useSettingsStore.getState().getAppModel('playground:image:text-to-image')
   return {
-    mode: 'video',
+    mode: 'image',
     prompt: '',
-    modelId: persistedVideo ?? defaultVideo,
+    modelId: persistedImage ?? defaultImage,
     aspectRatio: '9:16',
     durationSeconds: 5,
     resolution: '1K', // snapped to the model's video default by sanitize / the constraint effect
@@ -546,6 +547,47 @@ export default function Playground() {
     setState((s) => ({ ...s, mode: nextMode, prompt: restored.prompt, refs: restored.refs }))
   }
 
+  // Image → Video handoff. The loop this app is actually used for is "make a
+  // still, then animate it", which otherwise meant downloading the image,
+  // flipping tabs, re-uploading it as a start frame and retyping the prompt.
+  // Goes through the same stash as a manual tab switch so the Image tab keeps
+  // its own draft instead of bleeding its refs into Video.
+  //
+  // Refs carry a renderable URL, not an asset id (FrameSlot renders the value
+  // straight into an <img>), so the history item's asset is inlined first —
+  // same conversion the Bank's own Animate button does.
+  async function handleAnimateImage(item: ImageHistoryItem) {
+    let url = item.imageUrl
+    if (isAssetRef(url)) {
+      const asset = await getAsBase64(url)
+      if (!asset) {
+        addToast('That image is no longer available to animate.')
+        return
+      }
+      url = `data:${asset.mimeType};base64,${asset.base64}`
+    }
+    const startRef: PromptRef = { url, label: 'start', source: 'upload', slot: 'start' }
+    const seedPrompt = item.prompt?.trim()
+
+    // Already on Video (the grid is mode-filtered, so this only happens on a
+    // deep link): just swap the start frame and leave the draft alone.
+    if (state.mode === 'video') {
+      setState((s) => ({ ...s, refs: [...s.refs.filter((r) => r.slot !== 'start'), startRef] }))
+      return
+    }
+
+    setPromptStash((prev) => ({ ...prev, [state.mode]: { prompt: state.prompt, refs: state.refs } }))
+    const restored = promptStash.video ?? { prompt: '', refs: [] }
+    setState((s) => ({
+      ...s,
+      mode: 'video',
+      // The prompt that made the still is the best starting point for the
+      // motion; fall back to whatever the Video tab already had.
+      prompt: seedPrompt || restored.prompt,
+      refs: [...restored.refs.filter((r) => r.slot !== 'start'), startRef],
+    }))
+  }
+
   // Filter the history grid to the active mode. Users frequently bounce
   // between modes and want to see what they just made, not noise from the
   // other tabs.
@@ -575,7 +617,11 @@ export default function Playground() {
 
         {/* Right — history grid */}
         <div className="flex flex-1 flex-col md:min-h-0 md:overflow-hidden">
-          <PlaygroundHistoryGrid inFlight={inFlight} filterMode={filterMode} />
+          <PlaygroundHistoryGrid
+            inFlight={inFlight}
+            filterMode={filterMode}
+            onAnimateImage={handleAnimateImage}
+          />
         </div>
       </div>
     </div>

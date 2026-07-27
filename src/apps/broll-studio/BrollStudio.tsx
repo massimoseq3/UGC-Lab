@@ -123,15 +123,17 @@ export default function BrollStudio() {
   const [scriptText, setScriptText] = usePersistedState(`${baseKey}:scriptText`, '')
   const [additionalContext, setAdditionalContext] = usePersistedState(`${baseKey}:context`, '')
 
-  // Panel-level "New" — wipes the input column back to a blank slate. Inputs
-  // ONLY: the current result, every card's images/videos, and all history rows
-  // stay put, because outputs are the user's work.
+  // Panel-level "New" — wipes the input column back to a blank slate and clears
+  // the storyboard off the right-hand canvas, so a fresh take starts on an empty
+  // workspace. Still no data loss: the result, every card's images/videos and
+  // every history row stay put — the session is one History click away.
   const handleClearInputs = () => {
     setSelectedProductId(null)
     setSelectedModelId(null)
     setSelectedScriptId(null)
     setScriptText('')
     setAdditionalContext('')
+    setClearedCanvasSig(canvasSigRef.current)
   }
   const [result, setResult] = usePersistedState<BrollResult | null>(
     `${baseKey}:result`,
@@ -364,6 +366,21 @@ export default function BrollStudio() {
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(sessionId || null)
   useEffect(() => { setActiveHistoryId(sessionId || null) }, [sessionId])
 
+  // Canvas-clear state for the right panel, owned here because BOTH the panel's
+  // + and the left column's "New" empty it. It's a view state, not a delete:
+  // the signature is keyed to the storyboard that was cleared, so the next
+  // generation (or a history pick) fills the panel again on its own.
+  const [clearedCanvasSig, setClearedCanvasSig] = useState<string | null>(null)
+  const canvasSceneCount = mode === 'continuous'
+    ? (continuousResult?.scenes.length ?? 0)
+    : (result?.scenes.length ?? 0)
+  const canvasSig = `${mode}|${sessionId}|${canvasSceneCount}`
+  const canvasCleared = canvasSceneCount > 0 && clearedCanvasSig === canvasSig
+  // Read through a ref so handleClearInputs (defined above, fired from the
+  // other column) always clears whatever is on the canvas right now.
+  const canvasSigRef = useRef(canvasSig)
+  useEffect(() => { canvasSigRef.current = canvasSig }, [canvasSig])
+
   const selectedProduct = useMemo<Product | null>(
     () => (selectedProductId ? products.find((p) => p.id === selectedProductId) ?? null : null),
     [selectedProductId, products],
@@ -415,6 +432,17 @@ export default function BrollStudio() {
     const sessionContinuous = sessionMode === 'continuous' ? continuousResult : null
     if ((!sessionResult && !sessionContinuous) || !sessionIdRef.current) return
     const handle = setTimeout(() => {
+      // A row's identity fields describe the session that PRODUCED the content,
+      // so an empty input never overwrites one that's already stamped: clearing
+      // the input column ("New") would otherwise re-save this row with no
+      // product or script and rename it "Untitled session" — losing the label
+      // on work that hasn't changed. Swapping one product for another still
+      // updates the row; only emptying leaves the stamp alone.
+      const prev = useBankStore.getState().brollHistory.find((r) => r.id === sessionIdRef.current)
+      const rowProductId = selectedProductId ?? prev?.productId
+      const rowScriptText = scriptText || prev?.scriptText || ''
+      const rowProductName = selectedProduct?.productName
+        ?? (rowProductId ? products.find((p) => p.id === rowProductId)?.productName : undefined)
       const item: BrollHistoryItem = {
         id: sessionIdRef.current,
         // Candidate creation time — only applied to a brand-new row; the store
@@ -426,12 +454,12 @@ export default function BrollStudio() {
         styleId: sessionStyleId || undefined,
         styleBrief: sessionStyleBrief ?? undefined,
         styleName: sessionStyleName ?? undefined,
-        inputSummary: buildInputSummary(selectedProduct?.productName, scriptText),
-        productId: selectedProductId ?? undefined,
-        modelId: selectedModelId ?? undefined,
-        scriptId: selectedScriptId ?? undefined,
-        scriptText: scriptText || undefined,
-        context: additionalContext || undefined,
+        inputSummary: buildInputSummary(rowProductName, rowScriptText),
+        productId: rowProductId,
+        modelId: selectedModelId ?? prev?.modelId,
+        scriptId: selectedScriptId ?? prev?.scriptId,
+        scriptText: rowScriptText || undefined,
+        context: additionalContext || prev?.context,
         result: sessionResult ?? { scenes: [] },
         cardStates: sessionResult ? cardStates : {},
         // The ROW's shape is deliberately unchanged by the mode split: a
@@ -450,7 +478,7 @@ export default function BrollStudio() {
       upsertBrollHistory(item)
     }, 1000)
     return () => clearTimeout(handle)
-  }, [result, cardStates, lineDelivery, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, sessionStyleId, sessionStyleBrief, sessionStyleName, continuousModelId, sessionMode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, upsertBrollHistory])
+  }, [result, cardStates, lineDelivery, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, sessionStyleId, sessionStyleBrief, sessionStyleName, continuousModelId, sessionMode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, products, upsertBrollHistory])
 
   const handleSelectProduct = (item: unknown) => {
     setSelectedProductId((item as Product).id)
@@ -1135,6 +1163,8 @@ export default function BrollStudio() {
           setCardStates={setCardStates}
           activeHistoryId={activeHistoryId}
           onSelectHistory={handleSelectHistory}
+          canvasCleared={canvasCleared}
+          onClearCanvas={() => setClearedCanvasSig(canvasSig)}
         />
       </div>
 

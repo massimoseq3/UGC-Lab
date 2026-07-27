@@ -89,6 +89,7 @@ import ClipDownloadModal, { type ClipDownloadEntry } from './ClipDownloadModal'
 import { copyToClipboard } from '../../../utils/clipboard'
 import { sendClipToPlayground } from '../services/sendClipToPlayground'
 import type { ContinuousStoryboardOp } from '../continuousEdits'
+import { useBackdropClose } from '../../../hooks/useBackdropClose'
 
 // Every clip is silent narration-wise — the voiceover and music land in the
 // edit. Appended to the motion prompt at fire time so hand-edits can't drop it.
@@ -170,6 +171,7 @@ export default function ContinuousView({
     | { kind: 'frames'; fresh: number[]; done: number[] }
     | null
   >(null)
+  const confirmBackdrop = useBackdropClose(() => setConfirmGen(null))
   // Frames branch only: opt into regenerating frames that already have a picked
   // keyframe (mirrors Line-by-Line's "also regenerate" toggle).
   const [includeExisting, setIncludeExisting] = useState(false)
@@ -1328,7 +1330,7 @@ export default function ContinuousView({
       {confirmGen && createPortal(
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
-          onClick={() => setConfirmGen(null)}
+          {...confirmBackdrop}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -1641,6 +1643,7 @@ function SceneEditModal({
   const textRef = useRef<HTMLTextAreaElement | null>(null)
   useCloseOnEscape(true, onClose)
   useCloseOnAppSwitch(true, onClose)
+  const sceneBackdrop = useBackdropClose(onClose)
 
   const trimmed = line.trim()
   const head = line.slice(0, caret).trim()
@@ -1651,7 +1654,7 @@ function SceneEditModal({
   const syncCaret = () => setCaret(textRef.current?.selectionStart ?? line.length)
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm" {...sceneBackdrop}>
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg rounded-2xl border border-ink/10 bg-ink-950/95 p-5 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>

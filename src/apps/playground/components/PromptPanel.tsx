@@ -125,8 +125,10 @@ interface PromptPanelProps {
 }
 
 const MODE_TABS: Array<{ id: PlaygroundMode; label: string; icon: React.ComponentType<{ className?: string }> }> = [
-  { id: 'video', label: 'Video', icon: Film },
+  // Image leads: the common loop is making a still and then animating it, so
+  // the tab you start in sits first and the Animate handoff reads left→right.
   { id: 'image', label: 'Image', icon: ImageIcon },
+  { id: 'video', label: 'Video', icon: Film },
   { id: 'music', label: 'Music', icon: MusicIcon },
 ]
 
@@ -314,13 +316,19 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
     ? undefined
     : 'text-to-music'
 
+  // The per-mode model memory key: what ModelPicker persists under, and what
+  // the mode-swap effect below reads back. Video's picker is ModelSidePanel,
+  // which leaves persistence to its caller (elsewhere it drives per-card picks
+  // that must NOT become an app default), so Playground writes the key itself.
+  // Without that write the key stayed empty and every Image → Video flip fell
+  // through to the registry default, throwing away the user's pick.
+  const modelKey = `playground:${taskForMode}${pickerMode ? `:${pickerMode}` : ''}`
+
   // When the mode flips, swap to a sensible default model for that mode if
-  // the previously-selected model doesn't fit. ModelPicker's persistence
-  // layer (per-app + per-task key) handles per-mode memory automatically.
+  // the previously-selected model doesn't fit.
   useEffect(() => {
     if (!model || model.task !== taskForMode) {
-      const persistedKey = `playground:${taskForMode}${pickerMode ? `:${pickerMode}` : ''}`
-      const persisted = useSettingsStore.getState().getAppModel(persistedKey)
+      const persisted = useSettingsStore.getState().getAppModel(modelKey)
       const fallback = getDefaultModel('playground', taskForMode, pickerMode)?.id
       const next = persisted ?? fallback ?? ''
       if (next && next !== state.modelId) {
@@ -913,7 +921,10 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 isOpen={modelPanelOpen}
                 onClose={() => setModelPanelOpen(false)}
                 value={state.modelId}
-                onChange={(modelId) => onChange({ ...state, modelId })}
+                onChange={(modelId) => {
+                  useSettingsStore.getState().setAppModel(modelKey, modelId)
+                  onChange({ ...state, modelId })
+                }}
                 costParams={{
                   durationSeconds: isMotionControl ? motionDuration : state.durationSeconds,
                   resolution: state.resolution,

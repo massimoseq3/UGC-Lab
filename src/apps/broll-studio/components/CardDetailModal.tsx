@@ -42,6 +42,7 @@ import { productAngleSlots, normalizePhotoSelection } from '../services/productA
 import ModelWaitNotice from '../../../components/ModelWaitNotice'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
+import { useBackdropClose } from '../../../hooks/useBackdropClose'
 import {
   ModalGallery,
   ReferenceSlotCard,
@@ -217,11 +218,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   // Mounted only while open, so `enabled` is simply true.
   useCloseOnAppSwitch(true, onClose)
 
-  // Backdrop-click closes the modal — but a text-selection drag that STARTS
-  // inside the content and releases over the backdrop fires a `click` on their
-  // common ancestor (the backdrop), which would wrongly close it. Guard by
-  // remembering whether the press began on the backdrop itself.
-  const pointerDownOnBackdrop = useRef(false)
+  const backdrop = useBackdropClose(onClose)
 
   const persistedImageModel = useSettingsStore((s) => s.getAppModel('broll-studio:image:text-to-image'))
   const imageModelId = persistedImageModel ?? getDefaultModel('broll-studio', 'image', 'text-to-image')?.id
@@ -442,8 +439,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   return createPortal((
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm sm:px-6"
-      onMouseDown={(e) => { pointerDownOnBackdrop.current = e.target === e.currentTarget }}
-      onClick={(e) => { if (e.target === e.currentTarget && pointerDownOnBackdrop.current) onClose() }}
+      {...backdrop}
     >
       <button
         type="button"

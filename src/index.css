@@ -385,6 +385,18 @@ textarea,
   animation: field-flash 0.8s ease-out;
 }
 
+/* Graph-paper backdrop for a media stage (Characters' Single view): faint ink
+   lines that invert with the theme, masked to fade out at the edges so the
+   pattern reads as depth behind the picture rather than a boxed-in texture. */
+.stage-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--color-ink) 3%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--color-ink) 3%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+  -webkit-mask-image: radial-gradient(ellipse at center, black 35%, transparent 100%);
+  mask-image: radial-gradient(ellipse at center, black 35%, transparent 100%);
+}
+
 /* Image DNA scanning animation */
 @keyframes scan {
   0% { top: 0; }

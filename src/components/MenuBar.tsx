@@ -14,6 +14,7 @@ import AppLogo from './AppLogo'
 import CrabSprite from './CrabSprite'
 import SettingsModal from './SettingsModal'
 import { API_KEY_STEPS } from './apiKeySteps'
+import { useBackdropClose } from '../hooks/useBackdropClose'
 
 // Thin macOS-style menu bar: branding + the active app's name on the left,
 // credits balance + external quick links + the theme toggle on the right. Pure chrome —
@@ -230,10 +231,11 @@ function CreditsItem() {
 // by the Dashboard's get-started row). Explains where the key comes from and
 // hands off to Settings for the paste + test.
 export function ApiKeyGuide({ onClose, onOpenSettings }: { onClose: () => void; onOpenSettings: () => void }) {
+  const backdrop = useBackdropClose(onClose)
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
+      {...backdrop}
     >
       <div
         className="mx-4 w-full max-w-md rounded-3xl border border-ink/10 bg-surface-1 p-5 shadow-2xl lg:mx-0 lg:p-6"

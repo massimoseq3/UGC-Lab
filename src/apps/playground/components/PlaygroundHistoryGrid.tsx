@@ -23,6 +23,7 @@ import GeneratingBackdrop from '../../../components/GeneratingBackdrop'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import type { PlaygroundMode, InFlightGen } from '../types'
 import { humanizeError } from '../../../utils/friendlyError'
+import { useBackdropClose } from '../../../hooks/useBackdropClose'
 export type { InFlightGen }
 
 // List-view size-slider bounds. The raw value drives the slider fill % and the
@@ -42,9 +43,12 @@ interface PlaygroundHistoryGridProps {
   inFlight: InFlightGen[]
   // Active mode filter — null shows everything.
   filterMode: PlaygroundMode | null
+  // Carry a finished still over to the Video tab as its start frame, with the
+  // prompt that made it. Omitted → the Animate action is hidden.
+  onAnimateImage?: (item: ImageHistoryItem) => void
 }
 
-export default function PlaygroundHistoryGrid({ inFlight, filterMode }: PlaygroundHistoryGridProps) {
+export default function PlaygroundHistoryGrid({ inFlight, filterMode, onAnimateImage }: PlaygroundHistoryGridProps) {
   const imageHistory = useBankStore((s) => s.imageHistory)
   const videoHistory = useBankStore((s) => s.videoHistory)
   const musicHistory = useBankStore((s) => s.musicHistory)
@@ -203,6 +207,7 @@ export default function PlaygroundHistoryGrid({ inFlight, filterMode }: Playgrou
                         onSave={() => handleSaveImage(entry.data)}
                         onDelete={() => deleteImageHistory(entry.data.id)}
                         onCopyPrompt={() => handleCopyPrompt(entry.data.prompt)}
+                        onAnimate={onAnimateImage ? () => onAnimateImage(entry.data) : undefined}
                       />
                     )}
                     {entry.kind === 'video' && (
@@ -239,6 +244,7 @@ export default function PlaygroundHistoryGrid({ inFlight, filterMode }: Playgrou
                     onClickImage={entry.kind === 'image' ? () => setPreviewItem(entry) : undefined}
                     onCopyPrompt={() => handleCopyPrompt(entry.data.prompt)}
                     onSave={entry.kind === 'image' ? () => handleSaveImage(entry.data) : undefined}
+                    onAnimate={entry.kind === 'image' && onAnimateImage ? () => onAnimateImage(entry.data) : undefined}
                     onDownload={async () => {
                       if (entry.kind === 'image') {
                         const u = await getUrl(entry.data.imageUrl)
@@ -272,6 +278,11 @@ export default function PlaygroundHistoryGrid({ inFlight, filterMode }: Playgrou
           onSave={() => {
             if (previewItem.kind === 'image') handleSaveImage(previewItem.data)
           }}
+          onAnimate={
+            previewItem.kind === 'image' && onAnimateImage
+              ? () => onAnimateImage(previewItem.data)
+              : undefined
+          }
         />
       )}
     </div>
@@ -314,6 +325,7 @@ function HistoryListRow({
   onSave,
   onDownload,
   onDelete,
+  onAnimate,
 }: {
   entry: HistoryEntry
   mediaAspect: number
@@ -323,6 +335,7 @@ function HistoryListRow({
   onSave?: () => void
   onDownload: () => void
   onDelete: () => void
+  onAnimate?: () => void
 }) {
   const { url, status } = useAssetUrlState(
     entry.kind === 'image' ? entry.data.imageUrl : entry.kind === 'video' ? entry.data.videoUrl : null,
@@ -402,7 +415,7 @@ function HistoryListRow({
         {entry.kind === 'music' && audioUrl && (
           <audio src={audioUrl} controls className="h-8 w-full" />
         )}
-        {/* Canonical action order: download · save · copy · delete. */}
+        {/* Canonical action order: download · save · copy · [animate] · delete. */}
         <div className="flex items-center gap-1">
           <ListRowButton title="Download" onClick={onDownload}>
             <Download className="h-4 w-4" />
@@ -419,6 +432,11 @@ function HistoryListRow({
           {prompt && (
             <ListRowButton title="Copy prompt" onClick={onCopyPrompt}>
               <Copy className="h-4 w-4" />
+            </ListRowButton>
+          )}
+          {onAnimate && (
+            <ListRowButton title="Animate in Video" onClick={onAnimate}>
+              <ImagePlay className="h-4 w-4" />
             </ListRowButton>
           )}
           <TileDeleteButton variant="chrome" onDelete={onDelete} />
@@ -498,6 +516,7 @@ function ImageTile({
   onSave,
   onDelete,
   onCopyPrompt,
+  onAnimate,
 }: {
   item: ImageHistoryItem
   isSaving: boolean
@@ -505,6 +524,7 @@ function ImageTile({
   onSave: () => void
   onDelete: () => void
   onCopyPrompt: () => void
+  onAnimate?: () => void
 }) {
   const { url, status } = useAssetUrlState(item.imageUrl)
   const isSaved = !!item.linkedBRollId
@@ -526,7 +546,7 @@ function ImageTile({
           </div>
         )}
         {/* Hover action stack — top-right vertical column, app-wide standard
-            order: download · save · copy · delete. */}
+            order: download · save · copy · [animate] · delete. */}
         <TileActionStack>
           <TileActionButton
             title="Download"
@@ -548,6 +568,14 @@ function ImageTile({
           {item.prompt && (
             <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
               <Copy className="h-4 w-4" />
+            </TileActionButton>
+          )}
+          {onAnimate && (
+            <TileActionButton
+              title="Animate in Video"
+              onClick={(e) => { e.stopPropagation(); onAnimate() }}
+            >
+              <ImagePlay className="h-4 w-4" />
             </TileActionButton>
           )}
           <TileDeleteButton onDelete={onDelete} />
@@ -731,16 +759,19 @@ function PreviewModal({
   onClose,
   onSave,
   isSaving,
+  onAnimate,
 }: {
   entry: HistoryEntry
   onClose: () => void
   onSave: () => void
   isSaving: boolean
+  onAnimate?: () => void
 }) {
   const imageUrl = useAssetUrl(entry.kind === 'image' ? entry.data.imageUrl : null)
   const videoUrl = useAssetUrl(entry.kind === 'video' ? entry.data.videoUrl : null)
   const addToast = useAppStore((s) => s.addToast)
   const [copied, setCopied] = useState(false)
+  const backdrop = useBackdropClose(onClose)
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
@@ -786,7 +817,7 @@ function PreviewModal({
   return (
     <div
       className="fixed inset-0 z-[60] flex flex-col bg-black/80 backdrop-blur-sm"
-      onClick={onClose}
+      {...backdrop}
     >
       {/* Top-right holds only Close now — Save + Download moved down to
           labeled buttons beside Copy prompt. Delete lives on the grid tile. */}
@@ -882,6 +913,12 @@ function PreviewModal({
               >
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : linked ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
                 <span>{linked ? 'Saved to Bank' : 'Save to Bank'}</span>
+              </ModalBarButton>
+            )}
+            {entry.kind === 'image' && onAnimate && (
+              <ModalBarButton onClick={() => { onAnimate(); onClose() }}>
+                <ImagePlay className="h-4 w-4" />
+                <span>Animate</span>
               </ModalBarButton>
             )}
             <ModalBarButton onClick={handleDownload}>

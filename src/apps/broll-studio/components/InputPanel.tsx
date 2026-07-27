@@ -360,14 +360,142 @@ export default function InputPanel({
             {selectedModel && <ModelCard model={selectedModel} />}
           </BankCard>
 
+          {/* Script — optional, and labelled as such. Bring your own words from
+              the bank or a paste; leave it empty and the Ad Format below
+              writes them. Grows to fill the column once it holds a
+              script, stands down to two rows while it's empty (an empty
+              five-row box has nothing to show, and the column is narrow enough
+              that the leftover space pushed the brief below the fold). */}
+          <div className={`flex flex-col overflow-hidden rounded-3xl border transition-colors ${hasScript ? 'min-h-0 flex-1' : 'shrink-0'} ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
+            <BankCard
+              icon={FileText}
+              label="Script / Hooks"
+              accentClass="bg-scripts-500/15 text-scripts-400"
+              selectedClass="border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10"
+              isEmpty={!selectedScript}
+              emptyHint="Or let the format write it"
+              optional={!hasScript}
+              onSelect={onSelectScript}
+              onClear={selectedScript ? onClearScript : undefined}
+              flat
+            >
+              {selectedScript && <ScriptCard script={selectedScript} />}
+            </BankCard>
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              <textarea
+                value={scriptText}
+                onChange={(e) => onScriptTextChange(e.target.value)}
+                rows={hasScript ? 5 : 2}
+                placeholder="…or paste your own script here"
+                className={`w-full grow resize-none border-0 bg-transparent px-4 py-2.5 text-[13px] leading-relaxed text-ink-200 placeholder-ink-700 outline-none ${hasScript ? 'min-h-[92px]' : 'min-h-[52px]'}`}
+              />
+              <ExpandButton onClick={() => setScriptExpanded(true)} className="absolute bottom-2 right-2" />
+            </div>
+          </div>
+
+          {/* Additional instructions — a slim, fully-rounded dashed pill; a tap
+              opens a centered editor popup (ExpandTextModal) to write in. Shows
+              the note (or the placeholder + Optional) on its face. */}
+          <button
+            type="button"
+            onClick={() => setInstructionsExpanded(true)}
+            className="flex h-11 w-full items-center gap-2 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 text-left transition-colors hover:border-ink/20 hover:bg-ink/[0.05]"
+          >
+            <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={1.5} />
+            <span className={`min-w-0 flex-1 truncate text-[13px] ${additionalContext.trim() ? 'font-medium text-ink-100' : 'text-ink-400'}`}>
+              {/* Doubles as the creative brief when there's no script yet — the
+                  product row carries the rest, so blank stays a normal answer. */}
+              {additionalContext.trim() ? additionalContext.trim() : hasScript ? 'Additional Instructions' : 'Brief / Additional Instructions'}
+            </span>
+            {!additionalContext.trim() && (
+              <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
+                Optional
+              </span>
+            )}
+          </button>
+
+        </div>
+      </div>
+
+      {/* Render-settings + Generate band — the clip type and visual style are
+          the controls that shape the output, so they dock together in one
+          tinted panel directly above the Generate button (the Characters tab
+          groups its model + chips + button the same way). Sticky on mobile,
+          static rounded-top card on desktop. */}
+      <div className="sticky bottom-0 z-30 border-t border-ink/5 bg-surface-0 px-5 py-3 md:static md:z-auto md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
+        <div className="mb-2.5 flex flex-col gap-2">
+
+          {/* The two decisions that shape the output, docked together above
+              Generate — and the two things Generate is gated on. The
+              References column above says what the ad is ABOUT (product,
+              character, words); this pair says what it IS: how it looks
+              (Visual Style) and how it's shot (Ad Format).
+
+              Visual style — one row that opens the style popup (presets, your
+              saved styles, and the analyse-from-references flow all live
+              there). Same shape as Scripts' Script Style row: dashed and
+              asking to be filled until a look is picked, accent-filled with a
+              clear X after. A custom style shows its name with a Custom tag. */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={onOpenStyle}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenStyle() } }}
+            className={`group order-first flex w-full cursor-pointer items-center gap-3 rounded-full border px-3.5 py-3 text-left transition-colors ${
+              styleChosen
+                ? 'border-broll-500/25 bg-broll-500/[0.07] hover:border-broll-500/35 hover:bg-broll-500/10'
+                : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-broll-500/30 hover:bg-broll-500/5'
+            }`}
+          >
+            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${styleIsCustom ? 'bg-broll-500/20 text-broll-300' : 'bg-broll-500/10 text-broll-400 light:text-broll-600'}`}>
+              {styleIsCustom ? <Sparkles className="h-5 w-5" strokeWidth={1.75} /> : <Palette className="h-5 w-5" strokeWidth={1.5} />}
+            </div>
+            <div className="min-w-0 flex-1">
+              {styleChosen ? (
+                <>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-[13px] font-medium tracking-tight text-broll-200 light:text-broll-700">{styleLabel}</span>
+                    {styleIsCustom && (
+                      <span className="shrink-0 rounded-full bg-broll-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-broll-300 light:text-broll-700">
+                        Custom
+                      </span>
+                    )}
+                  </div>
+                  <div className="truncate text-[11px] leading-snug text-ink-500">{styleHint}</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-sm font-medium text-ink-300">Visual Style</div>
+                  <div className="text-xs text-ink-600">Select how every clip looks</div>
+                </>
+              )}
+            </div>
+            {styleChosen ? (
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
+                  <RefreshCw className="h-2.5 w-2.5" />
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onClearStyle() }}
+                  title="Clear style"
+                  aria-label="Clear style"
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
+            )}
+          </div>
+
           {/* Ad Format — what kind of content this ad imitates. NOT a
-              fallback for "I have no script": it's the primary creative input
-              in this app. A format decides how the ad is SHOT (it carries the
-              scene staging that every prompt is written against), and when
-              there's no script it also decides how the words are written. That
-              double job is why Formats lead its picker and why it sits above
-              the script box rather than below it — pick the kind of ad first,
-              then decide whether you're bringing the words yourself. */}
+              fallback for "I have no script": a format carries the scene
+              staging that every prompt is written against, so it decides how
+              the ad is SHOT whether or not the words come from here. When
+              there is no script it writes those too, at the length below.
+              That double job is why Formats lead its picker. */}
           <div className="flex shrink-0 flex-col gap-2 rounded-3xl border border-ink/[0.07] bg-ink/[0.02] p-2.5">
             <div className="flex items-center justify-between gap-2 px-1.5">
               <span className="text-[10px] font-medium uppercase tracking-wider text-ink-600">
@@ -451,131 +579,6 @@ export default function InputPanel({
                 accent="broll"
                 options={WRITE_LENGTHS.map((len) => ({ value: String(len), label: `${len}s` }))}
               />
-            )}
-          </div>
-
-          {/* Script — optional, and labelled as such. Bring your own words from
-              the bank or a paste; leave it empty and the format above writes
-              them. Sits BELOW the format for that reason: it's the override,
-              not the starting point. Grows to fill the column once it holds a
-              script, stands down to two rows while it's empty (an empty
-              five-row box has nothing to show, and the column is narrow enough
-              that the leftover space pushed the brief below the fold). */}
-          <div className={`flex flex-col overflow-hidden rounded-3xl border transition-colors ${hasScript ? 'min-h-0 flex-1' : 'shrink-0'} ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
-            <BankCard
-              icon={FileText}
-              label="Script / Hooks"
-              accentClass="bg-scripts-500/15 text-scripts-400"
-              selectedClass="border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10"
-              isEmpty={!selectedScript}
-              emptyHint="Or let the format write it"
-              optional={!hasScript}
-              onSelect={onSelectScript}
-              onClear={selectedScript ? onClearScript : undefined}
-              flat
-            >
-              {selectedScript && <ScriptCard script={selectedScript} />}
-            </BankCard>
-            <div className="relative flex min-h-0 flex-1 flex-col">
-              <textarea
-                value={scriptText}
-                onChange={(e) => onScriptTextChange(e.target.value)}
-                rows={hasScript ? 5 : 2}
-                placeholder="…or paste your own script here"
-                className={`w-full grow resize-none border-0 bg-transparent px-4 py-2.5 text-[13px] leading-relaxed text-ink-200 placeholder-ink-700 outline-none ${hasScript ? 'min-h-[92px]' : 'min-h-[52px]'}`}
-              />
-              <ExpandButton onClick={() => setScriptExpanded(true)} className="absolute bottom-2 right-2" />
-            </div>
-          </div>
-
-          {/* Additional instructions — a slim, fully-rounded dashed pill; a tap
-              opens a centered editor popup (ExpandTextModal) to write in. Shows
-              the note (or the placeholder + Optional) on its face. */}
-          <button
-            type="button"
-            onClick={() => setInstructionsExpanded(true)}
-            className="flex h-11 w-full items-center gap-2 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 text-left transition-colors hover:border-ink/20 hover:bg-ink/[0.05]"
-          >
-            <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={1.5} />
-            <span className={`min-w-0 flex-1 truncate text-[13px] ${additionalContext.trim() ? 'font-medium text-ink-100' : 'text-ink-400'}`}>
-              {/* Doubles as the creative brief when there's no script yet — the
-                  product row carries the rest, so blank stays a normal answer. */}
-              {additionalContext.trim() ? additionalContext.trim() : hasScript ? 'Additional Instructions' : 'Brief / Additional Instructions'}
-            </span>
-            {!additionalContext.trim() && (
-              <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
-                Optional
-              </span>
-            )}
-          </button>
-
-        </div>
-      </div>
-
-      {/* Render-settings + Generate band — the clip type and visual style are
-          the controls that shape the output, so they dock together in one
-          tinted panel directly above the Generate button (the Characters tab
-          groups its model + chips + button the same way). Sticky on mobile,
-          static rounded-top card on desktop. */}
-      <div className="sticky bottom-0 z-30 border-t border-ink/5 bg-surface-0 px-5 py-3 md:static md:z-auto md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
-        <div className="mb-2.5 flex flex-col gap-2">
-
-          {/* Visual style — one row that opens the style popup (presets, your
-              saved styles, and the analyse-from-references flow all live
-              there). Same shape as Scripts' Script Style row: dashed and
-              asking to be filled until a look is picked, accent-filled with a
-              clear X after. A custom style shows its name with a Custom tag. */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={onOpenStyle}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenStyle() } }}
-            className={`group order-first flex w-full cursor-pointer items-center gap-3 rounded-full border px-3.5 py-3 text-left transition-colors ${
-              styleChosen
-                ? 'border-broll-500/25 bg-broll-500/[0.07] hover:border-broll-500/35 hover:bg-broll-500/10'
-                : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-broll-500/30 hover:bg-broll-500/5'
-            }`}
-          >
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${styleIsCustom ? 'bg-broll-500/20 text-broll-300' : 'bg-broll-500/10 text-broll-400 light:text-broll-600'}`}>
-              {styleIsCustom ? <Sparkles className="h-5 w-5" strokeWidth={1.75} /> : <Palette className="h-5 w-5" strokeWidth={1.5} />}
-            </div>
-            <div className="min-w-0 flex-1">
-              {styleChosen ? (
-                <>
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate text-[13px] font-medium tracking-tight text-broll-200 light:text-broll-700">{styleLabel}</span>
-                    {styleIsCustom && (
-                      <span className="shrink-0 rounded-full bg-broll-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-broll-300 light:text-broll-700">
-                        Custom
-                      </span>
-                    )}
-                  </div>
-                  <div className="truncate text-[11px] leading-snug text-ink-500">{styleHint}</div>
-                </>
-              ) : (
-                <>
-                  <div className="text-sm font-medium text-ink-300">Visual Style</div>
-                  <div className="text-xs text-ink-600">Select how every clip looks</div>
-                </>
-              )}
-            </div>
-            {styleChosen ? (
-              <div className="flex shrink-0 items-center gap-1">
-                <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
-                  <RefreshCw className="h-2.5 w-2.5" />
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onClearStyle() }}
-                  title="Clear style"
-                  aria-label="Clear style"
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ) : (
-              <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
             )}
           </div>
         </div>

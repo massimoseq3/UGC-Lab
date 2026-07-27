@@ -20,10 +20,11 @@ interface FrameSlotProps {
   disabledNote?: string
 }
 
-// A big square drop-zone for a single frame (start / end). Empty it's a
-// labelled dashed square with an "Optional" tag; filled it shows the frame with
-// a remove button. Upload or pick from a bank; whole-panel drag-and-drop is
-// wired by the parent straight into the value.
+// A 16:9 drop-zone for a single frame (start / end). Empty it's a labelled
+// dashed tile with an "Optional" tag; filled it shows the frame with a remove
+// button. Upload or pick from a bank; whole-panel drag-and-drop is wired by the
+// parent straight into the value. Kept deliberately short — the two slots sit
+// directly above the prompt box and every pixel here is a pixel it loses.
 export default function FrameSlot({
   label,
   value,
@@ -50,7 +51,7 @@ export default function FrameSlot({
 
   if (value) {
     return (
-      <div className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-ink/10 bg-black/30">
+      <div className="group relative aspect-[16/9] w-full overflow-hidden rounded-2xl border border-ink/10 bg-black/30">
         <img src={value.dataUri} alt="" className="h-full w-full object-contain" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 pb-1 pt-5">
           <span className="text-[11px] font-medium text-white">{label}</span>
@@ -74,7 +75,7 @@ export default function FrameSlot({
         type="button"
         disabled={disabled}
         onClick={() => setActionMenu((v) => !v)}
-        className={`group relative flex aspect-[4/3] w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-ink/15 bg-ink/[0.02] transition-colors ${
+        className={`group relative flex aspect-[16/9] w-full flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-ink/15 bg-ink/[0.02] transition-colors ${
           disabled
             ? 'cursor-not-allowed opacity-40'
             : 'hover:border-ink/30 hover:bg-ink/[0.04]'
@@ -85,10 +86,10 @@ export default function FrameSlot({
             Optional
           </span>
         )}
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/[0.05] text-ink-400 transition-colors group-hover:text-ink-200">
-          <ImageIcon className="h-4 w-4" />
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink/[0.05] text-ink-400 transition-colors group-hover:text-ink-200">
+          <ImageIcon className="h-3.5 w-3.5" />
         </span>
-        <span className="text-[12px] font-medium text-ink-400 transition-colors group-hover:text-ink-200">
+        <span className="text-[11px] font-medium text-ink-400 transition-colors group-hover:text-ink-200">
           {label}
         </span>
         {disabled && disabledNote && (

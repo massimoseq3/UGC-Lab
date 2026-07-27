@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   X,
@@ -61,6 +61,7 @@ import { downloadImage } from '../../../utils/downloadImage'
 import { copyToClipboard } from '../../../utils/clipboard'
 import { humanizeError } from '../../../utils/friendlyError'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
+import { useBackdropClose } from '../../../hooks/useBackdropClose'
 
 // ── Shared modal shell ─────────────────────────────────────────
 
@@ -68,16 +69,12 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
   useCloseOnEscape(true, onClose)
   useCloseOnAppSwitch(true, onClose)
 
-  // A text-selection drag that starts inside the content and releases over the
-  // backdrop fires a `click` on the backdrop — guard so only a real backdrop
-  // press-and-release closes the modal.
-  const pointerDownOnBackdrop = useRef(false)
+  const backdrop = useBackdropClose(onClose)
 
   return createPortal((
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm sm:px-6"
-      onMouseDown={(e) => { pointerDownOnBackdrop.current = e.target === e.currentTarget }}
-      onClick={(e) => { if (e.target === e.currentTarget && pointerDownOnBackdrop.current) onClose() }}
+      {...backdrop}
     >
       <button
         type="button"

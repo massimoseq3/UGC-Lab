@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Maximize2, X } from 'lucide-react'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
+import { useBackdropClose } from '../hooks/useBackdropClose'
 
 // Per-app accent for the modal's focus ring + Done button. Literal class
 // strings (Tailwind can't build class names from props at runtime).
@@ -104,6 +105,7 @@ export default function ExpandTextModal({
   mono = false,
 }: ExpandTextModalProps) {
   const highlightRef = useRef<HTMLDivElement>(null)
+  const backdrop = useBackdropClose(onClose)
 
   useCloseOnAppSwitch(open, onClose)
 
@@ -116,7 +118,7 @@ export default function ExpandTextModal({
   return createPortal(
     <div
       className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
-      onClick={onClose}
+      {...backdrop}
     >
       <div
         className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink-950/95 shadow-2xl"
