@@ -1039,8 +1039,8 @@ function ScriptBankCard({
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium text-ink-200">{label}</div>
-          <div className="text-xs text-ink-400">Click to select from bank</div>
+          <div className="text-[13px] font-medium text-ink-200">{label}</div>
+          <div className="text-[11px] text-ink-400">Click to select from bank</div>
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
       </button>
@@ -1062,7 +1062,7 @@ function ScriptBankCard({
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-ink-200">{selected.title}</div>
+        <div className="truncate text-[13px] font-medium text-ink-200">{selected.title}</div>
         <div className="truncate text-[11px] text-ink-500">{label}</div>
       </div>
       <div className="flex shrink-0 items-center gap-1">
