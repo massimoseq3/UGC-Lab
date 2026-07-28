@@ -848,7 +848,11 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
           onClose={() => setPresetOpen(false)}
           title="UGC Prompt Presets"
           subtitle="Pick a format to prefill the prompt + aspect ratio"
-          size="wide"
+          // 460px — a step under the old 560px so more of the list is on screen
+          // at once, but wider than the Characters picker's 380px: these tiles
+          // are the only thing that says what a format looks like, and at 380
+          // the frame is too small to read the shot.
+          size="medium"
         >
           <div className="grid grid-cols-3 gap-2 px-4 py-3">
             {(state.mode === 'image' ? IMAGE_PRESETS : VIDEO_PRESETS).map((preset) => (

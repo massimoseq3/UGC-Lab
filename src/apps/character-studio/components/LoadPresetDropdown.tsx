@@ -119,13 +119,15 @@ export function PresetPickerSlideOver({
   }
 
   return (
-    // 560px, three across. A face is what's being picked here, so the panel is
-    // sized around the grid rather than around the 380px slide-over beside it:
-    // the two widths are chosen so the card lands at the same ~170px either
-    // way, and the wider panel buys a third face per row instead of a bigger
-    // one. Nine starters read as three rows of three rather than four and a
-    // half.
-    <SlideOver open={open} onClose={onClose} title={title} subtitle={subtitle} size="wide">
+    // The standard 380px slide-over, three faces across. It was 560px, which
+    // made each card ~170px wide and — at the portraits' own 9:16 — ~300px
+    // tall, so three rows of starters ran ~900px and pushed the Bank section
+    // off the bottom: your own saved characters were only reachable by
+    // scrolling past every built-in. Narrowing the panel scales the whole grid
+    // down with it (the cards are a fraction of the width, and 9:16 takes the
+    // height with them), which lands the Bank header about 200px higher while
+    // keeping the row of three.
+    <SlideOver open={open} onClose={onClose} title={title} subtitle={subtitle}>
       <div className="px-4 py-3">
         <div className="px-1 pb-2 pt-0.5 text-[9px] font-semibold uppercase tracking-widest text-ink-500">
           Starters
