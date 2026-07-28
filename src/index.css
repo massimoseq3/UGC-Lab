@@ -508,12 +508,17 @@ textarea,
 
 /* One meteor every ~22s. The traverse is 5% of the cycle, so the layer is
    invisible almost the whole time — a rare event you catch out of the corner of
-   your eye, not an effect running on the page. */
+   your eye, not an effect running on the page.
+   The rotation MUST match the translate: the bar's bright end is its head (the
+   gradient runs white → transparent left to right), so it has to point along the
+   direction of travel. Travel is down-left — atan2(205, -460), i.e. 24° below
+   horizontal — which is rotate(-24deg), not +24. With the sign flipped the
+   streak sat 48° off its own path and the meteor flew sideways, head last. */
 @keyframes meteor {
-  0%      { opacity: 0; transform: translate3d(0, 0, 0) rotate(24deg); }
+  0%      { opacity: 0; transform: translate3d(0, 0, 0) rotate(-24deg); }
   1%      { opacity: 0.55; }
-  5%      { opacity: 0; transform: translate3d(-460px, 205px, 0) rotate(24deg); }
-  100%    { opacity: 0; transform: translate3d(-460px, 205px, 0) rotate(24deg); }
+  5%      { opacity: 0; transform: translate3d(-460px, 205px, 0) rotate(-24deg); }
+  100%    { opacity: 0; transform: translate3d(-460px, 205px, 0) rotate(-24deg); }
 }
 .desktop-meteor {
   background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
