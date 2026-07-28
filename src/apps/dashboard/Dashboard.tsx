@@ -9,7 +9,7 @@ import { computeUsageMetrics, dailyMinutesSaved, usageDayStart } from '../../uti
 import { AI_UGC_ACADEMY_URL } from '../../utils/constants'
 import ActivityHeatmap, { HeatmapLegend } from './ActivityHeatmap'
 import ConnectKeyCard from './ConnectKeyCard'
-import DesktopWallpaper from './DesktopWallpaper'
+import DesktopWallpaper from '../../components/DesktopWallpaper'
 import DesktopIcons from './DesktopIcons'
 import SolarSystem from './SolarSystem'
 import StreakRing from './StreakRing'

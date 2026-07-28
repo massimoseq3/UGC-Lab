@@ -462,6 +462,23 @@ textarea,
     radial-gradient(880px 560px at 55% 114%, rgba(242, 178, 49, 0.16), transparent 70%);
 }
 
+/* Mono variant, for Edit: the top-left bloom is neutral light rather than an
+   accent, so the page doesn't lead with another app's colour. Monochrome means
+   the light itself, not a grey wash — white in dark mode, a soft shadow in
+   light, where a white bloom on a white canvas would be invisible. */
+.desktop-wallpaper-mono {
+  background-image:
+    radial-gradient(820px 620px at 2% -12%, rgba(255, 255, 255, 0.07), transparent 70%),
+    radial-gradient(680px 560px at 99% 0%, rgba(113, 101, 255, 0.22), transparent 72%),
+    radial-gradient(940px 600px at 52% 116%, rgba(242, 178, 49, 0.14), transparent 70%);
+}
+[data-theme="light"] .desktop-wallpaper-mono {
+  background-image:
+    radial-gradient(760px 560px at 4% -10%, rgba(24, 24, 27, 0.07), transparent 70%),
+    radial-gradient(620px 520px at 97% 2%, rgba(113, 101, 255, 0.13), transparent 72%),
+    radial-gradient(880px 560px at 55% 114%, rgba(242, 178, 49, 0.16), transparent 70%);
+}
+
 /* Starfield, dark mode only. Two tiled layers of dots at different densities,
    each drifting and breathing on its own period — offset periods are what read
    as twinkling; pulsing one layer alone just reads as flicker. Drift animates
