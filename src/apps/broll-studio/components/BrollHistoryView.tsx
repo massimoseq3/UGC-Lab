@@ -153,13 +153,9 @@ function activityLabel(a: RowActivity): string {
 // matches where a click takes you.
 export function brollHistoryMode(item: BrollHistoryItem): BrollMode {
   if (item.continuousResult) return 'continuous'
-  // Rows store the pre-split shape (mode 'line' + lineDelivery) — see the
-  // history snapshot in BrollStudio — so the per-line mode is reconstructed
-  // from the delivery the session actually ran with.
-  const perLine: BrollMode = item.lineDelivery === 'dialogue' ? 'dialogue' : 'broll'
   const line = item.result as BrollResult | null
-  if (line?.scenes?.length) return perLine
-  return item.mode === 'continuous' ? 'continuous' : perLine
+  if (line?.scenes?.length) return 'line'
+  return item.mode === 'continuous' ? 'continuous' : 'line'
 }
 
 // A session from the retired One-Shot mode, and nothing else — no keyframe
@@ -198,17 +194,17 @@ function historyStyleLabel(item: BrollHistoryItem, mode: BrollMode): string | nu
 }
 
 const MODE_BADGE: Record<BrollMode, string> = {
-  broll: 'B-Roll',
-  dialogue: 'Dialogue',
+  line: 'Line-by-Line',
   continuous: 'Continuous',
 }
 
-// Mode filter pills.
+// Mode filter pills. Deliberately mode-only: delivery is a setting inside
+// Line-by-Line, not a kind of session, so a dialogue run files under the same
+// pill as a silent one.
 type ModeFilter = 'all' | BrollMode
 const MODE_FILTERS: { id: ModeFilter; label: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'broll', label: 'B-Roll' },
-  { id: 'dialogue', label: 'Dialogue' },
+  { id: 'line', label: 'Line-by-Line' },
   { id: 'continuous', label: 'Continuous' },
 ]
 function itemMode(it: BrollHistoryItem): Exclude<ModeFilter, 'all'> {

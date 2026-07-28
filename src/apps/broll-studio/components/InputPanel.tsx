@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote, Video, Clapperboard } from 'lucide-react'
 import type { Product, Model, Script } from '../../../stores/types'
-import { deliveryForMode, type BrollMode } from '../types'
+import { isLineMode, type BrollDelivery, type BrollMode } from '../types'
 import { WRITE_LENGTHS, WRITE_STYLE_META, isWriteStyle, type WriteLength } from '../../script-architect/types'
 import type { AdFormat } from '../types'
 import ScriptStyleList from '../../script-architect/components/ScriptStyleList'
@@ -44,14 +44,18 @@ interface InputPanelProps {
   onClearInputs: () => void
   onGenerate: () => void
   // Opens the Import-prompts popup — paste in a storyboard written outside the
-  // app instead of paying for the prompt-writing call. Works in all three modes.
+  // app instead of paying for the prompt-writing call. Works in both modes.
   onImportPrompts: () => void
   isGenerating: boolean
   highlightField?: string | null
-  // B-Roll / Dialogue (both per-line) vs Continuous, which swaps the right
-  // panel for the keyframe-chain storyboard.
+  // Line-by-Line vs Continuous, which swaps the right panel for the
+  // keyframe-chain storyboard.
   mode: BrollMode
   onModeChange: (mode: BrollMode) => void
+  // Line-by-Line delivery — whether the cards speak. Not a mode: both produce
+  // the same per-line storyboard, so it rides in the settings band.
+  lineDelivery: BrollDelivery
+  onLineDeliveryChange: (delivery: BrollDelivery) => void
   // The ad format — what kind of content this ad imitates. A required, primary
   // input: it carries the scene staging every prompt is written against, so it
   // decides how the ad is SHOT, and when no script is supplied it also decides
@@ -272,6 +276,8 @@ export default function InputPanel({
   highlightField,
   mode,
   onModeChange,
+  lineDelivery,
+  onLineDeliveryChange,
   autoScriptStyle,
   onAutoScriptStyleChange,
   adBlueprintTitle,
@@ -300,16 +306,16 @@ export default function InputPanel({
   // nothing ever fires unpriced, not because the number is large. With no
   // script yet there's nothing to measure (the script itself is written first,
   // and its length is what sets the storyboard's size), so the pill sits out.
-  const promptCredits = hasScript ? formatCredits(estimatePromptCredits(mode, scriptText, deliveryForMode(mode))) : null
+  const promptCredits = hasScript ? formatCredits(estimatePromptCredits(mode, scriptText, lineDelivery)) : null
 
   return (
     <div className="flex flex-col md:h-full">
-      {/* Mode toggle header — the three things this app can make. B-Roll Clips
-          and Dialogue both walk the script line by line; the difference is
-          whether anyone speaks, which decides the whole session, so it sits
-          here rather than in a second toggle further down. Continuous is the
-          keyframe chain. Sits in a 57px bar so its border-b lines up with the
-          right panel's Scenes/History strip, matching every other app's
+      {/* Mode toggle header — the two shapes of workspace this app has:
+          Line-by-Line (script → per-line shot prompts) vs Continuous (script →
+          keyframe chain). Whether the cards SPEAK is not a mode — both
+          deliveries produce the same per-line storyboard — so that's a toggle
+          in the settings band. Sits in a 57px bar so its border-b lines up with
+          the right panel's Storyboard/History strip, matching every other app's
           aligned top rule. */}
       <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
         <SegmentedToggle<BrollMode>
@@ -319,8 +325,7 @@ export default function InputPanel({
           onChange={onModeChange}
           accent="broll"
           options={[
-            { value: 'broll', label: 'B-Roll', icon: Rows3 },
-            { value: 'dialogue', label: 'Dialogue', icon: MessageSquareQuote },
+            { value: 'line', label: 'Line-by-Line', icon: Rows3 },
             { value: 'continuous', label: 'Continuous', icon: Box },
           ]}
         />
@@ -456,6 +461,27 @@ export default function InputPanel({
           static rounded-top card on desktop. */}
       <div className="sticky bottom-0 z-30 border-t border-ink/5 bg-surface-0 px-5 py-2.5 md:static md:z-auto md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
         <div className="mb-2 flex flex-col gap-2">
+
+          {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
+              card silent, for a voiceover laid over in the edit; "With
+              Dialogue" makes all three the character speaking that line,
+              staged three different ways. It sits ABOVE the Visual Style / Ad
+              Format pair rather than between them: those two are one decision
+              about what the ad IS, and splitting them reads as three unrelated
+              rows. Continuous has no deliveries — it's narration over
+              footage — so the toggle isn't rendered there at all. */}
+          {isLineMode(mode) && (
+            <SegmentedToggle<BrollDelivery>
+              className="h-11 !p-1"
+              value={lineDelivery}
+              onChange={onLineDeliveryChange}
+              accent="broll"
+              options={[
+                { value: 'silent', label: 'B-Roll Clips' },
+                { value: 'dialogue', label: 'With Dialogue' },
+              ]}
+            />
+          )}
 
           {/* The two decisions that shape the output, docked together above
               Generate — and the two things Generate is gated on. The
@@ -642,14 +668,14 @@ export default function InputPanel({
             <>
               {isContinuous ? (
                 <Box className="h-4 w-4" strokeWidth={2.5} />
-              ) : mode === 'dialogue' ? (
+              ) : lineDelivery === 'dialogue' ? (
                 <MessageSquareQuote className="h-4 w-4" strokeWidth={2.5} />
               ) : (
                 <Film className="h-4 w-4" strokeWidth={2.5} />
               )}
               <span>
                 {isContinuous ? 'Generate Storyboard'
-                  : mode === 'dialogue' ? 'Generate Dialogue Prompts'
+                  : lineDelivery === 'dialogue' ? 'Generate Dialogue Prompts'
                   : 'Generate B-Roll Prompts'}
               </span>
               {promptCredits && (

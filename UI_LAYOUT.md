@@ -392,10 +392,10 @@ close (ChevronDown).
 
 ### Mode toggle (left panel header, 57px bar)
 
-Three-way `SegmentedToggle`, left→right: **B-Roll** (rows) · **Dialogue**
-(quote bubble) · **Continuous** (box). B-Roll and Dialogue are both per-line;
-they were one mode with a delivery toggle in the settings band until the split.
-All three Generate buttons carry an estimated-credits pill. (A fourth mode,
+Two-way `SegmentedToggle`, left→right: **Line-by-Line** (rows) · **Continuous**
+(box). Whether the cards speak is not a mode — that's the **B-Roll Clips / With
+Dialogue** toggle at the top of the settings band, shown only in Line-by-Line.
+Both Generate buttons carry an estimated-credits pill. (A third mode,
 **One-Shot**, was retired — see `types.ts:BrollMode`.)
 
 The **References** eyebrow row below it ends in a pair of matching grey pills,
@@ -447,11 +447,12 @@ own paste textarea — that box is `flex-1`, so it takes every spare pixel the
 column has → a **BRIEF** box (labelled **INSTRUCTIONS** once a script exists),
 tagged OPTIONAL, which is a plain textarea you type straight into.
 
-The pinned settings band below holds the two decisions that shape the output as
-plain rows, the same size as the reference cards above: **Visual Style** →
-**Ad Format** over a **10s / 15s / 20s / 30s / 60s** length toggle that appears
-only while the script box is empty → **Generate B-Roll / Dialogue / Storyboard
-Prompts** button. Both rows are dashed until picked; there are no Required tags,
+The pinned settings band below opens with the **B-Roll Clips / With Dialogue**
+delivery toggle (Line-by-Line only), then the two decisions that shape the
+output as plain rows, the same size as the reference cards above: **Visual
+Style** → **Ad Format** over a **10s / 15s / 20s / 30s / 60s** length toggle
+that appears only while the script box is empty → **Generate B-Roll / Dialogue
+/ Storyboard Prompts** button. Both rows are dashed until picked; there are no Required tags,
 because the button greys out until both are chosen. The Ad Format slide-over
 pins a **Standard UGC** card above the Formats and Structures sections. The one
 line under the button, "Writes a 30s script first, then storyboards it", shows
@@ -475,7 +476,7 @@ Top tabs: **Scenes / History**. Scenes view: a control bar with the scene count
   Seven selectable variation tags (`ALL_TAGS` in `services/generateBroll.ts`):
   **Action · Emotional · Product shot · POV · Environment · Transition · Proof** — a
   colored chip top-left of each card (lime / pink / amber / violet / teal / sky /
-  orange). In **Dialogue** mode all three cards carry the `Dialogue` tag instead —
+  orange). Under **With Dialogue** all three cards carry the `Dialogue` tag instead —
   it's outside `ALL_TAGS` (the silent menu) but emitted wholesale by the delivery
   override. `Static` survives in the `VariationTag` union so older persisted
   sessions still render; nothing produces it any more. The bottom-center
@@ -507,7 +508,7 @@ mute button. Clicking the card body opens the modal on Image, as before.
 ### Right history (`components/BrollHistoryView.tsx`)
 
 The other half of the Scenes / History tab pair. Header block: full-width search
-field, then mode filter pills (All · B-Roll · Dialogue · Continuous — only when more
+field, then mode filter pills (All · Line-by-Line · Continuous — only when more
 than one mode is present, preceded by an "N sessions rendering" chip while
 anything is in flight) on the left with the sort dropdown (Newest / Oldest /
 Recently updated) on the right.

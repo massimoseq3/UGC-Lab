@@ -219,16 +219,16 @@ Wrap every scene in this exact XML envelope. Do not include any text outside the
 </VAR_3>
 </SCENE>`
 
-// Delivery override appended to the system instruction ONLY in Dialogue mode.
+// Delivery override appended to the system instruction ONLY under With Dialogue.
 // Read last, so it wins over the "every shot is SILENT" doctrine everywhere.
 //
 // ALL THREE cards speak the line. This used to be one talking card plus two
 // silent b-roll ideas, locked to a single continuous take — same room, same
 // wardrobe, same lens height for the whole ad, with each card chained to the
-// previous one's still. Both halves were wrong for what this mode is: if you
-// wanted silent footage you'd be in B-Roll mode, and three angles on one sitting
+// previous one's still. Both halves were wrong for what this delivery is: if you
+// wanted silent footage you'd be on B-Roll Clips, and three angles on one sitting
 // is one idea filmed three times, which is exactly what the b-roll side of the
-// app spent its whole prompt learning not to do. So a Dialogue scene is now
+// app spent its whole prompt learning not to do. So a dialogue scene is now
 // three genuinely different ways to DELIVER the line — different room, different
 // activity, different staging — and the picked format (see the SCENE STAGING
 // block, when there is one) decides what "different" looks like: a street
@@ -520,7 +520,7 @@ function parseRefs(raw: string | undefined): VariationRefs | undefined {
 // forced to 'character' whatever VISIBILITY said, because back when a scene had
 // ONE talking card and two b-roll cards, the product had its own shots to live
 // in and attaching packaging to a talking head just pulled it into a frame that
-// only needed a face. In Dialogue mode every card is a talking card, so that
+// only needed a face. Under With Dialogue every card is a talking card, so that
 // exception would mean the product never appears in the whole ad — and a line
 // that names the product still has to be built from the real packaging.
 function clampRefsToVisibility(refs: VariationRefs, productVisible: boolean | undefined): VariationRefs {
@@ -536,7 +536,7 @@ function clampRefsToVisibility(refs: VariationRefs, productVisible: boolean | un
 function defaultRefsFor(tag: VariationTag, productVisible: boolean | undefined): VariationRefs {
   // The legacy STATIC anchor take is sourced from the character reference
   // alone. DIALOGUE cards used to be too; they now follow VISIBILITY like
-  // everything else, since in Dialogue mode every card is a talking card and a
+  // everything else, since under With Dialogue every card is a talking card and a
   // line about the product still has to be built from the real packaging.
   if (tag === 'STATIC') return 'character'
   // Product must not appear when VISIBILITY is no — keep the character ref on so

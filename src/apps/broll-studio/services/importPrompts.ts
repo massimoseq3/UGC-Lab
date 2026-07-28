@@ -67,21 +67,19 @@ export type ImportOutcome =
 // Each mode's envelope has a tag the other never uses, so a paste into the
 // wrong mode can say which mode it actually belongs to instead of just failing.
 
-// Only tells the two ENVELOPES apart: B-Roll and Dialogue share the
-// <SCENE>/<VAR_N> shape, so a per-line paste resolves to 'broll' as the
-// representative and the caller compares with isLineMode. What distinguishes
-// the two is whether the cards speak, which is the member's pick, not the
-// paste's — importing a silent storyboard into Dialogue is a legitimate thing
-// to do, since the prompts are what get rendered either way.
+// Tells the two ENVELOPES apart, and nothing finer: both deliveries share the
+// <SCENE>/<VAR_N> shape, and which one a paste was written for is the member's
+// pick rather than the paste's — importing a silent storyboard with the
+// dialogue toggle on is legitimate, since the prompts are what get rendered
+// either way.
 export function detectImportMode(text: string): BrollMode | null {
   if (/<STORYBOARD>/i.test(text) || /<SCENE_1>/i.test(text)) return 'continuous'
-  if (/<SCENE>/i.test(text) && /<VAR_1>/i.test(text)) return 'broll'
+  if (/<SCENE>/i.test(text) && /<VAR_1>/i.test(text)) return 'line'
   return null
 }
 
 const MODE_LABEL: Record<BrollMode, string> = {
-  broll: 'B-Roll',
-  dialogue: 'Dialogue',
+  line: 'Line-by-Line',
   continuous: 'Continuous',
 }
 
@@ -91,22 +89,22 @@ function wrongModeError(detected: BrollMode, wanted: BrollMode): string {
 
 // ── Per-mode parse ─────────────────────────────────────────────
 
-function importLine(mode: BrollMode, text: string, ctx: ImportContext): ImportOutcome {
+function importLine(text: string, ctx: ImportContext): ImportOutcome {
   const scenes = parseScenes(text, ctx.lineDelivery)
   if (scenes.length === 0) {
     const detected = detectImportMode(text)
     return {
       ok: false,
       error: detected && !isLineMode(detected)
-        ? wrongModeError(detected, mode)
+        ? wrongModeError(detected, 'line')
         : `No <SCENE> blocks found. Each scene needs <SCENE>…</SCENE> wrapping a <LINE> and its <VAR_1>…<VAR_${variationsForDelivery(ctx.lineDelivery)}> prompts.`,
     }
   }
 
   const promptCount = scenes.reduce((n, s) => n + s.variations.length, 0)
   const notes: string[] = []
-  // Both modes expect three prompts per scene. Read through the helper anyway,
-  // so the bar follows the count if either mode's shape changes again.
+  // Both deliveries expect three prompts per scene. Read through the helper
+  // anyway, so the bar follows the count if either shape changes again.
   const expected = variationsForDelivery(ctx.lineDelivery)
   const thin = scenes.filter((s) => s.variations.length < expected).map((s) => s.number)
   if (thin.length > 0) {
@@ -120,7 +118,7 @@ function importLine(mode: BrollMode, text: string, ctx: ImportContext): ImportOu
   return {
     ok: true,
     parsed: {
-      mode,
+      mode: 'line',
       lineResult: {
         scenes,
         style: styleBriefFor({ styleId: ctx.styleId, styleBrief: ctx.styleBrief }),
@@ -192,7 +190,7 @@ function importContinuous(text: string, ctx: ImportContext): ImportOutcome {
 
 export function parseImport(mode: BrollMode, text: string, ctx: ImportContext): ImportOutcome {
   if (!text.trim()) return { ok: false, error: 'Paste the prompts first.' }
-  if (isLineMode(mode)) return importLine(mode, text, ctx)
+  if (isLineMode(mode)) return importLine(text, ctx)
   return importContinuous(text, ctx)
 }
 
@@ -207,9 +205,7 @@ function importTail(mode: BrollMode): string {
   const envelope = perLine
     ? 'the <SCENE>…</SCENE> blocks (one per line of the script)'
     : 'the single <STORYBOARD>…</STORYBOARD> envelope'
-  const filename = perLine
-    ? (mode === 'dialogue' ? 'dialogue-prompts.txt' : 'broll-prompts.txt')
-    : 'continuous-storyboard.txt'
+  const filename = perLine ? 'line-by-line-prompts.txt' : 'continuous-storyboard.txt'
 
   return `# HOW YOUR ANSWER IS USED — READ THIS LAST, IT OVERRIDES ANY HABIT TO EXPLAIN YOURSELF
 

@@ -11,12 +11,13 @@ export type SceneType =
 
 // Shot role for a variation.
 //
-// In B-Roll mode a scene gets 3 SILENT variations, each role picked by the LLM
-// per line from the selectable menu (ALL_TAGS), so the mix adapts to what each
-// script line earns. No shot speaks — a voiceover is laid over in the edit.
+// Under the B-Roll Clips delivery a scene gets 3 SILENT variations, each role
+// picked by the LLM per line from the selectable menu (ALL_TAGS), so the mix
+// adapts to what each script line earns. No shot speaks — a voiceover is laid
+// over in the edit.
 //
-// In Dialogue mode all 3 are DIALOGUE: the character speaking that line, staged
-// three different ways. DIALOGUE is therefore not offered in ALL_TAGS (which is
+// Under With Dialogue all 3 are DIALOGUE: the character speaking that line,
+// staged three different ways. DIALOGUE is therefore not in ALL_TAGS (which is
 // the silent menu) but is emitted wholesale by the dialogue delivery override —
 // see PARSEABLE_TAGS.
 //
@@ -286,8 +287,8 @@ export interface CardState {
   // single piece to camera cut into pieces. Silent b-roll cards ignore it —
   // their whole job is to look different from each other.
   //
-  // Defaults OFF, and that flipped with the mode split: a Dialogue scene is now
-  // three genuinely different ways to deliver the line (different room,
+  // Defaults OFF, and that flipped when the delivery was reshaped: a dialogue
+  // scene is now three different ways to deliver the line (different room,
   // different activity), so anchoring each card to the last one's still fights
   // the prompt it was written from. Identity is held by the character
   // reference, which does that job better than a chain image can. Turn it on
@@ -316,14 +317,16 @@ export interface CardState {
   videoPrompt: string | null
 }
 
-// The B-Roll workspace's three modes.
+// The B-Roll workspace's two modes.
 //
-// 'broll' and 'dialogue' both walk the script line by line and give each line
-// three cards; what differs is whether anyone speaks. They used to be ONE mode
-// ("Line-by-Line") with a delivery toggle underneath, but the choice decides
-// what the whole session is — silent footage you lay a voiceover over, or the
-// character delivering the lines on camera — so it belongs in the mode row
-// rather than buried in the settings band.
+// 'line'       — walk the script line by line, three cards per line.
+// 'continuous' — the keyframe chain (its own storyboard shape entirely).
+//
+// Whether anyone SPEAKS is not a mode: both deliveries produce the same
+// per-line storyboard, so the choice lives on its own toggle in the settings
+// band (see BrollDelivery). It briefly rode in the mode row as a third mode
+// ("B-Roll | Dialogue | Continuous") and was folded back — a mode is a
+// different shape of workspace, and these two share one.
 //
 // One-Shot (whole script → one multi-cut clip) was pulled in July 2026: no
 // model on kie could hold a 30s ad together well enough to ship, so it burned
@@ -331,15 +334,17 @@ export interface CardState {
 // untouched (BrollHistoryItem.oneShot*, hidden from the History list) so the
 // mode can come back with a model that can actually do it. Do not reuse
 // 'oneshot' for anything else.
-export type BrollMode = 'broll' | 'dialogue' | 'continuous'
+export type BrollMode = 'line' | 'continuous'
 
-// 'dialogue' — the character speaks the actual script lines on camera.
-// 'silent'   — pure silent b-roll; a voiceover is laid over in the edit.
+// Line-by-Line delivery — the "B-Roll Clips / With Dialogue" toggle.
 //
-// Now fully determined by the mode (see deliveryForMode). It survives as its
-// own type because it's what the SERVICE and the persisted history rows speak:
-// `BrollHistoryItem` still stores `mode: 'line'` + `lineDelivery`, and those
-// rows are cloud-synced, so the storage shape is deliberately left alone.
+// 'dialogue' — every variation is the character speaking the scene's exact
+//              line, staged three different ways.
+// 'silent'   — every variation is silent b-roll; a voiceover is laid over in
+//              the edit.
+//
+// It's also what the SERVICE and the persisted history rows speak:
+// `BrollHistoryItem` stores `mode: 'line'` + `lineDelivery`.
 export type BrollDelivery = 'dialogue' | 'silent'
 
 // What kind of ad the storyboard is shooting. Either one of Scripts' own styles
@@ -354,25 +359,21 @@ export function isAdFormat(value: unknown): value is AdFormat {
   return value === 'standard' || isWriteStyle(value)
 }
 
-// Whether anyone speaks in this mode. Continuous is silent narration-over-
-// footage like 'broll'.
-export function deliveryForMode(mode: BrollMode): BrollDelivery {
-  return mode === 'dialogue' ? 'dialogue' : 'silent'
-}
-
-// Only the two per-line modes run the scene/variation pipeline; Continuous has
-// its own storyboard shape.
+// Only Line-by-Line runs the scene/variation pipeline; Continuous has its own
+// storyboard shape. A named helper rather than a bare comparison because it's
+// asked in a dozen places and has now been a two- and a three-value question.
 export function isLineMode(mode: BrollMode): boolean {
-  return mode === 'broll' || mode === 'dialogue'
+  return mode === 'line'
 }
 
 // Coerces anything read from localStorage or a history row into a live mode.
-// Pre-split sessions stored 'line' with the delivery held separately, and
-// 'oneshot' is the retired mode — both land on a per-line mode, picking the
-// dialogue one only when that row actually ran with dialogue.
-export function sanitizeBrollMode(raw: unknown, delivery?: BrollDelivery): BrollMode {
-  if (raw === 'broll' || raw === 'dialogue' || raw === 'continuous') return raw
-  return delivery === 'dialogue' ? 'dialogue' : 'broll'
+// 'broll' / 'dialogue' are the short-lived three-mode split (the delivery is
+// recovered separately, from the same raw value — see readPersistedMode in
+// BrollStudio), 'animated' is Continuous' first name, and 'oneshot' is the
+// retired mode. Everything unrecognised lands on Line-by-Line.
+export function sanitizeBrollMode(raw: unknown): BrollMode {
+  if (raw === 'continuous' || raw === 'animated') return 'continuous'
+  return 'line'
 }
 
 // ── Continuous mode (keyframe chain) ─────────────────────────────

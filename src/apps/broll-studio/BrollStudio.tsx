@@ -3,7 +3,7 @@ import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
 import type { AdBlueprintPayload, Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
-import { deliveryForMode, isLineMode, isAdFormat, sanitizeBrollMode, type AdFormat, type BrollResult, type PromptVariation, type ReferenceImage, type VariationTag, type VariationRefs, type CardState, type BrollMode, type BrollDelivery, type ContinuousResult, type ContinuousConcept, type ContinuousSelection, type ContinuousFrameCardState, type ContinuousClipCardState } from './types'
+import { isLineMode, isAdFormat, sanitizeBrollMode, type AdFormat, type BrollResult, type PromptVariation, type ReferenceImage, type VariationTag, type VariationRefs, type CardState, type BrollMode, type BrollDelivery, type ContinuousResult, type ContinuousConcept, type ContinuousSelection, type ContinuousFrameCardState, type ContinuousClipCardState } from './types'
 import { generateBroll } from './services/generateBroll'
 import { productPhotosOf } from './services/productAngles'
 import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, styleBriefFor, styleUsesRealism, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
@@ -45,18 +45,17 @@ function isAdBlueprint(raw: unknown): raw is AdBlueprintPayload {
   return typeof b.title === 'string' && typeof b.script === 'string' && !!b.staging?.trim()
 }
 
-// The delivery a pre-split session was left on, read straight out of its own
-// localStorage slot. `usePersistedState`'s sanitize only sees its own value, and
-// resolving a stored 'line' mode needs the sibling key: it decides whether that
-// session reopens as B-Roll Clips or as Dialogue. The key is dead after this —
-// nothing writes it any more — so a missing/garbage value just means 'silent'.
-function readPersistedDelivery(baseKey: string): BrollDelivery {
+// The raw mode slot, read straight out of localStorage. `usePersistedState`'s
+// sanitize only sees its OWN value, and the delivery toggle needs this one: a
+// member left mid-session while Dialogue was briefly its own mode has
+// `:mode === 'dialogue'` and a `:lineDelivery` that predates it, so reading the
+// mode back is the only way they reopen in With Dialogue rather than silently
+// losing the delivery they were working in.
+function readPersistedMode(baseKey: string): string {
   try {
-    return JSON.parse(localStorage.getItem(`${baseKey}:lineDelivery`) ?? '""') === 'dialogue'
-      ? 'dialogue'
-      : 'silent'
+    return String(JSON.parse(localStorage.getItem(`${baseKey}:mode`) ?? '""'))
   } catch {
-    return 'silent'
+    return ''
   }
 }
 
@@ -212,21 +211,24 @@ export default function BrollStudio() {
   )
 
   // ── Mode ─────────────────────────────────────────────────────
-  // 'broll' | 'dialogue' | 'continuous'. The first two were one mode
-  // ("Line-by-Line") with a delivery toggle underneath until the split, so a
-  // persisted 'line' resolves through whatever delivery that session was left
-  // on — someone who was working in With Dialogue reopens in Dialogue mode.
-  const [mode, setMode] = usePersistedState<BrollMode>(`${baseKey}:mode`, 'broll', {
-    sanitize: (raw) => {
-      // The keyframe-chain mode shipped briefly as 'animated' before the rename.
-      if ((raw as string) === 'animated') return 'continuous'
-      return sanitizeBrollMode(raw, readPersistedDelivery(baseKey))
-    },
+  // 'line' | 'continuous'. Dialogue rode here as a third mode for a while;
+  // sanitizeBrollMode folds that value (and the retired 'oneshot') back onto
+  // Line-by-Line, with the delivery recovered by the toggle below.
+  const [mode, setMode] = usePersistedState<BrollMode>(`${baseKey}:mode`, 'line', {
+    sanitize: sanitizeBrollMode,
   })
-  // Whether the cards speak. Fully determined by the mode now that the delivery
-  // toggle is gone — kept as its own value because it's what the service and
-  // the persisted history rows speak.
-  const lineDelivery = deliveryForMode(mode)
+  // Line-by-Line delivery: 'silent' (every card silent b-roll — the default) or
+  // 'dialogue' (every card the character speaking that line, staged three
+  // different ways). Not a mode: both produce the same per-line storyboard.
+  const [lineDelivery, setLineDelivery] = usePersistedState<BrollDelivery>(
+    `${baseKey}:lineDelivery`,
+    'silent',
+    // A member sitting in the short-lived Dialogue *mode* has that in the mode
+    // slot and a stale delivery in this one, so the mode wins when it says
+    // dialogue. Runs on the default too, which is exactly what's wanted — their
+    // `:lineDelivery` may never have been written.
+    { sanitize: (raw) => (raw === 'dialogue' || readPersistedMode(baseKey) === 'dialogue' ? 'dialogue' : 'silent') },
+  )
 
   // ── Script Style + length (write the script here) ──────────────
   // For the member who opens B-Roll without a script. Picking a Script Style
@@ -271,7 +273,7 @@ export default function BrollStudio() {
 
   // ── Continuous mode (keyframe chain) state ─────────────────────
   // Until the user actively picks a style, the look falls back to a mode-
-  // specific default: UGC Realism for the per-line modes, 3D Animated for
+  // specific default: UGC Realism for Line-by-Line, 3D Animated for
   // Continuous. `styleChosen` (not the raw id) gates this so a legacy persisted
   // id from the old app-wide default doesn't masquerade as an explicit pick.
   const [continuousStyleId, setContinuousStyleId] = usePersistedState<string>(`${baseKey}:continuousStyle`, '')
@@ -369,8 +371,15 @@ export default function BrollStudio() {
   // same precedence as the history badge — and their row keeps updating.
   const [sessionMode, setSessionMode] = usePersistedState<BrollMode>(
     `${baseKey}:sessionMode`,
-    continuousResult ? 'continuous' : 'broll',
-    { sanitize: (raw) => sanitizeBrollMode(raw, readPersistedDelivery(baseKey)) },
+    continuousResult ? 'continuous' : 'line',
+    { sanitize: sanitizeBrollMode },
+  )
+  // And which delivery it ran with, stamped at Generate for the same reason:
+  // the toggle above is live, so reading it in the snapshot would let a flip
+  // made after the run rewrite what a finished session says it is.
+  const [sessionDelivery, setSessionDelivery] = usePersistedState<BrollDelivery>(
+    `${baseKey}:sessionDelivery`,
+    'silent',
   )
 
   // The style the CURRENT session's content was actually generated with —
@@ -507,12 +516,8 @@ export default function BrollStudio() {
         context: additionalContext || prev?.context,
         result: sessionResult ?? { scenes: [] },
         cardStates: sessionResult ? cardStates : {},
-        // The ROW's shape is deliberately unchanged by the mode split: a
-        // per-line session still stores mode 'line' plus its delivery, because
-        // these rows are cloud-synced and already on every member's account.
-        // The UI's three modes are reconstructed from the pair on read.
-        mode: sessionMode === 'continuous' ? 'continuous' : 'line',
-        lineDelivery: sessionResult ? deliveryForMode(sessionMode) : undefined,
+        mode: sessionMode,
+        lineDelivery: sessionResult ? sessionDelivery : undefined,
         continuousResult: sessionContinuous ?? undefined,
         continuousFrameStates: sessionContinuous && Object.keys(continuousFrameStates).length > 0 ? continuousFrameStates : undefined,
         continuousClipStates: sessionContinuous && Object.keys(continuousClipStates).length > 0 ? continuousClipStates : undefined,
@@ -523,7 +528,7 @@ export default function BrollStudio() {
       upsertBrollHistory(item)
     }, 1000)
     return () => clearTimeout(handle)
-  }, [result, cardStates, lineDelivery, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, sessionStyleId, sessionStyleBrief, sessionStyleName, continuousModelId, sessionMode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, products, upsertBrollHistory])
+  }, [result, cardStates, sessionDelivery, continuousResult, continuousFrameStates, continuousClipStates, continuousSelections, continuousStyleId, sessionStyleId, sessionStyleBrief, sessionStyleName, continuousModelId, sessionMode, selectedProductId, selectedModelId, selectedScriptId, scriptText, additionalContext, selectedProduct, products, upsertBrollHistory])
 
   const handleSelectProduct = (item: unknown) => {
     setSelectedProductId((item as Product).id)
@@ -931,6 +936,7 @@ export default function BrollStudio() {
   const handleImportPrompts = (parsed: ImportParsed) => {
     setSessionId(newSessionId())
     setSessionMode(parsed.mode)
+    setSessionDelivery(lineDelivery)
     stampSessionStyle()
     // Recover the script from the storyboard when the panel's box is empty —
     // it names the history row and backs the scene editors. Never clobbers a
@@ -976,12 +982,13 @@ export default function BrollStudio() {
       // holding the old result with no card states). Batched into one commit,
       // so the rebuild effect sees the new result against empty cards.
       setSessionId(newSessionId())
-      setSessionMode(mode)
+      setSessionMode('line')
+      setSessionDelivery(lineDelivery)
       stampSessionStyle()
       setCardStates({})
       setResult(res)
       useAppStore.getState().addToast(
-        mode === 'dialogue' ? 'Dialogue scenes ready' : 'B-roll scenes ready',
+        lineDelivery === 'dialogue' ? 'Dialogue scenes ready' : 'B-roll scenes ready',
         'success',
       )
     } catch (err) {
@@ -1078,14 +1085,17 @@ export default function BrollStudio() {
       )
     }
     setCardStates(restored)
+    // Restore the Line-by-Line delivery toggle (legacy rows => silent).
+    setLineDelivery(item.lineDelivery ?? 'silent')
 
     // Switch to the mode this row actually represents (derived from its content,
     // not the unreliable last-active `mode`) so the toggle + right panel land on
     // what the user clicked. Same helper drives the history badge, so they agree.
     const rowMode = brollHistoryMode(item)
     setMode(rowMode)
-    // Further edits keep updating this row as the mode it actually is.
+    // Further edits keep updating this row as the mode + delivery it actually is.
     setSessionMode(rowMode)
+    setSessionDelivery(item.lineDelivery ?? 'silent')
 
     // Continuous snapshot (absent on older rows).
     setContinuousResult((item.continuousResult as ContinuousResult | undefined) ?? null)
@@ -1157,6 +1167,8 @@ export default function BrollStudio() {
           highlightField={highlightField}
           mode={mode}
           onModeChange={setMode}
+          lineDelivery={lineDelivery}
+          onLineDeliveryChange={setLineDelivery}
           autoScriptStyle={autoScriptStyle}
           adBlueprintTitle={adBlueprint?.title ?? null}
           onClearAdBlueprint={() => setAdBlueprint(null)}
