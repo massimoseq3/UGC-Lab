@@ -1,5 +1,6 @@
 import { CheckCircle2, Download } from 'lucide-react'
 import type { ReactNode } from 'react'
+import DesktopWallpaper from '../../components/DesktopWallpaper'
 import SkillFolder, { downloadSkill } from './SkillFolder'
 
 // Edit is the last stop in the create row. Unlike the other apps it doesn't
@@ -53,57 +54,63 @@ const BENEFITS = [
 
 export default function EditStudio() {
   return (
-    <div className="mx-auto grid min-h-full max-w-5xl content-center gap-10 px-5 py-10 md:grid-cols-2 md:items-center md:gap-8 md:px-8">
-      {/* Left: the folder is the download */}
-      <div className="flex flex-col items-center gap-7">
-        <SkillFolder />
-        <div className="flex flex-col items-center gap-2">
-          <button
-            type="button"
-            onClick={downloadSkill}
-            className="flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-[13px] font-medium text-paper transition-opacity hover:opacity-90"
-          >
-            <Download className="h-4 w-4" strokeWidth={2} />
-            Download Skill
-          </button>
-          <p className="text-[11px] text-ink-600">video-editor.skill · 25 KB</p>
+    // Same deep-space wallpaper as the Dashboard. Edit is the other page with no
+    // panels of its own — a folder and a card floating on the bare canvas — so it
+    // sits on the sky rather than in an empty room.
+    <div className="relative flex min-h-full flex-col">
+      <DesktopWallpaper tint="mono" />
+
+      <div className="relative mx-auto grid w-full max-w-5xl flex-1 content-center gap-10 px-5 py-10 md:grid-cols-2 md:items-center md:gap-8 md:px-8">
+        {/* Left: the folder is the download */}
+        <div className="flex flex-col items-center gap-7">
+          <SkillFolder />
+          <div className="flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={downloadSkill}
+              className="flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-[13px] font-medium text-paper transition-opacity hover:opacity-90"
+            >
+              <Download className="h-4 w-4" strokeWidth={2} />
+              Download Skill
+            </button>
+            <p className="text-[11px] text-ink-600">video-editor.skill · 25 KB</p>
+          </div>
         </div>
-      </div>
 
-      {/* Right: what it is + how to set it up */}
-      <div className="flex flex-col gap-5">
-        <header>
-          <h1 className="text-4xl italic font-normal tracking-tight text-ink-50 md:text-[2.6rem]" style={DISPLAY_FONT}>
-            Your AI Video Editor
-          </h1>
-          <p className="mt-2 max-w-md text-[14px] leading-relaxed text-ink-400">
-            A Claude Skill that edits your videos for you.
-          </p>
-          <ul className="mt-2 space-y-1.5">
-            {BENEFITS.map((benefit) => (
-              <li key={benefit} className="flex items-center gap-2 text-[13.5px] text-ink-300">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500 light:text-emerald-600" strokeWidth={2} />
-                <span>{benefit}</span>
-              </li>
-            ))}
-          </ul>
-        </header>
+        {/* Right: what it is + how to set it up */}
+        <div className="flex flex-col gap-5">
+          <header>
+            <h1 className="text-4xl italic font-normal tracking-tight text-ink-50 md:text-[2.6rem]" style={DISPLAY_FONT}>
+              Your AI Video Editor
+            </h1>
+            <p className="mt-2 max-w-md text-[14px] leading-relaxed text-ink-400">
+              A Claude Skill that edits your videos for you.
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {BENEFITS.map((benefit) => (
+                <li key={benefit} className="flex items-center gap-2 text-[13.5px] text-ink-300">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500 light:text-emerald-600" strokeWidth={2} />
+                  <span>{benefit}</span>
+                </li>
+              ))}
+            </ul>
+          </header>
 
-        <div className="rounded-3xl border border-ink/10 bg-surface-1/60 p-5 shadow-lg shadow-black/20 light:shadow-black/[0.08]">
-          <h2 className="text-[15px] font-semibold tracking-tight text-ink-100">Set it up</h2>
-          <ol className="mt-4 space-y-3.5">
-            {SKILL_STEPS.map((step, i) => (
-              <li key={i} className="flex items-start gap-3 text-[13px] leading-relaxed text-ink-400">
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink/[0.06] text-[11px] font-semibold text-ink-300">
-                  {i + 1}
-                </span>
-                <span>{step}</span>
-              </li>
-            ))}
-          </ol>
-          <p className="mt-4 border-t border-ink/[0.07] pt-3.5 text-[12px] leading-relaxed text-ink-500">
-            No editing apps needed. Your files never leave your computer.
-          </p>
+          {/* Blurred, not just translucent: over the starfield a flat 60% fill
+              reads as a smudge — the blur is what makes it a pane. */}
+          <div className="rounded-3xl border border-ink/10 bg-ink/[0.045] p-5 backdrop-blur-2xl backdrop-saturate-150 shadow-lg shadow-black/30 light:border-black/[0.05] light:bg-white/70 light:shadow-black/[0.08]">
+            <h2 className="text-[15px] font-semibold tracking-tight text-ink-100">Set it up</h2>
+            <ol className="mt-4 space-y-3.5">
+              {SKILL_STEPS.map((step, i) => (
+                <li key={i} className="flex items-start gap-3 text-[13px] leading-relaxed text-ink-400">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink/[0.06] text-[11px] font-semibold text-ink-300">
+                    {i + 1}
+                  </span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
         </div>
       </div>
     </div>

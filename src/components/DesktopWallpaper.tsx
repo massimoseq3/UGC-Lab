@@ -1,15 +1,25 @@
 // The desktop's wallpaper: deep space. Colour blooms are the nebula, two tiled
 // star layers give it depth, and a meteor crosses every ~22 seconds.
 //
+// Shared, not Dashboard-only: Edit is the other full-page screen with no panels
+// of its own to fill the window, so it sits on the same sky. Drop it into any
+// `relative` full-height root — it paints behind everything and takes no events.
+//
 // All of it is dark-mode only except the blooms. A starfield needs a night sky —
 // white dots vanish on a bright wallpaper and dark ones read as dust — so light
 // mode keeps the clean gradient and drops the stars, the vignette and the meteor.
 // Colours and keyframes live in index.css (`.desktop-*`) so both themes stay in
-// one place.
-export default function DesktopWallpaper() {
+// one place — including `tint`, which swaps only the bloom colours: the stars,
+// the meteors and the vignette are the same sky whichever page is on it.
+interface DesktopWallpaperProps {
+  /** 'mono' trades the top-left emerald bloom for neutral light. */
+  tint?: 'default' | 'mono'
+}
+
+export default function DesktopWallpaper({ tint = 'default' }: DesktopWallpaperProps) {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="desktop-wallpaper absolute inset-0" />
+      <div className={`absolute inset-0 ${tint === 'mono' ? 'desktop-wallpaper-mono' : 'desktop-wallpaper'}`} />
       <div className="desktop-stars-far absolute inset-0 light:hidden" />
       <div className="desktop-stars-near absolute inset-0 light:hidden" />
       {/* Two meteors on the same 22s cycle, offset so they never share a pass. */}
