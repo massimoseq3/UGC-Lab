@@ -1,60 +1,66 @@
-import { useState, useRef, useCallback } from 'react'
-import { Upload, Dna, Check, X } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { Dna, Check, X, ChevronRight } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 
 interface PhotoExtractZoneProps {
-  isExtracting: boolean
+  // How many reference photos are being analysed right now (any source).
+  analyzingCount: number
   extractError: string | null
+  // True while a reference's DNA is sitting in the form. Kept separate from
+  // `thumbnail`, which can be empty when the browser couldn't decode the file.
+  applied: boolean
   thumbnail: string | null
-  onPhotoDrop: (file: File) => void
+  onPhotoDrop: (files: File[]) => void
   onReset: () => void
+  onOpenLibrary: () => void
 }
 
-const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-const MAX_SIZE = 10 * 1024 * 1024
+// The chevron that opens the reference library, pinned to the right of the row
+// in every state — the same affordance the preset row beside it carries. It
+// sits inside a clickable drop zone, so it swallows the click that would
+// otherwise open the file dialog behind it.
+//
+// No count rides alongside it: this row shares a half-width column with the
+// preset picker, and a badge here truncated the label that explains the drop.
+function LibraryButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onClick() }}
+      title="Reference photos"
+      aria-label="Open reference photos"
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-200"
+    >
+      <ChevronRight className="h-4 w-4" strokeWidth={2} />
+    </button>
+  )
+}
 
 export default function PhotoExtractZone({
-  isExtracting,
+  analyzingCount,
   extractError,
+  applied,
   thumbnail,
   onPhotoDrop,
   onReset,
+  onOpenLibrary,
 }: PhotoExtractZoneProps) {
   const [dragOver, setDragOver] = useState(false)
-  const [validationError, setValidationError] = useState<string | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
 
-  const validateAndSubmit = useCallback((file: File) => {
-    setValidationError(null)
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      setValidationError('Unsupported format. Use JPG, PNG, or WebP.')
-      return
-    }
-    if (file.size > MAX_SIZE) {
-      setValidationError('File too large. Maximum size is 10 MB.')
-      return
-    }
-    onPhotoDrop(file)
-  }, [onPhotoDrop])
-
+  // Format/size validation lives in the library (it has to report per file on a
+  // bulk drop) — this row just hands the files over.
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setDragOver(false)
-    const file = e.dataTransfer.files[0]
-    if (file) validateAndSubmit(file)
-  }, [validateAndSubmit])
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) validateAndSubmit(file)
-    e.target.value = ''
-  }
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) onPhotoDrop(files)
+  }, [onPhotoDrop])
 
   // Analyzing state — fixed h-12 so it stays the exact size of the preset pill
   // beside it (the bar + message centre within the row rather than growing it).
-  if (isExtracting) {
+  if (analyzingCount > 0) {
     return (
-      <div className="flex h-12 items-center gap-3 rounded-full border border-green-500/20 bg-green-500/[0.04] px-4">
+      <div className="flex h-12 items-center gap-3 rounded-full border border-green-500/20 bg-green-500/[0.04] px-3">
         {thumbnail && (
           <img
             src={thumbnail}
@@ -63,27 +69,41 @@ export default function PhotoExtractZone({
           />
         )}
         <div className="min-w-0 flex-1">
-          <GenerationProgress
-            isActive={true}
-            color="bg-green-500"
-            showHelper={false}
-            messageClassName="text-xs truncate text-ink-300"
-            messages={['Preparing image...', 'Sending request...', 'Extracting visual DNA...', 'Finalizing analysis...']}
-          />
+          {analyzingCount > 1 ? (
+            // A batch has no single prompt to narrate — the count is the news.
+            <span className="flex items-center gap-1.5 text-xs text-ink-300">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-400" />
+              </span>
+              Analysing {analyzingCount} photos…
+            </span>
+          ) : (
+            <GenerationProgress
+              isActive={true}
+              color="bg-green-500"
+              showHelper={false}
+              messageClassName="text-xs truncate text-ink-300"
+              messages={['Preparing image...', 'Sending request...', 'Extracting visual DNA...', 'Finalizing analysis...']}
+            />
+          )}
         </div>
+        <LibraryButton onClick={onOpenLibrary} />
       </div>
     )
   }
 
   // Success state — collapsed confirmation
-  if (thumbnail && !extractError) {
+  if (applied) {
     return (
-      <div className="flex h-12 items-center gap-3 rounded-full border border-green-500/20 bg-green-500/[0.06] px-4">
-        <img
-          src={thumbnail}
-          alt="Source"
-          className="h-8 w-8 shrink-0 rounded-full object-cover"
-        />
+      <div className="flex h-12 items-center gap-2.5 rounded-full border border-green-500/20 bg-green-500/[0.06] px-3">
+        {thumbnail && (
+          <img
+            src={thumbnail}
+            alt="Source"
+            className="h-8 w-8 shrink-0 rounded-full object-cover"
+          />
+        )}
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <Check className="h-3.5 w-3.5 shrink-0 text-green-400 light:text-green-600" />
           <span className="truncate text-xs font-medium text-green-300 light:text-green-700">
@@ -98,50 +118,45 @@ export default function PhotoExtractZone({
         >
           <X className="h-3.5 w-3.5" />
         </button>
+        <LibraryButton onClick={onOpenLibrary} />
       </div>
     )
   }
 
-  // Empty / drop zone state
+  // Empty state. A click opens the library rather than the file dialog — that's
+  // where browsing, bulk-adding and reusing an old analysis all live, and the
+  // panel has its own drop zone. Dropping straight on the row still works.
   return (
     <div>
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        onClick={() => inputRef.current?.click()}
-        className={`flex cursor-pointer items-center gap-2.5 rounded-full border border-dashed px-3 py-2 transition-all ${dragOver
+        onClick={onOpenLibrary}
+        className={`flex cursor-pointer items-center gap-2.5 rounded-full border border-dashed py-2 pl-3 pr-2 transition-all ${dragOver
             ? 'border-green-400/40 bg-green-400/5'
             : 'border-ink/10 bg-ink/[0.02] hover:border-ink/20 hover:bg-ink/[0.05]'
           }`}
       >
-        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${dragOver ? 'bg-green-400/10' : 'bg-ink/5'}`}>
-          {dragOver ? (
-            <Dna className="h-4 w-4 text-green-400 light:text-green-600" strokeWidth={1.5} />
-          ) : (
-            <Upload className="h-4 w-4 text-ink-500" strokeWidth={1.5} />
-          )}
+        {/* The DNA glyph is the row's identity, not just its drag state — it
+            mirrors the preset row's tinted person circle beside it, in the
+            green this app's extraction surfaces already use. */}
+        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${dragOver ? 'bg-green-400/20' : 'bg-green-500/10'}`}>
+          <Dna className="h-4 w-4 text-green-400 light:text-green-600" strokeWidth={1.5} />
         </div>
         {/* 13px — the B-Roll reference-row title size, matching the preset
             button beside it. No hint line: the title says it. */}
         <div className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-300">
-          {dragOver ? 'Drop to extract DNA' : 'Drop an image to autofill'}
+          {dragOver ? 'Drop to extract DNA' : 'Extract Character DNA'}
         </div>
+        <LibraryButton onClick={onOpenLibrary} />
       </div>
 
-      {(validationError || extractError) && (
+      {extractError && (
         <p className="mt-1.5 text-[11px] text-red-400 light:text-red-600">
-          {validationError ?? extractError}
+          {extractError}
         </p>
       )}
-
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-        onChange={handleFileSelect}
-        className="hidden"
-      />
     </div>
   )
 }

@@ -119,14 +119,18 @@ export function PresetPickerSlideOver({
   }
 
   return (
-    // Wide panel (560px, same as BankPicker) — at 380px three portrait cards
-    // per row were too small to tell the faces apart.
-    <SlideOver open={open} onClose={onClose} title={title} subtitle={subtitle} size="wide">
+    // Standard 380px panel, matching the Extract Character DNA slide-over this
+    // row sits beside — the two pickers open from adjacent rows and reading as
+    // one pattern matters more than the extra column. The grid drops to two
+    // across to compensate, so a portrait card stays the same size it was at
+    // three-across in a 560px panel; at three-across here the faces were too
+    // small to tell apart.
+    <SlideOver open={open} onClose={onClose} title={title} subtitle={subtitle}>
       <div className="px-4 py-3">
         <div className="px-1 pb-2 pt-0.5 text-[9px] font-semibold uppercase tracking-widest text-ink-500">
           Starters
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {BUILTIN_PRESETS.map((p) => (
             <PresetCard key={p.id} name={p.name} imageUrl={p.image} onClick={() => pick(p.profile)} />
           ))}
@@ -151,7 +155,7 @@ export function PresetPickerSlideOver({
                 <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-ink-500" />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {bankPresets.map((m: Model) => (
                 <PresetCard
                   key={m.id}

@@ -779,3 +779,48 @@ export function flattenDna(dna: VisualDNA): Partial<CharacterProfile> {
   }
   return flat
 }
+
+// Build a full form profile from a flat field map — extracted DNA, or an
+// inter-app payload. Camera Device is never taken from the source: it stays the
+// fixed photorealism string every generated character is locked to.
+export function profileFromFlat(flat: Record<string, unknown>): CharacterProfile {
+  const profile = createEmptyProfile()
+  for (const [key, value] of Object.entries(flat)) {
+    if (key === 'cameraDevice') continue
+    if (key in profile && typeof value === 'string') profile[key] = value
+  }
+  profile.cameraDevice = PHOTOREALISM_STYLE
+  return profile
+}
+
+// One analysed reference photo in the Characters reference library.
+//
+// Deliberately localStorage-only, and deliberately thumbnail-only. The payload
+// that matters is `profile` — the extracted DNA; the picture is just how you
+// recognise the row. Keeping the full-size original would mean an IndexedDB
+// asset that no bank row points at, which the orphan sweep deletes on the next
+// sign-in, so the row carries a ~224px JPEG data URI instead.
+export interface CharacterRefItem {
+  id: string
+  // File name stem, as dropped.
+  name: string
+  // Small JPEG data URI (may be '' if the browser couldn't decode the file).
+  thumb: string
+  createdAt: number
+  // Set once the analysis lands.
+  profile?: CharacterProfile
+  error?: string
+}
+
+// A row with neither a profile nor an error, and no live analysis running, was
+// interrupted mid-analysis (a refresh, a closed tab). It can't be left reading
+// "Analysing…" forever, so it reads as a failure the member can retry or clear.
+export const INTERRUPTED_REF_ERROR = 'Analysis was interrupted.'
+
+// One-line descriptor for a reference row — enough to tell two analysed faces
+// apart in the list without opening either.
+export function describeRefProfile(profile: CharacterProfile): string {
+  return [profile.gender, profile.age, profile.ethnicity, profile.hairColor && `${profile.hairColor} hair`]
+    .filter((part) => typeof part === 'string' && part.trim() !== '')
+    .join(' · ')
+}
