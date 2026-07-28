@@ -89,11 +89,13 @@ interface ControlsPanelProps {
   onProfileChange: (profile: CharacterProfile) => void
   activeTab: TabId
   onActiveTabChange: (tab: TabId) => void
-  isExtracting: boolean
+  analyzingCount: number
   extractError: string | null
+  referenceApplied: boolean
   extractedThumb: string | null
-  onPhotoDrop: (file: File) => void
+  onPhotoDrop: (files: File[]) => void
   onResetExtract: () => void
+  onOpenLibrary: () => void
   // "New" — resets the form + extracted reference photo to a blank slate.
   onClear: () => void
   // Generate bar (lives at the foot of this column).
@@ -112,11 +114,13 @@ export default function ControlsPanel({
   onProfileChange,
   activeTab,
   onActiveTabChange,
-  isExtracting,
+  analyzingCount,
   extractError,
+  referenceApplied,
   extractedThumb,
   onPhotoDrop,
   onResetExtract,
+  onOpenLibrary,
   onClear,
   error,
   onGenerate,
@@ -232,11 +236,13 @@ export default function ControlsPanel({
               </div>
               <div className="min-w-0 flex-1">
                 <PhotoExtractZone
-                  isExtracting={isExtracting}
+                  analyzingCount={analyzingCount}
                   extractError={extractError}
+                  applied={referenceApplied}
                   thumbnail={extractedThumb}
                   onPhotoDrop={onPhotoDrop}
                   onReset={onResetExtract}
+                  onOpenLibrary={onOpenLibrary}
                 />
               </div>
             </div>

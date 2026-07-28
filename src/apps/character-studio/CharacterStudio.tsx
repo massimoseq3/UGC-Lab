@@ -4,23 +4,21 @@ import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
 import { useSettingsStore } from '../../stores/settingsStore'
-import type { CharacterProfile, InFlightCharacterGen, LaunchGenOptions, TabId } from './types'
-import { createEmptyProfile, flattenDna, PHOTOREALISM_STYLE } from './types'
+import type { CharacterProfile, CharacterRefItem, InFlightCharacterGen, LaunchGenOptions, TabId } from './types'
+import { createEmptyProfile, profileFromFlat } from './types'
 import type { AspectRatio, ImageResolution } from '../../utils/models'
 import { getDefaultModel, clampImageResolution } from '../../utils/models'
 import ControlsPanel from './components/ControlsPanel'
 import GalleryPanel from './components/GalleryPanel'
+import ReferenceLibrarySlideOver from './components/ReferenceLibrarySlideOver'
 import { startCharacterTask, startCharacterEditTask, finishCharacterTask, type GenerationKind } from './services/generateCharacter'
 import { humanizeError } from '../../utils/friendlyError'
-import { analyzeImage } from './services/analyzeImage'
+import { useReferenceLibrary } from './useReferenceLibrary'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 
 // In-flight character generations older than 30 min are evicted on resume —
 // matches the cap used by Playground so the user's mental model is uniform.
 const INFLIGHT_TTL_MS = 30 * 60 * 1000
-
-const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
-const MAX_SIZE = 10 * 1024 * 1024
 
 export default function CharacterStudio() {
   const baseKey = useProjectScopedKey('character-studio')
@@ -57,7 +55,12 @@ export default function CharacterStudio() {
   // pick renders the sheet vertically. The portrait aspect itself is left
   // alone; flipping back to Portrait still shows 1:1.
   const sheetAspect = (profile.aspectRatio ?? '').includes('16:9') ? '16:9' : '9:16'
-  const [extractedThumb, setExtractedThumb] = usePersistedState<string | null>(`${baseKey}:thumb`, null)
+
+  // Which analysed reference photo currently fills the form. The photo itself
+  // lives in the reference library below — this is only the pointer, so the
+  // autofill pill and the library agree on which row is in play.
+  const [activeRefId, setActiveRefId] = usePersistedState<string | null>(`${baseKey}:activeRef`, null)
+  const [libraryOpen, setLibraryOpen] = useState(false)
 
   // Parallel generations: persisted to localStorage so a mid-flight refresh
   // resumes polling via finishCharacterTask. Stale entries (>30 min, e.g. a
@@ -65,11 +68,28 @@ export default function CharacterStudio() {
   // stuck on a phantom spinner.
   const [inFlight, setInFlight] = usePersistedState<InFlightCharacterGen[]>(`${baseKey}:in-flight`, [])
   const [error, setError] = useState<string | null>(null)
-  const [isExtracting, setIsExtracting] = useState(false)
-  const [extractError, setExtractError] = useState<string | null>(null)
+
+  // Fill the form from an analysed reference and mark it as the active one.
+  const applyReference = useCallback((item: CharacterRefItem) => {
+    if (!item.profile) return
+    setProfile(item.profile)
+    setActiveRefId(item.id)
+  }, [setProfile, setActiveRefId])
+
+  const library = useReferenceLibrary(baseKey, applyReference)
+  // Pulled out because the hook returns a fresh object each render — the
+  // callbacks below want the stable functions, not the wrapper.
+  const { addFiles, clearError: clearLibraryError, remove: removeRef } = library
+  const analyzingCount = library.analyzingIds.length
+  const activeRef = library.items.find((it) => it.id === activeRefId) ?? null
+  // While a batch runs the pill wears the first photo in it; otherwise it wears
+  // whichever reference filled the form.
+  const pillThumb = analyzingCount > 0
+    ? (library.items.find((it) => library.analyzingIds.includes(it.id))?.thumb || null)
+    : (activeRef?.thumb || null)
 
   // Pulse the dock dot while portraits/sheets generate or DNA extraction runs.
-  useReportActivity('character-studio', inFlight.length > 0 || isExtracting)
+  useReportActivity('character-studio', inFlight.length > 0 || analyzingCount > 0)
   const [overlayActive, setOverlayActive] = useState(false)
 
   // Abort controllers keyed by gen id so per-tile Cancel can target one job.
@@ -90,67 +110,37 @@ export default function CharacterStudio() {
     const { targetField, data } = interAppPayload
 
     if (targetField === 'profile' && typeof data === 'object' && data !== null) {
-      const incoming = data as Record<string, string>
-      const newProfile = createEmptyProfile()
-      for (const [key, value] of Object.entries(incoming)) {
-        if (key === 'cameraDevice') continue
-        if (key in newProfile && typeof value === 'string') {
-          newProfile[key] = value
-        }
-      }
-      newProfile.cameraDevice = PHOTOREALISM_STYLE
-      setProfile(newProfile)
+      setProfile(profileFromFlat(data as Record<string, unknown>))
     }
 
     consumePayload()
   }, [interAppPayload, activeApp, consumePayload])
 
-  const handlePhotoDrop = useCallback(async (file: File) => {
-    setExtractError(null)
-    setIsExtracting(true)
-
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') setExtractedThumb(reader.result)
-    }
-    reader.readAsDataURL(file)
-
-    try {
-      const dna = await analyzeImage(file)
-      const flat = flattenDna(dna)
-      const newProfile = createEmptyProfile()
-      for (const [key, value] of Object.entries(flat)) {
-        if (key === 'cameraDevice') continue
-        if (key in newProfile && typeof value === 'string') {
-          newProfile[key] = value
-        }
-      }
-      newProfile.cameraDevice = PHOTOREALISM_STYLE
-      setProfile(newProfile)
-    } catch (err) {
-      setExtractError(humanizeError(err, 'Failed to extract DNA from image.'))
-      setExtractedThumb(null)
-    } finally {
-      setIsExtracting(false)
-    }
-  }, [])
-
-  // Clear just the source-image thumbnail so the user can drop another image.
-  // Deliberately does NOT wipe the form — that's the "New" button's job.
+  // Detach the active reference so the pill goes back to its drop state.
+  // Deliberately does NOT wipe the form (that's "New") and does NOT delete the
+  // library row — the analysis stays reusable.
   const handleResetExtract = useCallback(() => {
-    setExtractedThumb(null)
-    setExtractError(null)
-  }, [])
+    setActiveRefId(null)
+    clearLibraryError()
+  }, [setActiveRefId, clearLibraryError])
 
-  // "New": reset the form to empty AND drop the extracted reference photo +
-  // any errors, so the controls are a true blank slate. The gallery stays —
-  // generated influencers live in the characterHistory bank, untouched.
+  // Removing a library row that's currently in play leaves the form alone but
+  // drops the pill — the row it pointed at no longer exists.
+  const handleRemoveRef = useCallback((id: string) => {
+    removeRef(id)
+    setActiveRefId((current) => (current === id ? null : current))
+  }, [removeRef, setActiveRefId])
+
+  // "New": reset the form to empty AND detach the reference photo + any errors,
+  // so the controls are a true blank slate. The gallery stays — generated
+  // influencers live in the characterHistory bank, untouched — and so does the
+  // reference library, which is history, not input.
   const handleClear = useCallback(() => {
     setProfile(createEmptyProfile())
-    setExtractedThumb(null)
-    setExtractError(null)
+    setActiveRefId(null)
+    clearLibraryError()
     setError(null)
-  }, [setProfile, setExtractedThumb])
+  }, [setProfile, setActiveRefId, clearLibraryError])
 
   // Full-area drag overlay handlers
   const handleDragEnter = (e: React.DragEvent) => {
@@ -165,21 +155,14 @@ export default function CharacterStudio() {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
   }
+  // Drops anywhere on the app go into the reference library, same as the pill —
+  // several at once are analysed as a batch. Validation lives there.
   const handleOverlayDrop = (e: React.DragEvent) => {
     e.preventDefault()
     dragDepthRef.current = 0
     setOverlayActive(false)
-    const file = e.dataTransfer.files[0]
-    if (!file) return
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      setExtractError('Unsupported format. Use JPG, PNG, or WebP.')
-      return
-    }
-    if (file.size > MAX_SIZE) {
-      setExtractError('File too large. Maximum size is 10 MB.')
-      return
-    }
-    handlePhotoDrop(file)
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) addFiles(files)
   }
 
   // Finish an already-started task (poll → save asset → write history → drop
@@ -349,11 +332,13 @@ export default function CharacterStudio() {
           onProfileChange={setProfile}
           activeTab={activeTab}
           onActiveTabChange={setActiveTab}
-          isExtracting={isExtracting}
-          extractError={extractError}
-          extractedThumb={extractedThumb}
-          onPhotoDrop={handlePhotoDrop}
+          analyzingCount={analyzingCount}
+          extractError={library.error}
+          referenceApplied={Boolean(activeRef?.profile)}
+          extractedThumb={pillThumb}
+          onPhotoDrop={addFiles}
           onResetExtract={handleResetExtract}
+          onOpenLibrary={() => setLibraryOpen(true)}
           onClear={handleClear}
           error={error}
           onGenerate={handleGenerate}
@@ -374,6 +359,24 @@ export default function CharacterStudio() {
           onLaunchGen={(opts) => void launchGen(opts)}
         />
       </div>
+
+      {/* The reference library — every photo analysed for autofill, kept so a
+          face can be reused without paying for the analysis twice. Lives here
+          rather than in ControlsPanel so a bulk analysis keeps running with the
+          panel closed. */}
+      <ReferenceLibrarySlideOver
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        items={library.items}
+        analyzingIds={library.analyzingIds}
+        activeId={activeRefId}
+        error={library.error}
+        onAdd={addFiles}
+        onApply={applyReference}
+        onRetry={library.retry}
+        canRetry={library.canRetry}
+        onRemove={handleRemoveRef}
+      />
 
       {/* Full-area drag overlay — mirrors the Products bank dropzone: a full-bleed
           dashed border with a light tint and a single centered pill, rather than
