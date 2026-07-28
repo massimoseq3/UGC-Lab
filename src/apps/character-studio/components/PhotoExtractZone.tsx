@@ -60,7 +60,10 @@ export default function PhotoExtractZone({
   // beside it (the bar + message centre within the row rather than growing it).
   if (analyzingCount > 0) {
     return (
-      <div className="flex h-12 items-center gap-3 rounded-full border border-green-500/20 bg-green-500/[0.04] px-3">
+      <div
+        onClick={onOpenLibrary}
+        className="flex h-12 cursor-pointer items-center gap-3 rounded-full border border-green-500/20 bg-green-500/[0.04] px-3 transition-colors hover:border-green-500/30 hover:bg-green-500/[0.08]"
+      >
         {thumbnail && (
           <img
             src={thumbnail}
@@ -93,10 +96,15 @@ export default function PhotoExtractZone({
     )
   }
 
-  // Success state — collapsed confirmation
+  // Success state — collapsed confirmation. The whole row opens the library,
+  // exactly like the empty state above it: the chevron says where it goes, but
+  // a 24px target beside a full-width row is the only part that moved.
   if (applied) {
     return (
-      <div className="flex h-12 items-center gap-2.5 rounded-full border border-green-500/20 bg-green-500/[0.06] px-3">
+      <div
+        onClick={onOpenLibrary}
+        className="flex h-12 cursor-pointer items-center gap-2.5 rounded-full border border-green-500/20 bg-green-500/[0.06] px-3 transition-colors hover:border-green-500/30 hover:bg-green-500/[0.10]"
+      >
         {thumbnail && (
           <img
             src={thumbnail}
@@ -111,7 +119,7 @@ export default function PhotoExtractZone({
           </span>
         </div>
         <button
-          onClick={onReset}
+          onClick={(e) => { e.stopPropagation(); onReset() }}
           title="Clear image"
           aria-label="Clear image"
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/5 hover:text-ink-200"
