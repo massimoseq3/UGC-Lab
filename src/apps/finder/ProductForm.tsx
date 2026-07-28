@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { X, ImagePlus, Download, Loader2, AlertCircle, Sparkles } from 'lucide-react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { X, ImagePlus, Download, Loader2, AlertCircle, Sparkles, Check, Package, Users, Star, Tag } from 'lucide-react'
 import type { Product } from '../../stores/types'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
 import { useAppStore } from '../../stores/appStore'
@@ -7,11 +7,15 @@ import { extractProductInfo } from './services/extractProductInfo'
 import { downloadImage } from '../../utils/downloadImage'
 import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_SIZE } from './services/imageValidation'
 import { humanizeError } from '../../utils/friendlyError'
+import SegmentedToggle from '../../components/SegmentedToggle'
 import ExpandTextModal, { ExpandButton } from '../../components/ExpandableText'
 
 interface ProductFormProps {
   item?: Product | null
   onSave: (data: Omit<Product, 'id' | 'createdAt'>) => Promise<void> | void
+  // Persists the form as it stands without closing it, and hands back the row
+  // as stored (photos swapped for asset refs). See the autosave block below.
+  onAutosave?: (data: Omit<Product, 'id' | 'createdAt'>) => Promise<Omit<Product, 'id' | 'createdAt'>>
   onCancel: () => void
   // Called when the user dismisses the form while extraction is still running.
   // The parent takes over: persists the partial form as a draft and lets the
@@ -19,29 +23,56 @@ interface ProductFormProps {
   onCancelDuringExtraction?: (file: File, partial: Omit<Product, 'id' | 'createdAt'>, listingText?: string) => void
 }
 
-const FIELD_META: Record<string, { label: string; type: 'text' | 'textarea'; required?: boolean }> = {
-  productName: { label: 'Product Name', type: 'text', required: true },
+const FIELD_META: Record<string, { label: string; type: 'text' | 'textarea'; required?: boolean; hint?: string }> = {
+  productName: { label: 'Product name', type: 'text', required: true },
   productDescription: { label: 'Description', type: 'textarea', required: true },
-  targetMarket: { label: 'Target Market', type: 'textarea' },
-  painPoints: { label: 'Pain Points', type: 'textarea' },
+  targetMarket: { label: 'Target market', type: 'textarea' },
+  painPoints: { label: 'Pain points', type: 'textarea' },
+  customerLanguage: { label: 'Customer language', type: 'textarea', hint: 'How buyers say it in their own words' },
+  objections: { label: 'Objections', type: 'textarea', hint: 'What stops them buying' },
   usps: { label: 'USPs', type: 'textarea' },
   benefits: { label: 'Benefits', type: 'textarea' },
-  keySpecs: { label: 'Key Specs & Facts', type: 'textarea' },
-  customerLanguage: { label: 'Customer Language', type: 'textarea' },
-  objections: { label: 'Objections', type: 'textarea' },
+  keySpecs: { label: 'Key specs & facts', type: 'textarea' },
   offer: { label: 'Offer', type: 'textarea' },
   cta: { label: 'CTA', type: 'text' },
 }
 
-// The image sits alone on the left; every text field stacks down the right
-// column (which scrolls).
-const FIELDS = ['productName', 'productDescription', 'targetMarket', 'painPoints', 'usps', 'benefits', 'keySpecs', 'customerLanguage', 'objections', 'offer', 'cta'] as const
+// The fields grouped the way they're USED downstream, not the order they were
+// added in: Scripts and B-Roll read the audience block to pick an angle and the
+// selling block to back it up. Eleven identical boxes down one column had no
+// hierarchy and no landmarks — four named stops give the column a shape, and
+// the jump strip above it says out loud that there's more below.
+type SectionKey = 'identity' | 'audience' | 'selling' | 'offer'
+
+const SECTIONS: { key: SectionKey; label: string; icon: React.ElementType; fields: string[] }[] = [
+  { key: 'identity', label: 'Identity', icon: Package, fields: ['productName', 'productDescription'] },
+  { key: 'audience', label: 'Audience', icon: Users, fields: ['targetMarket', 'painPoints', 'customerLanguage', 'objections'] },
+  { key: 'selling', label: 'Selling', icon: Star, fields: ['usps', 'benefits', 'keySpecs'] },
+  { key: 'offer', label: 'Offer', icon: Tag, fields: ['offer', 'cta'] },
+]
 
 const REQUIRED_KEYS = ['productName', 'productDescription'] as const
 
 // Extra angles beyond the hero shot. Four is enough to cover closed/open/label/
 // contents without turning the auto-fill call into a photo album.
 const MAX_EXTRA_IMAGES = 4
+
+// How long the form sits still before it writes. Long enough that typing a
+// sentence is one save, short enough that clicking away can't outrun it (the
+// close and unmount paths flush anyway).
+const AUTOSAVE_DELAY = 700
+
+// `extraImages` is optional on the stored row but always an array in the form,
+// so every read of it here is unconditional.
+type FormState = Omit<Product, 'id' | 'createdAt'> & { extraImages: string[] }
+
+// What's actually persisted, so an edit that changes nothing doesn't write.
+const signatureOf = (f: FormState) => JSON.stringify(f)
+
+// Enough intent to be worth a row. Opening the form and closing it again must
+// not litter the bank with empty products.
+const worthSaving = (f: FormState) =>
+  !!(f.productImage || f.productName.trim() || f.productDescription.trim())
 
 // One extra-angle thumbnail. Its own component so `useAssetUrl` can resolve
 // each stored `asset://` ref (a hook can't run inside a .map callback).
@@ -62,8 +93,35 @@ function ExtraImageThumb({ src, onRemove }: { src: string; onRemove: () => void 
   )
 }
 
-export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtraction }: ProductFormProps) {
-  const [form, setForm] = useState({
+// Fades the bottom edge of a scroll port while there's more below it, and stops
+// fading at the end. A permanent fade is decoration; one that comes and goes is
+// the only thing on screen telling you the column moves.
+function useScrollFade<T extends HTMLElement>() {
+  const ref = useRef<T>(null)
+  const [more, setMore] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = () => setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 8)
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    // The port itself resizes with the window; its content resizes as fields
+    // grow — both change whether there's anything below the fold.
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    if (el.firstElementChild) observer.observe(el.firstElementChild)
+    return () => {
+      el.removeEventListener('scroll', update)
+      observer.disconnect()
+    }
+  }, [])
+
+  return [ref, more] as const
+}
+
+export default function ProductForm({ item, onSave, onAutosave, onCancel, onCancelDuringExtraction }: ProductFormProps) {
+  const [form, setForm] = useState<FormState>({
     productImage: item?.productImage ?? '',
     extraImages: item?.extraImages ?? [],
     productName: item?.productName ?? '',
@@ -90,29 +148,113 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
   const [extractError, setExtractError] = useState<string | null>(null)
   const [overlayActive, setOverlayActive] = useState(false)
   const [expandedField, setExpandedField] = useState<string | null>(null)
+  const [activeSection, setActiveSection] = useState<SectionKey>('identity')
+  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
   const resolvedAssetUrl = useAssetUrl(form.productImage)
   const displayImage = localPreview ?? resolvedAssetUrl
   const addToast = useAppStore((s) => s.addToast)
 
+  const [fieldsRef, fieldsHaveMore] = useScrollFade<HTMLDivElement>()
+  const [sideRef, sideHasMore] = useScrollFade<HTMLDivElement>()
+  const sectionRefs = useRef<Partial<Record<SectionKey, HTMLDivElement | null>>>({})
+
+  // Reload only when the form is pointed at a DIFFERENT product. Deliberately
+  // keyed on the id and not the object: autosave rewrites the row on every
+  // pass, and re-seeding from it would overwrite whatever was typed while that
+  // save was in flight.
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(() => {
-    if (item) {
-      setForm({
-        productImage: item.productImage,
-        extraImages: item.extraImages ?? [],
-        productName: item.productName,
-        productDescription: item.productDescription,
-        targetMarket: item.targetMarket,
-        painPoints: item.painPoints,
-        usps: item.usps,
-        benefits: item.benefits,
-        keySpecs: item.keySpecs ?? '',
-        customerLanguage: item.customerLanguage ?? '',
-        objections: item.objections ?? '',
-        offer: item.offer,
-        cta: item.cta,
+    if (!item) return
+    setForm({
+      productImage: item.productImage,
+      extraImages: item.extraImages ?? [],
+      productName: item.productName,
+      productDescription: item.productDescription,
+      targetMarket: item.targetMarket,
+      painPoints: item.painPoints,
+      usps: item.usps,
+      benefits: item.benefits,
+      keySpecs: item.keySpecs ?? '',
+      customerLanguage: item.customerLanguage ?? '',
+      objections: item.objections ?? '',
+      offer: item.offer,
+      cta: item.cta,
+    })
+  }, [item?.id])
+  /* eslint-enable react-hooks/exhaustive-deps */
+
+  // --- Autosave ------------------------------------------------------------
+  // The form writes itself. Dropping an extra angle and clicking away used to
+  // throw the angle out; nothing here is lost by leaving. A product that
+  // doesn't exist yet lands as an unconfirmed draft (orange dot in the bank)
+  // and the Add button confirms it.
+  const formRef = useRef(form)
+  formRef.current = form
+  // Signature of what's on disk. Seeded from the opening state so merely
+  // opening a product doesn't rewrite it.
+  const savedSigRef = useRef(signatureOf(form))
+  const autosaveRef = useRef(onAutosave)
+  autosaveRef.current = onAutosave
+  const inFlightRef = useRef(false)
+  // Set once the form has handed off (submitted, or closed mid-extraction) —
+  // the unmount flush must not run then, or Add Product would write the row
+  // twice: once confirmed, once as a fresh draft.
+  const handedOffRef = useRef(false)
+
+  const flushAutosave = useCallback(async () => {
+    const save = autosaveRef.current
+    const snapshot = formRef.current
+    if (!save || handedOffRef.current || inFlightRef.current) return
+    if (!worthSaving(snapshot)) return
+    if (signatureOf(snapshot) === savedSigRef.current) return
+
+    inFlightRef.current = true
+    setAutosaveState('saving')
+    try {
+      const stored = await save(snapshot)
+      // What's on disk is the snapshot with its photos swapped for asset refs.
+      savedSigRef.current = signatureOf({
+        ...snapshot,
+        productImage: stored.productImage,
+        extraImages: stored.extraImages ?? [],
       })
+      // Adopt those refs so the next pass doesn't re-upload the same bytes —
+      // but only where the form still holds the photo we just persisted.
+      setForm((f) => ({
+        ...f,
+        productImage: f.productImage === snapshot.productImage ? stored.productImage : f.productImage,
+        extraImages: (f.extraImages ?? []).map((src) => {
+          const i = (snapshot.extraImages ?? []).indexOf(src)
+          return i >= 0 ? (stored.extraImages ?? [])[i] ?? src : src
+        }),
+      }))
+      setAutosaveState('saved')
+      inFlightRef.current = false
+      // Anything typed while that write was in the air gets its own pass —
+      // otherwise the last edit before a close could be the one that's dropped.
+      if (signatureOf(formRef.current) !== savedSigRef.current) void flushRef.current()
+    } catch (err) {
+      console.warn('[ProductForm] autosave failed', err)
+      setAutosaveState('idle')
+      inFlightRef.current = false
     }
-  }, [item])
+  }, [])
+  // Self-reference for the retry above (the callback can't name itself).
+  const flushRef = useRef(flushAutosave)
+  flushRef.current = flushAutosave
+
+  // Deliberately keyed on the form alone — `onAutosave` is read through a ref,
+  // so a parent that hands down a fresh function each render can't restart the
+  // debounce out from under the typist.
+  useEffect(() => {
+    if (!worthSaving(form) || signatureOf(form) === savedSigRef.current) return
+    const timer = setTimeout(() => { void flushAutosave() }, AUTOSAVE_DELAY)
+    return () => clearTimeout(timer)
+  }, [form, flushAutosave])
+
+  // Leaving the bank, switching tabs, closing the form — whatever ends this
+  // component, the pending edit goes with it.
+  useEffect(() => () => { void flushAutosave() }, [flushAutosave])
 
   const set = (key: string, value: string) => {
     setForm((f) => ({ ...f, [key]: value }))
@@ -216,8 +358,12 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
 
   const handleClose = () => {
     if (isExtracting && extractingFileRef.current && onCancelDuringExtraction) {
+      // The parent finishes the extraction in the background and writes it to
+      // the same row this form has been autosaving into.
+      handedOffRef.current = true
       onCancelDuringExtraction(extractingFileRef.current, form, listingText)
     } else {
+      void flushAutosave()
       onCancel()
     }
   }
@@ -259,16 +405,50 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
 
   const missingRequired = REQUIRED_KEYS.filter((k) => !form[k].trim())
 
+  const filledIn = (fields: string[]) =>
+    fields.filter((k) => (form[k as keyof FormState] as string)?.trim()).length
+
+  const jumpTo = (key: SectionKey) => {
+    setActiveSection(key)
+    sectionRefs.current[key]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  // Keep the jump strip pointing at whatever's under the top of the column,
+  // however it was reached.
+  useEffect(() => {
+    const root = fieldsRef.current
+    if (!root) return
+    const els = SECTIONS.map((s) => sectionRefs.current[s.key]).filter(Boolean) as HTMLElement[]
+    if (els.length === 0) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0]
+        const key = first?.target.getAttribute('data-section') as SectionKey | null
+        if (key) setActiveSection(key)
+      },
+      { root, rootMargin: '-20% 0px -70% 0px', threshold: 0 },
+    )
+    els.forEach((el) => observer.observe(el))
+    return () => observer.disconnect()
+  }, [fieldsRef])
+
   const renderField = (key: string) => {
-    const { label, type, required } = FIELD_META[key]
-    const value = form[key as keyof typeof form] as string
+    const { label, type, required, hint } = FIELD_META[key]
+    const value = form[key as keyof FormState] as string
     const isMissing = showError && required && !value.toString().trim()
     const baseCls = 'w-full rounded-2xl border bg-ink/[0.02] px-4 py-3 text-[13px] text-ink-200 placeholder-ink-600 outline-none transition-colors'
     const borderCls = isMissing ? 'border-red-500/60 focus:border-red-400' : 'border-ink/10 focus:border-ink/20'
     return (
       <label key={key} className="flex flex-col gap-1.5">
-        <span className={`text-[11px] font-medium uppercase tracking-widest ${isMissing ? 'text-red-400 light:text-red-600' : 'text-ink-400'}`}>
-          {label}{required && ' *'}
+        {/* Sentence case, quiet: uppercase belongs to the section headings now,
+            so a label reads as a label and a heading reads as a heading. */}
+        <span className="flex items-baseline gap-2">
+          <span className={`text-[12px] font-medium ${isMissing ? 'text-red-400 light:text-red-600' : 'text-ink-300'}`}>
+            {label}{required && <span className="text-ink-600"> *</span>}
+          </span>
+          {hint && <span className="truncate text-[11px] text-ink-600">{hint}</span>}
         </span>
         {type === 'textarea' ? (
           <div className="relative">
@@ -296,10 +476,12 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
     if (saving) return
     if (missingRequired.length > 0) {
       setShowError(true)
+      jumpTo('identity')
       return
     }
     setShowError(false)
     setSaving(true)
+    handedOffRef.current = true
     try {
       await onSave(form)
     } finally {
@@ -324,24 +506,51 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
           </div>
         </div>
       )}
-      {/* Header — stays fixed above the scrolling fields */}
+      {/* Header — title, what the autosave is doing, and the way out. The
+          primary action lives up here now: as a slab pinned across the field
+          column it read as the bottom of the form, which is exactly why nobody
+          could tell the column scrolled. */}
       <div className="flex shrink-0 items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold tracking-tight text-ink-200">
-          {item ? 'Edit Product' : 'New Product'}
-        </h3>
-        <button type="button" onClick={handleClose} className="text-ink-500 hover:text-ink-300 transition-colors">
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex min-w-0 items-center gap-3">
+          <h3 className="text-sm font-semibold tracking-tight text-ink-200">
+            {item ? 'Edit product' : 'New product'}
+          </h3>
+          <span className="flex items-center gap-1.5 text-[11px] text-ink-500">
+            {autosaveState === 'saving' && <><Loader2 className="h-3 w-3 animate-spin" />Saving…</>}
+            {autosaveState === 'saved' && <><Check className="h-3 w-3" />Saved</>}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="submit"
+            disabled={saving || isExtracting}
+            className="flex h-9 items-center gap-2 rounded-full bg-ink px-4 text-[13px] font-medium tracking-tight text-ink-900 transition-colors hover:bg-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {item ? 'Done' : 'Add product'}
+          </button>
+          <button
+            type="button"
+            onClick={handleClose}
+            title="Close — everything is already saved"
+            className="text-ink-500 transition-colors hover:text-ink-300"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      {/* Side-by-side: image alone on the left, every field scrolls down the right. */}
+      {/* Side-by-side: the photos on the left, every field down the right. */}
       <div className="flex flex-col gap-6 md:flex-row lg:min-h-0 lg:flex-1">
-        {/* Left — the product photos + listing copy. Deliberately does NOT
-            scroll: it stays put while the field column on the right moves, so
-            the image you're describing is always in view. */}
-        <div className="flex w-full shrink-0 flex-col gap-4 md:w-[300px] lg:min-h-0">
+        {/* Left — the product photos + listing copy. Scrolls on its own so the
+            paste box and the Auto-fill button stay reachable on a short window;
+            the photo above them is what the right column is describing. */}
+        <div
+          ref={sideRef}
+          className={`flex w-full shrink-0 flex-col gap-4 md:w-[300px] lg:min-h-0 lg:overflow-y-auto lg:pr-1 ${sideHasMore ? 'scroll-fade-b' : ''}`}
+        >
           {displayImage ? (
-            <div className="group/img relative aspect-square w-full overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02]">
+            <div className="group/img relative aspect-square w-full shrink-0 overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02]">
               <img src={displayImage} alt="" className="h-full w-full object-cover" />
               {isExtracting && (
                 <div className="absolute left-2 top-2 z-10 flex items-center gap-1.5 rounded-lg bg-black/70 px-2.5 py-1 text-[10px] font-medium text-emerald-200 backdrop-blur-sm">
@@ -368,7 +577,7 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="group flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] px-3 text-center transition-colors hover:border-ink/20"
+              className="group flex aspect-square w-full shrink-0 flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] px-3 text-center transition-colors hover:border-ink/20"
             >
               <ImagePlus className="h-6 w-6 text-ink-600 transition-colors group-hover:text-ink-400" />
               <span className="text-[10px] font-medium uppercase tracking-widest text-ink-600 transition-colors group-hover:text-ink-500">
@@ -377,15 +586,30 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
             </button>
           )}
 
+          {/* Auto-fill sits directly under the photo it reads. */}
+          {displayImage && (
+            <button
+              type="button"
+              onClick={rerunExtraction}
+              disabled={isExtracting}
+              className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-[12px] font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 light:text-emerald-700"
+            >
+              {isExtracting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {isExtracting
+                ? 'Extracting…'
+                : `Auto-fill from ${form.extraImages.length > 0 ? `${form.extraImages.length + 1} photos` : 'image'}${listingText.trim() ? ' + copy' : ''}`}
+            </button>
+          )}
+
           {/* More angles — extra shots of the same product (box open, what's
               inside, the label). They ride along in the auto-fill read and are
               individually attachable wherever a reference image is picked. */}
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium uppercase tracking-widest text-ink-400">
-                More Angles <span className="normal-case tracking-normal text-ink-600">(optional)</span>
+          <div className="flex shrink-0 flex-col gap-1.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[12px] font-medium text-ink-300">
+                More angles <span className="text-ink-600">(optional)</span>
               </span>
-              <span className="text-[10px] font-medium tabular-nums text-ink-600">
+              <span className="text-[11px] font-medium tabular-nums text-ink-600">
                 {form.extraImages.length}/{MAX_EXTRA_IMAGES}
               </span>
             </div>
@@ -408,9 +632,9 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
 
           {/* Listing copy — optional paste box that feeds auto-fill. Text from
               the product page carries the claims/specs/offer a photo can't. */}
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-medium uppercase tracking-widest text-ink-400">
-              Listing Copy <span className="normal-case tracking-normal text-ink-600">(optional)</span>
+          <label className="flex shrink-0 flex-col gap-1.5">
+            <span className="text-[12px] font-medium text-ink-300">
+              Listing copy <span className="text-ink-600">(optional)</span>
             </span>
             <textarea
               value={listingText}
@@ -420,19 +644,6 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
               className="w-full resize-none rounded-2xl border border-ink/10 bg-ink/[0.02] px-4 py-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
             />
           </label>
-          {displayImage && (
-            <button
-              type="button"
-              onClick={rerunExtraction}
-              disabled={isExtracting}
-              className="flex items-center justify-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-[12px] font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 light:text-emerald-700"
-            >
-              {isExtracting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {isExtracting
-                ? 'Extracting…'
-                : `Auto-fill from ${form.extraImages.length > 0 ? `${form.extraImages.length + 1} photos` : 'image'}${listingText.trim() ? ' + copy' : ''}`}
-            </button>
-          )}
         </div>
         <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" className="hidden" onChange={handleImage} />
         <input
@@ -444,37 +655,62 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
           onChange={(e) => { addExtraImages(e.target.files); e.target.value = '' }}
         />
 
-        {/* Right — every field + save (the only part that scrolls) */}
-        <div className={`flex min-w-0 flex-1 flex-col gap-3 transition-opacity lg:min-h-0 lg:overflow-y-auto lg:pr-1 ${isExtracting ? 'pointer-events-none opacity-60' : ''}`}>
-          <div className="flex flex-col gap-4">
-            {FIELDS.map(renderField)}
+        {/* Right — the fields, in four named stops. */}
+        <div className={`flex min-w-0 flex-1 flex-col gap-3 transition-opacity lg:min-h-0 ${isExtracting ? 'pointer-events-none opacity-60' : ''}`}>
+          {/* Jump strip. Opaque on purpose (the Ad Analyzer lesson): the column
+              has no background of its own, so a translucent bar lets fields
+              scroll visibly through it and the strip reads as unpinned. */}
+          <div className="shrink-0">
+            <SegmentedToggle<SectionKey>
+              dense
+              accent="products"
+              value={activeSection}
+              onChange={jumpTo}
+              options={SECTIONS.map((s) => ({
+                value: s.key,
+                label: s.label,
+                icon: s.icon,
+                badge: `${filledIn(s.fields)}/${s.fields.length}`,
+              }))}
+            />
           </div>
 
-          {/* Sticky save footer — pinned to the bottom of the scrolling field
-              column so Save is always visible without scrolling to find it. */}
-          <div className="sticky bottom-0 z-10 -mx-1 mt-2 flex flex-col gap-2 border-t border-ink/10 bg-surface-0/90 px-1 pb-1 pt-3 backdrop-blur-sm">
-            {showError && (
-              <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300 light:text-red-700">
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                <span>Please fill in the required fields first.</span>
-              </div>
-            )}
+          <div
+            ref={fieldsRef}
+            className={`min-h-0 flex-1 lg:overflow-y-auto lg:pr-1 ${fieldsHaveMore ? 'scroll-fade-b' : ''}`}
+          >
+            <div className="flex flex-col gap-7 pb-2">
+              {SECTIONS.map((section) => (
+                <div
+                  key={section.key}
+                  ref={(el) => { sectionRefs.current[section.key] = el }}
+                  data-section={section.key}
+                  className="flex scroll-mt-2 flex-col gap-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-500">
+                      {section.label}
+                    </span>
+                    <span className="h-px flex-1 bg-ink/[0.07]" />
+                  </div>
+                  {section.fields.map(renderField)}
+                </div>
+              ))}
 
-            {extractError && (
-              <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300 light:text-red-700">
-                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                <span className="break-words">{extractError}</span>
-              </div>
-            )}
+              {showError && (
+                <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300 light:text-red-700">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>Fill in the product name and description to add this product.</span>
+                </div>
+              )}
 
-            <button
-              type="submit"
-              disabled={saving || isExtracting}
-              className="flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-ink-900 transition-colors hover:bg-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              {saving ? 'Saving…' : (item ? 'Save Changes' : 'Add Product')}
-            </button>
+              {extractError && (
+                <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300 light:text-red-700">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span className="break-words">{extractError}</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -483,7 +719,7 @@ export default function ProductForm({ item, onSave, onCancel, onCancelDuringExtr
         <ExpandTextModal
           open
           onClose={() => setExpandedField(null)}
-          value={form[expandedField as keyof typeof form] as string}
+          value={form[expandedField as keyof FormState] as string}
           onChange={(v) => set(expandedField, v)}
           title={FIELD_META[expandedField].label}
           accent="ink"

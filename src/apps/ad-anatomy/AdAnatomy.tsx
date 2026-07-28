@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { AlertCircle, RotateCcw } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertCircle, RotateCcw, Volume2, VolumeX } from 'lucide-react'
 import UploadView from './components/UploadView'
 import ResultsView from './components/ResultsView'
 import HistoryRail from './components/HistoryRail'
@@ -12,26 +12,6 @@ import { enqueueAnalysis, resumeAnalysis } from './services/analysisQueue'
 import { useBankStore } from '../../stores/bankStore'
 import { useReportActivity } from '../../stores/activityStore'
 
-// Cycled under the spinner during analysis so the user has something
-// interesting to read while the kie task runs.
-const AD_FACTS = [
-  'The first 1.5 seconds of a UGC ad decide whether a viewer scrolls or stays.',
-  'Ads filmed on a real iPhone front camera outperform DSLR-shot ads on TikTok 3× as often.',
-  '40% of top-performing UGC ads start with a face directly in the camera lens.',
-  'Vertical 9:16 ads command roughly 90% more attention on social than horizontal cuts.',
-  'A handheld micro-jitter signals "real person" to the brain faster than any caption.',
-  'The hook line of a high-converting ad averages 7 words.',
-  'Best-in-class UGC ads name the product after the third spoken line — never earlier.',
-  'Showing the after-state before the product itself is the single biggest hook trick.',
-  'Most viral ads use one continuous take. No cuts. The cut is the kill switch.',
-  'Captions raise watch-through by ~80% even when audio is on.',
-  'Eye contact with the lens for >2 seconds doubles a viewer\'s recall of the brand.',
-  '"Pattern interrupts" (sudden zoom, on-screen text, prop reveal) every 3-5 seconds keep retention high.',
-  'A genuine half-smile outperforms a full smile in trust scores by ~30%.',
-  'CTAs that name a feeling ("get your glow back") beat feature-CTAs ("32mg of vitamin C") by 2.5×.',
-  'Ad fatigue sets in around 7 days for any single creative — refresh weekly.',
-]
-const FACT_ROTATE_MS = 5000
 
 export default function AdAnatomy() {
   const baseKey = useProjectScopedKey('ad-anatomy')
@@ -213,15 +193,15 @@ function CompletePane({ item, onReset }: { item: AdAnatomyHistoryItem; onReset: 
 
 // ── Pane: analysis in progress ──────────────────────────────────────
 function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
-  const [factIndex, setFactIndex] = useState(0)
   // Prefer the live source asset (gives us a playing preview) over the
   // stamped thumbnail. Falls back to thumbnail once source is cleaned up.
   const sourceUrl = useAssetUrl(item.uploadedRef ?? null)
   const thumbUrl = useAssetUrl(item.thumbnailRef ?? null)
-  useEffect(() => {
-    const id = setInterval(() => setFactIndex((i) => (i + 1) % AD_FACTS.length), FACT_ROTATE_MS)
-    return () => clearInterval(id)
-  }, [])
+  const videoRef = useRef<HTMLVideoElement>(null)
+  // Autoplay only survives muted, so it starts muted — but the member is
+  // watching their own ad play, and wanting to hear it is the obvious next
+  // thought. One button, on the media.
+  const [muted, setMuted] = useState(true)
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 px-6 py-8">
@@ -230,20 +210,17 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
           Analyzing the ad
         </h2>
         <p className="text-[11px] font-medium uppercase tracking-widest text-[#FF5257]/70">
-          {item.perception ? 'Pass 2 of 2 — strategy & scene prompts' : 'Pass 1 of 2 — logging every cut'}
+          Pass {item.perception ? '2' : '1'} of 2
         </p>
-        {item.fileName && (
-          <p className="max-w-md truncate text-[11px] text-ink-600">{item.fileName}</p>
-        )}
       </div>
 
       {(sourceUrl || thumbUrl) && (
         <div
-          className="relative max-h-80 max-w-72 overflow-hidden rounded-2xl border border-ink/10 shadow-[0_0_90px_-28px_rgba(255,82,87,0.45)]"
+          className="group relative max-h-80 max-w-72 overflow-hidden rounded-2xl border border-ink/10 shadow-[0_0_90px_-28px_rgba(255,82,87,0.45)]"
           style={{ aspectRatio: '9 / 16' }}
         >
           {sourceUrl ? (
-            <video src={sourceUrl} className="h-full w-full object-cover" muted autoPlay loop playsInline />
+            <video ref={videoRef} src={sourceUrl} className="h-full w-full object-cover" muted={muted} autoPlay loop playsInline />
           ) : (
             <img src={thumbUrl!} alt="" className="h-full w-full object-cover" />
           )}
@@ -260,33 +237,26 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
               <div className="absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF5257] to-transparent shadow-[0_0_16px_3px_rgba(255,82,87,0.85)]" />
             </div>
           </div>
+          {sourceUrl && (
+            <button
+              type="button"
+              onClick={() => setMuted((m) => !m)}
+              title={muted ? 'Turn sound on' : 'Turn sound off'}
+              className="absolute bottom-2 right-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white transition-colors hover:bg-black/75"
+            >
+              {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+            </button>
+          )}
           <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/5" />
         </div>
       )}
 
-      <div className="flex w-full max-w-md flex-col items-center gap-3">
-        <div className="flex min-h-[60px] w-full items-start gap-2 rounded-xl border border-ink/5 bg-ink/[0.02] px-3.5 py-3">
-          <span className="mt-0.5 shrink-0 rounded-full bg-[#FF5257]/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-[#FF5257]/80">
-            Did you know
-          </span>
-          <p key={factIndex} className="animate-fade-in text-[12px] leading-relaxed text-ink-400">
-            {AD_FACTS[factIndex]}
-          </p>
-        </div>
-        <p className="text-[11px] text-ink-600">Feel free to upload more ads or jump to another tool — this keeps running in the background.</p>
-      </div>
+      <p className="text-[11px] text-ink-600">This keeps running if you switch tools.</p>
 
       <style>{`
         @keyframes ad-scan {
           0% { transform: translateY(0); }
           100% { transform: translateY(500%); }
-        }
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(2px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fade-in {
-          animation: fade-in 280ms ease-out;
         }
       `}</style>
     </div>
