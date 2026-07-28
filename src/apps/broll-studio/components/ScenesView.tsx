@@ -365,6 +365,11 @@ export default function ScenesView({
   // from the prompt alone — worth saying out loud, since those cost the same
   // but come back as something the member hasn't seen a frame of.
   const videoAnimateCount = videoTargets.filter((k) => (cardStates[k]?.images.length ?? 0) > 0).length
+  const videoSourceNote =
+    videoTargets.length === 0 ? null
+      : videoAnimateCount === videoTargets.length ? 'from the card stills'
+        : videoAnimateCount === 0 ? 'from the prompts'
+          : `${videoAnimateCount} from a still, ${videoTargets.length - videoAnimateCount} from the prompt`
   const videoBatchCredits = batchVideoModelId
     ? videoTargets.reduce<number | null>((sum, key) => {
         if (sum === null) return null
@@ -720,9 +725,10 @@ export default function ScenesView({
           runs edge to edge; the blur keeps scenes legible sliding under it. */}
       <div className="sticky top-0 z-20 -mx-5 mb-5 flex items-center justify-between gap-3 border-b border-ink/5 bg-surface-0/80 px-5 py-3.5 backdrop-blur-md">
         <div className="flex min-w-0 items-center gap-2">
-          {/* Same 13px sentence-case label as the input column's section
-              headings (and the Voiceovers side panel's). */}
-          <span className="shrink-0 text-[13px] font-medium text-ink-200">
+          {/* Small-caps and dim — the count is a caption for the storyboard
+              below it, so it takes the same eyebrow treatment as the style pill
+              beside it rather than reading as a heading. */}
+          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
             {result.scenes.length} Scene{result.scenes.length === 1 ? '' : 's'}
           </span>
           {/* Style pill — parity with Continuous, so the member can see
@@ -824,18 +830,14 @@ export default function ScenesView({
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-md rounded-2xl border border-ink/10 bg-ink-950/95 p-5 shadow-2xl"
           >
+            {/* Same shape as the video dialog below — the two open from
+                buttons sitting side by side and must read as a pair. */}
             <h3 className="text-sm font-medium text-ink-100">
-              {batchTargets.length === 0
-                ? 'Nothing to generate'
-                : `Generate ${batchTargets.length} image${batchTargets.length === 1 ? '' : 's'}`}
+              {batchTargets.length === 0 ? 'Nothing to generate' : 'Generate images'}
             </h3>
             <p className="mt-1 text-xs text-ink-500">
-              {batchConfirm.scope}
-              {batchColumn !== 'all' && ` · Option ${batchColumn + 1}`} · all fire in parallel.
-              {batchDone.length > 0 && !includeExisting && (
-                <> {batchDone.length} card{batchDone.length === 1 ? '' : 's'} already
-                {batchDone.length === 1 ? ' has' : ' have'} an image and will be skipped.</>
-              )}
+              {[batchConfirm.scope, batchColumn !== 'all' ? `Option ${batchColumn + 1}` : null]
+                .filter(Boolean).join(' · ')}
             </p>
 
             <ColumnChips
@@ -846,7 +848,6 @@ export default function ScenesView({
                 !!batchConfirm.keys.some((k) => columnOf(k) === col && promptReady(k)) &&
                 batchConfirm.keys.every((k) => columnOf(k) !== col || !promptReady(k) || hasImage(k))
               }
-              hint="One image per line first — see the storyboard before paying for the alternatives."
             />
 
             {batchDone.length > 0 && (
@@ -867,7 +868,6 @@ export default function ScenesView({
             {/* Run settings — model is the shared B-Roll image model; resolution
                 and aspect apply to every card in this batch. */}
             <div className="mt-4 flex flex-col gap-2.5">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Model</span>
               <ModelPicker
                 appId="broll-studio"
                 task="image"
@@ -912,17 +912,9 @@ export default function ScenesView({
               )}
             </div>
 
-            <div className="mt-3 flex items-center justify-between rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5 text-xs">
-              <span className="text-ink-400">Estimated cost</span>
-              <span className="font-medium text-ink-100">
-                {/* An empty run costs nothing — formatCredits(0) would read
-                    "< 1 credit", which looks like a real charge. */}
-                {batchTargets.length === 0 ? '—' : formatCredits(batchTotalCredits) ?? '— credits'}
-              </span>
-            </div>
-            {balance !== null && (
-              <p className={`mt-1.5 text-[11px] ${batchOverBudget ? 'text-red-400 light:text-red-600' : 'text-ink-500'}`}>
-                Your balance: {balance.toLocaleString()} credits{batchOverBudget ? ' — not enough' : ''}
+            {balance !== null && batchOverBudget && (
+              <p className="mt-3 text-[11px] text-red-400 light:text-red-600">
+                Not enough credits — your balance is {balance.toLocaleString()}.
               </p>
             )}
             <div className="mt-4 flex items-center justify-end gap-2">
@@ -938,10 +930,18 @@ export default function ScenesView({
                 type="button"
                 onClick={confirmBatch}
                 disabled={batchTargets.length === 0}
-                className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-4 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-broll-500"
+                className="flex items-center gap-2 rounded-full border border-white/15 bg-broll-500 py-1.5 pl-4 pr-2 text-[12px] font-medium text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-broll-500"
               >
                 <Images className="h-3.5 w-3.5" />
-                Generate
+                {batchTargets.length === 0
+                  ? 'Generate'
+                  : `Generate ${batchTargets.length} image${batchTargets.length === 1 ? '' : 's'}`}
+                <span className="flex items-center gap-1 rounded-full bg-black/25 px-2 py-0.5 text-[11px] tabular-nums">
+                  <Coins className="h-3 w-3" strokeWidth={2} />
+                  {/* An empty run costs nothing — formatCredits(0) would read
+                      "< 1 credit", which looks like a real charge. */}
+                  {batchTargets.length === 0 ? '—' : formatCredits(batchTotalCredits) ?? '—'}
+                </span>
               </button>
             </div>
           </div>
@@ -960,28 +960,20 @@ export default function ScenesView({
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-md rounded-2xl border border-ink/10 bg-ink-950/95 p-5 shadow-2xl"
           >
+            {/* One title, one line of context. The count and the price live on
+                the Generate button — everything else this dialog used to
+                explain (parallel rendering, refresh-safety, why some cards are
+                skipped) is either obvious from the storyboard behind it or
+                already said by the controls below. */}
             <h3 className="text-sm font-medium text-ink-100">
-              {videoTargets.length === 0
-                ? 'Nothing to generate'
-                : `Generate ${videoTargets.length} video${videoTargets.length === 1 ? '' : 's'}`}
+              {videoTargets.length === 0 ? 'Nothing to generate' : 'Generate videos'}
             </h3>
             <p className="mt-1 text-xs text-ink-500">
-              {videoConfirm.scope}
-              {videoColumn !== 'all' && ` · Option ${videoColumn + 1}`} · all render in parallel and survive a refresh.
-              {videoTargets.length > 0 && (
-                <>
-                  {' '}
-                  {videoAnimateCount > 0 && `${videoAnimateCount} animate the still on the card`}
-                  {videoAnimateCount > 0 && videoAnimateCount < videoTargets.length && ', and '}
-                  {videoAnimateCount < videoTargets.length &&
-                    `${videoTargets.length - videoAnimateCount} render from the prompt alone`}
-                  .
-                </>
-              )}
-              {videoDone.length > 0 && !includeExistingVideos && (
-                <> {videoDone.length} card{videoDone.length === 1 ? '' : 's'} already
-                {videoDone.length === 1 ? ' has' : ' have'} a clip and will be skipped.</>
-              )}
+              {[
+                videoConfirm.scope,
+                videoColumn !== 'all' ? `Option ${videoColumn + 1}` : null,
+                videoSourceNote,
+              ].filter(Boolean).join(' · ')}
             </p>
 
             <ColumnChips
@@ -992,7 +984,6 @@ export default function ScenesView({
                 !!videoConfirm.keys.some((k) => columnOf(k) === col && promptReady(k)) &&
                 videoConfirm.keys.every((k) => columnOf(k) !== col || !promptReady(k) || hasVideo(k))
               }
-              hint="One clip per line first — if a line's Option 1 works, the other two never cost you anything."
             />
 
             {videoDone.length > 0 && (
@@ -1014,7 +1005,6 @@ export default function ScenesView({
                 card modal's picker writes), plus one resolution and one clip
                 length for every video in the batch. */}
             <div className="mt-4 flex flex-col gap-2.5">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Model</span>
               <ModelPicker
                 appId="broll-studio"
                 task="video"
@@ -1048,16 +1038,11 @@ export default function ScenesView({
               )}
             </div>
 
-            <div className="mt-3 flex items-center justify-between rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2.5 text-xs">
-              <span className="text-ink-400">Estimated cost</span>
-              <span className="flex items-center gap-1 font-medium text-ink-100">
-                <Coins className="h-3 w-3" strokeWidth={2} />
-                {videoTargets.length === 0 ? '—' : formatCredits(videoBatchCredits) ?? '— credits'}
-              </span>
-            </div>
-            {balance !== null && (
-              <p className={`mt-1.5 text-[11px] ${videoOverBudget ? 'text-red-400 light:text-red-600' : 'text-ink-500'}`}>
-                Your balance: {balance.toLocaleString()} credits{videoOverBudget ? ' — not enough' : ''}
+            {/* Balance only when it's in the way — the price itself rides on
+                the button. */}
+            {balance !== null && videoOverBudget && (
+              <p className="mt-3 text-[11px] text-red-400 light:text-red-600">
+                Not enough credits — your balance is {balance.toLocaleString()}.
               </p>
             )}
             {videoModelCantAnimate && (
@@ -1078,10 +1063,17 @@ export default function ScenesView({
                 type="button"
                 onClick={confirmVideoBatch}
                 disabled={videoTargets.length === 0 || videoModelCantAnimate}
-                className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-4 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-broll-500"
+                className="flex items-center gap-2 rounded-full border border-white/15 bg-broll-500 py-1.5 pl-4 pr-2 text-[12px] font-medium text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-broll-500"
               >
                 <VideoIcon className="h-3.5 w-3.5" />
-                Generate
+                {videoTargets.length === 0
+                  ? 'Generate'
+                  : `Generate ${videoTargets.length} video${videoTargets.length === 1 ? '' : 's'}`}
+                {/* The price sits on the button that spends it. */}
+                <span className="flex items-center gap-1 rounded-full bg-black/25 px-2 py-0.5 text-[11px] tabular-nums">
+                  <Coins className="h-3 w-3" strokeWidth={2} />
+                  {videoTargets.length === 0 ? '—' : formatCredits(videoBatchCredits) ?? '—'}
+                </span>
               </button>
             </div>
           </div>
@@ -1107,7 +1099,6 @@ function ColumnChips({
   value,
   onChange,
   isDone,
-  hint,
 }: {
   columns: number[]
   value: BatchColumn
@@ -1115,7 +1106,6 @@ function ColumnChips({
   // Column has nothing left to generate — ticked, so a member walking the
   // columns can see how far they've got.
   isDone: (col: number) => boolean
-  hint: string
 }) {
   if (columns.length < 2) return null
   const chip = (active: boolean) =>
@@ -1126,8 +1116,10 @@ function ColumnChips({
     }`
   return (
     <div className="mt-3">
-      <span className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Options</span>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      {/* No eyebrow and no hint paragraph: the chips say "Option 1 / All
+          options" in full, and a dialog that has to teach on every open is a
+          dialog nobody reads. */}
+      <div className="flex flex-wrap items-center gap-1.5">
         {columns.map((col) => (
           <button key={col} type="button" onClick={() => onChange(col)} className={chip(value === col)}>
             {isDone(col) && <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} />}
@@ -1138,7 +1130,6 @@ function ColumnChips({
           All options
         </button>
       </div>
-      <p className="mt-1.5 text-[11px] leading-relaxed text-ink-500">{hint}</p>
     </div>
   )
 }

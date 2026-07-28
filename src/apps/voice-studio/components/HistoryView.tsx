@@ -8,12 +8,11 @@ import { GeneratingChip, GeneratingPulseRing } from '../../../components/Generat
 import DayPill from '../../../components/DayPill'
 import Waveform from './Waveform'
 import {
-  attachAnalyser,
   claimAudioSlot,
   formatClock,
-  primeAudioContext,
   releaseAudioSlot,
   resolveAudioUrl,
+  waveformPeaks,
 } from './audio'
 
 // A voiceover that's been fired but hasn't landed yet. Rendered as a card at the
@@ -48,7 +47,9 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
   const [isPlaying, setIsPlaying] = useState(false)
   const [position, setPosition] = useState(0)
   const [duration, setDuration] = useState(0)
-  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null)
+  // Peaks for the loaded clip — the whole waveform, decoded once and drawn at
+  // rest while playback fills it left to right.
+  const [peaks, setPeaks] = useState<number[] | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const rafRef = useRef(0)
   const loadTokenRef = useRef(0)
@@ -86,7 +87,11 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
     setIsPlaying(false)
     setPosition(0)
     setDuration(item.duration || 0)
-    setAnalyser(null)
+    setPeaks(null)
+    void waveformPeaks(item.audioUrl).then((p) => {
+      // A newer card claimed the player while this decoded.
+      if (loadTokenRef.current === token) setPeaks(p)
+    })
 
     let url: string
     try {
@@ -101,7 +106,6 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
     const audio = new Audio(url)
     audio.preload = 'metadata'
     audioRef.current = audio
-    setAnalyser(attachAnalyser(audio))
 
     audio.addEventListener('loadedmetadata', () => {
       if (audioRef.current !== audio) return
@@ -135,14 +139,19 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
     }
   }
 
+  // Click anywhere on the waveform to jump there — the strip shows the whole
+  // clip, so a position on it is a position in the audio.
+  const seekTo = (seconds: number) => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.currentTime = Math.max(0, Math.min(seconds, audio.duration || seconds))
+    setPosition(audio.currentTime)
+  }
+
   const togglePlay = (item: VoiceHistoryItem) => {
-    // Synchronous, inside the click: a context opened later can come up
-    // suspended, and attaching a suspended context would mute the clip.
-    primeAudioContext()
     const audio = audioRef.current
     if (audio && loadedId === item.id) {
       if (audio.paused) {
-        setAnalyser((prev) => prev ?? attachAnalyser(audio))
         void audio.play().catch(() => { /* ignored */ })
       } else {
         audio.pause()
@@ -340,9 +349,10 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
                         {item.scriptPreview}
                       </p>
 
-                      {/* Waveform — opens on play and moves with the voice.
-                          The grid-rows trick animates it in and out without a
-                          fixed height to keep in step with the bar row. */}
+                      {/* Waveform — the whole clip, filling left to right as it
+                          plays, and clickable to seek. Opens on play; the
+                          grid-rows trick animates it in and out without a fixed
+                          height to keep in step with the bar row. */}
                       <div
                         className={`grid transition-all duration-300 ease-out ${
                           showWave ? 'mt-3 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
@@ -351,8 +361,9 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
                         <div className="overflow-hidden">
                           <div className="flex items-center gap-2 rounded-2xl border border-ink/[0.07] bg-ink/[0.02] px-3 py-1.5">
                             <Waveform
-                              analyser={analyser}
-                              playing={isPlayingThis}
+                              peaks={isLoaded ? peaks : null}
+                              progress={clipDuration > 0 ? position / clipDuration : 0}
+                              onSeek={isLoaded ? (f) => seekTo(f * clipDuration) : undefined}
                               className="min-w-0 flex-1"
                             />
                             <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] tabular-nums text-ink-400">

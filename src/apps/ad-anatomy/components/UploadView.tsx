@@ -145,12 +145,11 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
     <div ref={panelRef} className="relative flex h-full flex-col items-center justify-center gap-6 p-8">
       <div className="flex flex-col items-center gap-2 text-center">
         <Eye className="h-8 w-8 text-[#FF5257]/60" strokeWidth={1.5} />
+        {/* No blurb under it: the drop zone below already says what to do, and
+            the line it replaced only restated the heading. */}
         <h2 className="text-lg font-semibold tracking-tight text-ink-200">
           Reverse Engineer Any Ad
         </h2>
-        <p className="max-w-sm text-sm text-ink-500">
-          Drop in one or more ads and we&apos;ll analyze them with extreme precision so you can reverse-engineer every detail.
-        </p>
       </div>
 
       <button
@@ -167,9 +166,6 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
           <span className="text-ink-200 underline underline-offset-2">browse</span>
         </span>
         <span className="text-[11px] text-ink-600">MP4, MOV, WebM — max {MAX_SIZE_MB}MB each</span>
-        {!hasStaged && (
-          <span className="text-[10px] uppercase tracking-widest text-ink-700">Up to 5 analyse in parallel · the rest queue</span>
-        )}
       </button>
       <input
         ref={inputRef}
