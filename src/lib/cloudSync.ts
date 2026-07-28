@@ -420,7 +420,16 @@ async function hydrateFromCloud(userId: string): Promise<boolean> {
         : (data ?? []).map((row) => row.data as unknown)
       // Overlay the outbox so a row that was created locally but never synced
       // (push failed/timed out) survives the pull instead of vanishing.
-      return [key, applyOutbox(key, base)] as const
+      const overlaid = applyOutbox(key, base)
+      // Postgres returns these rows in no particular order (no ORDER BY — the
+      // query only filters by user_id), but every "newest first" view (e.g.
+      // Characters' Single view reading characterHistory[0]) assumes the array
+      // already is sorted that way, which local unshift-on-add writes uphold
+      // but a cloud pull doesn't. Restore that invariant here so a refresh
+      // can't surface a random old row instead of the latest one.
+      const sorted = [...overlaid].sort((a, b) =>
+        ((b as { createdAt?: number }).createdAt ?? 0) - ((a as { createdAt?: number }).createdAt ?? 0))
+      return [key, sorted] as const
     }),
   )
 

@@ -7,6 +7,29 @@ import { useAssetUrl } from '../hooks/useAssetUrl'
 import { saveFromDataUrl } from '../utils/assetStore'
 import { CONTINUOUS_STYLES } from '../utils/visualStyle'
 import SlideOver from './SlideOver'
+// Preview art for the built-in styles — the same scene rendered in each look, so
+// the grid reads as one comparison set. Pre-scaled to ~640px JPEG (the cards are
+// ~137px wide) and keyed by style id, exactly like the Characters preset
+// portraits. Lives here rather than on the style itself so `visualStyle.ts` stays
+// plain data: it's imported by prompt builders and services that have no business
+// pulling bundler asset URLs. A style with no entry falls back to the glyph.
+import ugcPreview from '../assets/stylePresets/ugc.jpg'
+import zack3dPreview from '../assets/stylePresets/zack-3d.jpg'
+import clayPreview from '../assets/stylePresets/clay.jpg'
+import brickPreview from '../assets/stylePresets/brick.jpg'
+import paperPreview from '../assets/stylePresets/paper.jpg'
+import animePreview from '../assets/stylePresets/anime.jpg'
+import cartoonPreview from '../assets/stylePresets/cartoon.jpg'
+
+const STYLE_PREVIEWS: Record<string, string> = {
+  ugc: ugcPreview,
+  'zack-3d': zack3dPreview,
+  clay: clayPreview,
+  brick: brickPreview,
+  paper: paperPreview,
+  anime: animePreview,
+  cartoon: cartoonPreview,
+}
 
 // How many reference frames one style can be read from. Matches the cap the
 // parent enforces when adding refs.
@@ -95,39 +118,55 @@ interface StyleModalProps {
   subjectLabel?: string
 }
 
-// One saved style's reference mosaic (up to four frames).
-function SavedThumb({ refId }: { refId: string }) {
-  const url = useAssetUrl(refId)
-  return url ? <img src={url} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-ink/[0.06]" />
-}
-
-function StyleCardShell({
+// A style is a look, so the card is a picture of it — the same 9:16 tile the
+// Characters preset picker uses, three across in a 380px panel. Built-in presets
+// pass a bundled `imageUrl` from STYLE_PREVIEWS; a saved style passes an
+// `imageRef` and covers itself with the first frame it was read from. Neither
+// present (a style with no preview art yet) falls back to the glyph.
+function StyleTile({
+  imageRef,
+  imageUrl,
+  name,
   active,
-  onClick,
   accent,
-  children,
+  onClick,
 }: {
+  imageRef?: string
+  imageUrl?: string
+  name: string
   active: boolean
-  onClick: () => void
   accent: StyleModalAccent
-  children: React.ReactNode
+  onClick: () => void
 }) {
+  const assetUrl = useAssetUrl(imageRef)
+  const url = imageUrl ?? assetUrl
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`relative flex w-full flex-col overflow-hidden rounded-2xl border p-3.5 text-left transition-colors ${
-        active
-          ? accent.card
-          : 'border-ink/5 bg-ink/[0.03] hover:border-ink/15 hover:bg-ink/[0.06]'
+      title={name}
+      className={`group relative block aspect-[9/16] w-full overflow-hidden rounded-xl border transition-all hover:-translate-y-px ${
+        active ? accent.card : 'border-ink/5 bg-ink/[0.03] hover:border-ink/15'
       }`}
     >
+      {url ? (
+        <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <Palette className={`h-6 w-6 ${active ? accent.titleOn : 'text-ink-700'}`} strokeWidth={1.5} />
+        </div>
+      )}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2.5 pt-7">
+        {/* Wraps to two lines rather than truncating: at three tiles across a
+            380px panel, anything past ~12 characters clipped — which hit both
+            the longer preset names and most user-named saved styles. */}
+        <span className="block line-clamp-2 text-[12px] font-semibold leading-tight tracking-tight text-zinc-100">{name}</span>
+      </div>
       {active && (
-        <span className={`absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full text-white ${accent.solid}`}>
+        <span className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-white ${accent.solid}`}>
           <Check className="h-3 w-3" strokeWidth={3} />
         </span>
       )}
-      {children}
     </button>
   )
 }
@@ -255,9 +294,11 @@ export default function StyleModal({
           ? 'The look is read from these frames — never their subjects'
           : `The look every ${subjectLabel} is rendered in`
       }
-      // 560px, same as BankPicker — the style cards carry a name plus a
-      // three-line brief, which 380px squeezes to a word a line.
-      size="wide"
+      // The standard 380px panel, matching the Characters preset picker: the
+      // browse grid is three 9:16 tiles across now rather than two text cards,
+      // so a look is picked off its picture and the whole list fits without
+      // scrolling past the presets to reach your own styles.
+      size={view === 'create' ? 'wide' : 'default'}
       // The create view routes to the host's own BankPicker for reference
       // frames, and that picker has to land on top of this panel.
       layer="below-pickers"
@@ -307,23 +348,21 @@ export default function StyleModal({
           )}
 
           <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-ink-600">Presets</p>
-          <div className="grid grid-cols-2 gap-2.5">
-            {CONTINUOUS_STYLES.map((s) => {
-              const active = !usingCustom && s.id === styleId
-              return (
-                <StyleCardShell key={s.id} active={active} accent={accent} onClick={() => { onPickPreset(s.id); onClose() }}>
-                  <span className={`flex h-8 w-8 items-center justify-center rounded-full ${active ? accent.iconOn : 'bg-ink/5 text-ink-500'}`}>
-                    <Palette className="h-4 w-4" strokeWidth={1.75} />
-                  </span>
-                  <span className={`mt-2.5 text-[13px] font-semibold tracking-tight ${active ? accent.titleOn : 'text-ink-100'}`}>{s.label}</span>
-                  <span className="mt-1 line-clamp-3 text-[11px] leading-snug text-ink-500">{s.hint}</span>
-                </StyleCardShell>
-              )
-            })}
+          <div className="grid grid-cols-3 gap-2">
+            {CONTINUOUS_STYLES.map((s) => (
+              <StyleTile
+                key={s.id}
+                name={s.label}
+                imageUrl={STYLE_PREVIEWS[s.id]}
+                active={!usingCustom && s.id === styleId}
+                accent={accent}
+                onClick={() => { onPickPreset(s.id); onClose() }}
+              />
+            ))}
           </div>
 
           <p className="mb-2.5 mt-6 text-[11px] font-medium uppercase tracking-wider text-ink-600">Your styles</p>
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-3 gap-2">
             {savedStyles.map((s) => (
               <SavedStyleCard
                 key={s.id}
@@ -335,17 +374,16 @@ export default function StyleModal({
               />
             ))}
             {/* Dashed create card — always last, so the row reads "…and one
-                more of your own". */}
+                more of your own". Same 9:16 footprint as the tiles beside it. */}
             <button
               type="button"
               onClick={openCreate}
-              className="flex min-h-[124px] flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-ink/10 bg-ink/[0.02] p-3.5 text-center transition-colors hover:border-ink/25 hover:bg-ink/[0.05]"
+              className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink/10 bg-ink/[0.02] p-2 text-center transition-colors hover:border-ink/25 hover:bg-ink/[0.05]"
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/5 text-ink-500">
                 <Sparkles className="h-4 w-4" strokeWidth={1.75} />
               </span>
-              <span className="text-[13px] font-semibold tracking-tight text-ink-200">New from images</span>
-              <span className="text-[11px] leading-snug text-ink-600">Upload frames of an ad whose look you want</span>
+              <span className="text-[11px] font-semibold leading-tight tracking-tight text-ink-200">New from images</span>
             </button>
           </div>
         </div>
@@ -536,29 +574,22 @@ function SavedStyleCard({
   onDelete: () => void
 }) {
   const [confirming, setConfirming] = useState(false)
-  const thumbs = (item.thumbRefs ?? []).slice(0, 4)
+  // The cover is the first frame the style was read from — the closest thing a
+  // saved look has to a picture of itself. The rest stay in the row's edit form.
+  const cover = (item.thumbRefs ?? [])[0]
 
   return (
     <div className="group/style relative">
-      <StyleCardShell active={active} accent={accent} onClick={onUse}>
-        {thumbs.length > 0 ? (
-          <div className="flex gap-1">
-            {thumbs.map((ref) => (
-              <div key={ref} className="h-8 w-8 shrink-0 overflow-hidden rounded-lg border border-ink/10">
-                <SavedThumb refId={ref} />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <span className={`flex h-8 w-8 items-center justify-center rounded-full ${active ? accent.iconOn : 'bg-ink/5 text-ink-500'}`}>
-            <Palette className="h-4 w-4" strokeWidth={1.75} />
-          </span>
-        )}
-        <span className={`mt-2.5 truncate pr-6 text-[13px] font-semibold tracking-tight ${active ? accent.titleOn : 'text-ink-100'}`}>{item.name}</span>
-        <span className="mt-1 line-clamp-3 text-[11px] leading-snug text-ink-500">{item.brief}</span>
-      </StyleCardShell>
+      <StyleTile
+        imageRef={cover}
+        name={item.name}
+        active={active}
+        accent={accent}
+        onClick={onUse}
+      />
       {/* Two-click delete, matching the app-wide tile idiom: the first click
-          arms a red Confirm pill that reverts after 3s. */}
+          arms a red Confirm pill that reverts after 3s. Sits top-left so it
+          clears both the active check bubble and the name plate. */}
       <button
         type="button"
         onClick={(e) => {
@@ -572,10 +603,10 @@ function SavedStyleCard({
           onDelete()
         }}
         title={confirming ? 'Click again to delete' : 'Delete style'}
-        className={`absolute bottom-2.5 right-2.5 flex items-center gap-1 rounded-full transition-all ${
+        className={`absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full transition-all ${
           confirming
-            ? 'bg-red-500/90 px-2.5 py-1 text-[10px] font-semibold text-white opacity-100'
-            : 'h-7 w-7 justify-center text-ink-600 opacity-0 hover:bg-ink/10 hover:text-red-300 group-hover/style:opacity-100'
+            ? 'bg-red-500/90 px-2 py-1 text-[9px] font-semibold text-white opacity-100'
+            : 'h-7 w-7 justify-center bg-black/55 text-white opacity-0 hover:bg-red-500/60 group-hover/style:opacity-100'
         }`}
       >
         {confirming ? 'Confirm' : <Trash2 className="h-3.5 w-3.5" />}

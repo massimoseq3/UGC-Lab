@@ -599,7 +599,7 @@ function SingleInFlight({ gen, onCancel }: { gen: InFlightCharacterGen; onCancel
     <Stage aspectRatio={gen.aspectRatio}>
       {(frameStyle) => (
         <div
-          className="relative overflow-hidden rounded-xl shadow-[0_0_90px_-24px_rgba(247,79,158,0.6)]"
+          className="relative overflow-hidden rounded-xl shadow-[0_0_60px_-28px_rgba(247,79,158,0.35)]"
           style={frameStyle}
         >
           <GeneratingTile
@@ -653,6 +653,13 @@ function SingleCard({
               </div>
             )}
             <SourceBadge isSheet={a.isSheet} savedAsModel={a.savedAsModel} />
+            {/* Delete rides the picture's own top-right corner, the same place
+                it sits on every other media tile in the app — not in the row of
+                named actions below, where it was the one destructive control
+                among five safe ones and threw their centring off. */}
+            <TileActionStack forceVisible={a.deleting}>
+              <TileDeleteButton onDelete={a.confirmDelete} busy={a.deleting} />
+            </TileActionStack>
           </div>
         )}
       </Stage>
@@ -668,6 +675,10 @@ function SingleCard({
           />
         </div>
       ) : (
+        // Named actions only, so they centre on the picture above them. Delete
+        // used to sit at the end of this row, reserving 32px it never drew
+        // (its hover reveal needed a `group` this row didn't have) and pushing
+        // the whole row left of centre; it lives on the image now.
         <div className="flex flex-wrap items-center justify-center gap-1.5">
           <ActionPill
             icon={a.savingToBank ? Loader2 : a.savedAsModel ? Check : Bookmark}
@@ -695,7 +706,6 @@ function SingleCard({
               onClick={onMakeSheet}
             />
           )}
-          <TileDeleteButton variant="chrome" onDelete={a.confirmDelete} busy={a.deleting} />
         </div>
       )}
 

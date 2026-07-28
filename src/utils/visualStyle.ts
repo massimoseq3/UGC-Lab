@@ -63,6 +63,13 @@ export const CONTINUOUS_STYLES: ContinuousStyle[] = [
       'Handcrafted stop-motion claymation shot one frame at a time on a physical miniature set: every surface is modelling clay with visible fingerprints, thumb dents, and tool marks, and shapes are charmingly imperfect — slightly asymmetric, a little lumpy, sculpted rather than modelled. Proportions are squat and chunky with oversized heads and simple mitten hands; edges are soft and hand-smoothed, and armature seams occasionally show through. The palette is warm and earthy — putty, terracotta, ochre, moss, cream — in matte, low-saturation blocks of solid colour, broken by the occasional bright clay accent. Light comes from small practical fixtures rigged just off the diorama: a warm, soft-but-directional key with visible falloff onto the set walls and gentle shadows at tabletop scale. The camera sits close with macro-ish depth of field and true miniature parallax, a faint stop-motion judder in movement, and no digital gloss anywhere.',
   },
   {
+    id: 'brick',
+    label: 'Brick Build',
+    hint: 'Interlocking plastic toy bricks on a tabletop build.',
+    brief:
+      'Everything constructed from interlocking plastic toy bricks and photographed as a real tabletop build: glossy injection-moulded ABS with visible stud tops, seam lines, sprue marks and tiny scuffs on the most-handled pieces. Forms are blocky and modular — stepped diagonals instead of curves, figures with cylindrical heads, C-shaped claw hands, printed rather than sculpted faces, and stiff articulated joints. Detail is implied by clever part usage, never by fine sculpting. The palette is bright primary plastic — red, yellow, blue, bright green — in flat saturated blocks against light grey and tan baseplates. Light is soft tabletop studio lighting with crisp specular hits on every rounded stud and short, sharp shadows on the build surface. The camera sits low at minifigure eye level, macro-close with shallow depth of field and true miniature scale.',
+  },
+  {
     id: 'paper',
     label: 'Papercraft',
     hint: 'Layered paper-cutout diorama staged like a pop-up book.',
@@ -76,6 +83,22 @@ export const CONTINUOUS_STYLES: ContinuousStyle[] = [
     brief:
       'Clean 2D anime cel animation in a modern TV-series register, drawn and composited rather than rendered: confident tapering linework of even weight, flat cel shading in two hard-edged tones per surface, and almost no gradients outside the sky. Figures carry lightly stylized proportions, large expressive eyes with specular catchlights, simplified hands, and hair drawn as sculpted clumps rather than strands. The palette is clean and saturated, with a clear separation between warm character tones and cooler background washes. Backgrounds are painterly and softer than the characters — brushed texture, atmospheric depth, visible paint edges — so the cel-shaded figures read as a distinct layer on top. Light is graphic: one defined key direction, hard-edged shadow shapes, and generous soft bloom, lens flare, and light-shaft overlays added in the composite. Camera work is limited-animation — held frames, sliding pans, speed lines — with no photographic grain.',
   },
+  {
+    id: 'cartoon',
+    label: 'Cartoon',
+    hint: 'Soft hand-drawn cartoon — bean shapes, pastels, painted skies.',
+    brief:
+      'Simple hand-drawn 2D cartoon animation in a whimsical all-ages register: characters reduced to soft bean and noodle shapes — bendy rubber-hose limbs with no visible joints, rounded simplified bodies, oversized simple heads, tiny dot eyes set close together and small expressive mouths. Linework is a thin, even, dark-maroon outline rather than black, clean and confident with no hatching or line-weight variation. Colour is flat and unshaded on characters, at most one soft cel tone, in a pastel candy palette — mint green, bubblegum pink, pale butter yellow, sky blue, lavender — kept light and airy. Backgrounds contrast the flat figures: soft painted gouache and watercolour washes with visible paper texture, blended horizons and dreamy faded depth. Light is decorative rather than physical, implied by gentle colour shifts with no cast shadows or speculars. Flat, graphic and hand-drawn, never 3D, never photoreal.',
+  },
+]
+
+// Retired styles — off the picker, still resolvable. A session's `styleId` is
+// persisted on its brollHistory row, so deleting an entry outright would send
+// every finished Cinematic session through the fallback: the History pill would
+// relabel it "3D Animated" and a re-render would come back in the wrong look.
+// Same contract as the retired One-Shot mode — the rows keep working, the
+// option is just no longer offered. Nothing new can pick these.
+const RETIRED_STYLES: ContinuousStyle[] = [
   {
     id: 'cinematic',
     label: 'Cinematic',
@@ -91,7 +114,9 @@ export const CONTINUOUS_STYLES: ContinuousStyle[] = [
 const FALLBACK_STYLE = CONTINUOUS_STYLES.find((s) => s.id === 'zack-3d')!
 
 export function getContinuousStyle(id: string): ContinuousStyle {
-  return CONTINUOUS_STYLES.find((s) => s.id === id) ?? FALLBACK_STYLE
+  return CONTINUOUS_STYLES.find((s) => s.id === id)
+    ?? RETIRED_STYLES.find((s) => s.id === id)
+    ?? FALLBACK_STYLE
 }
 
 // Whether this storyboard keeps the app-wide iPhone-realism suffix. A style

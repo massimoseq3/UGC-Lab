@@ -12,8 +12,9 @@ interface SlideOverProps {
   // Optional pinned footer (e.g. action buttons) below the scroll area.
   footer?: React.ReactNode
   // 'wide' matches BankPicker's 560px panel — for card grids where 380px
-  // squeezes the tiles too small to read.
-  size?: 'default' | 'wide'
+  // squeezes the tiles too small to read. 'medium' (460px) is the step between,
+  // for a grid that wants a bigger tile without giving up the compact panel.
+  size?: 'default' | 'medium' | 'wide'
   // Optional back arrow left of the title, for a panel with a second view
   // inside it (StyleModal's "New style from references").
   onBack?: () => void
@@ -45,7 +46,7 @@ export default function SlideOver({ open, onClose, title, subtitle, children, fo
       />
       <div
         className={`fixed bottom-0 right-0 top-0 ${layer === 'below-pickers' ? 'z-[66]' : 'z-[80]'} flex ${
-          size === 'wide' ? 'w-[560px]' : 'w-[380px]'
+          size === 'wide' ? 'w-[560px]' : size === 'medium' ? 'w-[460px]' : 'w-[380px]'
         } max-w-full flex-col border-l border-ink/5 bg-surface-1/95 backdrop-blur-2xl transition-transform duration-300 ease-out ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
