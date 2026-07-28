@@ -58,7 +58,7 @@ export default function EditStudio() {
     // panels of its own — a folder and a card floating on the bare canvas — so it
     // sits on the sky rather than in an empty room.
     <div className="relative flex min-h-full flex-col">
-      <DesktopWallpaper tint="mono" />
+      <DesktopWallpaper />
 
       <div className="relative mx-auto grid w-full max-w-5xl flex-1 content-center gap-10 px-5 py-10 md:grid-cols-2 md:items-center md:gap-8 md:px-8">
         {/* Left: the folder is the download */}

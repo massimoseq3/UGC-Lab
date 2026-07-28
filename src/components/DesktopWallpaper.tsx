@@ -9,17 +9,13 @@
 // white dots vanish on a bright wallpaper and dark ones read as dust — so light
 // mode keeps the clean gradient and drops the stars, the vignette and the meteor.
 // Colours and keyframes live in index.css (`.desktop-*`) so both themes stay in
-// one place — including `tint`, which swaps only the bloom colours: the stars,
-// the meteors and the vignette are the same sky whichever page is on it.
-interface DesktopWallpaperProps {
-  /** 'mono' trades the top-left emerald bloom for neutral light. */
-  tint?: 'default' | 'mono'
-}
-
-export default function DesktopWallpaper({ tint = 'default' }: DesktopWallpaperProps) {
+// one place. Both pages take the sky exactly as it is: a `tint` prop for a
+// second bloom palette lasted one commit and came back out when the Dashboard
+// wanted the same neutral top-left corner Edit did.
+export default function DesktopWallpaper() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className={`absolute inset-0 ${tint === 'mono' ? 'desktop-wallpaper-mono' : 'desktop-wallpaper'}`} />
+      <div className="desktop-wallpaper absolute inset-0" />
       <div className="desktop-stars-far absolute inset-0 light:hidden" />
       <div className="desktop-stars-near absolute inset-0 light:hidden" />
       {/* Two meteors on the same 22s cycle, offset so they never share a pass. */}
