@@ -160,7 +160,7 @@ export function backfillCardState(card: Partial<CardState> & Record<string, unkn
     pendingStartedAt: (card.pendingStartedAt as number | null) ?? null,
     refsCharacter: card.refsCharacter !== false,
     refsProduct: card.refsProduct !== false,
-    // A pre-split "With Dialogue" session wrote an explicit `true` here, so it
+    // An older "With Dialogue" session wrote an explicit `true` here, so it
     // keeps its chain; anything generated since writes an explicit `false`. Only
     // a card from before the field existed lands on the `true` fallback, and
     // those sessions were all chained.

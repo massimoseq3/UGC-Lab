@@ -98,7 +98,7 @@ export function buildContinuousPrompt(editable: string, style: string): string {
 // two fight each other). UGC Realism (realism === true) and legacy results
 // (realism undefined) are left exactly as before — same prompt, realism stack on
 // — so today's default output is unchanged until a style is picked. Kept in one
-// place so all three modes stay consistent.
+// place so both modes stay consistent.
 export function applyStyleToPrompt(
   editablePrompt: string,
   style: { style?: string; realism?: boolean } | null | undefined,

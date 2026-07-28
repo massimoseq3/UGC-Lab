@@ -136,7 +136,7 @@ export default function RightPanel(props: RightPanelProps) {
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'scenes', label: isContinuous ? 'Continuous Storyboard' : mode === 'dialogue' ? 'Dialogue Storyboard' : 'B-Roll Storyboard', badge: sceneCount > 0 ? sceneCount : undefined },
+            { value: 'scenes', label: isContinuous ? 'Continuous Storyboard' : 'Line by Line Storyboard', badge: sceneCount > 0 ? sceneCount : undefined },
             { value: 'history', label: 'History', badge: historyCount > 0 ? historyCount : undefined },
           ]}
         />

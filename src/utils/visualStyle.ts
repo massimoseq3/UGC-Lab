@@ -1,4 +1,4 @@
-// Visual styles — the shared look system behind B-Roll's three modes and the
+// Visual styles — the shared look system behind B-Roll's two modes and the
 // Characters portrait/sheet generator. A style is one dense paragraph of pure
 // aesthetic direction (medium, forms, palette, light, camera/finish) that gets
 // appended to an image or video prompt without carrying any subject matter of

@@ -10,20 +10,19 @@ import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
 
 const MODE_LABEL: Record<BrollMode, string> = {
-  broll: 'B-Roll',
-  dialogue: 'Dialogue',
+  line: 'Line-by-Line',
   continuous: 'Continuous',
 }
 
+// Delivery-agnostic on purpose: the shape is three prompts per line either
+// way, and the brief the modal hands out is built from the live delivery.
 const MODE_WHAT: Record<BrollMode, string> = {
-  broll: 'three silent shot prompts per script line',
-  dialogue: 'three ways of delivering each script line on camera',
+  line: 'three shot prompts per script line',
   continuous: 'a keyframe chain — scenes, keyframe concepts and their motion',
 }
 
 const BRIEF_FILENAME: Record<BrollMode, string> = {
-  broll: 'broll-brief.txt',
-  dialogue: 'dialogue-brief.txt',
+  line: 'line-by-line-brief.txt',
   continuous: 'continuous-brief.txt',
 }
 

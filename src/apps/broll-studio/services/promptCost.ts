@@ -1,5 +1,5 @@
 // Credit estimate for the "write me prompts" LLM call behind B-Roll's Generate
-// button (B-Roll, Dialogue, Continuous).
+// button (Line-by-Line, Continuous).
 //
 // These are chat completions, billed per 1k tokens rather than per call, so
 // there is no exact number to show before the model answers. The estimate below
@@ -20,11 +20,12 @@ const CHARS_PER_TOKEN = 4
 // to the nearest 500. Re-measure if a system prompt changes materially — being
 // out by a few hundred tokens moves the estimate by hundredths of a credit.
 const SYSTEM_TOKENS: Record<BrollMode, number> = {
-  broll: 5000,
-  // Same base instruction plus the dialogue delivery override.
-  dialogue: 5500,
+  line: 5000,
   continuous: 4000,
 }
+
+// With Dialogue sends the same base instruction plus the delivery override.
+const DIALOGUE_ADDENDUM_TOKENS = 500
 
 // Typical output size of one unit of work, in tokens.
 const TOKENS_PER_VARIATION = 130   // one b-roll prompt paragraph
@@ -44,16 +45,18 @@ function sentenceCount(scriptText: string): number {
 export function estimatePromptCredits(
   mode: BrollMode,
   scriptText: string,
-  // Per-line modes only. Both deliveries write three prompts per scene, so this
-  // costs the same either way — kept as an input because the count comes from
-  // variationsForDelivery, which is where a future change would land.
+  // Line-by-Line only. Both deliveries write three prompts per scene, so it
+  // only moves the input side (the dialogue override) — kept as an input
+  // because the count comes from variationsForDelivery, which is where a
+  // future change to the shape would land.
   delivery: BrollDelivery = 'silent',
 ): number | null {
   const chatModelId = getDefaultModel('broll-studio', 'chat')?.id
   if (!chatModelId) return null
   const scriptTokens = Math.ceil(scriptText.length / CHARS_PER_TOKEN)
   const scenes = sentenceCount(scriptText)
-  const inputTokens = SYSTEM_TOKENS[mode] + scriptTokens
+  const dialogueOverride = mode === 'line' && delivery === 'dialogue' ? DIALOGUE_ADDENDUM_TOKENS : 0
+  const inputTokens = SYSTEM_TOKENS[mode] + dialogueOverride + scriptTokens
 
   // One call either way; what differs is the shape of what comes back.
   const outputTokens = mode === 'continuous'

@@ -310,15 +310,10 @@ export interface BrollHistoryItem {
   // 'oneshot' is retired — no UI produces it any more, but persisted rows keep it
   // (see the oneShot* fields below), so it stays in the union.
   //
-  // This is deliberately the PRE-SPLIT shape. The workspace now offers three
-  // modes (B-Roll / Dialogue / Continuous), but the two per-line ones still
-  // store 'line' here and say which they are via `lineDelivery` — these rows are
-  // cloud-synced and already on every member's account, so the storage stays put
-  // and brollHistoryMode reconstructs the mode from the pair on read.
   mode?: 'line' | 'oneshot' | 'continuous'
-  // Whether the per-line cards speak. Absent on legacy rows (=> 'silent', all-
-  // silent b-roll). Together with `mode` this is what identifies a row as a
-  // B-Roll session or a Dialogue one.
+  // Whether the Line-by-Line cards speak. Absent on legacy rows (=> 'silent',
+  // all-silent b-roll). Stamped from the delivery the session actually ran
+  // with, not the live toggle, so a flip after the fact can't rewrite it.
   lineDelivery?: 'dialogue' | 'silent'
   // Retired One-Shot mode's snapshot. Nothing writes these any more and the
   // History list hides rows that carry only these (isRetiredOneShotRow) — they
