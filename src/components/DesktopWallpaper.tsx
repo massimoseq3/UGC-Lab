@@ -18,11 +18,17 @@ export default function DesktopWallpaper() {
       <div className="desktop-wallpaper absolute inset-0" />
       <div className="desktop-stars-far absolute inset-0 light:hidden" />
       <div className="desktop-stars-near absolute inset-0 light:hidden" />
-      {/* Two meteors on the same 22s cycle, offset so they never share a pass. */}
-      <span className="desktop-meteor absolute right-[12%] top-[8%] h-px w-24 light:hidden" />
+      {/* Two meteors on the same 22s cycle, offset so they never share a pass.
+          Both are delayed — the sky should be still when the page arrives, not
+          throwing a meteor on mount. The delay only works because
+          `.desktop-meteor` fills backwards; see the note in index.css. */}
+      <span
+        className="desktop-meteor absolute right-[12%] top-[8%] h-px w-24 light:hidden"
+        style={{ animationDelay: '6s' }}
+      />
       <span
         className="desktop-meteor absolute right-[38%] top-[2%] h-px w-16 light:hidden"
-        style={{ animationDelay: '11s' }}
+        style={{ animationDelay: '17s' }}
       />
       {/* Vignette — seats the widgets on the surface. In light mode it would
           just dirty the wallpaper. */}
