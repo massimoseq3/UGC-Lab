@@ -1,7 +1,7 @@
 import type { GenerateScriptInput, GeneratedScript, RemixAngle, EditableProductContext, WriteStyle, WriteLength, HookCategory } from '../types'
 import { HOOK_COUNT, REMIX_ANGLES, DEFAULT_VARIATION_COUNT, isVariationCount, WRITE_STYLE_META } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
-import { kieChatCompletions, type ChatMessage } from '../../../utils/kie'
+import { kieChatCompletions, LONG_CHAT_TIMEOUT_MS, type ChatMessage } from '../../../utils/kie'
 import { getChatEndpointPath, CHAT_MODEL_DEFAULT } from '../../../utils/models'
 
 // Scripts runs on the app-wide chat model. It spent a stint on the STRONG tier
@@ -13,10 +13,9 @@ const CHAT_MODEL_ID = CHAT_MODEL_DEFAULT
 // A batch fires N of these calls at once, so they contend with each other and a
 // take routinely runs past kieChatCompletions' 120s default — which aborts the
 // request client-side while kie.ai finishes the generation anyway and bills for
-// it. Every other chat surface already buys itself more room (Ad Analyzer 300s,
-// product auto-fill and style analysis 180s); Scripts was the last one left on
-// the bare default.
-const SCRIPT_TIMEOUT_MS = 300_000
+// it. Shared with B-Roll's storyboard calls, which hit the same wall for the
+// same reason; the why lives on LONG_CHAT_TIMEOUT_MS.
+const SCRIPT_TIMEOUT_MS = LONG_CHAT_TIMEOUT_MS
 
 // ── Shared writing DNA ──
 //

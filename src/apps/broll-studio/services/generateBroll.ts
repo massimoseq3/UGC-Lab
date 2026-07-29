@@ -4,6 +4,7 @@ import {
   kieChatCompletions,
   ensureHostedUrl,
   createTask,
+  LONG_CHAT_TIMEOUT_MS,
   type ChatMessage,
 } from '../../../utils/kie'
 import { getDefaultModel, getChatEndpointPath, buildImageInput, getModel, type AspectRatio, type ImageResolution } from '../../../utils/models'
@@ -334,7 +335,7 @@ export async function generateBroll(input: BrollInput): Promise<BrollResult> {
       ],
     },
   ]
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages)
+  const responseText = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: LONG_CHAT_TIMEOUT_MS })
 
   // Resolve the visual style once and stamp it on the result. It's appended to
   // each card's prompt (and the realism stack toggled) at fire time — the scene
@@ -799,7 +800,7 @@ one flowing paragraph
   const messages: ChatMessage[] = [
     { role: 'user', content: [{ type: 'text', text: prompt }] },
   ]
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages)
+  const responseText = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: LONG_CHAT_TIMEOUT_MS })
 
   // Tag envelope rather than JSON: the six-field prompt is multi-line, and a
   // raw newline inside a JSON string is a parse error — which used to surface
@@ -878,7 +879,7 @@ one flowing paragraph
     { role: 'system', content: [{ type: 'text', text: SYSTEM_INSTRUCTION }] },
     { role: 'user', content: [{ type: 'text', text: userMessage }] },
   ]
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages)
+  const responseText = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: LONG_CHAT_TIMEOUT_MS })
   const tagged = responseText.match(/<PROMPT>([\s\S]*?)<\/PROMPT>/)?.[1]?.trim()
   if (tagged) return tagged
   // No envelope — the model answered with the bare rewrite. Strip any code

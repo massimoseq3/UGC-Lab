@@ -13,7 +13,7 @@
 
 import type { ContinuousConcept, ContinuousFrame, ContinuousResult, ContinuousScene, ReferenceImage, VariationRefs } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
-import { kieChatCompletions, type ChatMessage } from '../../../utils/kie'
+import { kieChatCompletions, LONG_CHAT_TIMEOUT_MS, type ChatMessage } from '../../../utils/kie'
 import { getChatEndpointPath, getModel, snapVideoDurationUp } from '../../../utils/models'
 import { IPHONE_REALISM_SUFFIX } from './realism'
 import { extractBlock, extractNumberedBlock } from './xmlBlocks'
@@ -642,7 +642,7 @@ export async function generateContinuous(input: ContinuousInput): Promise<Contin
       ],
     },
   ]
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages)
+  const responseText = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: LONG_CHAT_TIMEOUT_MS })
   const result = parseContinuousResult(responseText, input)
   if (!result) throw new Error('The storyboard came back empty. Try again.')
   return result
@@ -763,7 +763,7 @@ one flowing paragraph
     { role: 'system', content: [{ type: 'text', text: CONTINUOUS_SYSTEM }] },
     { role: 'user', content: [{ type: 'text', text: user }] },
   ]
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages)
+  const responseText = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: LONG_CHAT_TIMEOUT_MS })
   return cleanPromptBody(extractTag(responseText, 'PROMPT') ?? responseText)
 }
 
@@ -788,7 +788,7 @@ one flowing paragraph
     { role: 'system', content: [{ type: 'text', text: CONTINUOUS_SYSTEM }] },
     { role: 'user', content: [{ type: 'text', text: user }] },
   ]
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages)
+  const responseText = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: LONG_CHAT_TIMEOUT_MS })
   return cleanPromptBody(extractTag(responseText, 'PROMPT') ?? responseText)
 }
 
@@ -848,7 +848,7 @@ one flowing paragraph
       ],
     },
   ]
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages)
+  const responseText = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: LONG_CHAT_TIMEOUT_MS })
   return cleanPromptBody(extractTag(responseText, 'MOTION') ?? responseText)
 }
 
@@ -874,7 +874,7 @@ one flowing paragraph
     { role: 'system', content: [{ type: 'text', text: CONTINUOUS_SYSTEM }] },
     { role: 'user', content: [{ type: 'text', text: user }] },
   ]
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages)
+  const responseText = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: LONG_CHAT_TIMEOUT_MS })
   return cleanPromptBody(extractTag(responseText, 'MOTION') ?? responseText)
 }
 
