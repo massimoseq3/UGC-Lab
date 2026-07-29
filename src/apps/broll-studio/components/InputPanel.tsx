@@ -244,7 +244,7 @@ function ScriptCard({ script }: { script: Script | null }) {
   const title = script?.title ?? 'Imported Script'
   return (
     <div className="flex items-center gap-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/15 text-scripts-400">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/15 text-scripts-text">
         <FileText className="h-[18px] w-[18px]" strokeWidth={1.5} />
       </div>
       <div className="min-w-0 flex-1">
@@ -394,7 +394,7 @@ export default function InputPanel({
             <BankCard
               icon={FileText}
               label="Script / Hooks"
-              accentClass="bg-scripts-500/15 text-scripts-400"
+              accentClass="bg-scripts-500/15 text-scripts-text"
               selectedClass="border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10"
               isEmpty={!selectedScript}
               emptyHint="Or let the format write it"
@@ -571,7 +571,7 @@ export default function InputPanel({
                 : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
             }`}
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-text">
               {adBlueprintTitle
                 ? <Clapperboard className="h-5 w-5" strokeWidth={1.75} />
                 : isWriteStyle(autoScriptStyle) && WRITE_STYLE_META[autoScriptStyle].group === 'format'

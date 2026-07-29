@@ -33,9 +33,10 @@ export const TEAM: TeamMember[] = [
     role: 'Copywriter',
     blurb: 'Writes and remixes the words that sell, in any length or style.',
     // Scripts' navy (#24365A) measures ~1.65:1 against the dark surface — the
-    // label was effectively invisible. This is the same steel blue as the
+    // label was effectively invisible. This is the same periwinkle as the
     // `--color-scripts-text` token, which exists for exactly this reason.
-    roleColor: '#8FA6CE',
+    // Keep the two in step.
+    roleColor: '#A9C4FF',
   },
   {
     appId: 'voice-studio',

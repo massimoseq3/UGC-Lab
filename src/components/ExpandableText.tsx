@@ -17,7 +17,9 @@ const ACCENT_FOCUS: Record<ExpandAccent, string> = {
 }
 const ACCENT_DONE: Record<ExpandAccent, string> = {
   playground: 'bg-playground-500/15 text-playground-400 hover:bg-playground-500/25',
-  scripts: 'bg-scripts-500/15 text-scripts-400 hover:bg-scripts-500/25',
+  // Scripts' navy is too dark to label its own tint — `scripts-text` is the
+  // readable steel-blue token that exists for exactly this.
+  scripts: 'bg-scripts-500/15 text-scripts-text hover:bg-scripts-500/25',
   broll: 'bg-broll-500/15 text-broll-400 hover:bg-broll-500/25',
   ink: 'bg-ink/10 text-ink-100 hover:bg-ink/15',
 }

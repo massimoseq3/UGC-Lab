@@ -526,7 +526,7 @@ function VariationCard({
           <div className="flex gap-2">
             <button
               onClick={commitEdit}
-              className="flex flex-1 items-center justify-center gap-2 rounded-full bg-scripts-500/15 px-4 py-2.5 text-[12px] font-medium tracking-tight text-scripts-400 transition-colors hover:bg-scripts-500/25"
+              className="flex flex-1 items-center justify-center gap-2 rounded-full bg-scripts-500/15 px-4 py-2.5 text-[12px] font-medium tracking-tight text-scripts-text transition-colors hover:bg-scripts-500/25"
             >
               <Check className="h-3.5 w-3.5" /> Done
             </button>
@@ -550,7 +550,7 @@ function VariationCard({
             <button
               onClick={handleSave}
               disabled={!saveTitle.trim()}
-              className="rounded-full bg-scripts-500/15 px-4 py-2 text-xs font-medium text-scripts-400 transition-colors hover:bg-scripts-500/25 disabled:opacity-40"
+              className="rounded-full bg-scripts-500/15 px-4 py-2 text-xs font-medium text-scripts-text transition-colors hover:bg-scripts-500/25 disabled:opacity-40"
             >
               Save
             </button>

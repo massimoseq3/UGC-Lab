@@ -359,7 +359,7 @@ export default function InputPanel({
               className="mt-1.5 flex w-full items-center justify-between gap-2 rounded-full border border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-left transition-colors hover:border-ink/20 hover:bg-ink/[0.04]"
             >
               <div className="flex items-center gap-2">
-                <PenLine className="h-3.5 w-3.5 text-scripts-400" strokeWidth={1.75} />
+                <PenLine className="h-3.5 w-3.5 text-scripts-text" strokeWidth={1.75} />
                 <span className="text-[12px] font-medium text-ink-200">Edit product details for this script</span>
               </div>
               <ChevronRight className="h-4 w-4 text-ink-400" strokeWidth={2} />
@@ -391,7 +391,7 @@ export default function InputPanel({
                 <span className="text-[13px] text-ink-500">No products yet</span>
                 <button
                   onClick={handleOpenFinder}
-                  className="text-left text-[11px] text-scripts-400 transition-colors hover:text-scripts-300"
+                  className="text-left text-[11px] text-scripts-text transition-colors hover:text-ink-100"
                 >
                   Add one in Bank
                 </button>
@@ -465,7 +465,7 @@ export default function InputPanel({
                     : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
                 }`}
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-text">
                   <FishingHook className="h-[18px] w-[18px]" strokeWidth={1.75} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -519,7 +519,7 @@ export default function InputPanel({
                     : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
                 }`}
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-400">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-text">
                   {styleChosen && WRITE_STYLE_META[writeStyle].group === 'format'
                     ? <Video className="h-[18px] w-[18px]" strokeWidth={1.75} />
                     : <FileText className="h-[18px] w-[18px]" strokeWidth={1.75} />}
@@ -921,7 +921,7 @@ export default function InputPanel({
                     : 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'
                 }`}
               >
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${active ? 'bg-scripts-500/10 text-scripts-400' : 'bg-ink/5 text-ink-500'}`}>
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${active ? 'bg-scripts-500/10 text-scripts-text' : 'bg-ink/5 text-ink-500'}`}>
                   {choice === 'auto' ? <Sparkles className="h-5 w-5" strokeWidth={1.75} /> : <FishingHook className="h-5 w-5" strokeWidth={1.75} />}
                 </div>
                 <div className="min-w-0 flex-1">
