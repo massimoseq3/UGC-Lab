@@ -353,15 +353,14 @@ export interface AdAnatomyHistoryItem {
   // Source ad asset id — only present while status === 'analyzing'. Dropped
   // on success/error so the bank doesn't accumulate large video blobs.
   uploadedRef?: string
-  // kie.ai job id of whichever pass is currently in flight. Set after
-  // createTask returns. Persisted so a refresh-mid-analysis can resume
-  // polling instead of dropping the result. Missing when the analyser falls
-  // back to the streaming transport.
+  // kie.ai job id of the analysis in flight. Set after createTask returns.
+  // Persisted so a refresh-mid-analysis can resume polling instead of dropping
+  // the result. Missing when the analyser falls back to the streaming
+  // transport.
   taskId?: string
-  // Pass-1 (perception) output — transcript + shot list + visual dossiers.
-  // Persisted between the two analysis passes so pass 2 (text-only) can be
-  // restarted after a refresh even without the source file. Cleared on
-  // success/error. Opaque JSON, same reasoning as `result`.
+  // Legacy: pass-1 output from the retired two-pass analyser (reverted July
+  // 2026). Nothing writes it any more; kept so a row still carrying one stays
+  // valid, and it's cleared on the next success/error.
   perception?: unknown
   // Opaque JSON so types.ts stays decoupled from ad-anatomy's internal types.
   // Undefined until status === 'complete'.
