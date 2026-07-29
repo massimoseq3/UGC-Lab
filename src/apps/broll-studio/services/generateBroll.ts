@@ -110,7 +110,7 @@ When the viewer hears the sentence and sees the sentence at the same time, the a
 
 # YOUR JOB
 
-For each voiceover line in the script, produce 3 variations — 3 genuinely DIFFERENT ideas for visualizing that line, not one idea filmed from three angles. Before writing, silently brainstorm: what's the literal image hiding in this line? the real-life moment behind it? the feeling? the visible proof? Then write the three STRONGEST ideas as prompts — three you'd actually shoot, not two good ones and a filler.
+For each voiceover line in the script, produce 3 variations — 3 genuinely DIFFERENT ideas for visualizing that line, not one idea filmed from three angles. Before writing, silently brainstorm the pictures inside THIS line: what it would look like if it were literally true, what actually happens in a life where it's true, what it leaves behind, what would prove it to someone who doubted it. Then write the three STRONGEST ideas as prompts — whatever lenses they turn out to be — three you'd actually shoot, not two good ones and a filler.
 
 **Every shot is SILENT b-roll.** No one talks to camera, no one lip-syncs, no line is spoken. The finished voiceover is laid over these clips in the edit.
 
@@ -128,7 +128,9 @@ Tag each variation with the lens it uses (declare it in the <TAG> field):
 - PROOF = visible evidence the claim is real — the after-state, a side-by-side, an ordinary screen artifact (a timer, a streak). Never invent fake reviews, ratings, or statistics. The ONE lens where a phone may appear in frame, as the object being looked at.
 
 Lens rules:
-- The three tags must be different from each other, and each must produce a DIFFERENT CONCEPT — different subject, different idea, not the same beat reframed.
+- The tag is a LABEL for the idea you had, not a slot to fill. Have the idea first, then name the lens it turned out to be. Two variations MAY share a tag when they are genuinely different pictures — two different ACTIONS beat one ACTION plus a weak ENVIRONMENT shot invented to avoid repeating a tag.
+- What must never repeat is the PICTURE. Two variations are the same idea if you could film them in the same room, in the same minute, with the same prop. Change the object, the action, or who is in frame — a new angle on the same moment is not a new idea.
+- No two LABELs in one scene may name the same object or action.
 - When the line carries a metaphor or vivid image, at least one variation MUST make it literal (usually ACTION).
 - Choose for the line, not by habit, and vary the mix across the ad.
 - When VISIBILITY is no: PRODUCT is off the menu and no variation may show the product or its packaging.
@@ -136,7 +138,7 @@ Lens rules:
 
 You decide per variation:
 - LABEL — a short slug naming the actual idea (e.g. "CARDBOARD BITE", "BAR HITS THE BIN", "DRAWER OF REJECTS"). Two-to-four words.
-- REFS — which reference images to attach: character / product / both / none. ERR ON THE SIDE OF ATTACHING — a reference the model doesn't strictly need is harmless, but a missing one loses the character's face or the product's exact look. Attach the character reference whenever a person (or even just their hands, for POV) could appear, OR whenever holding the character's look consistent might help — when unsure, attach it. Attach the product reference whenever the product could appear or its exact packaging/shape could inform the frame — when unsure, attach it. Prefer "both" whenever both could plausibly help. Reserve "none" only for shots that clearly show neither a person nor the product (a bare environment, an abstract insert). Two rules are absolute: when VISIBILITY is no, REFS must NOT include product — the product cannot appear at all in that shot. When VISIBILITY is yes, REFS MUST include product on EVERY variation of that scene — the voiceover is talking about the product, so the shot has to be built from the real packaging rather than the model's invention of it.
+- REFS — which reference images to attach: character / product / both / none. The character half is your call, and you should ERR ON THE SIDE OF ATTACHING: a reference the model doesn't strictly need is harmless, a missing one loses the character's face. Attach it whenever a person — or just their hands, for POV — could appear, or whenever holding their look consistent might help. Reserve "none" for shots with neither a person nor the product (a bare environment, an abstract insert). The product half is NOT your call — it follows VISIBILITY exactly: VISIBILITY=no means REFS must not include product, VISIBILITY=yes means REFS must include it on every variation of that scene, because a line about the product has to be built from the real packaging rather than the model's invention of it.
 
 # PROMPT FORMAT (EVERY PROMPT, EVERY VARIATION)
 
@@ -174,7 +176,7 @@ The ONE exception: a PROOF shot may show a screen as the deliberate subject bein
 # SELF-CHECK BEFORE RETURNING
 
 1. Could someone watching this shot guess the line it belongs to? If not, the idea isn't visual enough — find the image inside the line and rewrite.
-2. Are the 3 variations three different IDEAS (different subject or concept), not one idea from three angles? With only three slots there is no room for a filler — if one is weaker than the others, replace it.
+2. Could any two of these be filmed in the same room, in the same minute, with the same prop? Then they are one idea — replace one. Sharing a tag is fine; sharing a picture is not. With only three slots there is no room for a filler, so a weak idea is replaced rather than kept for the lens it covers.
 3. If the line has a metaphor or vivid image, does one variation make it literal?
 4. Is every prompt ONE readable paragraph — no labels, no device named, silent?
 5. Does product visibility match the rule exactly?
@@ -189,7 +191,10 @@ Line: "I spent years eating protein bars that tasted like actual cardboard befor
 > <TAG>TRANSITION</TAG> <LABEL>BARS HIT THE BIN</LABEL>
 > A drawer slides open to reveal a graveyard of half-eaten, stale protein bars in dull wrappers; the character's hand sweeps the whole pile into a kitchen bin in one motion and the drawer knocks shut. Framed from just above the drawer, close enough to read the sad crumbs. Wrappers crinkle and thud into the bin.
 
-Two different concepts: one makes the metaphor literal, one shows the years of bad bars ending. Neither is a person standing in a kitchen doing nothing.
+> <TAG>ACTION</TAG> <LABEL>WASHING IT DOWN</LABEL>
+> At a cluttered desk mid-afternoon, the character works a dry mouthful of a chalky bar in a plain unmarked grey wrapper — no logo, no text — then grabs a cold mug of coffee and forces the swallow down with a hard blink and a small shudder, going straight back to the screen. Framed from across the desk at eye height, flat overcast light from the window behind the monitor. A dull swallow and the mug knocking back onto the desk.
+
+Three different pictures. The first and third share the ACTION lens and that is fine — different room, different object, different act, so neither could be filmed as the other. A second angle on the cardboard bite would NOT be fine. Note the desk bar is an unbranded stand-in: this line attacks the category, so VISIBILITY is no and the bad bar can never be the advertised product.
 
 # OUTPUT FORMAT (STRICT)
 
@@ -206,13 +211,13 @@ Wrap every scene in this exact XML envelope. Do not include any text outside the
 <PROMPT>one flowing paragraph matching the chosen lens. Silent b-roll — no speech anywhere</PROMPT>
 </VAR_1>
 <VAR_2>
-<TAG>a DIFFERENT role from VAR_1</TAG>
+<TAG>the lens this idea turned out to be — may repeat an earlier VAR's tag when the picture is genuinely different</TAG>
 <LABEL>...</LABEL>
 <REFS>...</REFS>
 <PROMPT>...</PROMPT>
 </VAR_2>
 <VAR_3>
-<TAG>a DIFFERENT role from VAR_1 and VAR_2</TAG>
+<TAG>the lens this idea turned out to be — may repeat an earlier VAR's tag when the picture is genuinely different</TAG>
 <LABEL>...</LABEL>
 <REFS>...</REFS>
 <PROMPT>...</PROMPT>
@@ -249,7 +254,7 @@ THE THREE VARIATIONS ARE THREE DIFFERENT IDEAS, NOT THREE ANGLES ON ONE:
 Same words, three genuinely different ways to say them. Change the SITUATION, not just the framing — a different room or location, a different thing they're doing while they talk, a different moment of the day, a different physical relationship to the camera. The character is the same person in the same ad, but they are not nailed to one chair.
 - WRONG: three shots of the character on the same sofa at chest height, differing only in expression and how close the frame is.
 - RIGHT: one at the kitchen counter mid-way through making something, hands busy, glancing up between words; one sat on the edge of the bed, quieter, closer, talking straight into the lens; one walking through the front door still holding a bag, talking over their shoulder.
-Each variation must be a shot you could actually cut to and feel a change. If two of them could be described by the same sentence, replace one.
+Each variation must be a shot you could actually cut to and feel a change. Two of them are the same idea if they happen in the same place, at the same point in the day, with the same thing in their hands — a warmer expression or a closer frame is not a different idea. If two are the same idea, replace one.
 
 WHEN A SCENE STAGING BLOCK IS PRESENT, IT WINS: it says what kind of content this ad imitates, and every variation stages that — three different spots along the same street for a street interview, three moments of the same routine for a GRWM, three angles of the same recording session for a podcast clip. Vary WITHIN the format; never break it. When there is no staging block, the ad is a plain organic UGC video and the character moves around their own life.
 
@@ -282,7 +287,7 @@ export function buildBrollUserPrompt(input: BrollInput): string {
   const withDialogue = input.delivery === 'dialogue'
   const variationBrief = withDialogue
     ? `For EACH scene emit exactly three variations, and ALL THREE are the character speaking that line out loud — <TAG>DIALOGUE</TAG> on every one, with the line embedded verbatim in double quotes. They are three genuinely DIFFERENT ways to deliver it: different room or location, different thing they're doing while they talk, different physical relationship to the camera. Not one setup shot from three distances. Three slots only — no VAR_4.`
-    : `For EACH scene emit exactly three variations: three genuinely DIFFERENT ideas for showing what that line SAYS — make metaphors literal, show the act, the feeling, the proof. Pick three distinct lenses from the menu (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF), declared in each <TAG> field. Every shot is silent — no one speaks (a voiceover is added later). Three slots only, so every one has to earn its place — no filler fourth idea.`
+    : `For EACH scene emit exactly three variations: three genuinely DIFFERENT ideas for showing what that line SAYS — make metaphors literal, show the act, the feeling, the proof. Two of them are the same idea if you could film them in the same room, in the same minute, with the same prop. Tag each with the lens it turned out to be (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF) in its <TAG> field — the lens follows the idea, and two variations may share one when the pictures are genuinely different. Every shot is silent — no one speaks (a voiceover is added later). Three slots only, so every one has to earn its place — no filler.`
 
   let prompt = `Break this script into ${withDialogue ? 'dialogue' : 'B-Roll'} scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph, as long as the idea needs — no word limit, and never trim a detail to hit a length. Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation, erring toward attaching references whenever they could plausibly help. Two REFS rules are hard: VISIBILITY=no excludes the product from every variation, and VISIBILITY=yes includes it in every variation.\n\nScript:\n${input.scriptText}`
 
