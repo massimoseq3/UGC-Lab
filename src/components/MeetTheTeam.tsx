@@ -72,9 +72,12 @@ export default function MeetTheTeam() {
         onClick={(e) => e.stopPropagation()}
         className="relative flex max-h-[94dvh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-ink/10 bg-surface-1 shadow-2xl shadow-black/50"
       >
+        {/* The same blue the desktop wallpaper blooms with (rgba(113,101,255) —
+            see `.desktop-wallpaper` in index.css), so the intro reads as part of
+            the sky it opens over rather than a green panel sitting on it. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(600px_220px_at_50%_-10%,rgba(5,150,105,0.14),transparent_75%)]"
+          className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(600px_220px_at_50%_-10%,rgba(113,101,255,0.16),transparent_75%)]"
         />
         <button
           onClick={close}
