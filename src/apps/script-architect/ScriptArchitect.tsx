@@ -7,7 +7,7 @@ import InputPanel from './components/InputPanel'
 import RightPanel from './components/RightPanel'
 import { generateScript } from './services/generateScript'
 import { humanizeError } from '../../utils/friendlyError'
-import { WRITE_STYLE_META, HOOK_CATEGORY_META, detectSceneBlueprint, isWriteStyle, isWriteFormat, isWriteLength, isHookCategoryChoice, isVariationCount, parseHooks, DEFAULT_VARIATION_COUNT, type ScriptMode, type ScriptUiMode, type EditableProductContext, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount, type RemixAngle } from './types'
+import { WRITE_STYLE_META, HOOK_CATEGORY_META, detectSceneBlueprint, isWriteStyle, isWriteFormat, isWriteLength, isRemixLength, isHookCategoryChoice, isVariationCount, parseHooks, DEFAULT_VARIATION_COUNT, DEFAULT_REMIX_LENGTH, type ScriptMode, type ScriptUiMode, type EditableProductContext, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type VariationCount, type RemixAngle } from './types'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 
 interface ReverseEngineerPayload {
@@ -53,6 +53,12 @@ export default function ScriptArchitect() {
     sanitize: (v) => (isWriteFormat(v) ? v : 'script'),
   })
   const [writeLength, setWriteLength] = usePersistedState<WriteLength>(`${baseKey}:writeLength`, 15)
+  // Remix's own length, kept in its own slot: it carries a 'default' (keep the
+  // source ad's length) that Write New has no meaning for, and the two modes'
+  // picks shouldn't overwrite each other.
+  const [remixLength, setRemixLength] = usePersistedState<RemixLength>(`${baseKey}:remixLength`, DEFAULT_REMIX_LENGTH, {
+    sanitize: (v) => (isRemixLength(v) ? v : DEFAULT_REMIX_LENGTH),
+  })
   // How many takes a generate returns. Applies to both modes; Hooks ignores it.
   const [variationCount, setVariationCount] = usePersistedState<VariationCount>(`${baseKey}:variationCount`, DEFAULT_VARIATION_COUNT, {
     sanitize: (v) => (isVariationCount(v) ? v : DEFAULT_VARIATION_COUNT),
@@ -188,6 +194,9 @@ export default function ScriptArchitect() {
         writeStyle,
         writeFormat,
         writeLength,
+        // 'default' → omitted, which is what tells the remix to keep the
+        // source ad's own length.
+        remixLength: remixLength === 'default' ? undefined : remixLength,
         hookCategory,
         variationCount,
         productId: selectedProduct.id,
@@ -213,6 +222,7 @@ export default function ScriptArchitect() {
         writeStyle,
         writeFormat,
         writeLength,
+        remixLength,
         hookCategory,
         variationCount,
         remixAngles: result.angles,
@@ -255,6 +265,9 @@ export default function ScriptArchitect() {
     // falls back to matching them by variation count.
     setOutputAngles((item.remixAngles as RemixAngle[] | undefined) ?? null)
     if (isVariationCount(item.variationCount)) setVariationCount(item.variationCount)
+    // Rows saved before Remix had a length carry none — they keep the current
+    // pick rather than snapping to 'default'.
+    if (item.mode === 'remix' && isRemixLength(item.remixLength)) setRemixLength(item.remixLength)
     // Restore the left-panel inputs too. Older rows (saved before these
     // fields existed) fall back to the inputSummary slice for the source so
     // something sensible reappears.
@@ -309,6 +322,8 @@ export default function ScriptArchitect() {
           onWriteFormatChange={setWriteFormat}
           writeLength={writeLength}
           onWriteLengthChange={setWriteLength}
+          remixLength={remixLength}
+          onRemixLengthChange={setRemixLength}
           variationCount={variationCount}
           onVariationCountChange={setVariationCount}
           hookCategory={hookCategory}

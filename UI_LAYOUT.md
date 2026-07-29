@@ -302,7 +302,10 @@ merged into one Remix mode — the source box auto-detects the pasted format).
   scene blueprint (`--- Scene N` / `SCENE N —` headers) the box flips to
   fuchsia + monospace and a footer chip appears: "Scene blueprint detected —
   scenes will be rewritten" with a **Remix as script instead** override button
-  (toggles back via "Rewrite scenes instead").
+  (toggles back via "Rewrite scenes instead"). Above Generate: the **variations**
+  toggle, then a **Length** toggle reading **Default / 10s / 15s / 20s / 30s /
+  60s** — Default keeps the source ad's own length. Both hide while the
+  blueprint rewrite is active.
 - **Write New:**
   1. **Output** sub-toggle — left→right **Script · Hooks · Scenes** (a fourth
      **Cinematic** option was retired).
@@ -314,7 +317,8 @@ merged into one Remix mode — the source box auto-detects the pasted format).
      resets to Best Mix).
   4. **Describe Your Ad** textarea (the brief; optional).
   5. **Length** toggle — 10s / 15s / 20s / 30s / 60s (hidden entirely for Hooks
-     — they're one-liners).
+     — they're one-liners). No "Default" here: a script written from scratch has
+     no source length to inherit.
 
 **Generate button** (pinned bottom): label varies — "Generate 3 Scripts" /
 "Generate 10 Hooks" / "Generate 3 Scene Drafts" / "Generate 3 Script Variations"

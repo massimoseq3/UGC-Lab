@@ -250,7 +250,7 @@ const REVERSE_ENGINEER_SYSTEM = `You are an elite UGC ad creative director. You 
 
 You will receive:
 - A comprehensive reverse-engineered prompt for a winning UGC video ad, broken into one or more scenes (separated by "--- Scene N: <label> (MM:SS-MM:SS) ---" headers). Each scene fully describes the original character (age / gender / hair / wardrobe / etc.), the original product (label / container / colour / etc.), embedded original dialogue lines, plus setting / framing / camera / lighting / mood.
-- The user's product context (name, description, target market, pain points, USPs, benefits, key specs, customer language, objections, offer, CTA).
+- The user's product context (name, description, target market, pain points, USPs, benefits, key specs, objections, offer, CTA).
 
 YOUR TASK — apply these four transformations to every scene:
 
@@ -466,23 +466,80 @@ const FORMAT_OVERRIDES_TAKE = `WHEN THE FORMAT AND THE TAKE DISAGREE, THE FORMAT
 // opening device and a different anchor on each.
 const WRITE_ANGLE_DISCIPLINE = `ANGLE DISCIPLINE: commit to exactly ONE pain point and the ONE benefit that pays it off — chosen from the product details per the anchor below (or inferred from the brief if no product details are given). Every line of the script drives that single idea deeper. Do NOT tour multiple pain points, stack USPs, or list benefits — a script that mentions three benefits sells none. Other product facts may appear only in service of the one idea (a spec as proof, the offer at the CTA).`
 
+// The creator's own words outrank the batch's angle spread. A brief that names
+// the angle ("make it about the 3am feed", "push the price per use") used to be
+// fought by every take's assigned anchor, which is the app arguing with the
+// person using it. Read LAST in the angle block, so it beats the anchor above
+// it. Shared by both batch pipelines — Write New's takes and Remix's angles
+// spread the same way and have to yield the same way.
+const CREATOR_ANGLE_PRECEDENCE = `WHEN THE CREATOR HAS ALREADY PICKED THE ANGLE, IT WINS: if the brief or the additional instructions name the angle to build this ad around — a specific pain point, benefit, feature, audience, story, or hook — write THAT one and drop the assigned angle above entirely. Every variation in the batch then argues the creator's angle, and this one differs from the others only in its opening device and how it gets there. You choose an angle yourself ONLY when the creator left it open, and then it must be the one assigned above.`
+
 // Ordered STRONGEST FIRST — a generate takes the first N, so picking 3 gets the
 // three best angles rather than an arbitrary three. The first three deliberately
 // span the whole awareness ladder (problem-aware / solution-aware / unaware)
 // with a different opening device and a different anchor on each; everything
 // after widens the net without repeating one of them.
-const WRITE_TAKE_INSTRUCTION: string[] = [
-  `THIS TAKE: open with a specific personal confession or moment ("I did X for years before I realized..."). Anchor: the most personal, private-feeling pain point — write for a problem-aware viewer who thinks it's just them.\n${WRITE_ANGLE_DISCIPLINE}`,
-  `THIS TAKE: open with a surprising number, stat, or before/after result that reframes the problem. Anchor: the most concrete, measurable benefit — write proof-first for a skeptical, solution-aware viewer.\n${WRITE_ANGLE_DISCIPLINE}`,
-  `THIS TAKE: open mid-story, in the middle of a moment or a question, so the viewer is dropped straight into the action. Anchor: the most unexpected benefit or use-moment — write curiosity-first for an unaware viewer who wasn't shopping at all.\n${WRITE_ANGLE_DISCIPLINE}`,
-  `THIS TAKE: open with a bold claim or hot take stated as fact. Anchor: the single strongest USP — write for a solution-aware viewer comparing options.\n${WRITE_ANGLE_DISCIPLINE}`,
-  `THIS TAKE: open by naming the exact reason someone wouldn't buy this, out loud, before defending it. Anchor: the biggest objection (price, effort, "tried something like it") and the one benefit that answers it — write for a skeptic who has already been burned.\n${WRITE_ANGLE_DISCIPLINE}`,
-  `THIS TAKE: open by directly calling out the viewer ("if you [pain point], stop scrolling" energy — in your own words, not that phrase). Anchor: the most widespread everyday pain point — write for a problem-aware viewer who hasn't looked for a fix yet.\n${WRITE_ANGLE_DISCIPLINE}`,
-  `THIS TAKE: open on the thing they're using right now and why it keeps failing them — never name a competitor brand, say "the one everyone buys". Anchor: the single clearest difference (result, time, or price) — write for a viewer who thinks their current fix is fine.\n${WRITE_ANGLE_DISCIPLINE}`,
-  `THIS TAKE: open on a mistake the viewer is probably making without knowing it. Anchor: the pain point that mistake causes, and the benefit that ends it — write for a problem-aware viewer who has misdiagnosed their own problem.\n${WRITE_ANGLE_DISCIPLINE}`,
-  `THIS TAKE: open on how you found it — a friend, a comment section, someone who wouldn't shut up about it. Anchor: the benefit that made it worth passing on — write social-proof-first for an unaware viewer who trusts people over ads.\n${WRITE_ANGLE_DISCIPLINE}`,
-  `THIS TAKE: open inside one specific moment in the day when the problem bites — a time, a place, a routine. Anchor: the benefit felt in exactly that moment — write for a problem-aware viewer who lives that moment daily.\n${WRITE_ANGLE_DISCIPLINE}`,
+//
+// `label` is that take's anchor in one phrase — it's what the OTHER takes in the
+// batch are told to stay off. It lives beside the instruction it summarises so
+// the two can't drift; a stale label would push a take away from a free angle.
+const WRITE_TAKES: { label: string; instruction: string }[] = [
+  {
+    label: 'the most personal, private-feeling pain point, opened as a confession',
+    instruction: `THIS TAKE: open with a specific personal confession or moment ("I did X for years before I realized..."). Anchor: the most personal, private-feeling pain point — write for a problem-aware viewer who thinks it's just them.`,
+  },
+  {
+    label: 'the most concrete measurable benefit, opened on a number or before/after',
+    instruction: `THIS TAKE: open with a surprising number, stat, or before/after result that reframes the problem. Anchor: the most concrete, measurable benefit — write proof-first for a skeptical, solution-aware viewer.`,
+  },
+  {
+    label: 'the most unexpected benefit or use-moment, opened mid-story',
+    instruction: `THIS TAKE: open mid-story, in the middle of a moment or a question, so the viewer is dropped straight into the action. Anchor: the most unexpected benefit or use-moment — write curiosity-first for an unaware viewer who wasn't shopping at all.`,
+  },
+  {
+    label: 'the single strongest USP, opened as a bold claim',
+    instruction: `THIS TAKE: open with a bold claim or hot take stated as fact. Anchor: the single strongest USP — write for a solution-aware viewer comparing options.`,
+  },
+  {
+    label: 'the biggest objection and the benefit that answers it',
+    instruction: `THIS TAKE: open by naming the exact reason someone wouldn't buy this, out loud, before defending it. Anchor: the biggest objection (price, effort, "tried something like it") and the one benefit that answers it — write for a skeptic who has already been burned.`,
+  },
+  {
+    label: 'the most widespread everyday pain point, opened by calling the viewer out',
+    instruction: `THIS TAKE: open by directly calling out the viewer ("if you [pain point], stop scrolling" energy — in your own words, not that phrase). Anchor: the most widespread everyday pain point — write for a problem-aware viewer who hasn't looked for a fix yet.`,
+  },
+  {
+    label: 'the clearest difference from what they already use',
+    instruction: `THIS TAKE: open on the thing they're using right now and why it keeps failing them — never name a competitor brand, say "the one everyone buys". Anchor: the single clearest difference (result, time, or price) — write for a viewer who thinks their current fix is fine.`,
+  },
+  {
+    label: 'the pain point caused by a mistake the viewer is making unknowingly',
+    instruction: `THIS TAKE: open on a mistake the viewer is probably making without knowing it. Anchor: the pain point that mistake causes, and the benefit that ends it — write for a problem-aware viewer who has misdiagnosed their own problem.`,
+  },
+  {
+    label: 'the benefit worth passing on, carried by social proof',
+    instruction: `THIS TAKE: open on how you found it — a friend, a comment section, someone who wouldn't shut up about it. Anchor: the benefit that made it worth passing on — write social-proof-first for an unaware viewer who trusts people over ads.`,
+  },
+  {
+    label: 'the benefit felt inside one recurring moment of the day',
+    instruction: `THIS TAKE: open inside one specific moment in the day when the problem bites — a time, a place, a routine. Anchor: the benefit felt in exactly that moment — write for a problem-aware viewer who lives that moment daily.`,
+  },
 ]
+
+// The angle half of a take's prompt. Takes run as parallel calls blind to each
+// other, so naming what the siblings are anchored to is the only thing stopping
+// a product with one obvious pain point from coming back as three near-identical
+// scripts. `takeCount` is the batch size — 1 (writeOneScript) drops the clause.
+function takeAngleBlock(take: number, takeCount: number): string {
+  const entry = WRITE_TAKES[take] ?? WRITE_TAKES[0]
+  const siblings = WRITE_TAKES.slice(0, takeCount).filter((_, i) => i !== take).map((t) => t.label)
+
+  let block = `${entry.instruction}\n${WRITE_ANGLE_DISCIPLINE}`
+  if (siblings.length) {
+    block += `\nNOT YOUR ANGLE: ${takeCount} takes are being written from this brief at once, each committed to a different angle. The others are taking ${siblings.join('; ')}. Stay off theirs even if one of them looks like the stronger idea for this product — the batch is only worth generating if the ${takeCount} scripts argue ${takeCount} genuinely different things.`
+  }
+  return `${block}\n\n${CREATOR_ANGLE_PRECEDENCE}`
+}
 
 // Word budgets assume ~2.4 words/sec on-camera pace, so the read time
 // actually matches the length the user picked.
@@ -500,7 +557,7 @@ function formatEndTimestamp(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-async function runWrite(input: GenerateScriptInput, take: number, apiKey: string, endpoint: string): Promise<string> {
+async function runWrite(input: GenerateScriptInput, take: number, takeCount: number, apiKey: string, endpoint: string): Promise<string> {
   const style = input.writeStyle ?? 'pas'
   const format = input.writeFormat ?? 'script'
   const length = input.writeLength ?? 15
@@ -519,7 +576,7 @@ async function runWrite(input: GenerateScriptInput, take: number, apiKey: string
   const staging = format === 'scenes' ? WRITE_STYLE_SCENE_DIRECTION[style] : undefined
   if (staging) prompt += `${staging}\n\n`
 
-  prompt += `${WRITE_TAKE_INSTRUCTION[take] ?? WRITE_TAKE_INSTRUCTION[0]}\n\n`
+  prompt += `${takeAngleBlock(take, takeCount)}\n\n`
 
   if (WRITE_STYLE_META[style].group === 'format') prompt += `${FORMAT_OVERRIDES_TAKE}\n\n`
 
@@ -562,7 +619,6 @@ function productContextLines(ctx?: EditableProductContext | null): string {
   if (ctx.usps) lines.push(`- USPs: ${ctx.usps}`)
   if (ctx.benefits) lines.push(`- Benefits: ${ctx.benefits}`)
   if (ctx.keySpecs) lines.push(`- Key Facts & Specs (cite these concrete specifics instead of vague claims): ${ctx.keySpecs}`)
-  if (ctx.customerLanguage) lines.push(`- Customer Language (verbatim phrases real buyers use — mirror this voice in hooks and dialogue): ${ctx.customerLanguage}`)
   if (ctx.objections) lines.push(`- Objections (hesitation — counter; address the most relevant one, don't list them): ${ctx.objections}`)
   if (ctx.offer) lines.push(`- Offer: ${ctx.offer}`)
   if (ctx.cta) lines.push(`- Call-to-Action: ${ctx.cta}`)
@@ -617,7 +673,18 @@ async function runRemix(input: GenerateScriptInput, angle: RemixAngle, apiKey: s
     prompt += `Additional context and instructions:\n${input.additionalContext}\n\n`
   }
 
-  prompt += `${REMIX_ANGLE_INSTRUCTION[angle]}\n\nGenerate the full script now.`
+  prompt += `${REMIX_ANGLE_INSTRUCTION[angle]}\n\n${CREATOR_ANGLE_PRECEDENCE}\n\n`
+
+  // No target length means the 'default' pick: the remix inherits the source
+  // ad's pacing, which is the whole point of remixing a winner. A picked length
+  // re-cuts it, and the word budget is what actually makes that land.
+  const length = input.remixLength
+  if (length) {
+    const budget = WRITE_LENGTH_BUDGET[length]
+    prompt += `${lengthDiscipline(length)}\n\nLENGTH: this remix must read aloud in about ${length} seconds — write ${budget.words}, regardless of how long the source script is. Keep the source's hook style, structure and CTA placement; drop whole beats from the middle to fit. Count the words before you answer.\n\n`
+  }
+
+  prompt += `Generate the full script now.`
 
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: REMIX_SYSTEM }] },
@@ -679,9 +746,9 @@ export async function generateScript(input: GenerateScriptInput): Promise<Genera
     }
     // Clamped to the take-angle list, so a count can never index past it and
     // repeat an angle.
-    const takeCount = Math.min(requestedCount(input), WRITE_TAKE_INSTRUCTION.length)
+    const takeCount = Math.min(requestedCount(input), WRITE_TAKES.length)
     const settled = await Promise.allSettled(
-      Array.from({ length: takeCount }, (_, take) => runWrite(input, take, apiKey, endpoint)),
+      Array.from({ length: takeCount }, (_, take) => runWrite(input, take, takeCount, apiKey, endpoint)),
     )
     return { variations: keepFulfilled(settled) }
   }
@@ -716,8 +783,9 @@ function keepFulfilled(settled: PromiseSettledResult<string>[]): string[] {
 export async function writeOneScript(input: GenerateScriptInput): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const endpoint = getChatEndpointPath(CHAT_MODEL_ID)
-  // Take 0 is the strongest angle in the list (see WRITE_TAKE_INSTRUCTION).
-  return runWrite({ ...input, mode: 'write', writeFormat: 'script' }, 0, apiKey, endpoint)
+  // Take 0 is the strongest angle in the list (see WRITE_TAKES). Batch size 1 —
+  // there are no siblings to steer away from.
+  return runWrite({ ...input, mode: 'write', writeFormat: 'script' }, 0, 1, apiKey, endpoint)
 }
 
 // ── Brief enhancement ──

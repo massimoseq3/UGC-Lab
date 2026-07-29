@@ -95,6 +95,17 @@ export const WRITE_LENGTHS: WriteLength[] = [10, 15, 20, 30, 60]
 export const isWriteLength = (value: unknown): value is WriteLength =>
   WRITE_LENGTHS.includes(value as WriteLength)
 
+// Remix rewrites an ad that already has a length, so unlike Write New it has a
+// "leave it alone" option — 'default' keeps the source's own pacing and beat
+// count, which is what remixing a winning ad usually wants. It leads the list
+// and is the default pick; the numbers re-cut the source to a target duration.
+export type RemixLength = WriteLength | 'default'
+export const REMIX_LENGTHS: RemixLength[] = ['default', ...WRITE_LENGTHS]
+export const DEFAULT_REMIX_LENGTH: RemixLength = 'default'
+
+export const isRemixLength = (value: unknown): value is RemixLength =>
+  value === 'default' || isWriteLength(value)
+
 export const WRITE_STYLE_GROUP_META: Record<WriteStyleGroup, { label: string; hint: string }> = {
   structure: { label: 'Structures', hint: 'How the argument is built' },
   format: { label: 'Formats', hint: 'The kind of content the ad is disguised as' },
@@ -220,7 +231,6 @@ export interface EditableProductContext {
   usps: string
   benefits: string
   keySpecs: string
-  customerLanguage: string
   objections: string
   offer: string
   cta: string
@@ -239,7 +249,6 @@ export function createEditableContext(product: Product): EditableProductContext 
     usps: product.usps,
     benefits: product.benefits,
     keySpecs: product.keySpecs ?? '',
-    customerLanguage: product.customerLanguage ?? '',
     objections: product.objections ?? '',
     offer: product.offer,
     cta: product.cta,
@@ -255,6 +264,9 @@ export interface GenerateScriptInput {
   writeStyle?: WriteStyle
   writeFormat?: WriteFormat
   writeLength?: WriteLength
+  // Remix mode: the target duration to re-cut the source ad to. Omitted → the
+  // remix keeps the source's own length and beat count (the 'default' pick).
+  remixLength?: WriteLength
   // Hooks format only: which formula family the 10 hooks draw from.
   hookCategory?: HookCategoryChoice
   // How many takes to return. Omitted → DEFAULT_VARIATION_COUNT.

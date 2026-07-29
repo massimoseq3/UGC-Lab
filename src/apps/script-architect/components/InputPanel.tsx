@@ -1,7 +1,7 @@
 import { useState, type ComponentType } from 'react'
 import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkles, Undo2, Redo2, Eraser, Shuffle, FishingHook, Video } from 'lucide-react'
 import type { Product, Script } from '../../../stores/types'
-import { WRITE_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNT, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type HookCategoryChoice, type VariationCount } from '../types'
+import { WRITE_LENGTHS, REMIX_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNT, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type VariationCount } from '../types'
 import { useBankStore } from '../../../stores/bankStore'
 import BankPicker from '../../../components/BankPicker'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -36,6 +36,8 @@ interface InputPanelProps {
   onWriteFormatChange: (value: WriteFormat) => void
   writeLength: WriteLength
   onWriteLengthChange: (value: WriteLength) => void
+  remixLength: RemixLength
+  onRemixLengthChange: (value: RemixLength) => void
   variationCount: VariationCount
   onVariationCountChange: (value: VariationCount) => void
   hookCategory: HookCategoryChoice
@@ -66,6 +68,8 @@ export default function InputPanel({
   onWriteFormatChange,
   writeLength,
   onWriteLengthChange,
+  remixLength,
+  onRemixLengthChange,
   variationCount,
   onVariationCountChange,
   hookCategory,
@@ -787,7 +791,7 @@ export default function InputPanel({
           </div>
         )}
         {/* Length — pinned directly above Generate. Hooks are one-liners, so the
-            format has no duration and the toggle hides; only Write New offers it. */}
+            format has no duration and the toggle hides. */}
         {mode === 'write' && !isHooksFormat && (
           <div className="mb-3">
             <SegmentedToggle<string>
@@ -796,6 +800,24 @@ export default function InputPanel({
               value={String(writeLength)}
               onChange={(v) => onWriteLengthChange(Number(v) as WriteLength)}
               options={WRITE_LENGTHS.map((len) => ({ value: String(len), label: `${len}s` }))}
+            />
+          </div>
+        )}
+        {/* Remix's length carries a "Default" — the source ad already has a
+            length, and keeping it is usually the point of remixing a winner.
+            Hidden for the blueprint rewrite, which holds the source's own scene
+            timestamps and can't be re-cut to a different duration. */}
+        {mode !== 'write' && !blueprintActive && (
+          <div className="mb-3">
+            <SegmentedToggle<string>
+              className="h-12 !p-1"
+              accent="scripts"
+              value={String(remixLength)}
+              onChange={(v) => onRemixLengthChange((v === 'default' ? 'default' : Number(v)) as RemixLength)}
+              options={REMIX_LENGTHS.map((len) => ({
+                value: String(len),
+                label: len === 'default' ? 'Default' : `${len}s`,
+              }))}
             />
           </div>
         )}
@@ -872,7 +894,6 @@ export default function InputPanel({
             <EditableField label="USPs" value={editableContext.usps} onChange={(v) => updateField('usps', v)} />
             <EditableField label="Benefits" value={editableContext.benefits} onChange={(v) => updateField('benefits', v)} />
             <EditableField label="Key Specs & Facts" value={editableContext.keySpecs} onChange={(v) => updateField('keySpecs', v)} />
-            <EditableField label="Customer Language" value={editableContext.customerLanguage} onChange={(v) => updateField('customerLanguage', v)} />
             <EditableField label="Objections" value={editableContext.objections} onChange={(v) => updateField('objections', v)} />
             <EditableField label="Offer" value={editableContext.offer} onChange={(v) => updateField('offer', v)} />
             <EditableField label="CTA" value={editableContext.cta} onChange={(v) => updateField('cta', v)} />
