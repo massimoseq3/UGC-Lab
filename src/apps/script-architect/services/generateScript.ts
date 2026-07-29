@@ -10,6 +10,14 @@ import { getChatEndpointPath, CHAT_MODEL_DEFAULT } from '../../../utils/models'
 // every one on their own key. Back on Gemini 3 Flash.
 const CHAT_MODEL_ID = CHAT_MODEL_DEFAULT
 
+// A batch fires N of these calls at once, so they contend with each other and a
+// take routinely runs past kieChatCompletions' 120s default — which aborts the
+// request client-side while kie.ai finishes the generation anyway and bills for
+// it. Every other chat surface already buys itself more room (Ad Analyzer 300s,
+// product auto-fill and style analysis 180s); Scripts was the last one left on
+// the bare default.
+const SCRIPT_TIMEOUT_MS = 300_000
+
 // ── Shared writing DNA ──
 //
 // Every mode (write / scenes / remix / reverse-engineer) sits on
@@ -389,7 +397,7 @@ async function runHooks(input: GenerateScriptInput, apiKey: string, endpoint: st
   ]
 
   // Hooks are spoken opening lines end to end.
-  const text = await kieChatCompletions(apiKey, endpoint, messages)
+  const text = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: SCRIPT_TIMEOUT_MS })
   return nameSpokenTokens(text, spokenProductName(input))
 }
 
@@ -591,7 +599,7 @@ async function runWrite(input: GenerateScriptInput, take: number, takeCount: num
 
   // Scenes mix visual direction with speech (tokens are legitimate in the
   // former); a plain script is spoken end to end.
-  const text = await kieChatCompletions(apiKey, endpoint, messages)
+  const text = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: SCRIPT_TIMEOUT_MS })
   return format === 'scenes'
     ? nameSpokenTokensInDialogue(text, spokenProductName(input))
     : nameSpokenTokens(text, spokenProductName(input))
@@ -684,7 +692,7 @@ async function runRemix(input: GenerateScriptInput, angle: RemixAngle, apiKey: s
   ]
 
   // Plain remix output is pure spoken words, so any token anywhere is spoken.
-  const text = await kieChatCompletions(apiKey, endpoint, messages)
+  const text = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: SCRIPT_TIMEOUT_MS })
   return nameSpokenTokens(text, spokenProductName(input))
 }
 
@@ -711,7 +719,7 @@ async function runReverseEngineer(input: GenerateScriptInput, apiKey: string, en
     { role: 'user', content: [{ type: 'text', text: prompt }] },
   ]
 
-  const text = await kieChatCompletions(apiKey, endpoint, messages)
+  const text = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: SCRIPT_TIMEOUT_MS })
   return nameSpokenTokensInDialogue(text, spokenProductName(input))
 }
 
@@ -739,15 +747,31 @@ export async function generateScript(input: GenerateScriptInput): Promise<Genera
     // Clamped to the take-angle list, so a count can never index past it and
     // repeat an angle.
     const takeCount = Math.min(requestedCount(input), WRITE_TAKES.length)
-    const variations = await Promise.all(
+    const settled = await Promise.allSettled(
       Array.from({ length: takeCount }, (_, take) => runWrite(input, take, takeCount, apiKey, endpoint)),
     )
-    return { variations }
+    return { variations: keepFulfilled(settled) }
   }
 
-  const angles = REMIX_ANGLES.slice(0, Math.min(requestedCount(input), REMIX_ANGLES.length))
-  const variations = await Promise.all(angles.map((angle) => runRemix(input, angle, apiKey, endpoint)))
+  const requested = REMIX_ANGLES.slice(0, Math.min(requestedCount(input), REMIX_ANGLES.length))
+  const settled = await Promise.allSettled(requested.map((angle) => runRemix(input, angle, apiKey, endpoint)))
+  const variations = keepFulfilled(settled)
+  // The stamp has to name the angles that actually came back, in order — it's
+  // what OutputPanel labels each take with.
+  const angles = requested.filter((_, i) => settled[i].status === 'fulfilled')
   return { variations, angles }
+}
+
+// A batch is N independent chat calls, and Promise.all rejects on the FIRST one
+// to fail — so a single slow take threw away every take that had already
+// landed, and the member saw an error next to a kie.ai log full of successful
+// generations they'd paid for. Keep what came back; only surface the failure
+// when nothing did.
+function keepFulfilled(settled: PromiseSettledResult<string>[]): string[] {
+  const kept = settled.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
+  if (kept.length > 0) return kept
+  const first = settled.find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined
+  throw first?.reason ?? new Error('Script generation returned nothing.')
 }
 
 // ONE spoken script from a brief + style + length — the strongest take, not a
@@ -789,7 +813,7 @@ ${draft}
     { role: 'system', content: [{ type: 'text', text: ENHANCE_BRIEF_SYSTEM }] },
     { role: 'user', content: [{ type: 'text', text: userMessage }] },
   ]
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages)
+  const responseText = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: SCRIPT_TIMEOUT_MS })
   return responseText
     .replace(/```[a-z]*\n?/gi, '')
     .replace(/```/g, '')
