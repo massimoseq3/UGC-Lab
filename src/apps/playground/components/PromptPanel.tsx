@@ -48,7 +48,7 @@ import type { BankType } from '../../../utils/constants'
 import type { BRoll } from '../../../stores/types'
 import PresetCard from './PresetCard'
 import SlideOver from '../../../components/SlideOver'
-import ExpandTextModal, { ExpandButton, renderBracketHighlight } from '../../../components/ExpandableText'
+import ExpandTextModal, { BracketHighlightArea, ExpandButton } from '../../../components/ExpandableText'
 import MentionPopover from './MentionPopover'
 import type { PlaygroundMode, BankReference } from '../types'
 import { VIDEO_PRESETS, IMAGE_PRESETS, type Preset } from '../presets'
@@ -134,8 +134,6 @@ const MODE_TABS: Array<{ id: PlaygroundMode; label: string; icon: React.Componen
 
 export default function PromptPanel({ state, onChange, onModeChange, onSubmit, isGenerating }: PromptPanelProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  // Backdrop that paints the [bracketed] placeholders red behind the textarea.
-  const highlightRef = useRef<HTMLDivElement>(null)
 
   // Mention popover state — open when the user just typed an @ that isn't
   // followed by a space. `mentionQuery` is what follows the most recent @.
@@ -222,14 +220,6 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
       setIsEnhancing(false)
     }
   }
-
-  // Keep the highlight backdrop scrolled in lockstep with the textarea (e.g.
-  // after a preset drops in a long prompt and focuses/scrolls the field).
-  useEffect(() => {
-    if (highlightRef.current && textareaRef.current) {
-      highlightRef.current.scrollTop = textareaRef.current.scrollTop
-    }
-  }, [state.prompt])
 
   const model = getModel(state.modelId)
   const modelSavings = model ? officialSavingsPercent(model.id) : null
@@ -752,35 +742,28 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                       <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
                     </button>
                   )}
-                  <div className="relative flex grow">
-                    <div
-                      ref={highlightRef}
-                      aria-hidden
-                      className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words pb-3 pl-3.5 pr-[calc(0.875rem+11px)] pt-3 text-[13px] font-light leading-[1.5] tracking-[-0.025em] text-transparent"
-                    >
-                      {renderBracketHighlight(state.prompt)}
-                    </div>
-                    <textarea
-                      ref={textareaRef}
-                      value={state.prompt}
-                      onChange={handlePromptChange}
-                      onScroll={(e) => {
-                        if (highlightRef.current) highlightRef.current.scrollTop = e.currentTarget.scrollTop
-                      }}
-                      onBlur={() => { commitPromptDraft(); setTimeout(() => setMentionOpen(false), 150) }}
-                      rows={6}
-                      placeholder={
-                        state.mode === 'image'
-                          ? 'Describe the image you want… (type @ to reference banks)'
-                          : isMotionControl
-                          ? 'Optional — refine the motion or leave blank…'
-                          : state.mode === 'video'
-                          ? 'Describe the video… (type @ to reference banks)'
-                          : 'Describe the music — genre, mood, instruments…'
-                      }
-                      className="relative min-h-[120px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-[1.5] text-ink-200 placeholder-ink-600 outline-none [scrollbar-gutter:stable]"
-                    />
-                  </div>
+                  {/* basis-0 so the field's own content can't inflate the panel
+                      — its height is the free space the column hands it, and
+                      anything longer scrolls inside. */}
+                  <BracketHighlightArea
+                    value={state.prompt}
+                    onChange={handlePromptChange}
+                    textareaRef={textareaRef}
+                    onBlur={() => { commitPromptDraft(); setTimeout(() => setMentionOpen(false), 150) }}
+                    className="min-h-[120px] grow basis-0"
+                    padClass="px-3.5 pb-3 pt-3"
+                    textClass="text-[13px] leading-[1.5]"
+                    textareaClass="text-ink-200 placeholder-ink-600"
+                    placeholder={
+                      state.mode === 'image'
+                        ? 'Describe the image you want… (type @ to reference banks)'
+                        : isMotionControl
+                        ? 'Optional — refine the motion or leave blank…'
+                        : state.mode === 'video'
+                        ? 'Describe the video… (type @ to reference banks)'
+                        : 'Describe the music — genre, mood, instruments…'
+                    }
+                  />
                   {/* Footer toolbar — its own section under a hairline. Enhance +
                       Undo/Redo bottom-left; Expand bottom-right. */}
                   <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
