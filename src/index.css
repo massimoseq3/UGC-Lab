@@ -523,9 +523,16 @@ textarea,
   5%      { opacity: 0; transform: translate3d(-460px, 205px, 0) rotate(-24deg); }
   100%    { opacity: 0; transform: translate3d(-460px, 205px, 0) rotate(-24deg); }
 }
+/* `backwards` (plus the base opacity) is load-bearing, not tidiness: a meteor
+   with an animation-delay renders with its OWN style until the animation starts,
+   and a bare streak is opacity 1 with no transform — so the delayed meteor hung
+   in the corner as a static white dash for its first 11 seconds and then began
+   behaving. Every meteor also starts delayed, so the sky is calm on arrival
+   rather than firing one the instant the page mounts. */
 .desktop-meteor {
   background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
-  animation: meteor 22s linear infinite;
+  opacity: 0;
+  animation: meteor 22s linear infinite backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
