@@ -68,15 +68,45 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
   },
 
   // ── Network / timeouts (our own messages) ──
+  //
+  // These four were one rule, and its advice ("the model is likely busy, give
+  // it a minute") was wrong for three of them. A dropped connection, a request
+  // we hung up on (kie finishes and bills it anyway), and a poll budget that
+  // ran out while the task was still rendering all need different next steps —
+  // and "try again" is the expensive answer when the work already happened.
+  //
+  // Order matters: a stalled upload and a blind poll loop both say "timed out"
+  // too, so the connection rules must sit above the generic catch-all.
   {
-    test: (m) => m.includes('timed out') || m.includes('timeout'),
+    // r2.ts's stalled upload, and fetchWithRetry giving up on the socket.
+    test: (m) =>
+      m.includes('stalled') ||
+      m.includes('connection failed') ||
+      m.includes('failed to fetch') ||
+      m.includes('network'),
     message:
-      'This took too long and timed out. Try again — if it keeps happening the model is likely busy, so give it a minute.',
+      'The connection dropped mid-request. Check your internet connection and try again.',
   },
   {
-    test: (m) => m.includes('connection failed') || m.includes('failed to fetch') || m.includes('network'),
+    // PollTimeoutError with unreachable=true — we gave up while the polls
+    // themselves were failing, so the model was never the problem.
+    test: (m) => m.includes('connection to kie.ai kept failing'),
     message:
-      "Couldn't reach kie.ai. Check your internet connection and try again.",
+      'Lost the connection to kie.ai while waiting. Check your internet — the generation may have finished anyway, so check kie.ai before running it again.',
+  },
+  {
+    // fetchWithRetry's AbortController fired: we stopped listening before kie
+    // answered. kie bills for whatever it finished after that.
+    test: (m) => m.includes('request timed out'),
+    message:
+      'The request was dropped before kie.ai answered. It may have finished anyway, so check kie.ai before retrying.',
+  },
+  {
+    // PollTimeoutError on a healthy connection — the task is very likely still
+    // rendering on kie.ai, and regenerating pays for it twice.
+    test: (m) => m.includes('timed out') || m.includes('timeout'),
+    message:
+      "This is taking longer than we wait for, so we stopped watching — it's likely still running on kie.ai. Check there before generating it again.",
   },
 
   // ── Empty / malformed model responses ──

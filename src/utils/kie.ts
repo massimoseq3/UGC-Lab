@@ -99,16 +99,34 @@ function isTerminalPollError(err: unknown): boolean {
 // Thrown when a poll loop exhausts its attempt budget. Distinct from a genuine
 // `fail` so callers can tell "we stopped watching" (the kie task may STILL be
 // rendering — resume it later) apart from "the generation actually failed"
-// (drop it). The message keeps the old "...timed out after N minutes." wording
-// so humanizeError's timeout rule still matches.
+// (drop it). The message keeps the "...timed out after N minutes." wording so
+// humanizeError's timeout rules still match.
+//
+// `unreachable` says the loop was BLIND when it gave up — the polls themselves
+// were failing, so this is the member's connection rather than a slow model.
+// Both cases used to arrive as the same sentence, which told a member with dead
+// Wi-Fi that "the model is likely busy".
 export class PollTimeoutError extends Error {
   readonly minutes: number
-  constructor(minutes: number, label = 'Generation') {
-    super(`${label} timed out after ${minutes} minute${minutes === 1 ? '' : 's'}.`)
+  readonly unreachable: boolean
+  constructor(minutes: number, label = 'Generation', unreachable = false) {
+    const elapsed = `${minutes} minute${minutes === 1 ? '' : 's'}`
+    super(
+      unreachable
+        ? `${label} timed out after ${elapsed} — the connection to kie.ai kept failing.`
+        : `${label} timed out after ${elapsed}.`,
+    )
     this.name = 'PollTimeoutError'
     this.minutes = minutes
+    this.unreachable = unreachable
   }
 }
+
+// How many consecutive failed polls at the tail of a loop count as "we never
+// got a healthy read before giving up". Three cycles is long enough that one
+// blip can't trip it, short enough that a connection lost late in a long render
+// is still reported as a connection problem.
+const UNREACHABLE_STREAK = 3
 
 export function isPollTimeout(err: unknown): err is PollTimeoutError {
   return err instanceof PollTimeoutError
@@ -278,6 +296,7 @@ export async function pollTask(
   opts: RunTaskOptions = {},
 ): Promise<TaskRecord> {
   const { signal, onProgress, pollIntervalMs = POLL_INTERVAL_MS, maxPollAttempts = MAX_POLL_ATTEMPTS } = opts
+  let blindStreak = 0
 
   for (let i = 0; i < maxPollAttempts; i++) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -300,8 +319,10 @@ export async function pollTask(
       // it now instead of burning the full ~10-minute poll window.
       if (signal?.aborted) throw err
       if (isTerminalPollError(err)) throw err
+      blindStreak++
       continue
     }
+    blindStreak = 0
 
     onProgress?.(record.progress ?? 0, record.state)
 
@@ -312,7 +333,7 @@ export async function pollTask(
   }
 
   const minutes = Math.round((maxPollAttempts * pollIntervalMs) / 60_000)
-  throw new PollTimeoutError(minutes)
+  throw new PollTimeoutError(minutes, 'Generation', blindStreak >= UNREACHABLE_STREAK)
 }
 
 // ── Result parsing ──────────────────────────────────────────────
@@ -376,6 +397,14 @@ export interface ChatMessage {
   role: ChatRole
   content: ChatContentPart[] | string
 }
+
+// The ceiling for chat calls that write something long: a storyboard, a batch
+// of takes, a whole-video read. kie's gateway BUFFERS the SSE stream rather
+// than streaming it, so the timeout below bounds the entire generation, not
+// just time-to-headers — a big call blows through the 120s default while kie
+// finishes the job anyway and bills for it. Consuming the stream incrementally
+// is the real fix; this raises the ceiling until then.
+export const LONG_CHAT_TIMEOUT_MS = 300_000
 
 export interface ChatCompletionsOptions {
   signal?: AbortSignal
@@ -534,6 +563,7 @@ export async function kieVeoPoll(
   opts: RunTaskOptions = {},
 ): Promise<string[]> {
   const { signal, pollIntervalMs = POLL_INTERVAL_MS, maxPollAttempts = VIDEO_POLL_ATTEMPTS, onProgress } = opts
+  let blindStreak = 0
 
   for (let i = 0; i < maxPollAttempts; i++) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -555,14 +585,18 @@ export async function kieVeoPoll(
         if (TERMINAL_POLL_STATUS.has(env.code)) {
           throw new KieHttpError(env.code, friendlyHttpError(env.code, env.msg, 'GET /veo/record-info'))
         }
+        // A bad envelope code on a healthy read — kie answered, so we're not blind.
+        blindStreak = 0
         continue
       }
       record = env.data
     } catch (err) {
       if (signal?.aborted) throw err
       if (isTerminalPollError(err)) throw err
+      blindStreak++
       continue
     }
+    blindStreak = 0
 
     onProgress?.(0, record.state ?? 'generating')
 
@@ -591,7 +625,7 @@ export async function kieVeoPoll(
   }
 
   const minutes = Math.round((maxPollAttempts * pollIntervalMs) / 60_000)
-  throw new PollTimeoutError(minutes, 'Veo generation')
+  throw new PollTimeoutError(minutes, 'Veo generation', blindStreak >= UNREACHABLE_STREAK)
 }
 
 // ── Suno music generation (custom endpoint) ────────────────────
@@ -685,6 +719,7 @@ export async function pollMusicTask(
   opts: RunTaskOptions = {},
 ): Promise<SunoRecordData> {
   const { signal, pollIntervalMs = POLL_INTERVAL_MS, maxPollAttempts = MUSIC_POLL_ATTEMPTS, onProgress } = opts
+  let blindStreak = 0
 
   for (let i = 0; i < maxPollAttempts; i++) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
@@ -696,8 +731,10 @@ export async function pollMusicTask(
     } catch (err) {
       if (signal?.aborted) throw err
       if (isTerminalPollError(err)) throw err
+      blindStreak++
       continue
     }
+    blindStreak = 0
 
     onProgress?.(0, record.status === 'SUCCESS' ? 'success' : 'generating')
 
@@ -713,7 +750,7 @@ export async function pollMusicTask(
   }
 
   const minutes = Math.round((maxPollAttempts * pollIntervalMs) / 60_000)
-  throw new PollTimeoutError(minutes, 'Music generation')
+  throw new PollTimeoutError(minutes, 'Music generation', blindStreak >= UNREACHABLE_STREAK)
 }
 
 // ── Gemini Omni create endpoints (synchronous) ─────────────────

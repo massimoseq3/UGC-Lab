@@ -45,9 +45,19 @@ async function presign(op: 'put' | 'get', assetId: string, mimeType?: string, by
   return await res.json() as SignedUrlResponse
 }
 
+// Thrown when an attempt outlives its budget. A distinct class (rather than a
+// bare Error the caller has to string-match) because a stall and a rejection
+// need opposite advice: check your connection vs. fix the bucket CORS policy.
+class NetworkTimeoutError extends Error {
+  constructor(ms: number) {
+    super(`Network timeout after ${Math.round(ms / 1000)}s`)
+    this.name = 'NetworkTimeoutError'
+  }
+}
+
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`Network timeout after ${Math.round(ms / 1000)}s`)), ms)
+    const t = setTimeout(() => reject(new NetworkTimeoutError(ms)), ms)
     p.then((v) => { clearTimeout(t); resolve(v) }, (e) => { clearTimeout(t); reject(e) })
   })
 }
@@ -76,6 +86,14 @@ export async function uploadAssetToR2(assetId: string, blob: Blob): Promise<void
     const host = (() => { try { return new URL(url).host } catch { return 'r2.cloudflarestorage.com' } })()
     const origin = typeof window !== 'undefined' ? window.location.origin : '<unknown origin>'
     const reason = err instanceof Error ? err.message : String(err)
+    // A CORS rejection fails on the preflight — instantly. A timeout means the
+    // socket opened and the upload stalled, which is the opposite diagnosis:
+    // the member's connection, not the bucket. Blaming CORS for both sent a
+    // real outage (weak uplink, kie.ai timing out alongside it) to the wrong
+    // place, so the hint is only offered for failures it can actually explain.
+    if (err instanceof NetworkTimeoutError) {
+      throw new Error(`Upload to ${host} stalled and timed out after ${Math.round(ATTEMPT_TIMEOUT_MS / 1000)}s. Check your internet connection and try again.`)
+    }
     throw new Error(`R2 PUT to ${host} failed (${reason}). Likely a CORS misconfiguration — verify the bucket CORS policy allows ${origin} with method PUT.`)
   }
   if (!putRes.ok) {
