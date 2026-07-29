@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type ChangeEvent, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Maximize2, X } from 'lucide-react'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
@@ -48,6 +48,158 @@ export function renderBracketHighlight(text: string): ReactNode[] {
   // (a zero-width space gives the empty final line height).
   if (text.endsWith('\n')) nodes.push(String.fromCharCode(0x200b))
   return nodes
+}
+
+// The textarea's own form metrics (index.css gives every input font-weight 300
+// + tight tracking). The highlight layer isn't a form control, so it has to be
+// told, or the two layers wrap on different characters.
+const MIRROR_METRICS = 'font-light tracking-[-0.025em]'
+
+// Where the caret sits, in px from the top of the text — measured in a throwaway
+// mirror div that copies the textarea's own metrics. Used to bring a restored
+// caret into view, since the field itself no longer scrolls.
+function caretOffsetTop(ta: HTMLTextAreaElement, caret: number): number {
+  const cs = getComputedStyle(ta)
+  const mirror = document.createElement('div')
+  const s = mirror.style
+  s.position = 'absolute'
+  s.top = '0'
+  s.left = '-9999px'
+  s.visibility = 'hidden'
+  s.whiteSpace = 'pre-wrap'
+  s.overflowWrap = 'break-word'
+  s.boxSizing = cs.boxSizing
+  s.width = cs.width
+  s.padding = cs.padding
+  s.borderWidth = cs.borderWidth
+  s.borderStyle = 'solid'
+  s.fontFamily = cs.fontFamily
+  s.fontSize = cs.fontSize
+  s.fontWeight = cs.fontWeight
+  s.fontStyle = cs.fontStyle
+  s.letterSpacing = cs.letterSpacing
+  s.lineHeight = cs.lineHeight
+  mirror.textContent = ta.value.slice(0, caret)
+  const marker = document.createElement('span')
+  marker.textContent = '​'
+  mirror.appendChild(marker)
+  document.body.appendChild(mirror)
+  const top = marker.offsetTop
+  mirror.remove()
+  return top
+}
+
+// Grow the field to its content (never shorter than the port, so a click below
+// the last line still lands in the text). Zeroing the height to re-measure
+// drops the scroll position, so it's put back.
+function fitToContent(ta: HTMLTextAreaElement | null, sc: HTMLDivElement | null) {
+  if (!ta || !sc) return
+  const keep = sc.scrollTop
+  ta.style.height = '0px'
+  ta.style.height = `${Math.max(ta.scrollHeight, sc.clientHeight)}px`
+  sc.scrollTop = keep
+}
+
+// Keep the caret in view. The field no longer scrolls itself, so the browser
+// won't do this for us — every way the caret can move has to ask.
+function revealCaret(ta: HTMLTextAreaElement | null, sc: HTMLDivElement | null) {
+  if (!ta || !sc || document.activeElement !== ta) return
+  if (sc.scrollHeight <= sc.clientHeight) return
+  const top = caretOffsetTop(ta, ta.selectionEnd ?? 0)
+  const line = parseFloat(getComputedStyle(ta).lineHeight) || 20
+  if (top < sc.scrollTop) sc.scrollTop = top
+  else if (top + line > sc.scrollTop + sc.clientHeight) sc.scrollTop = top + line - sc.clientHeight
+}
+
+// Keys that move the caret without changing the text.
+const CARET_KEYS = new Set([
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'PageUp', 'PageDown', 'Home', 'End', 'a', 'A',
+])
+
+interface BracketHighlightAreaProps {
+  value: string
+  onChange: (e: ChangeEvent<HTMLTextAreaElement>) => void
+  placeholder?: string
+  // Sizing/chrome for the scroll port.
+  className?: string
+  // Padding + font metrics — applied to BOTH layers, so they wrap identically.
+  padClass: string
+  textClass: string
+  // Colours etc. for the visible textarea only.
+  textareaClass?: string
+  textareaRef?: RefObject<HTMLTextAreaElement | null>
+  onBlur?: () => void
+  autoFocus?: boolean
+}
+
+// A textarea with [bracketed placeholders] painted red behind it.
+//
+// The textarea is grown to its full content height and never scrolls itself —
+// the wrapper scrolls, carrying the highlight layer and the text together. The
+// obvious shape (a scrolling textarea whose overlay is synced from its scroll
+// event) always lands a frame or more behind, because the browser scrolls the
+// field on the compositor and hands JS the event afterwards: the red boxes
+// visibly chase the words. Scrolling one shared ancestor has nothing to sync.
+export function BracketHighlightArea({
+  value,
+  onChange,
+  placeholder,
+  className = '',
+  padClass,
+  textClass,
+  textareaClass = '',
+  textareaRef,
+  onBlur,
+  autoFocus = false,
+}: BracketHighlightAreaProps) {
+  const scrollerRef = useRef<HTMLDivElement>(null)
+  const ownRef = useRef<HTMLTextAreaElement>(null)
+  const taRef = textareaRef ?? ownRef
+
+  useLayoutEffect(() => {
+    fitToContent(taRef.current, scrollerRef.current)
+    revealCaret(taRef.current, scrollerRef.current)
+  }, [taRef, value])
+
+  // Re-fit when the port resizes — the wrap changes with the width, and the
+  // floor changes with the height.
+  useEffect(() => {
+    const sc = scrollerRef.current
+    if (!sc || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => fitToContent(taRef.current, scrollerRef.current))
+    ro.observe(sc)
+    return () => ro.disconnect()
+  }, [taRef])
+
+  return (
+    <div ref={scrollerRef} className={`relative overflow-y-auto [scrollbar-gutter:stable] ${className}`}>
+      <div className="relative">
+        {/* Transparent backdrop that only paints the bracket highlights. It
+            sits BEHIND the real textarea, so all selectable/clickable text
+            belongs to the textarea (no cursor/selection drift). */}
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 whitespace-pre-wrap break-words text-transparent ${MIRROR_METRICS} ${padClass} ${textClass}`}
+        >
+          {renderBracketHighlight(value)}
+        </div>
+        <textarea
+          ref={taRef}
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          onKeyUp={(e) => {
+            if (CARET_KEYS.has(e.key)) revealCaret(taRef.current, scrollerRef.current)
+          }}
+          autoFocus={autoFocus}
+          placeholder={placeholder}
+          rows={1}
+          className={`relative block w-full resize-none overflow-hidden border-0 bg-transparent outline-none ${padClass} ${textClass} ${textareaClass}`}
+        />
+      </div>
+    </div>
+  )
 }
 
 // Small Maximize button to drop into a textarea's corner. Kept subtle — no
@@ -104,7 +256,6 @@ export default function ExpandTextModal({
   highlightBrackets = false,
   mono = false,
 }: ExpandTextModalProps) {
-  const highlightRef = useRef<HTMLDivElement>(null)
   const backdrop = useBackdropClose(onClose)
 
   useCloseOnAppSwitch(open, onClose)
@@ -138,33 +289,16 @@ export default function ExpandTextModal({
 
         <div className="min-h-0 flex-1 p-4">
           {highlightBrackets ? (
-            <div
-              className={`relative flex h-[60vh] overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.03] transition-colors ${ACCENT_FOCUS[accent]}`}
-            >
-              {/* Transparent backdrop that only paints the bracket highlights.
-                  It sits BEHIND the real textarea, so all selectable/clickable
-                  text belongs to the textarea (no cursor/selection drift).
-                  font-light + tracking match the textarea's global form metrics,
-                  and the extra right padding matches the textarea's reserved
-                  scrollbar gutter, so both layers wrap identically. */}
-              <div
-                ref={highlightRef}
-                aria-hidden
-                className={`pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words pb-6 pl-4 pr-[calc(1rem+11px)] pt-3 font-light tracking-[-0.025em] text-transparent ${textClass}`}
-              >
-                {renderBracketHighlight(value)}
-              </div>
-              <textarea
-                autoFocus
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                onScroll={(e) => {
-                  if (highlightRef.current) highlightRef.current.scrollTop = e.currentTarget.scrollTop
-                }}
-                placeholder={placeholder}
-                className={`relative h-full w-full resize-none border-0 bg-transparent px-4 pb-6 pt-3 text-ink-200 placeholder-ink-600 outline-none [scrollbar-gutter:stable] ${textClass}`}
-              />
-            </div>
+            <BracketHighlightArea
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              autoFocus
+              className={`h-[60vh] rounded-3xl border border-ink/10 bg-ink/[0.03] transition-colors ${ACCENT_FOCUS[accent]}`}
+              padClass="px-4 pb-6 pt-3"
+              textClass={textClass}
+              textareaClass="text-ink-200 placeholder-ink-600"
+            />
           ) : (
             <textarea
               autoFocus
