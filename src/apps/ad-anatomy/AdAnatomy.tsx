@@ -27,10 +27,9 @@ export default function AdAnatomy() {
   const deleteAdAnatomyHistory = useBankStore((s) => s.deleteAdAnatomyHistory)
 
   // Mount-time reconciler. Two passes:
-  //  1. Resume any 'analyzing' row that can be re-attached: a kie taskId
-  //     (createTask transport — refresh-safe) or a stored pass-1 perception
-  //     (pass 2 is text-only and restarts without the source file). Flip the
-  //     rest to 'error' (pass-1 streaming rows can't resume).
+  //  1. Resume any 'analyzing' row carrying a kie taskId (createTask
+  //     transport — refresh-safe). Flip the rest to 'error', since a row that
+  //     fell back to streaming has nothing to re-attach to.
   //  2. One-time dedupe of duplicate-pair rows from the pre-fix bulk-drop bug
   //     (same fileName + createdAt within 2s). Guarded by a localStorage flag
   //     so it runs once per browser.
@@ -40,7 +39,7 @@ export default function AdAnatomy() {
     // Pass 1: resume / fail in-flight rows
     for (const item of items) {
       if (item.status !== 'analyzing') continue
-      if (item.taskId || item.perception) {
+      if (item.taskId) {
         resumeAnalysis(item)
       } else {
         void updateAdAnatomyHistory(item.id, {
@@ -209,9 +208,6 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
         <h2 className="text-xl font-semibold tracking-tight text-ink-100">
           Analyzing the ad
         </h2>
-        <p className="text-[11px] font-medium uppercase tracking-widest text-[#FF5257]/70">
-          Pass {item.perception ? '2' : '1'} of 2
-        </p>
       </div>
 
       {(sourceUrl || thumbUrl) && (

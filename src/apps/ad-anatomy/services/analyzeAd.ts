@@ -1,4 +1,4 @@
-import type { AnalysisResult, PerceptionResult, SynthesisResult } from '../types'
+import type { AnalysisResult } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import {
   createTask,
@@ -9,85 +9,22 @@ import {
   type ChatMessage,
 } from '../../../utils/kie'
 import { getChatEndpointPath, CHAT_MODEL_DEFAULT } from '../../../utils/models'
-import { evenlySpread, formatKeyframeTimestamp, type Keyframe } from '../utils/extractKeyframes'
 
 const CHAT_MODEL_ID = CHAT_MODEL_DEFAULT
 // Streaming fallback timeout — kept generous since chat completions don't
 // have intermediate progress signals like the task-based flow.
 const STREAM_TIMEOUT_MS = 300_000
 
-// Every media part rides inline as base64, and Gemini rejects a request whose
-// inline payload runs past ~20MB — as a validation error from deep inside the
-// task, not as an upfront size complaint, so it reads like a mystery rejection.
-// The video is the subject and always rides whole; keyframes are a supplement,
-// so they get trimmed to whatever room is left over. Budgeted below the real
-// ceiling because the prompts and JSON envelope ride along too.
-const INLINE_MEDIA_BUDGET_BYTES = 17 * 1024 * 1024
+// ONE PASS, ON PURPOSE (reverted July 2026). The analysis briefly ran as two
+// high-reasoning passes — perception (video → transcript + per-cut shot log +
+// dossiers) then a text-only synthesis — with ~20 client-side cut keyframes
+// attached to pass 1. Every analysis came back rejected as invalid, and
+// budgeting the inline payload plus a video-only retry (#373) didn't fix it.
+// This is the shape that demonstrably worked: one call, the video inline as the
+// only media part, low reasoning effort. See git history for the two-pass
+// version before reaching for it again — bring back one variable at a time.
 
-// The analysis runs as TWO passes so each gets the model's full attention:
-//   Pass 1 — PERCEPTION: video attached; pure observation. Transcript, a log
-//   of every camera cut, and full visual dossiers (character / product /
-//   setting). No strategy, no judgement.
-//   Pass 2 — SYNTHESIS: text-only; receives the pass-1 JSON and writes the
-//   scorecard, creative breakdown, and the scene-by-scene recreation prompts.
-// Splitting also makes pass 2 restartable after a refresh without the source
-// file, and stops long ads from running out of output room before the scene
-// prompts (the old single mega-call diluted detail across four artifacts).
-
-// ── Pass 1: perception ─────────────────────────────────────────────
-
-const PERCEPTION_SYSTEM = `You are a forensic video analyst logging a social media ad shot-by-shot. Your output is PURE OBSERVATION — no marketing judgement, no strategy, no scoring. A second analyst will work from your log without ever seeing the video, so anything you fail to record is lost forever. Record everything.
-
-You must respond with ONLY valid JSON matching this exact structure (no markdown, no code fences):
-
-{
-  "totalDurationSeconds": <integer — the full ad length; 0 for a still image>,
-  "characterDossier": "<full identifying description of every person who appears — see DOSSIER RULES>",
-  "productDossier": "<full identifying description of the product in every form it appears — see DOSSIER RULES>",
-  "settingDossier": "<every location, its lighting, colour palette, and notable props>",
-  "transcript": [
-    { "timestamp": "<MM:SS>", "text": "<verbatim spoken line>" }
-  ],
-  "shots": [
-    {
-      "index": <1-based integer>,
-      "start": "<MM:SS>",
-      "end": "<MM:SS>",
-      "framing": "<close-up / medium / wide / macro / POV / mirror selfie / over-the-shoulder / screen recording / text card / etc.>",
-      "camera": "<static / handheld / slow push-in / whip pan / zoom jump / etc.>",
-      "action": "<what visibly happens — who does what, how the product is handled, expressions, gestures>",
-      "onScreenText": "<any caption / overlay / sticker text VERBATIM, or omit if none>",
-      "dialogue": "<the spoken line(s) heard during this shot with speaker attribution, or omit if none>"
-    }
-  ]
-}
-
-SHOT LOG RULES — CRITICAL:
-- A shot is ANY visible camera change: a hard cut, an angle change, a location change, a zoom jump, or an inserted b-roll clip / graphic / text card. UGC ads often cut every 1-3 seconds — count the cuts before writing and log EVERY single one in chronological order.
-- Shots must cover the ENTIRE ad with no gaps and no overlaps: the first shot starts at 00:00, each shot's start equals the previous shot's end, and the last shot's end equals the total duration. Quick product inserts, b-roll flashes, and end cards are shots too — never fold them into a neighbouring shot.
-- "action" describes what you actually SEE, in concrete physical terms: hand positions, product interaction (held / opened / applied / poured / tapped), gaze direction, micro-expressions.
-- "onScreenText" is verbatim — captions, hook text, price stickers, UI overlays. Note styling only when distinctive (e.g. "yellow highlight captions").
-
-TRANSCRIPT RULES:
-- Transcribe every spoken word verbatim, including filler words and repeated words. One entry per spoken line, timestamped at the moment the line starts.
-- If there is no speech (music-only or still image), return an empty transcript array.
-
-DOSSIER RULES — CRITICAL (a video model must be able to recreate these one-for-one):
-- characterDossier: for EACH person who appears (label them "Main creator", "Second woman", etc. if more than one): apparent age range, gender presentation, ethnicity cues, body type / build, hair (length, colour, styling, parting), face shape and distinctive features, wardrobe (every visible garment with colour and fit), accessories (jewellery, glasses, headwear, nail polish). Describe what you actually see — never use placeholders.
-- productDossier: brand name / wordmark EXACTLY as printed on the label if visible, container shape (dropper bottle / pump / jar / sachet / sleeve / blister pack / box / etc.), container colour and material, label colour and design cues, approximate size relative to the hand. If the product appears in more than one form across the ad (boxed → unboxed → in use), describe each form and note which shots show it.
-- settingDossier: each distinct location with its lighting (natural window light / warm tungsten / cool overhead / ring light), colour palette, and notable props or background details.
-
-STILL IMAGE INPUT: if the input is a single image rather than a video, treat it as ONE shot with start "00:00", end "00:00", totalDurationSeconds 0, and an empty transcript; put all visible ad copy in onScreenText and fill the dossiers normally.
-
-HONESTY: record only what is actually visible or audible. Never invent details, brands, or dialogue.
-
-Output ONLY the JSON object.`
-
-const PERCEPTION_USER_PROMPT = `Log this ad completely: full verbatim timestamped transcript, every single camera cut as its own shot entry (count the cuts first — do not merge or skip any), and full identifying dossiers for the character(s), the product, and the setting(s). Return as JSON.`
-
-// ── Pass 2: synthesis ──────────────────────────────────────────────
-
-const SYNTHESIS_SYSTEM = `You are an elite UGC ad analyst and creative director. You receive a forensic shot log of a social media ad — a verbatim transcript, a chronological list of every camera cut, and full visual dossiers of the character(s), product, and setting(s). From it you produce three things: a brutally honest scorecard, a strategy-level creative breakdown (hook / angle / structure + a reusable script-style prompt), and a reverse-engineered prompt that could be sent to a text-to-video model (e.g. Seedance, Veo) to recreate the ad ONE-FOR-ONE, faithfully.
+const SYSTEM_INSTRUCTION = `You are an elite UGC ad analyst. You dissect social media video ads and produce four things: a brutally honest scorecard, a strategy-level creative breakdown (hook / angle / structure), an accurate timestamped transcript, and a reverse-engineered prompt that could be sent to a text-to-video model (e.g. Seedance, Veo) to recreate the ad ONE-FOR-ONE, faithfully.
 
 You must respond with ONLY valid JSON matching this exact structure (no markdown, no code fences):
 
@@ -95,25 +32,35 @@ SCORECARD RULE: Be brutally honest. Do not inflate scores. Most ads are average 
 
 CREATIVE BREAKDOWN RULE: This is a marketing-strategy dissection of WHY the ad works — not shot description. Write for a DTC media buyer who wants to steal the mechanics:
 
-1. hook (2-4 sentences): Quote the exact opening line / on-screen text / opening visual doing the work in the first 1-3 seconds (pull them verbatim from the shot log). Name the hook mechanism (pattern interrupt, curiosity gap, negative callout, bold claim, result-first reveal, direct callout of the viewer, etc.) and the psychological trigger it pulls. Say plainly why it stops the scroll — or why it fails to.
+1. hook (2-4 sentences): Quote the exact opening line / on-screen text / opening visual doing the work in the first 1-3 seconds. Name the hook mechanism (pattern interrupt, curiosity gap, negative callout, bold claim, result-first reveal, direct callout of the viewer, etc.) and the psychological trigger it pulls. Say plainly why it stops the scroll — or why it fails to.
 
 2. angle (2-4 sentences): The core persuasion angle / positioning (pain-point relief, transformation, discovery/"I found this", us-vs-them, social proof, authority, fear of loss, convenience, identity, etc.), who it targets, and the audience awareness level it assumes (unaware / problem-aware / solution-aware / product-aware).
 
-3. structure: A beat-by-beat skeleton of the ENTIRE ad, one beat per line, each formatted exactly as: "MM:SS–MM:SS <BEAT NAME> — <what it does psychologically>". Name beats in direct-response terms (Hook, Problem, Agitation, Discovery, Mechanism, Demo, Proof, Objection Handle, Offer, Urgency, CTA...). Cover 00:00 to the end, using the shot log's timestamps.
+3. structure: A beat-by-beat skeleton of the ENTIRE ad, one beat per line, each formatted exactly as: "MM:SS–MM:SS <BEAT NAME> — <what it does psychologically>". Name beats in direct-response terms (Hook, Problem, Agitation, Discovery, Mechanism, Demo, Proof, Objection Handle, Offer, Urgency, CTA...). Cover 00:00 to the end.
 
-SCENE RULES — CRITICAL (the recreation prompts):
+FAITHFUL RECREATION RULE — CRITICAL: Your job is to produce prompts that, when pasted into Seedance, will recreate the original ad as accurately as possible. Therefore in every scene prompt you MUST:
 
-1. CHUNKING: Read totalDurationSeconds. If it is 15 seconds or less, produce a SINGLE scene that covers the whole ad. Otherwise break the ad into multiple scenes at natural shot boundaries. Each scene MUST be 15 seconds or less. Aim for 8–12 seconds per scene. Number scenes starting at 1.
+1. Describe the ORIGINAL character in full visual detail. Include: apparent age range (e.g. "late 20s"), gender presentation, ethnicity cues, body type / build, hair (length, colour, styling — e.g. "shoulder-length wavy auburn hair, parted in the middle"), face shape and any distinctive features, wardrobe (every visible garment with colour and fit — e.g. "oversized cream cable-knit sweater, neutral tone"), accessories (jewellery, glasses, headwear, nail polish), and current micro-expression / gaze direction / hand position. Do NOT use placeholders. Do NOT write [CHARACTER]. Describe what you actually see.
 
-2. FULL COVERAGE: The scenes together MUST cover the ENTIRE ad with no gaps and no overlaps. The first scene starts at 00:00. Every subsequent scene's startTime MUST equal the previous scene's endTime. The final scene's endTime MUST equal the total ad duration.
+2. Describe the ORIGINAL product in full visual detail. Include: brand name / wordmark exactly as it appears on the label if visible, container shape (dropper bottle / pump / jar / sachet / sleeve / blister pack / box / etc.), container colour and material (clear glass / matte black plastic / metallic / kraft / etc.), label colour and design cues, approximate size relative to the hand, and how the character is interacting with it (held, opened, applied, sprayed, sipped, etc.). If the product appears in more than one form across scenes (boxed → unboxed → in use), note the form for each scene. Do NOT use placeholders. Do NOT write [PRODUCT]. Describe what you actually see.
 
-3. EVERY SHOT: Every shot in the log belongs to exactly one scene, and every shot in a scene MUST appear in that scene's prompt, in chronological order, as a timeline — e.g.: "[0:00–0:03] Close-up: she holds the dropper bottle to camera... [0:03–0:05] Quick cut to macro of serum texture... [0:05–0:08] Back to medium shot, she applies it to her cheek...". Never summarize a multi-cut scene down to its dominant shot. 1–3 sentences per shot; length grows with the number of cuts.
+3. Embed the ORIGINAL spoken line(s) for that scene inside the prompt body. Wrap them in quotes and attribute the speaker, e.g. "She says: 'I had dark spots from years of sun damage and nothing worked.'" Keep dialogue separate from action / camera direction so the next stage can find and rewrite it cleanly.
 
-4. SELF-CONTAINED PROMPTS: Each scene's prompt must stand alone — a video model sees ONE scene at a time. So in EVERY scene prompt: describe the character in full identifying detail from characterDossier (age, hair, wardrobe, accessories — never "the same woman", never [CHARACTER]); describe the product in full identifying detail from productDossier including the exact form it takes in that scene (never "the product", never [PRODUCT]); embed the original spoken line(s) from the shot log in quotes with speaker attribution, e.g. "She says: 'I had dark spots from years of sun damage and nothing worked.'" — keep dialogue separate from action / camera direction; include on-screen text where the log records it; and state setting, framing, camera movement, lighting, and mood from the dossiers.
+CHUNKING RULE — CRITICAL: Read the total ad duration. If it is 15 seconds or less, produce a SINGLE scene that covers the whole ad. Otherwise break the ad into multiple scenes at natural shot/scene boundaries. Each scene MUST be 15 seconds or less. Aim for 8–12 seconds per scene. Number scenes starting at 1.
 
-5. LABEL: Each scene's label is a short noun phrase (3–6 words) describing the shot — e.g. "Mirror reaction hook", "Product unboxing close-up", "Bathroom routine reveal".
+FULL COVERAGE RULE — CRITICAL: The scenes together MUST cover the ENTIRE ad with no gaps and no overlaps. The first scene starts at 00:00. Every subsequent scene's startTime MUST equal the previous scene's endTime. The final scene's endTime MUST equal the total ad duration. Never skip a stretch of the ad, no matter how minor or repetitive it looks — b-roll flashes, quick product inserts, text-card frames, and end cards all belong inside a scene.
+
+EVERY SHOT RULE — CRITICAL: UGC ads often cut every 1–3 seconds, so one 8–12s scene usually contains SEVERAL distinct shots. You MUST describe every single camera cut inside the scene, in chronological order — do not summarize a multi-cut scene down to its dominant shot. Structure a multi-shot scene's prompt as a timeline, e.g.: "[0:00–0:03] Close-up: she holds the dropper bottle to camera... [0:03–0:05] Quick cut to macro of serum texture... [0:05–0:08] Back to medium shot, she applies it to her cheek...". A shot is any visible camera change: cut, angle change, location change, zoom jump, or inserted b-roll/graphic. Count the cuts before writing; every one of them must appear in the timeline.
+
+SCENE PROMPT QUALITY: Each scene's prompt field must be a fully self-contained Seedance-ready directive. Beyond the character, product, and dialogue, describe: setting (location, props, colour palette), framing (POV, close-up, medium, wide, over-the-shoulder, mirror selfie, etc.), camera movement (static, slow push, hand-held, whip pan, etc.), lighting (natural window light, warm kitchen tungsten, cool overhead bathroom, etc.), and mood. For a single-shot scene 4–8 sentences is the right length; for a multi-shot scene, length grows with the number of cuts — 1–3 sentences per shot in the timeline, never dropping a shot to stay short.
+
+LABEL: Each scene's label is a short noun phrase (3–6 words) describing the shot — e.g. "Mirror reaction hook", "Product unboxing close-up", "Bathroom routine reveal".
+
+TRANSCRIPT: Transcribe every spoken word verbatim, including filler words. One entry per spoken line, timestamped at the moment the line starts. If there is no speech (music-only or a still image), return an empty transcript array.
 
 AD TITLE: Produce a short (3–6 word) Title Case descriptor of the ad as a whole, naming the product/brand and the angle. Examples: "Dunkin Zero-Sugar Berry Energy", "Glow Skin Serum Routine Reveal", "Tarte Two-Minute Glam Tutorial". No quotes, no trailing punctuation.
+
+HONESTY: describe only what is actually visible or audible. Never invent details, brands, or dialogue.
 
 {
   "adTitle": "<3-6 word Title Case descriptor>",
@@ -132,6 +79,9 @@ AD TITLE: Produce a short (3–6 word) Title Case descriptor of the ad as a whol
     "angle": "<2-4 sentences — persuasion angle, target, awareness level>",
     "structure": "<one beat per line: MM:SS–MM:SS BEAT NAME — psychological job, newline-separated>"
   },
+  "transcript": [
+    { "timestamp": "<MM:SS>", "text": "<line>" }
+  ],
   "reverseEngineeredPrompt": {
     "totalDurationSeconds": <integer>,
     "isSingleClip": <boolean — true if totalDurationSeconds <= 15>,
@@ -142,75 +92,33 @@ AD TITLE: Produce a short (3–6 word) Title Case descriptor of the ad as a whol
         "endTime": "<MM:SS>",
         "durationSeconds": <integer, <= 15>,
         "label": "<short shot name>",
-        "prompt": "<self-contained recreation prompt — shot-by-shot timeline, full character + product descriptions, embedded dialogue>"
+        "prompt": "<self-contained Seedance prompt — fully describes the original character, the original product, and embeds the original spoken line(s)>"
       }
     ]
   }
 }`
 
-function synthesisUserPrompt(perception: PerceptionResult): string {
-  return `Here is the forensic shot log of a UGC ad. Produce (1) a brutally honest scorecard, (2) the creative breakdown — hook, angle, beat-by-beat structure — and (3) the reverse-engineered scene prompts — scenes of ≤15 seconds covering the entire ad, with every logged shot described in chronological order inside its scene's timeline and the full character/product descriptions embedded in every scene prompt. Return as JSON.
-
---- SHOT LOG ---
-${JSON.stringify(perception, null, 2)}`
-}
+const USER_PROMPT = `Analyze this UGC ad video/image thoroughly. Produce: (1) a brutally honest scorecard, (2) a creative breakdown — the hook, angle, and beat-by-beat structure, (3) an accurate timestamped transcript, (4) a reverse-engineered prompt — chunked into scenes of ≤15 seconds each. The scenes must cover the ENTIRE ad from 00:00 to the end with no gaps, and every individual camera cut inside a scene must be described in chronological order as a timeline — do not merge or skip any shot. Each scene prompt MUST describe the original character in full identifying detail, describe the original product in full identifying detail, and embed the original spoken dialogue for that scene. Do not use placeholder tokens. Return the analysis as JSON.`
 
 // Inline data URI in the chat message. We previously tried kie's hosted-URL
 // upload but the createTask + recordInfo path didn't return results for the
 // chat model (PR #91 → reverted). Base64 inline is slower on the wire but
 // it's the path that actually works end-to-end today.
 //
-// `keyframes` are stills captured client-side at detected hard cuts (see
-// utils/extractKeyframes.ts). Video sampling runs at ~1 fps, so without them
-// fast cuts, quick product inserts, and text-card flashes fall between
-// sampled frames and vanish from the shot log.
-async function buildPerceptionMessages(videoFile: File, keyframes: Keyframe[] = []): Promise<ChatMessage[]> {
+// The video is the ONLY media part. Attaching extra stills alongside it is what
+// the two-pass build did, and every request came back rejected — see the note
+// at the top of this file.
+async function buildMessages(videoFile: File): Promise<ChatMessage[]> {
   const dataUri = await fileToDataUri(videoFile)
-  const frames = fitKeyframesToBudget(dataUri, keyframes)
-
-  let userText = PERCEPTION_USER_PROMPT
-  if (frames.length > 0) {
-    const stamps = frames.map((k) => formatKeyframeTimestamp(k.time)).join(', ')
-    userText += `\n\nAfter the video, ${frames.length} still keyframes are attached in chronological order, captured at detected hard cuts: ${stamps}. Use them to catch shots the video sampling may have skipped, to pin exact shot boundaries, and to read on-screen text and product labels precisely. The video remains the authority for motion, pacing, and audio.`
-  }
-
   return [
-    { role: 'system', content: [{ type: 'text', text: PERCEPTION_SYSTEM }] },
+    { role: 'system', content: [{ type: 'text', text: SYSTEM_INSTRUCTION }] },
     {
       role: 'user',
       content: [
-        { type: 'text', text: userText },
+        { type: 'text', text: USER_PROMPT },
         { type: 'image_url', image_url: { url: dataUri } },
-        ...frames.map((k) => ({ type: 'image_url' as const, image_url: { url: k.dataUri } })),
       ],
     },
-  ]
-}
-
-// Drop keyframes until the whole inline payload fits INLINE_MEDIA_BUDGET_BYTES.
-// Thinning is even rather than truncating the tail, so what survives still
-// covers the whole ad. A long video can leave no room at all — the analysis
-// then runs video-only, which is the pre-keyframe behaviour, not a failure.
-function fitKeyframesToBudget(videoUri: string, keyframes: Keyframe[]): Keyframe[] {
-  if (keyframes.length === 0) return []
-  const room = INLINE_MEDIA_BUDGET_BYTES - videoUri.length
-  if (room <= 0) {
-    console.warn('[ad-anatomy] video fills the inline budget — analysing without keyframes')
-    return []
-  }
-  const total = keyframes.reduce((n, k) => n + k.dataUri.length, 0)
-  if (total <= room) return keyframes
-
-  const fits = Math.floor(room / (total / keyframes.length))
-  const kept = evenlySpread(keyframes, fits)
-  console.warn(`[ad-anatomy] inline budget trimmed keyframes ${keyframes.length} → ${kept.length}`)
-  return kept
-}
-
-function buildSynthesisMessages(perception: PerceptionResult): ChatMessage[] {
-  return [
-    { role: 'system', content: [{ type: 'text', text: SYNTHESIS_SYSTEM }] },
-    { role: 'user', content: [{ type: 'text', text: synthesisUserPrompt(perception) }] },
   ]
 }
 
@@ -241,85 +149,54 @@ function extractTextFromResultEnvelope(envelope: unknown): string | null {
   return null
 }
 
-function parseJsonBlob(rawText: string, what: string): Record<string, unknown> {
+function parseAnalysisJson(rawText: string): AnalysisResult {
   const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
   let parsed: unknown
   try {
     parsed = JSON.parse(cleaned)
   } catch (e) {
     const reason = e instanceof Error ? e.message : String(e)
-    throw new Error(`Bad JSON from ${what}: ${reason} — body: ${cleaned.slice(0, 400)}`)
+    throw new Error(`Bad JSON from ad analysis model: ${reason} — body: ${cleaned.slice(0, 400)}`)
   }
   if (!parsed || typeof parsed !== 'object') {
-    throw new Error(`${what} response was not an object — body: ${cleaned.slice(0, 400)}`)
+    throw new Error(`Analysis response was not an object — body: ${cleaned.slice(0, 400)}`)
   }
-  return parsed as Record<string, unknown>
-}
-
-// Tasks created by the pre-two-pass build return a full AnalysisResult from
-// what we now treat as the perception task. Detect that shape so a refresh
-// across a deploy resolves cleanly instead of erroring.
-export type PerceptionParseOutcome =
-  | { kind: 'perception'; perception: PerceptionResult }
-  | { kind: 'legacy'; analysis: AnalysisResult }
-
-function parsePerceptionJson(rawText: string): PerceptionParseOutcome {
-  const obj = parseJsonBlob(rawText, 'ad perception pass')
-
-  const legacy = obj as Partial<AnalysisResult>
-  if (legacy.scorecard && Array.isArray(legacy.scorecard.scores) && legacy.reverseEngineeredPrompt) {
-    return { kind: 'legacy', analysis: obj as unknown as AnalysisResult }
-  }
-
-  const p = obj as Partial<PerceptionResult>
-  const missing: string[] = []
-  if (!Array.isArray(p.shots) || p.shots.length === 0) missing.push('shots')
-  if (!Array.isArray(p.transcript)) missing.push('transcript')
-  if (typeof p.characterDossier !== 'string') missing.push('characterDossier')
-  if (typeof p.productDossier !== 'string') missing.push('productDossier')
-  if (typeof p.totalDurationSeconds !== 'number') missing.push('totalDurationSeconds')
-  if (missing.length > 0) {
-    throw new Error(`Perception response missing ${missing.join(', ')}`)
-  }
-  return { kind: 'perception', perception: obj as unknown as PerceptionResult }
-}
-
-function parseSynthesisJson(rawText: string, perception: PerceptionResult): AnalysisResult {
-  const obj = parseJsonBlob(rawText, 'ad synthesis pass')
   // ResultsView consumes scorecard.scores, transcript, and
   // reverseEngineeredPrompt.scenes with .map(), so a response that parses as
-  // valid JSON but omits one would crash the render (a white screen) after
-  // the row is already persisted as complete. Validate the shape here so an
-  // incomplete response surfaces the friendly error pane and can be retried.
-  const p = obj as Partial<SynthesisResult>
+  // valid JSON but omits one of them would crash the render (a white screen)
+  // after the row is already persisted as complete. Validate the shape here so
+  // an incomplete response surfaces the friendly error pane and can be retried.
+  const p = parsed as Partial<AnalysisResult>
   const missing: string[] = []
   if (!p.reverseEngineeredPrompt || !Array.isArray(p.reverseEngineeredPrompt.scenes)) missing.push('reverseEngineeredPrompt.scenes')
   if (!p.scorecard || !Array.isArray(p.scorecard.scores)) missing.push('scorecard.scores')
+  if (!Array.isArray(p.transcript)) missing.push('transcript')
   if (missing.length > 0) {
-    throw new Error(`Analysis response missing ${missing.join(', ')}`)
+    throw new Error(`Analysis response missing ${missing.join(', ')} — body: ${cleaned.slice(0, 400)}`)
   }
-  const synthesis = obj as unknown as SynthesisResult
-  return { ...synthesis, transcript: perception.transcript }
+  return parsed as AnalysisResult
 }
 
-// ── Transport plumbing (shared by both passes) ─────────────────────
+// ── Public API ─────────────────────────────────────────────────────
 
 export type StartAnalysisOutcome =
   | { kind: 'task'; taskId: string }
   | { kind: 'fallback'; reason: string }
 
-// Kick off a pass via kie's createTask flow. The taskId returned here is what
-// we persist on the history row so a refresh can resume the poll. If kie
-// rejects createTask for the chat model (the endpoint is rare for chat), we
-// resolve with `{ kind: 'fallback', reason }` and the queue falls through to
-// the streaming transport.
-async function startChatTask(messages: ChatMessage[]): Promise<StartAnalysisOutcome> {
+// Kick off an analysis via kie's createTask flow. The taskId returned here
+// is what we persist on the history row so a refresh can resume the poll.
+// If kie rejects createTask for the chat model (the endpoint is rare for
+// chat), we resolve with `{ kind: 'fallback', reason }` and the queue falls
+// through to the streaming transport.
+export async function startAnalysisTask(videoFile: File): Promise<StartAnalysisOutcome> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
+  const messages = await buildMessages(videoFile)
+
   try {
     const taskId = await createTask(apiKey, CHAT_MODEL_ID, {
       messages,
       stream: false,
-      reasoning_effort: 'high',
+      reasoning_effort: 'low',
       include_thoughts: false,
     })
     if (!taskId || typeof taskId !== 'string') {
@@ -333,7 +210,11 @@ async function startChatTask(messages: ChatMessage[]): Promise<StartAnalysisOutc
   }
 }
 
-async function pollChatTaskText(taskId: string): Promise<string> {
+// Resume / wait on an existing kie task. Used both for new analyses (right
+// after startAnalysisTask returned a taskId) and for mount-time resume after
+// a refresh. Polls on CHAT_POLL_ATTEMPTS — a whole video read outlives the
+// 5-minute default.
+export async function pollAnalysisTask(taskId: string): Promise<AnalysisResult> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const record = await pollTask(apiKey, taskId, { maxPollAttempts: CHAT_POLL_ATTEMPTS })
 
@@ -351,42 +232,19 @@ async function pollChatTaskText(taskId: string): Promise<string> {
       `Analysis task ${taskId} succeeded but no text could be extracted. Raw resultJson: ${record.resultJson?.slice(0, 400)}`,
     )
   }
-  return text
+  return parseAnalysisJson(text)
 }
 
-async function streamChatText(messages: ChatMessage[]): Promise<string> {
+// Streaming fallback — a safety net when createTask is unavailable for the
+// chat model. Pinned to the same model the task path uses. Cannot be resumed
+// across refresh; the queue knows this and the reconciler flips such rows to
+// error.
+export async function streamAnalysisFallback(videoFile: File): Promise<AnalysisResult> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  // Pin the fallback to the same model the perception pass uses so both passes
-  // stay on one model even if createTask rejects and we drop to streaming.
   const endpoint = getChatEndpointPath(CHAT_MODEL_ID)
-  return kieChatCompletions(apiKey, endpoint, messages, {
+  const messages = await buildMessages(videoFile)
+  const responseText = await kieChatCompletions(apiKey, endpoint, messages, {
     timeoutMs: STREAM_TIMEOUT_MS,
-    reasoningEffort: 'high',
   })
-}
-
-// ── Public API ─────────────────────────────────────────────────────
-
-export async function startPerceptionTask(videoFile: File, keyframes: Keyframe[] = []): Promise<StartAnalysisOutcome> {
-  return startChatTask(await buildPerceptionMessages(videoFile, keyframes))
-}
-
-export async function pollPerceptionTask(taskId: string): Promise<PerceptionParseOutcome> {
-  return parsePerceptionJson(await pollChatTaskText(taskId))
-}
-
-export async function streamPerceptionFallback(videoFile: File, keyframes: Keyframe[] = []): Promise<PerceptionParseOutcome> {
-  return parsePerceptionJson(await streamChatText(await buildPerceptionMessages(videoFile, keyframes)))
-}
-
-export async function startSynthesisTask(perception: PerceptionResult): Promise<StartAnalysisOutcome> {
-  return startChatTask(buildSynthesisMessages(perception))
-}
-
-export async function pollSynthesisTask(taskId: string, perception: PerceptionResult): Promise<AnalysisResult> {
-  return parseSynthesisJson(await pollChatTaskText(taskId), perception)
-}
-
-export async function streamSynthesisFallback(perception: PerceptionResult): Promise<AnalysisResult> {
-  return parseSynthesisJson(await streamChatText(buildSynthesisMessages(perception)), perception)
+  return parseAnalysisJson(responseText)
 }
