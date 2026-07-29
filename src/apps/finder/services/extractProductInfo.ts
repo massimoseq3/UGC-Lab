@@ -13,7 +13,6 @@ export interface ProductExtraction {
   offer: string
   cta: string
   keySpecs: string
-  customerLanguage: string
   objections: string
 }
 
@@ -35,7 +34,6 @@ You must respond with ONLY valid JSON matching this exact structure (no markdown
   "offer": "<1-2 lines stating the commercial deal: price, bundle, discount, bonus, guarantee, shipping.>",
   "cta": "<one short imperative line, e.g. 'Shop now', 'Claim 20% off today'.>",
   "keySpecs": "<3-6 lines, newline-separated. Hard facts scripts can cite: key ingredients or materials with amounts if known, dimensions/quantity/servings, how the mechanism works in one plain sentence, usage frequency, anything certifiable that is actually visible or stated across any of the photos. Facts only — no marketing language.>",
-  "customerLanguage": "<4-6 lines, newline-separated. Verbatim-style phrases the target buyer would actually say about the problem or the product — the words they'd type in a review or say to a friend ('my makeup just slides off by noon'). First person, casual, no marketing speak. These seed hooks and dialogue.>",
   "objections": "<3-5 lines, newline-separated. Each line: the hesitation, then ' — ' then the counter. E.g. 'Looks expensive for the size — one jar lasts 3 months, cheaper per use than [alternative]'. Only counters you can support from the image or listing copy; otherwise leave a [bracketed placeholder] as the counter.>"
 }
 
@@ -44,7 +42,6 @@ Field discipline — these overlap in ways that trip people up. Keep them distin
 - USPs = "ours has X" — features and differentiators.
 - Benefits = "so you get Y" — the outcome in the customer's life.
 - Key Specs = the raw facts behind the USPs, stripped of persuasion.
-- Customer Language = how the buyer talks, not how the brand talks.
 - Offer = the commercial deal (price/bundle/guarantee). NOT the same as the CTA.
 - CTA = the single action you want them to take, as an imperative.
 
@@ -142,7 +139,6 @@ export async function extractProductInfo(
       offer: parsed.offer ?? '',
       cta: parsed.cta ?? '',
       keySpecs: parsed.keySpecs ?? '',
-      customerLanguage: parsed.customerLanguage ?? '',
       objections: parsed.objections ?? '',
     }
   } catch (err) {

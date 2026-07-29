@@ -18,8 +18,6 @@ export interface Product {
   // Deep-context fields (optional — absent on rows saved before they existed).
   // Concrete facts: ingredients, materials, specs, sizes, how it works.
   keySpecs?: string
-  // Voice-of-customer phrases — the words real buyers use about the problem.
-  customerLanguage?: string
   // Purchase hesitations, each paired with its counter.
   objections?: string
   createdAt: number
@@ -212,6 +210,9 @@ export interface ScriptHistoryItem {
   // it anymore; isWriteFormat coerces it to 'script' when a row is restored.
   writeFormat?: 'script' | 'hooks' | 'scenes' | 'prompt'
   writeLength?: number
+  // Remix only: the target duration, or 'default' when the remix kept the
+  // source ad's own length. Absent on rows saved before Remix had a length.
+  remixLength?: number | 'default'
   // Hooks format only: the formula-family choice ('auto' or a category slug).
   hookCategory?: string
   // How many takes this run asked for. Absent on rows saved before the count

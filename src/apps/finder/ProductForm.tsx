@@ -28,7 +28,6 @@ const FIELD_META: Record<string, { label: string; type: 'text' | 'textarea'; req
   productDescription: { label: 'Description', type: 'textarea', required: true },
   targetMarket: { label: 'Target market', type: 'textarea' },
   painPoints: { label: 'Pain points', type: 'textarea' },
-  customerLanguage: { label: 'Customer language', type: 'textarea', hint: 'How buyers say it in their own words' },
   objections: { label: 'Objections', type: 'textarea', hint: 'What stops them buying' },
   usps: { label: 'USPs', type: 'textarea' },
   benefits: { label: 'Benefits', type: 'textarea' },
@@ -46,7 +45,7 @@ type SectionKey = 'identity' | 'audience' | 'selling' | 'offer'
 
 const SECTIONS: { key: SectionKey; label: string; icon: React.ElementType; fields: string[] }[] = [
   { key: 'identity', label: 'Identity', icon: Package, fields: ['productName', 'productDescription'] },
-  { key: 'audience', label: 'Audience', icon: Users, fields: ['targetMarket', 'painPoints', 'customerLanguage', 'objections'] },
+  { key: 'audience', label: 'Audience', icon: Users, fields: ['targetMarket', 'painPoints', 'objections'] },
   { key: 'selling', label: 'Selling', icon: Star, fields: ['usps', 'benefits', 'keySpecs'] },
   { key: 'offer', label: 'Offer', icon: Tag, fields: ['offer', 'cta'] },
 ]
@@ -131,7 +130,6 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
     usps: item?.usps ?? '',
     benefits: item?.benefits ?? '',
     keySpecs: item?.keySpecs ?? '',
-    customerLanguage: item?.customerLanguage ?? '',
     objections: item?.objections ?? '',
     offer: item?.offer ?? '',
     cta: item?.cta ?? '',
@@ -175,7 +173,6 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
       usps: item.usps,
       benefits: item.benefits,
       keySpecs: item.keySpecs ?? '',
-      customerLanguage: item.customerLanguage ?? '',
       objections: item.objections ?? '',
       offer: item.offer,
       cta: item.cta,
