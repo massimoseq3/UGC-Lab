@@ -11,7 +11,6 @@ import {
   Lightbulb,
 } from 'lucide-react'
 import type { AnalysisResult, Scene } from '../types'
-import { buildAdBlueprint } from '../services/adBlueprint'
 import { useAppStore } from '../../../stores/appStore'
 import { useBankStore } from '../../../stores/bankStore'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -250,7 +249,7 @@ function TranscriptSection({ result, fileName }: { result: AnalysisResult; fileN
         ))}
       </div>
 
-      <ScriptActionRow onSave={handleSaveToBank} onSend={handleSendToScripts} />
+      <ScriptActionRow onSave={handleSaveToBank} onSend={handleSendToScripts} sendLabel="Remix transcript" />
     </Section>
   )
 }
@@ -336,14 +335,12 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
     addToast('Sent to Scripts + saved to bank')
   }
 
-  // Clone this ad with the member's own product. It deliberately does NOT ship these
-  // prompts — they describe the original creator and the original packaging —
-  // only the ad's transcript and its staging. See services/adBlueprint.ts.
-  const handleSendToBroll = () => {
-    const blueprint = buildAdBlueprint(result, fileName)
-    sendToApp({ targetApp: 'broll-studio', targetField: 'adBlueprint', data: blueprint })
-    addToast(`Sent to B-Roll — storyboard it with your own product`)
-  }
+  // A "Clone this with my product" button used to sit in the action row below,
+  // handing `buildAdBlueprint(result, fileName)` to B-Roll as an `adBlueprint`
+  // payload. Removed July 2026: it read as "recreate this ad" but actually
+  // dropped the member on the B-Roll page. The service, the payload type and
+  // B-Roll's consumer are all still wired — restore the button here if the
+  // handoff comes back under a label that says where it goes.
 
   return (
     <Section>
@@ -382,27 +379,21 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
       <ScriptActionRow
         onSave={handleSaveToBank}
         onSend={handleSendToScripts}
-        extra={
-          <button
-            onClick={handleSendToBroll}
-            className="flex w-full items-center justify-center gap-2 rounded-full border border-broll-500/20 bg-broll-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-broll-300 light:text-broll-700 transition-colors hover:bg-broll-500/20"
-          >
-            <Film className="h-4 w-4" strokeWidth={1.75} />
-            Clone this with my product
-            <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
-          </button>
-        }
+        sendLabel="Remix for your product"
       />
     </Section>
   )
 }
 
 // Shared bottom action row for the Transcript + Scenes sections — the larger,
-// Scripts-styled "Save to Script Bank" (neutral) + "Send to Scripts" (orange
-// scripts accent, with a trailing arrow) buttons, matching the Scripts app.
-// `extra` is the Scenes row's third button (Send to B-Roll); it wraps onto its
-// own line rather than squeezing three buttons into a narrow column.
-function ScriptActionRow({ onSave, onSend, extra }: { onSave: () => void; onSend: () => void; extra?: React.ReactNode }) {
+// Scripts-styled "Save to Script Bank" (neutral) + remix (scripts accent, with
+// a trailing arrow) buttons, matching the Scripts app. `sendLabel` names what
+// is actually handed over ("Remix transcript" / "Remix for your product")
+// rather than the destination app: both land in Scripts' Remix box, and the
+// section already says which one you're looking at.
+// The label uses `text-scripts-text`, not `text-scripts-400`: the scripts
+// accent is a dark navy, so a 400 label on its own tint reads as disabled.
+function ScriptActionRow({ onSave, onSend, sendLabel }: { onSave: () => void; onSend: () => void; sendLabel: string }) {
   return (
     <div className="flex flex-wrap gap-2 border-t border-ink/5 p-3">
       <button
@@ -414,13 +405,12 @@ function ScriptActionRow({ onSave, onSend, extra }: { onSave: () => void; onSend
       </button>
       <button
         onClick={onSend}
-        className="flex flex-1 min-w-0 items-center justify-center gap-2 rounded-full border border-scripts-500/20 bg-scripts-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-scripts-400 transition-colors hover:bg-scripts-500/20"
+        className="flex flex-1 min-w-0 items-center justify-center gap-2 rounded-full border border-scripts-500/20 bg-scripts-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-scripts-text transition-colors hover:bg-scripts-500/20"
       >
         <PenLine className="h-4 w-4" strokeWidth={1.75} />
-        Send to Scripts
+        {sendLabel}
         <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
       </button>
-      {extra}
     </div>
   )
 }

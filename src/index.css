@@ -91,10 +91,12 @@
   --color-scripts-400: color-mix(in oklab, #24365A 80%, white);
   --color-scripts-500: #24365A;
   --color-scripts-600: color-mix(in oklab, #24365A 85%, black);
-  /* Active accent label/icon (mode + length toggles, chosen Style card). A
-     light steel blue on dark — the navy itself would vanish on the dark
-     canvas; the light override below is the navy. */
-  --color-scripts-text: #8FA6CE;
+  /* Active accent label/icon (mode + length toggles, chosen Style card, and
+     every button label sitting on a scripts tint). A bright periwinkle on
+     dark — the navy itself vanishes on the dark canvas, and the steel blue
+     this used to be (#8FA6CE) still read as dull enough to look disabled
+     beside the other apps' accents; the light override below is the navy. */
+  --color-scripts-text: #A9C4FF;
 
   /* Voiceovers — blue #007AFF */
   --color-voice-100: color-mix(in oklab, #007AFF 25%, white);

@@ -40,7 +40,7 @@ export default function ScriptStyleList({
     : 'border-scripts-500/30 bg-scripts-500/10'
   const activeIcon = accent === 'broll'
     ? 'bg-broll-500/10 text-broll-400'
-    : 'bg-scripts-500/10 text-scripts-400'
+    : 'bg-scripts-500/10 text-scripts-text'
   const activeText = accent === 'broll' ? 'text-broll-300' : 'text-scripts-300'
 
   // Object key order IS the default order (see WRITE_STYLE_GROUP_META). Pulling
