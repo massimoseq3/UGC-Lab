@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Film, AlertCircle, Plus, Images, X, Palette, Download, Video as VideoIcon, Coins, Pencil, Check } from 'lucide-react'
+import { Film, AlertCircle, Plus, Images, X, Palette, Download, Video as VideoIcon, Clapperboard, Coins, Pencil, Check } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage, BatchVideoSettings } from '../types'
 import type { Product, Model } from '../../../stores/types'
@@ -87,6 +87,12 @@ interface BatchRequest {
   // Only a multi-scene batch offers columns; a single scene's row is one
   // card per column, where the choice means nothing.
   columnar: boolean
+  // Video runs only: animate the stills that exist, and nothing else. A plain
+  // video batch also fires cards that have no image yet, rendering those from
+  // the prompt alone — which is a different, blinder spend. After a
+  // Generate-all-images pass, "animate what I can see" is the step the member
+  // actually wants.
+  stillsOnly?: boolean
 }
 
 // Card keys are `${scene.number}-${variationIndex}` — the index IS the column.
@@ -352,10 +358,13 @@ export default function ScenesView({
         ? snapVideoDuration(BATCH_VIDEO_DURATION, batchVideoDurationOptions)
         : BATCH_VIDEO_DURATION
   const hasVideo = (key: string) => (cardStates[key]?.videos.length ?? 0) > 0
+  // What makes a card eligible for this run: a still to animate, or (for a
+  // plain video batch) just a prompt to render from.
+  const videoEligible = videoConfirm?.stillsOnly ? hasImage : promptReady
   const videoColumns = videoConfirm?.columnar ? columnsIn(videoConfirm.keys) : []
   const videoScoped = videoConfirm
     ? videoConfirm.keys.filter(
-        (k) => promptReady(k) && (videoColumn === 'all' || columnOf(k) === videoColumn),
+        (k) => videoEligible(k) && (videoColumn === 'all' || columnOf(k) === videoColumn),
       )
     : []
   const videoFresh = videoScoped.filter((k) => !hasVideo(k))
@@ -366,7 +375,9 @@ export default function ScenesView({
   // but come back as something the member hasn't seen a frame of.
   const videoAnimateCount = videoTargets.filter((k) => (cardStates[k]?.images.length ?? 0) > 0).length
   const videoSourceNote =
-    videoTargets.length === 0 ? null
+    // Redundant in a stills-only run: the title already says every clip comes
+    // off a still.
+    videoTargets.length === 0 || videoConfirm?.stillsOnly ? null
       : videoAnimateCount === videoTargets.length ? 'from the card stills'
         : videoAnimateCount === 0 ? 'from the prompts'
           : `${videoAnimateCount} from a still, ${videoTargets.length - videoAnimateCount} from the prompt`
@@ -391,17 +402,21 @@ export default function ScenesView({
     !videoModelModes.includes('image-to-video') &&
     !videoModelModes.includes('reference-to-video')
 
-  const requestVideoBatch = (keys: string[], scope: string, columnar = false) => {
-    const targets = keys.filter(promptReady)
+  const requestVideoBatch = (keys: string[], scope: string, columnar = false, stillsOnly = false) => {
+    const eligible = stillsOnly ? hasImage : promptReady
+    const targets = keys.filter(eligible)
     if (targets.length === 0) {
-      useAppStore.getState().addToast('No prompts ready to generate.', 'error')
+      useAppStore.getState().addToast(
+        stillsOnly ? 'No stills to animate yet.' : 'No prompts ready to generate.',
+        'error',
+      )
       return
     }
     // Cards that already have a clip are held back by default — a video is the
     // expensive half of this app, so re-billing one takes an explicit tick.
     setIncludeExistingVideos(false)
     setVideoColumn(columnar ? firstOpenColumn(targets, (k) => !hasVideo(k)) : 'all')
-    setVideoConfirm({ keys, scope, columnar })
+    setVideoConfirm({ keys, scope, columnar, stillsOnly })
   }
 
   const confirmVideoBatch = () => {
@@ -688,6 +703,9 @@ export default function ScenesView({
   }
 
   const allKeys = result.scenes.flatMap((s) => s.variations.map((_, i) => `${s.number}-${i}`))
+  // Cards holding a still — what the Animate action works on, and the reason
+  // its button only appears once there's something to animate.
+  const animatableKeys = allKeys.filter(hasImage)
 
   // Every rendered clip across every scene, for the download picker — parity
   // with Continuous. This is the mode that produces the most clips and where
@@ -722,8 +740,11 @@ export default function ScenesView({
       {/* The strip pins to the top of the scroll port and keeps its own hairline
           so the meta + batch actions stay reachable however far down the
           storyboard the member has scrolled. Full-bleed via -mx-5 so the rule
-          runs edge to edge; the blur keeps scenes legible sliding under it. */}
-      <div className="sticky top-0 z-20 -mx-5 mb-5 flex items-center justify-between gap-3 border-b border-ink/5 bg-surface-0/80 px-5 py-3.5 backdrop-blur-md">
+          runs edge to edge. Opaque on purpose (the Ad Analyzer lesson):
+          backdrop-filter doesn't re-blur inside the already-blurred window
+          frame, so a translucent strip let cards ghost through it and the bar
+          read as scrolling with the storyboard instead of pinned. */}
+      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5">
         <div className="flex min-w-0 items-center gap-2">
           {/* Small-caps and dim — the count is a caption for the storyboard
               below it, so it takes the same eyebrow treatment as the style pill
@@ -738,9 +759,11 @@ export default function ScenesView({
             <span className="truncate">{result.styleBrief ? (result.styleName?.trim() || 'Custom style') : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
           </span>
         </div>
-        {/* Batch actions, in the order the work happens — images, then videos,
-            then the export. Same shape and styling as Continuous' top strip. */}
-        <div className="flex shrink-0 items-center gap-2">
+        {/* Batch actions, in the order the work happens — images, then the
+            animate pass, then videos, then the export. Same shape and styling
+            as Continuous' top strip. Wraps rather than clipping its last
+            button on a narrow panel. */}
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button
             type="button"
             onClick={() => requestBatch(allKeys, 'All scenes', true)}
@@ -750,6 +773,22 @@ export default function ScenesView({
             <Images className="h-3.5 w-3.5" />
             Generate all images
           </button>
+          {/* Animate — the step straight after Generate-all-images, and only
+              offered once there's a still to animate. It's scoped to the cards
+              that HAVE one, so nothing renders from a prompt the member hasn't
+              seen a frame of (which is what the plain video batch beside it
+              would also do). */}
+          {animatableKeys.length > 0 && (
+            <button
+              type="button"
+              onClick={() => requestVideoBatch(allKeys, 'All stills', true, true)}
+              title="Animate every card that already has a still — nothing renders from a prompt alone"
+              className="flex items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 py-1.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/40 hover:bg-broll-500/20"
+            >
+              <Clapperboard className="h-3.5 w-3.5" />
+              Animate all stills
+            </button>
+          )}
           <button
             type="button"
             onClick={() => requestVideoBatch(allKeys, 'All scenes', true)}
@@ -966,7 +1005,9 @@ export default function ScenesView({
                 skipped) is either obvious from the storyboard behind it or
                 already said by the controls below. */}
             <h3 className="text-sm font-medium text-ink-100">
-              {videoTargets.length === 0 ? 'Nothing to generate' : 'Generate videos'}
+              {videoTargets.length === 0
+                ? (videoConfirm.stillsOnly ? 'Nothing to animate' : 'Nothing to generate')
+                : (videoConfirm.stillsOnly ? 'Animate stills' : 'Generate videos')}
             </h3>
             <p className="mt-1 text-xs text-ink-500">
               {[
@@ -981,8 +1022,8 @@ export default function ScenesView({
               value={videoColumn}
               onChange={setVideoColumn}
               isDone={(col) =>
-                !!videoConfirm.keys.some((k) => columnOf(k) === col && promptReady(k)) &&
-                videoConfirm.keys.every((k) => columnOf(k) !== col || !promptReady(k) || hasVideo(k))
+                !!videoConfirm.keys.some((k) => columnOf(k) === col && videoEligible(k)) &&
+                videoConfirm.keys.every((k) => columnOf(k) !== col || !videoEligible(k) || hasVideo(k))
               }
             />
 
@@ -1065,10 +1106,14 @@ export default function ScenesView({
                 disabled={videoTargets.length === 0 || videoModelCantAnimate}
                 className="flex items-center gap-2 rounded-full border border-white/15 bg-broll-500 py-1.5 pl-4 pr-2 text-[12px] font-medium text-white transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-broll-500"
               >
-                <VideoIcon className="h-3.5 w-3.5" />
+                {videoConfirm.stillsOnly
+                  ? <Clapperboard className="h-3.5 w-3.5" />
+                  : <VideoIcon className="h-3.5 w-3.5" />}
                 {videoTargets.length === 0
-                  ? 'Generate'
-                  : `Generate ${videoTargets.length} video${videoTargets.length === 1 ? '' : 's'}`}
+                  ? (videoConfirm.stillsOnly ? 'Animate' : 'Generate')
+                  : videoConfirm.stillsOnly
+                    ? `Animate ${videoTargets.length} still${videoTargets.length === 1 ? '' : 's'}`
+                    : `Generate ${videoTargets.length} video${videoTargets.length === 1 ? '' : 's'}`}
                 {/* The price sits on the button that spends it. */}
                 <span className="flex items-center gap-1 rounded-full bg-black/25 px-2 py-0.5 text-[11px] tabular-nums">
                   <Coins className="h-3 w-3" strokeWidth={2} />

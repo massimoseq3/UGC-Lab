@@ -571,8 +571,10 @@ export default function InputPanel({
                 expand-don't-scroll pattern as Playground's prompt). The length
                 toggle is pinned to the footer above Generate, so the brief owns
                 all the leftover space here. */}
-            {/* No min-h-0 here either — see the Additional Context note below. */}
-            <div className="mt-3 flex flex-1 flex-col">
+            {/* basis-0 + an explicit floor, so the brief takes the height that's
+                left rather than demanding a slab of it — see the Additional
+                Context note below for why the floor sits on the SECTION. */}
+            <div className="mt-3 flex min-h-[160px] flex-1 basis-0 flex-col">
               <div className="mb-3 flex items-center gap-2">
                 <StepLabel
                   label="Describe Your Ad"
@@ -583,13 +585,13 @@ export default function InputPanel({
               {/* Single rounded box (Playground prompt pattern): the textarea
                   grows to fill the box, the Enhance + Undo/Redo + Expand controls
                   sit attached in a footer under a hairline. */}
-              <div className="relative flex grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
+              <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
                 <textarea
                   value={brief}
                   onChange={(e) => handleBriefType(e.target.value)}
                   onBlur={commitBriefDraft}
                   placeholder={"Leave blank and I'll come up with the angle — or steer it: e.g. A girl in her 20s talking about this serum like she's telling her best friend, focus on how fast it cleared her skin. Casual, a little funny, end with the discount code."}
-                  className="min-h-[120px] w-full flex-1 resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
+                  className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                 />
                 {/* Footer toolbar — Enhance + Clear + Undo/Redo bottom-left;
                     Expand bottom-right (mirrors the Playground prompt field). */}
@@ -640,15 +642,17 @@ export default function InputPanel({
             </div>
           </>
         ) : (
-          <div className="mb-4 flex flex-col">
+          <div className="mb-4 flex min-h-[140px] flex-1 basis-0 flex-col">
             {/* Select from bank (header) + paste manually (textarea) merged into
                 one rounded box so the two sources read as a single input. One
                 box serves both remix pipelines: the pasted source's format is
                 auto-detected (a scene blueprint flips the chrome to fuchsia and
                 routes to the scene-rewrite pipeline; plain text gets 3 remixed
-                variations). Natural height (no grow) so the product row hugs it —
-                the Additional Context box absorbs the leftover column space. */}
-            <div className={`flex flex-col overflow-hidden rounded-3xl border bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30 ${sourceScript ? (blueprintActive ? 'border-fuchsia-500/40' : 'border-scripts-500/40') : 'border-dashed border-ink/10'} ${highlightField === 'source' ? 'animate-field-flash' : ''}`}>
+                variations). It splits the column's leftover height evenly with
+                the Additional Context box below (both flex-1 basis-0) — the two
+                writing surfaces are a matched pair, and a fixed-height slab here
+                is what pushed the rest of the column past the fold. */}
+            <div className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30 ${sourceScript ? (blueprintActive ? 'border-fuchsia-500/40' : 'border-scripts-500/40') : 'border-dashed border-ink/10'} ${highlightField === 'source' ? 'animate-field-flash' : ''}`}>
               <ScriptBankCard
                 selected={sourceScript}
                 label={blueprintActive ? 'Scene' : 'Script'}
@@ -656,16 +660,17 @@ export default function InputPanel({
                 accentClass={blueprintActive ? 'bg-fuchsia-500/10 text-fuchsia-300/80 light:text-fuchsia-700/80' : 'bg-scripts-500/10 text-scripts-300/80'}
                 onSelect={() => setScriptPickerOpen(true)}
                 onClear={() => setSourceScript(null)}
+                className="shrink-0"
                 flat
               />
-              <div className="relative flex grow flex-col">
+              <div className="relative flex min-h-0 grow flex-col">
                 <textarea
                   value={source}
                   onChange={(e) => { onSourceChange(e.target.value); setSourceScript(null) }}
                   rows={6}
                   placeholder={'…or paste a proven ad transcript, or a scene blueprint from Ad Analyzer — the format is detected automatically.'}
-                  className={`w-full grow resize-none border-0 bg-transparent px-4 py-3 leading-relaxed text-ink-200 outline-none ${
-                    isBlueprint ? 'min-h-[150px] overflow-y-auto font-mono text-xs placeholder-ink-700' : 'min-h-[120px] text-sm placeholder-ink-600'
+                  className={`w-full min-h-0 grow resize-none overflow-y-auto border-0 bg-transparent px-4 py-3 leading-relaxed text-ink-200 outline-none ${
+                    isBlueprint ? 'font-mono text-xs placeholder-ink-700' : 'text-sm placeholder-ink-600'
                   }`}
                 />
                 <ExpandButton onClick={() => setExpandedField('source')} className="absolute bottom-2 right-2" />
@@ -675,7 +680,7 @@ export default function InputPanel({
                   auto-detect can't know: remixing a blueprint's spoken lines
                   as a plain script instead of rewriting its scenes. */}
               {isBlueprint && (
-                <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-4 py-2">
+                <div className="flex shrink-0 items-center justify-between gap-2 border-t border-ink/10 px-4 py-2">
                   <span className={`flex min-w-0 items-center gap-1.5 truncate text-[11px] font-medium ${blueprintActive ? 'text-fuchsia-300 light:text-fuchsia-700' : 'text-ink-500'}`}>
                     {blueprintActive ? <Clapperboard className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
                     {blueprintActive ? 'Scene blueprint detected — scenes will be rewritten' : `Remixing as a plain script — ${variationCount} variations`}
@@ -701,18 +706,20 @@ export default function InputPanel({
             "Describe Your Video" brief (step 3), so it's only shown for the
             remix / scene-rewrite modes. */}
         {mode !== 'write' && (
-          // flex-1 to absorb leftover height, but NO min-h-0: that let the
-          // section shrink to zero on a short viewport while the textarea kept
-          // its min-height, so the footer toolbar overflowed and the box's
-          // overflow-hidden sliced it in half. Auto min-size = content size.
-          <div className="mt-2 flex flex-1 flex-col">
+          // flex-1 basis-0 with the floor on the SECTION, never min-h-0 plus a
+          // min-height on the textarea: that shape let the section shrink to
+          // zero on a short viewport while the textarea kept its own floor, so
+          // the box's overflow-hidden sliced the footer toolbar in half. A
+          // min-height on the section overrides its auto min-size, so it shrinks
+          // to a real, known floor and everything inside shrinks with it.
+          <div className="mt-2 flex min-h-[120px] flex-1 basis-0 flex-col">
             <div className="mb-2 flex items-center gap-2">
               <StepLabel label="Additional Context" optional />
             </div>
             {/* Single rounded box (matches the Write New brief): the textarea
-                grows to absorb the leftover column height, with Enhance / Clear /
-                Undo / Redo + Expand attached in a footer under a hairline. */}
-            <div className="relative flex grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
+                takes whatever height is left, with Enhance / Clear / Undo /
+                Redo + Expand attached in a footer under a hairline. */}
+            <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
               <textarea
                 value={additionalContext}
                 onChange={(e) => handleContextType(e.target.value)}
@@ -720,7 +727,7 @@ export default function InputPanel({
                 placeholder={blueprintActive
                   ? "Additional context for the rewrite (e.g. 'Keep tone playful', 'Make the CTA softer')..."
                   : "Additional context for this script (e.g. 'Focus on the self-cleaning feature', 'Summer campaign tone')..."}
-                className="min-h-[160px] w-full flex-1 resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
+                className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
               />
               {/* Footer toolbar — Enhance + Clear + Undo/Redo bottom-left;
                   Expand bottom-right (mirrors the Describe Your Ad field). */}
