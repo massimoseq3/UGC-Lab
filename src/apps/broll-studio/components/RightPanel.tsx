@@ -130,7 +130,11 @@ export default function RightPanel(props: RightPanelProps) {
     <div className="flex h-full flex-col">
       {/* Toggle strip — no global Settings popover anymore: each card owns its
           own settings inside its detail modal. */}
-      <div className="flex h-[57px] items-center justify-between gap-3 border-b border-ink/5 px-5">
+      {/* Opaque and stacked above the storyboard: the header is the panel's own
+          chrome, and a transparent one let the top edge of a scrolling card
+          show through the band under the tab strip — which reads as the pinned
+          bar below it letting content slide past. */}
+      <div className="relative z-30 flex h-[57px] shrink-0 items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5">
         <SegmentedToggle<Tab>
           className="h-10 !p-1 min-w-0"
           value={tab}

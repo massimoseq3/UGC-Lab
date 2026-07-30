@@ -9,6 +9,7 @@ import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_SIZE } from './services/imageValidation
 import { humanizeError } from '../../utils/friendlyError'
 import SegmentedToggle from '../../components/SegmentedToggle'
 import ExpandTextModal, { ExpandButton } from '../../components/ExpandableText'
+import AutoGrowTextarea from '../../components/AutoGrowTextarea'
 
 interface ProductFormProps {
   item?: Product | null
@@ -449,7 +450,10 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
         </span>
         {type === 'textarea' ? (
           <div className="relative">
-            <textarea
+            {/* Grows to fit — an auto-filled product fills every one of these,
+                and a column of boxes that each scroll internally is a column
+                you can't scroll through. */}
+            <AutoGrowTextarea
               value={value}
               onChange={(e) => set(key, e.target.value)}
               rows={3}
@@ -633,10 +637,15 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
             <span className="text-[12px] font-medium text-ink-300">
               Listing copy <span className="text-ink-600">(optional)</span>
             </span>
-            <textarea
+            {/* Grows with the paste, but capped — a whole Amazon listing would
+                otherwise push the photo and the Auto-fill button off the top of
+                the column. Past the cap it scrolls, which is the one place in
+                this form that's the right answer. */}
+            <AutoGrowTextarea
               value={listingText}
               onChange={(e) => setListingText(e.target.value)}
               rows={5}
+              maxHeight={280}
               placeholder="Paste the product page or Amazon listing text — auto-fill gets far more accurate with it."
               className="w-full resize-none rounded-2xl border border-ink/10 bg-ink/[0.02] px-4 py-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
             />

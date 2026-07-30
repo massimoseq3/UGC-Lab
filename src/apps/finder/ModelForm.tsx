@@ -1,10 +1,13 @@
-import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import type { ElementType } from 'react'
 import { X, ImagePlus, Download, Loader2, Copy, Check } from 'lucide-react'
 import type { Model } from '../../stores/types'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
 import { downloadImage } from '../../utils/downloadImage'
 import { copyToClipboard } from '../../utils/clipboard'
+// Long parameter values wrap onto several lines and the field grows to fit —
+// one shared idiom, so it can't drift from the one the product form uses.
+import AutoGrowTextarea from '../../components/AutoGrowTextarea'
 // The influencer DNA schema (tabs → subheading groups → fields) is owned by the
 // Influencers studio. We read it here so the bank detail view groups, labels and
 // ordering stay in lockstep with the create form instead of drifting apart.
@@ -151,27 +154,6 @@ function setAtPath(profile: Record<string, unknown> | null, path: string[], valu
     next[cat] = { ...(isPlainRecord(next[cat]) ? next[cat] : {}), [key]: value }
   }
   return next
-}
-
-// Auto-growing textarea — wraps long parameter values onto multiple lines and
-// grows to fit so nothing gets clipped (a single-line input would hide overflow).
-function AutoTextarea({ value, onChange, className }: { value: string; onChange: (v: string) => void; className: string }) {
-  const ref = useRef<HTMLTextAreaElement>(null)
-  useLayoutEffect(() => {
-    const el = ref.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [value])
-  return (
-    <textarea
-      ref={ref}
-      rows={1}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={className}
-    />
-  )
 }
 
 export default function ModelForm({ item, onSave, onCancel }: ModelFormProps) {
@@ -399,9 +381,10 @@ export default function ModelForm({ item, onSave, onCancel }: ModelFormProps) {
                             <div key={row.path.join('.')} className={`flex flex-col gap-0.5 ${row.wide ? 'sm:col-span-2' : ''}`}>
                               <dt className="px-3 text-[10px] font-medium uppercase tracking-widest text-ink-500">{row.label}</dt>
                               <dd>
-                                <AutoTextarea
+                                <AutoGrowTextarea
+                                  rows={1}
                                   value={getAtPath(profile, row.path)}
-                                  onChange={(v) => setProfileField(row.path, v)}
+                                  onChange={(e) => setProfileField(row.path, e.target.value)}
                                   className="w-full resize-none overflow-hidden rounded-2xl border border-transparent bg-transparent px-3 py-1.5 text-sm leading-snug text-ink-200 outline-none transition-colors hover:bg-ink/[0.04] focus:border-ink/15 focus:bg-ink/[0.04]"
                                 />
                               </dd>
@@ -426,9 +409,10 @@ export default function ModelForm({ item, onSave, onCancel }: ModelFormProps) {
                       <div key={row.path.join('.')} className="flex flex-col gap-0.5">
                         <dt className="px-3 text-[10px] font-medium uppercase tracking-widest text-ink-500">{row.label}</dt>
                         <dd>
-                          <AutoTextarea
+                          <AutoGrowTextarea
+                            rows={1}
                             value={getAtPath(profile, row.path)}
-                            onChange={(v) => setProfileField(row.path, v)}
+                            onChange={(e) => setProfileField(row.path, e.target.value)}
                             className="w-full resize-none overflow-hidden rounded-2xl border border-transparent bg-transparent px-3 py-1.5 text-sm leading-snug text-ink-200 outline-none transition-colors hover:bg-ink/[0.04] focus:border-ink/15 focus:bg-ink/[0.04]"
                           />
                         </dd>

@@ -1219,7 +1219,10 @@ export default function ContinuousView({
       {/* Top strip — storyboard meta + the two batch actions. Pinned to the top
           of the scroll port with its own hairline, so the batch buttons stay
           reachable however far down the storyboard the member has scrolled. */}
-      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0/80 px-5 py-3.5 backdrop-blur-md">
+      {/* Opaque, never translucent — see the note on the Line-by-Line strip:
+          a blurred bar inside the already-blurred window frame doesn't re-blur,
+          so frames ghost through it and the strip reads as unpinned. */}
+      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5">
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
           {/* Scene count matches the per-line storyboard's — small-caps and dim,
               the same eyebrow treatment as the pills beside it. */}
