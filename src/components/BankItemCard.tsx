@@ -206,6 +206,7 @@ function ImageCard({
           src={resolvedUrl}
           alt=""
           className="block w-full"
+          decoding="async"
           onLoad={(e) => onLandscape?.(e.currentTarget.naturalWidth > e.currentTarget.naturalHeight)}
         />
       ) : (

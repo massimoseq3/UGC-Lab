@@ -45,55 +45,136 @@ function json(status: number, body: unknown): Response {
   })
 }
 
-async function verifyUser(authHeader: string | null): Promise<{ userId: string } | { error: string; status?: number }> {
+// The `sub` claim of a JWT, read WITHOUT verifying the signature.
+//
+// This is never an authorization decision — `verifyUser` still asks Supabase
+// who the token belongs to, and every id used below is the VERIFIED one. The
+// unverified read exists purely so the two follow-up queries (disabled_at, and
+// the storage-cap sum) can be fired in the same tick as the verify instead of
+// waiting a full round trip for an id we can already see. A forged `sub` buys
+// nothing: the queries run under the caller's own token (RLS scopes them), and
+// their results are discarded unless the guess matches the verified id.
+function unverifiedSub(token: string): string | null {
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return null
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    const sub = (JSON.parse(json) as { sub?: unknown }).sub
+    return typeof sub === 'string' && sub ? sub : null
+  } catch {
+    return null
+  }
+}
+
+// Fetches the account's `disabled_at`. A valid JWT is not enough on its own: a
+// member removed from the allowlist has their profile stamped but keeps a
+// refreshable token, so a disabled account could otherwise keep minting R2
+// URLs after removal. Fails OPEN on a network/REST hiccup — same philosophy as
+// the storage-cap check, and RLS (migration 0012) backstops the Postgres side.
+async function fetchDisabledAt(supabaseUrl: string, supabaseAnon: string, token: string, userId: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/profiles?select=disabled_at&id=eq.${userId}`,
+      { headers: { apikey: supabaseAnon, Authorization: `Bearer ${token}` } },
+    )
+    if (!res.ok) return null
+    const rows = await res.json() as Array<{ disabled_at: string | null }>
+    return rows[0]?.disabled_at ?? null
+  } catch {
+    return null
+  }
+}
+
+// Sums the caller's existing `assets.byte_size`. Returns null when the query
+// itself fails — the caller lets the upload through rather than perma-blocking
+// on a flaky REST call.
+async function fetchUsedBytes(supabaseUrl: string, supabaseAnon: string, token: string, userId: string): Promise<number | null> {
+  try {
+    const res = await fetch(
+      `${supabaseUrl}/rest/v1/assets?select=byte_size&user_id=eq.${userId}`,
+      { headers: { apikey: supabaseAnon, Authorization: `Bearer ${token}` } },
+    )
+    if (!res.ok) return null
+    const rows = await res.json() as Array<{ byte_size: number }>
+    return rows.reduce((s, r) => s + Number(r.byte_size ?? 0), 0)
+  } catch {
+    return null
+  }
+}
+
+interface VerifiedCaller {
+  userId: string
+  // Present only when the pre-flight guess was right; null means the caller
+  // must fetch it the slow way (or skip it, per each check's fail-open rule).
+  usedBytes: number | null
+}
+
+// Verifies the caller and, in the SAME round trip, resolves the two checks that
+// depend on their id. This used to be three sequential fetches to Supabase —
+// verify, then disabled_at, then the storage sum — which is three transatlantic
+// round trips for anyone whose Supabase region isn't next door. Every presign
+// pays it, and a presign sits in front of every asset a member uploads or pulls
+// on a new device, so it was the single biggest fixed cost on the asset path.
+async function verifyUser(
+  authHeader: string | null,
+  needUsage: boolean,
+): Promise<VerifiedCaller | { error: string; status?: number }> {
   if (!authHeader?.startsWith('Bearer ')) return { error: 'Missing bearer token' }
   const token = authHeader.slice('Bearer '.length)
   const supabaseUrl = process.env.SUPABASE_URL
   const supabaseAnon = process.env.SUPABASE_ANON_KEY
   if (!supabaseUrl || !supabaseAnon) return { error: 'Server missing SUPABASE_URL/ANON_KEY' }
 
-  const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: supabaseAnon,
-    },
-  })
+  const guessedId = unverifiedSub(token)
+
+  const [res, guessedDisabledAt, guessedUsedBytes] = await Promise.all([
+    fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnon },
+    }),
+    guessedId ? fetchDisabledAt(supabaseUrl, supabaseAnon, token, guessedId) : Promise.resolve(null),
+    guessedId && needUsage ? fetchUsedBytes(supabaseUrl, supabaseAnon, token, guessedId) : Promise.resolve(null),
+  ])
+
   if (!res.ok) return { error: 'Invalid session' }
   const user = await res.json() as { id?: string }
   if (!user.id) return { error: 'No user id in session' }
 
-  // A valid JWT is not enough: a member removed from the allowlist has their
-  // profile stamped with `disabled_at` but keeps a refreshable token. Reject
-  // disabled accounts so they can't keep minting R2 URLs after removal. We fail
-  // OPEN if the profile lookup itself errors (network/REST hiccup) — same
-  // philosophy as the storage-cap check below, and RLS (migration 0012) is the
-  // backstop for the Postgres side regardless.
-  try {
-    const profRes = await fetch(
-      `${supabaseUrl}/rest/v1/profiles?select=disabled_at&id=eq.${user.id}`,
-      { headers: { apikey: supabaseAnon, Authorization: `Bearer ${token}` } },
-    )
-    if (profRes.ok) {
-      const rows = await profRes.json() as Array<{ disabled_at: string | null }>
-      if (rows[0]?.disabled_at) return { error: 'Account access has been revoked.', status: 403 }
-    }
-  } catch { /* fail open — see comment above */ }
+  // The speculative results only count if they were fetched for the id
+  // Supabase actually confirmed. When they weren't, redo them serially — a
+  // slower path nobody should hit, since a real client's own token always
+  // decodes to its own sub.
+  const trusted = guessedId === user.id
+  const disabledAt = trusted
+    ? guessedDisabledAt
+    : await fetchDisabledAt(supabaseUrl, supabaseAnon, token, user.id)
+  if (disabledAt) return { error: 'Account access has been revoked.', status: 403 }
 
-  return { userId: user.id }
+  const usedBytes = !needUsage
+    ? null
+    : trusted
+      ? guessedUsedBytes
+      : await fetchUsedBytes(supabaseUrl, supabaseAnon, token, user.id)
+
+  return { userId: user.id, usedBytes }
 }
 
 export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') return json(405, { error: 'POST only' })
 
-  const auth = await verifyUser(req.headers.get('authorization'))
-  if ('error' in auth) return json(auth.status ?? 401, { error: auth.error })
-
+  // Body is parsed BEFORE the auth call, not because anything trusts it — every
+  // validation below still runs, and nothing is signed until `verifyUser`
+  // returns — but because `op` decides whether the storage-cap query is worth
+  // firing, and firing it alongside the verify is what collapses three
+  // sequential Supabase round trips into one.
   let body: SignBody
   try {
     body = await req.json() as SignBody
   } catch {
     return json(400, { error: 'Invalid JSON' })
   }
+
+  const auth = await verifyUser(req.headers.get('authorization'), body?.op === 'put')
+  if ('error' in auth) return json(auth.status ?? 401, { error: auth.error })
 
   if (body.op !== 'put' && body.op !== 'get') return json(400, { error: 'op must be put|get' })
   if (!body.assetId || typeof body.assetId !== 'string') return json(400, { error: 'assetId required' })
@@ -126,34 +207,19 @@ export default async function handler(req: Request): Promise<Response> {
       return json(415, { error: `Unsupported mime type: ${body.mimeType}` })
     }
 
-    // Per-user storage cap. Sum the user's current `assets.byte_size` and
-    // reject if the new upload would push them over MAX_USER_BYTES.
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseAnon = process.env.SUPABASE_ANON_KEY
-    if (supabaseUrl && supabaseAnon) {
-      const tokenForRest = req.headers.get('authorization')!.slice('Bearer '.length)
-      const usageRes = await fetch(
-        `${supabaseUrl}/rest/v1/assets?select=byte_size&user_id=eq.${auth.userId}`,
-        {
-          headers: {
-            apikey: supabaseAnon,
-            Authorization: `Bearer ${tokenForRest}`,
-          },
-        },
-      )
-      if (usageRes.ok) {
-        const rows = await usageRes.json() as Array<{ byte_size: number }>
-        const currentBytes = rows.reduce((s, r) => s + Number(r.byte_size ?? 0), 0)
-        if (currentBytes + body.byteSize > MAX_USER_BYTES) {
-          const usedGb = (currentBytes / 1024 / 1024 / 1024).toFixed(2)
-          const capGb = (MAX_USER_BYTES / 1024 / 1024 / 1024).toFixed(0)
-          return json(413, {
-            error: `Storage cap reached — you're using ${usedGb} GB of ${capGb} GB. Free up space in Settings → Storage.`,
-            code: 'storage_cap',
-            usedBytes: currentBytes,
-            capBytes: MAX_USER_BYTES,
-          })
-        }
+    // Per-user storage cap. The sum was fetched alongside the auth verify; a
+    // null means that query failed and we let the upload through (see below).
+    {
+      const currentBytes = auth.usedBytes
+      if (currentBytes !== null && currentBytes + body.byteSize > MAX_USER_BYTES) {
+        const usedGb = (currentBytes / 1024 / 1024 / 1024).toFixed(2)
+        const capGb = (MAX_USER_BYTES / 1024 / 1024 / 1024).toFixed(0)
+        return json(413, {
+          error: `Storage cap reached — you're using ${usedGb} GB of ${capGb} GB. Free up space in Settings → Storage.`,
+          code: 'storage_cap',
+          usedBytes: currentBytes,
+          capBytes: MAX_USER_BYTES,
+        })
       }
       // If the usage query fails (network/REST hiccup), we let the upload
       // through. The next upload retries the cap check; one slipping by is

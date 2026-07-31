@@ -137,8 +137,16 @@ function Workspace() {
             const Component = APP_COMPONENTS[appId]
             const isActive = activeApp === appId
             return (
+              // data-app-pane is what index.css hangs the "stop painting"
+              // rule off. An app stays MOUNTED after its first open (running
+              // generations, in-flight polls and unsaved input all have to
+              // survive a dock switch) — but opacity-0 does not stop a single
+              // frame of work: CSS animations keep ticking, and the Dashboard
+              // is the default landing app, so its wallpaper and orrery were
+              // animating behind every other screen for the whole session.
               <div
                 key={appId}
+                data-app-pane={isActive ? 'active' : 'inactive'}
                 className={`absolute inset-0 ${
                   isActive ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
                 }`}

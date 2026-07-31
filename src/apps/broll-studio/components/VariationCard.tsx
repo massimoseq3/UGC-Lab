@@ -902,6 +902,8 @@ export default function VariationCard(props: VariationCardProps) {
               <img
                 src={resolvedImageUrl}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 className="absolute inset-0 h-full w-full object-cover"
               />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 to-transparent" />

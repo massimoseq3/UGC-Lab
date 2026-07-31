@@ -2,7 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/logo.png" />
+    <!-- logo-192.png, not the 1000×1000 logo.png master: the mark is never
+         drawn larger than 48 CSS px anywhere in the app, and the full-size
+         file is 576 KB — a fifth of the entire JS bundle, fetched on every
+         cold load and decoded to a ~4 MB bitmap for a 20px menu-bar glyph.
+         Regenerate with: sips -Z 192 public/logo.png --out public/logo-192.png -->
+    <link rel="icon" type="image/png" href="/logo-192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
