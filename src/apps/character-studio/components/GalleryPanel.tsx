@@ -289,8 +289,6 @@ function useHistoryTileActions(item: CharacterHistoryItem, onDelete: () => void 
   // Portraits and sheets alike save as their own Bank entry, tracked by
   // linkedModelId — once saved the tile shows the Saved/attached state.
   const savedAsModel = !!linkedModel
-  // The AI model that produced this image, shown as a small caption.
-  const modelLabel = getModel(item.modelId)?.displayName ?? item.modelId
 
   // Anything derived from a portrait — a sheet or an edit — files under that
   // character's name rather than a fresh random one: sheets take the
@@ -380,7 +378,7 @@ function useHistoryTileActions(item: CharacterHistoryItem, onDelete: () => void 
 
   return {
     url, status,
-    isSheet, savedAsModel, modelLabel,
+    isSheet, savedAsModel,
     savingToBank, nameDraft, setNameDraft, commitSave, openNameInput, toggleSave,
     deleting, confirmingDelete, setConfirmingDelete, confirmDelete,
     handleDownload,
@@ -712,7 +710,7 @@ function SingleCard({
       <PromptData profile={item.profile} />
 
       <p className="truncate text-center text-[10px] font-medium tracking-wider text-ink-500">
-        {a.modelLabel} · {formatRelative(item.createdAt)}
+        {formatRelative(item.createdAt)}
       </p>
     </>
   )
@@ -809,7 +807,6 @@ function HistoryTile({
   const a = useHistoryTileActions(item, onDelete)
 
   return (
-    <div>
     <div
       onClick={onClick}
       className="group relative cursor-pointer overflow-hidden rounded-lg border border-ink/10 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 hover:-translate-y-px card-soft-shadow"
@@ -871,12 +868,6 @@ function HistoryTile({
           />
         </div>
       )}
-    </div>
-    {a.modelLabel && (
-      <p className="mt-1 truncate text-center text-[10px] font-medium tracking-wider text-ink-500">
-        {a.modelLabel}
-      </p>
-    )}
     </div>
   )
 }
@@ -976,12 +967,13 @@ function HistoryListRow({
           scrolls within the stretched panel. */}
       <div className="relative min-w-0 flex-[2]">
         <div className="absolute inset-0 flex flex-col gap-2 py-3 pr-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="rounded-full bg-influencers-500/15 px-2 py-0.5 text-[10px] font-semibold text-influencers-200">{a.modelLabel}</span>
-          {meta.map((m) => (
-            <span key={m} className="rounded-full bg-ink/[0.06] px-1.5 py-0.5 text-[9px] font-medium text-ink-400">{m}</span>
-          ))}
-        </div>
+        {meta.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {meta.map((m) => (
+              <span key={m} className="rounded-full bg-ink/[0.06] px-1.5 py-0.5 text-[9px] font-medium text-ink-400">{m}</span>
+            ))}
+          </div>
+        )}
         {prompt && (
           <div className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-ink/[0.03] px-3 py-2 text-[12px] leading-relaxed text-ink-300">
             {prompt}

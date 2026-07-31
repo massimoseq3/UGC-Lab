@@ -343,7 +343,6 @@ function HistoryListRow({
   const audioUrl = useAssetUrl(entry.kind === 'music' ? entry.data.audioRef : null)
   // Native controls here, but the same one-clip-at-a-time rule as the tiles.
   const rowVideo = useExclusiveVideo()
-  const modelLabel = getModel(entry.data.modelId)?.displayName ?? entry.data.modelId
   const prompt = entry.data.prompt
   const isSaved = entry.kind === 'image' ? !!entry.data.linkedBRollId : false
 
@@ -403,12 +402,13 @@ function HistoryListRow({
           prompt scrolls within the stretched panel. */}
       <div className="relative min-w-0 flex-[1]">
         <div className="absolute inset-0 flex flex-col gap-2 py-3 pr-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="rounded-full bg-playground-500/15 px-2 py-0.5 text-[10px] font-semibold text-playground-200">{modelLabel}</span>
-          {meta.map((m) => (
-            <span key={m} className="rounded-full bg-ink/[0.06] px-1.5 py-0.5 text-[9px] font-medium text-ink-400">{m}</span>
-          ))}
-        </div>
+        {meta.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {meta.map((m) => (
+              <span key={m} className="rounded-full bg-ink/[0.06] px-1.5 py-0.5 text-[9px] font-medium text-ink-400">{m}</span>
+            ))}
+          </div>
+        )}
         {prompt && (
           <div className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-ink/[0.03] px-3 py-2 text-[12px] leading-relaxed text-ink-300">
             {prompt}
@@ -530,10 +530,8 @@ function ImageTile({
 }) {
   const { url, status } = useAssetUrlState(item.imageUrl)
   const isSaved = !!item.linkedBRollId
-  const modelLabel = getModel(item.modelId)?.displayName ?? item.modelId
 
   return (
-    <div>
       <div
         onClick={onClick}
         className="group relative cursor-pointer overflow-hidden rounded-lg border border-ink/10 light:border-ink/5 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 light:hover:border-ink/10 hover:-translate-y-px card-soft-shadow"
@@ -583,12 +581,6 @@ function ImageTile({
           <TileDeleteButton onDelete={onDelete} />
         </TileActionStack>
       </div>
-      {modelLabel && (
-        <p className="mt-1 truncate text-center text-[10px] font-medium tracking-wider text-ink-500">
-          {modelLabel}
-        </p>
-      )}
-    </div>
   )
 }
 
@@ -612,10 +604,8 @@ function VideoTile({
   const inline = useInlineVideo()
   const { hovering, unmuted, togglePlay, toggleMute } = inline
   const ratio = aspectStyle(item.aspectRatio)
-  const modelLabel = getModel(item.modelId)?.displayName ?? item.modelId
 
   return (
-    <div>
       <div
         {...inline.hoverProps}
         onClick={onClick}
@@ -679,12 +669,6 @@ function VideoTile({
           <TileDeleteButton onDelete={onDelete} />
         </TileActionStack>
       </div>
-      {modelLabel && (
-        <p className="mt-1 truncate text-center text-[10px] font-medium tracking-wider text-ink-500">
-          {modelLabel}
-        </p>
-      )}
-    </div>
   )
 }
 

@@ -292,12 +292,15 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     tags: ['recommended', 'fast', 'cheap'],
     pricing: { unit: 'per-1k-tokens', credits: 0.105 },
     official: chatOfficial(0.5, 3, KIE_PRICING),
-    defaultFor: ['ad-anatomy', 'character-studio'],
+    // The default everywhere, the two picker apps included — a member who never
+    // opens the picker pays the cheapest rate in the list, and the prompts were
+    // all written and tuned against this model in the first place.
+    defaultFor: ['ad-anatomy', 'character-studio', 'broll-studio', 'script-architect'],
     chatEndpoint: '/gemini-3-flash/v1/chat/completions',
     chatRating: {
       intelligence: 2,
       blurb:
-        'Cheapest and fastest. Fine for a rough first draft.',
+        'The default. Cheapest and fastest of the eight.',
     },
   },
 
@@ -309,17 +312,16 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     tags: ['new'],
     pricing: { unit: 'per-1k-tokens', credits: 0.27 },
     official: chatOfficial(1.5, 7.5, KIE_PRICING),
-    // The default writer in Scripts and B-Roll: the cheapest model that holds a
-    // long prompt contract without dropping scene tags. Gemini 3 Flash stays the
-    // default everywhere else, where the output feeds another model.
-    defaultFor: ['broll-studio', 'script-architect'],
+    // Was the unpicked default in Scripts and B-Roll and is no longer — it holds
+    // a long prompt contract slightly better, but at ~2.6× the credits on the
+    // member's own key, which is theirs to opt into rather than to discover.
     // OpenAI-compatible variant slug on kie.ai (native 3.6 uses Google's own
     // generateContent shape; our transport speaks OpenAI chat/completions).
     chatEndpoint: '/gemini-3-6-flash-openai/v1/chat/completions',
     chatRating: {
       intelligence: 4,
       blurb:
-        'The default. Solid writing, still cheap to run.',
+        'A step up in writing, for a few times the credits.',
     },
   },
 

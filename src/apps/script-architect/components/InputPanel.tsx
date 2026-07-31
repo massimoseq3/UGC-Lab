@@ -1,5 +1,5 @@
 import { useState, type ComponentType } from 'react'
-import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkles, Undo2, Redo2, Eraser, Shuffle, FishingHook, Video } from 'lucide-react'
+import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkles, Shuffle, FishingHook, Video } from 'lucide-react'
 import type { Product, Script } from '../../../stores/types'
 import { WRITE_LENGTHS, REMIX_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNT, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type VariationCount } from '../types'
 import { useBankStore } from '../../../stores/bankStore'
@@ -10,6 +10,7 @@ import SlideOver from '../../../components/SlideOver'
 import ScriptModelRow from '../../../components/ScriptModelRow'
 import Dropdown from '../../../components/Dropdown'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
+import PromptToolbar from '../../../components/PromptToolbar'
 import { useAppStore } from '../../../stores/appStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { enhanceBrief } from '../services/generateScript'
@@ -438,7 +439,10 @@ export default function InputPanel({
       {/* Scrollable inputs — a flex column so step 1's textarea can absorb
           leftover height (same expand-don't-scroll pattern as Playground).
           Tight top padding so the first section sits close to the toggle. */}
-      <div className="flex flex-1 flex-col overflow-y-auto px-5 pb-5 pt-4">
+      {/* pb-1, not pb-5: the brief grows to the bottom of this column and the
+          footer starts right under it, so anything more reads as a gap between
+          the box and the controls that belong to it. */}
+      <div className="flex flex-1 flex-col overflow-y-auto px-5 pb-1 pt-4">
         {mode === 'write' ? (
           <>
             {/* Output sub-mode toggle — governs the form below (which style
@@ -590,8 +594,8 @@ export default function InputPanel({
                 />
               </div>
               {/* Single rounded box (Playground prompt pattern): the textarea
-                  grows to fill the box, the Enhance + Undo/Redo + Expand controls
-                  sit attached in a footer under a hairline. */}
+                  grows to fill the box, with the shared PromptToolbar attached
+                  along the bottom inside the same border. */}
               <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
                 <textarea
                   value={brief}
@@ -600,51 +604,20 @@ export default function InputPanel({
                   placeholder={"Leave blank and I'll come up with the angle — or steer it: e.g. A girl in her 20s talking about this serum like she's telling her best friend, focus on how fast it cleared her skin. Casual, a little funny, end with the discount code."}
                   className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                 />
-                {/* Footer toolbar — Enhance + Clear + Undo/Redo bottom-left;
-                    Expand bottom-right (mirrors the Playground prompt field). */}
-                <div className="flex shrink-0 items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      title="Enhance prompt"
-                      onClick={handleEnhanceBrief}
-                      disabled={isEnhancing || !brief.trim()}
-                      className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-scripts-500/10 hover:text-scripts-300 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {isEnhancing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                      Enhance Prompt
-                    </button>
-                    <button
-                      type="button"
-                      title="Clear prompt"
-                      onClick={handleBriefClear}
-                      disabled={isEnhancing || !brief.trim()}
-                      className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Eraser className="h-3 w-3" />
-                      Clear Prompt
-                    </button>
-                    <button
-                      type="button"
-                      title="Undo"
-                      onClick={handleBriefUndo}
-                      disabled={!canUndoBrief || isEnhancing}
-                      className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                    >
-                      <Undo2 className="h-3 w-3" />
-                    </button>
-                    <button
-                      type="button"
-                      title="Redo"
-                      onClick={handleBriefRedo}
-                      disabled={!canRedoBrief || isEnhancing}
-                      className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                    >
-                      <Redo2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                  <ExpandButton onClick={() => setExpandedField('brief')} />
-                </div>
+                <PromptToolbar
+                  accent="scripts"
+                  onEnhance={handleEnhanceBrief}
+                  enhanceTitle="Enhance prompt"
+                  enhanceDisabled={!brief.trim()}
+                  busy={isEnhancing}
+                  onClear={handleBriefClear}
+                  clearDisabled={!brief.trim()}
+                  onUndo={handleBriefUndo}
+                  canUndo={canUndoBrief}
+                  onRedo={handleBriefRedo}
+                  canRedo={canRedoBrief}
+                  onExpand={() => setExpandedField('brief')}
+                />
               </div>
             </div>
           </>
@@ -736,51 +709,20 @@ export default function InputPanel({
                   : "Additional context for this script (e.g. 'Focus on the self-cleaning feature', 'Summer campaign tone')..."}
                 className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
               />
-              {/* Footer toolbar — Enhance + Clear + Undo/Redo bottom-left;
-                  Expand bottom-right (mirrors the Describe Your Ad field). */}
-              <div className="flex shrink-0 items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    title="Enhance prompt"
-                    onClick={handleEnhanceContext}
-                    disabled={isEnhancingContext || !additionalContext.trim()}
-                    className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-scripts-500/10 hover:text-scripts-300 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    {isEnhancingContext ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                    Enhance Prompt
-                  </button>
-                  <button
-                    type="button"
-                    title="Clear prompt"
-                    onClick={handleContextClear}
-                    disabled={isEnhancingContext || !additionalContext.trim()}
-                    className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Eraser className="h-3 w-3" />
-                    Clear Prompt
-                  </button>
-                  <button
-                    type="button"
-                    title="Undo"
-                    onClick={handleContextUndo}
-                    disabled={!canUndoContext || isEnhancingContext}
-                    className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    <Undo2 className="h-3 w-3" />
-                  </button>
-                  <button
-                    type="button"
-                    title="Redo"
-                    onClick={handleContextRedo}
-                    disabled={!canRedoContext || isEnhancingContext}
-                    className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    <Redo2 className="h-3 w-3" />
-                  </button>
-                </div>
-                <ExpandButton onClick={() => setExpandedField('additionalContext')} />
-              </div>
+              <PromptToolbar
+                accent="scripts"
+                onEnhance={handleEnhanceContext}
+                enhanceTitle="Enhance prompt"
+                enhanceDisabled={!additionalContext.trim()}
+                busy={isEnhancingContext}
+                onClear={handleContextClear}
+                clearDisabled={!additionalContext.trim()}
+                onUndo={handleContextUndo}
+                canUndo={canUndoContext}
+                onRedo={handleContextRedo}
+                canRedo={canRedoContext}
+                onExpand={() => setExpandedField('additionalContext')}
+              />
             </div>
           </div>
         )}
@@ -788,8 +730,10 @@ export default function InputPanel({
 
       {/* Generate button — pinned to the app window's bottom edge on mobile.
           Opaque bg: backdrop-filter doesn't re-blur inside the already-blurred
-          window frame, so any alpha lets content underneath ghost through. */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 shrink-0 border-t border-ink/5 bg-surface-0 px-5 py-3 md:static md:left-auto md:right-auto md:z-auto md:bg-transparent">
+          window frame, so any alpha lets content underneath ghost through. No
+          rule above it: the brief box ends where its own toolbar ends, so a
+          hairline there just fenced off controls that belong to the same column. */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 shrink-0 bg-surface-0 px-5 pb-3 pt-2 md:static md:left-auto md:right-auto md:z-auto md:bg-transparent">
         {/* Variations and length, side by side. Both were full-width segmented
             toggles — two 48px slabs stacked above Generate, in a column that
             has to fit a brief as well. As dropdowns they're one 36px row, and
@@ -804,14 +748,18 @@ export default function InputPanel({
           <div className="mb-2 flex items-center gap-2">
             {showTakes && (
               <div className="min-w-0 flex-1">
+                {/* The options carry the noun ("3 variations"), so there's no
+                    dim `label` on the trigger — with one it read "Variations 3
+                    variations". Length keeps its label, since "15s" alone
+                    doesn't say what it measures. */}
                 <Dropdown
                   compact
+                  className="h-11"
                   accent="scripts"
                   placement="above"
-                  label="Variations"
-                  value={String(variationCount)}
-                  options={VARIATION_COUNTS.map(String)}
-                  onChange={(v) => onVariationCountChange(Number(v) as VariationCount)}
+                  value={`${variationCount} variations`}
+                  options={VARIATION_COUNTS.map((n) => `${n} variations`)}
+                  onChange={(v) => onVariationCountChange(parseInt(v, 10) as VariationCount)}
                 />
               </div>
             )}
@@ -822,6 +770,7 @@ export default function InputPanel({
                     winner. Write New has no source to inherit from. */}
                 <Dropdown
                   compact
+                  className="h-11"
                   accent="scripts"
                   placement="above"
                   label="Length"

@@ -106,8 +106,13 @@ export default function ScriptModelRow({ appId, className = 'mb-3', compact = fa
               setOpen(true)
             }
           }}
+          // h-11 compact: B-Roll stacks this with a SegmentedToggle and the
+          // Visual Style row, and the three only read as one band at a shared
+          // height. Scripts gets the same row a few px taller than its
+          // Variations/Length dropdowns, which is the right way round — this is
+          // the control that decides what the click costs.
           className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-full border text-left transition-colors ${accent.border} ${
-            compact ? 'px-3 py-2' : 'gap-3 px-4 py-2.5'
+            compact ? 'h-11 px-3' : 'gap-3 px-4 py-2.5'
           }`}
         >
           {compact ? (
