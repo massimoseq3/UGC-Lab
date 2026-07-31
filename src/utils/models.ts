@@ -24,6 +24,26 @@ export type Mode = ImageMode | VideoMode | MusicMode
 
 export type Tag = 'recommended' | 'new' | 'fast' | 'cheap'
 
+// How a chat model's request and response are shaped on api.kie.ai. The model
+// slug lives in the URL for 'openai-chat' and in the request body for the other
+// two, which is why `chatSlug` exists — Opus 5 and Sonnet 5 share one endpoint.
+//   'openai-chat'      POST /<slug>/v1/chat/completions   (Gemini family)
+//   'claude-messages'  POST /claude/v1/messages           (Claude family)
+//   'openai-responses' POST /codex|grok/v1/responses      (GPT 5.6, Grok)
+export type ChatTransport = 'openai-chat' | 'claude-messages' | 'openai-responses'
+
+// What the script-model picker shows beside a chat model. `intelligence` is
+// editorial — a relative ordering of the models we actually offer, based on how
+// the providers position them against each other, not a benchmark score. Cost
+// is NOT declared here: it's derived from the entry's real `pricing` by
+// `chatCostTier`, so the two can never drift apart.
+export interface ChatRating {
+  // 5 = the strongest writer on offer here.
+  intelligence: 1 | 2 | 3 | 4 | 5
+  // One sentence on what this model is good for, under the name in the picker.
+  blurb: string
+}
+
 export interface Voice {
   id: string
   label: string
@@ -131,9 +151,18 @@ export interface ModelEntry {
   // official/market); the picker's "% off" chip stays official-only.
   market?: OfficialPricing
   defaultFor?: string[]
-  // Chat-only: OpenAI-compatible endpoint path on api.kie.ai.
+  // Chat-only: endpoint path on api.kie.ai.
   // e.g. '/gemini-3-flash/v1/chat/completions'
   chatEndpoint?: string
+  // Chat-only: request/response shape at that endpoint. Defaults to
+  // 'openai-chat' when omitted.
+  chatTransport?: ChatTransport
+  // Chat-only: the slug sent in the request BODY's `model` field. Required for
+  // transports whose endpoint doesn't name the model; omitted for 'openai-chat',
+  // where the slug is already in the URL.
+  chatSlug?: string
+  // Chat-only: star ratings + blurb for the script-model picker.
+  chatRating?: ChatRating
   // Video-only: which kie endpoint family to hit.
   // 'createTask' (default) -> POST /api/v1/jobs/createTask
   // 'veo'                  -> POST /api/v1/veo/generate
@@ -164,6 +193,11 @@ export const TTS_MODEL_ID = 'google/gemini-3-1-flash-tts'
 //             improve, and members pay the difference on their own key. Kept as
 //             the named opt-in for a surface where a wrong answer would cost
 //             real rework; check git log before promoting anything back.
+//
+// Neither constant is what Scripts or B-Roll call any more: those two read the
+// member's own pick (see resolveScriptModel in stores/settingsStore.ts), which
+// falls back to DEFAULT when nothing is chosen. Every OTHER chat surface still
+// resolves through these two.
 export const CHAT_MODEL_DEFAULT = 'gemini-3-flash'
 export const CHAT_MODEL_STRONG = 'gemini-3-6-flash'
 
@@ -193,35 +227,78 @@ function geminiTtsCredits(charCount: number): number {
   )
 }
 
+// The official-API comparison for a chat model. kie's pricing table lists a
+// provider list price per MILLION tokens for input and output separately; we
+// blend the pair 50/50 and express it per token, matching how `pricing.credits`
+// is derived for the same entry so the "% off" chip compares like with like.
+function chatOfficial(inUsdPerMillion: number, outUsdPerMillion: number, source: string): OfficialPricing {
+  const usdPerToken = (inUsdPerMillion + outUsdPerMillion) / 2 / 1_000_000
+  return { usdFor: ({ tokenCount = 1000 }) => usdPerToken * tokenCount, source }
+}
+
+const KIE_PRICING = 'https://kie.ai/pricing'
+
 export const MODEL_REGISTRY: ModelEntry[] = [
   // ── Chat / Vision ─────────────────────────────────────────────
 
-  // Chat runs on TWO models, split by what the output is worth:
+  // Chat has a DEFAULT that every surface runs on, plus a picker in the two
+  // apps that write words a person reads — Scripts and B-Roll. Everything else
+  // (vision extraction, the Ad Analyzer, style reads, prompt enhance) stays
+  // pinned to the default: those calls feed another model, not a reader, and
+  // paying Opus rates to shape a prompt is money lit on fire.
   //
-  //   Gemini 3 Flash   — everywhere. Prompt-shaping, vision extraction,
-  //                      storyboards, the Ad Analyzer, and Scripts. 3.6 didn't
-  //                      visibly beat 3 on any of them at ~2.6× the price —
-  //                      including on script prose, which was the last surface
-  //                      to move back.
-  //   Gemini 3.6 Flash — product auto-fill only (finder/extractProductInfo).
-  //                      A misread spec propagates into every script and ad
-  //                      written off that product, so it's worth the credits.
-  //
-  // Still no picker — the split is a product decision, not a user setting.
   // Order matters: Gemini 3 Flash is FIRST so it stays getDefaultModel's
-  // candidates[0] fallback for any chat consumer without an explicit defaultFor.
+  // candidates[0] fallback for any chat consumer without an explicit defaultFor,
+  // and it is the `defaultFor` of both picker apps — a member who never opens
+  // the picker keeps today's cost exactly.
+  //
+  // Every prompt in this app was written and tuned against Gemini 3 Flash, and
+  // the storyboard parsers expect its tag discipline. A stronger model writes
+  // better prose; it does not automatically parse better. Keep the tolerant
+  // parsers (services/xmlBlocks.ts) tolerant.
+  //
+  // PRICING — all eight verified against kie.ai/pricing on 2026-07-31, which
+  // lists chat models as separate input and output rows in credits per MILLION
+  // tokens. `pricing.credits` here is per THOUSAND and blends the two 50/50 —
+  // the same convention the original Gemini entries used, now carried to full
+  // precision (0.105, not 0.10) so `officialSavingsPercent` lands exactly on
+  // kie's published discount instead of a point either side. The blend is why
+  // these are display estimates, not invoices: a storyboard call is input-heavy
+  // and a batch of takes is output-heavy, and the real charge is metered
+  // server-side either way.
+  //
+  //   model            in cr/M   out cr/M   blended cr/1k
+  //   GPT 5.6 Luna        11.2       67.2      0.0392
+  //   Gemini 3 Flash        30        180      0.105
+  //   Gemini 3.6 Flash      90        450      0.27
+  //   Grok 4.5             160        480      0.32
+  //   GPT 5.6 Terra        112        672      0.392
+  //   Claude Sonnet 5      170        855      0.5125
+  //   GPT 5.6 Sol          280       1680      0.98
+  //   Claude Opus 5        400       2000      1.20
+  //
+  // `official` is kie's own "Official / Fal Price" column, blended the same way
+  // — which is what makes the picker's "% off" chip real (Gemini −70%, Claude
+  // −57.5/−60%, GPT −72%, Grok −60%).
+  //
+  // Cached-input and cache-write tiers exist on the OpenAI and Anthropic
+  // entries and are deliberately ignored: nothing in this app reuses a prompt
+  // prefix across calls, so we'd be quoting a discount no member ever gets.
   {
     id: 'gemini-3-flash',
     displayName: 'Gemini 3 Flash',
     provider: 'Google',
     task: 'chat',
     tags: ['recommended', 'fast', 'cheap'],
-    // Source: https://kie.ai/gemini-3-flash. Input $0.15/M tokens (30 cr/M =
-    // 0.030 cr/1k), output $0.90/M tokens (180 cr/M = 0.180 cr/1k). We use a
-    // blended 0.10 since most chat calls in this app skew toward output.
-    pricing: { unit: 'per-1k-tokens', credits: 0.1 },
-    defaultFor: ['ad-anatomy', 'character-studio', 'broll-studio', 'script-architect'],
+    pricing: { unit: 'per-1k-tokens', credits: 0.105 },
+    official: chatOfficial(0.5, 3, KIE_PRICING),
+    defaultFor: ['ad-anatomy', 'character-studio'],
     chatEndpoint: '/gemini-3-flash/v1/chat/completions',
+    chatRating: {
+      intelligence: 2,
+      blurb:
+        'Cheapest and fastest. Fine for a rough first draft.',
+    },
   },
 
   {
@@ -230,13 +307,130 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     provider: 'Google',
     task: 'chat',
     tags: ['new'],
-    // Source: https://kie.ai/gemini-3-6-flash. Input $0.45/M tokens (90 cr/M =
-    // 0.090 cr/1k), output $2.25/M tokens (450 cr/M = 0.450 cr/1k). Blended 0.26
-    // using the same input/output weighting as the Gemini 3 entry above.
-    pricing: { unit: 'per-1k-tokens', credits: 0.26 },
+    pricing: { unit: 'per-1k-tokens', credits: 0.27 },
+    official: chatOfficial(1.5, 7.5, KIE_PRICING),
+    // The default writer in Scripts and B-Roll: the cheapest model that holds a
+    // long prompt contract without dropping scene tags. Gemini 3 Flash stays the
+    // default everywhere else, where the output feeds another model.
+    defaultFor: ['broll-studio', 'script-architect'],
     // OpenAI-compatible variant slug on kie.ai (native 3.6 uses Google's own
     // generateContent shape; our transport speaks OpenAI chat/completions).
     chatEndpoint: '/gemini-3-6-flash-openai/v1/chat/completions',
+    chatRating: {
+      intelligence: 4,
+      blurb:
+        'The default. Solid writing, still cheap to run.',
+    },
+  },
+
+  // Slugs for all six below verified against the `model` enum in each API doc
+  // on docs.kie.ai; prices against kie.ai/pricing. Do not guess either.
+  {
+    id: 'claude-sonnet-5',
+    displayName: 'Claude Sonnet 5',
+    provider: 'Anthropic',
+    task: 'chat',
+    tags: ['recommended'],
+    pricing: { unit: 'per-1k-tokens', credits: 0.5125 },
+    official: chatOfficial(2, 10, KIE_PRICING),
+    chatEndpoint: '/claude/v1/messages',
+    chatTransport: 'claude-messages',
+    chatSlug: 'claude-sonnet-5',
+    chatRating: {
+      intelligence: 4,
+      blurb:
+        'Sounds the most like a real person. Best for dialogue.',
+    },
+  },
+
+  {
+    id: 'claude-opus-5',
+    displayName: 'Claude Opus 5',
+    provider: 'Anthropic',
+    task: 'chat',
+    tags: ['new'],
+    pricing: { unit: 'per-1k-tokens', credits: 1.2 },
+    official: chatOfficial(5, 25, KIE_PRICING),
+    chatEndpoint: '/claude/v1/messages',
+    chatTransport: 'claude-messages',
+    chatSlug: 'claude-opus-5',
+    chatRating: {
+      intelligence: 5,
+      blurb:
+        'The best writer here. Slow, and the priciest run.',
+    },
+  },
+
+  {
+    id: 'gpt-5-6-sol',
+    displayName: 'GPT 5.6 Sol',
+    provider: 'OpenAI',
+    task: 'chat',
+    tags: ['new'],
+    pricing: { unit: 'per-1k-tokens', credits: 0.98 },
+    official: chatOfficial(5, 30, KIE_PRICING),
+    chatEndpoint: '/codex/v1/responses',
+    chatTransport: 'openai-responses',
+    chatSlug: 'gpt-5-6-sol',
+    chatRating: {
+      intelligence: 5,
+      blurb:
+        'Follows long instructions to the letter. Best for scene blueprints.',
+    },
+  },
+
+  {
+    id: 'gpt-5-6-terra',
+    displayName: 'GPT 5.6 Terra',
+    provider: 'OpenAI',
+    task: 'chat',
+    tags: ['new'],
+    pricing: { unit: 'per-1k-tokens', credits: 0.392 },
+    official: chatOfficial(2, 12, KIE_PRICING),
+    chatEndpoint: '/codex/v1/responses',
+    chatTransport: 'openai-responses',
+    chatSlug: 'gpt-5-6-terra',
+    chatRating: {
+      intelligence: 4,
+      blurb:
+        'Strong all-rounder for a middling price.',
+    },
+  },
+
+  {
+    id: 'gpt-5-6-luna',
+    displayName: 'GPT 5.6 Luna',
+    provider: 'OpenAI',
+    task: 'chat',
+    tags: ['fast', 'cheap'],
+    pricing: { unit: 'per-1k-tokens', credits: 0.0392 },
+    official: chatOfficial(0.2, 1.2, KIE_PRICING),
+    chatEndpoint: '/codex/v1/responses',
+    chatTransport: 'openai-responses',
+    chatSlug: 'gpt-5-6-luna',
+    chatRating: {
+      intelligence: 4,
+      blurb:
+        'Cheaper than the default and writes better. The value pick.',
+    },
+  },
+
+  {
+    id: 'grok-4-5',
+    displayName: 'Grok 4.5',
+    provider: 'xAI',
+    task: 'chat',
+    tags: ['new'],
+    pricing: { unit: 'per-1k-tokens', credits: 0.32 },
+    official: chatOfficial(2, 6, KIE_PRICING),
+    chatEndpoint: '/grok/v1/responses',
+    chatTransport: 'openai-responses',
+    chatSlug: 'grok-4-5',
+    chatRating: {
+      intelligence: 4,
+      blurb:
+        'Punchy and willing to be funny. Good for hooks.',
+    },
   },
 
   // ── Image generation ──────────────────────────────────────────
@@ -496,7 +690,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     provider: 'ByteDance',
     task: 'video',
     modes: ['text-to-video', 'image-to-video', 'frames-to-video'],
-    tags: ['recommended', 'cheap'],
+    // Not starred: it's the Continuous default because it's frames-native and
+    // cheap, which is a cost decision, not a "pick this first" recommendation.
+    tags: ['cheap'],
     pricing: {
       unit: 'per-second',
       credits: 3.5,
@@ -613,7 +809,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // character_orientation ('image' → ≤10s, 'video' → ≤30s), so durations: []
   // and aspectRatios: [] (aspect inherits from the reference image).
   // Per-second pricing keyed on resolution (720p/1080p). Source: kie.ai/pricing.
-  // Docs: kling-3.0/motion-control · kling-2.6/motion-control on docs.kie.ai.
+  // Docs: kling-3.0/motion-control on docs.kie.ai. A Kling 2.6 Motion Control
+  // entry sat beside this one (cheaper, same inputs) and was removed July 2026.
   {
     id: 'kling-3.0/motion-control',
     displayName: 'Kling 3.0 Motion Control',
@@ -644,154 +841,14 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       aspectRatios: [],
     },
   },
-  {
-    id: 'kling-2.6/motion-control',
-    displayName: 'Kling 2.6 Motion Control',
-    provider: 'Kling AI',
-    task: 'video',
-    modes: ['motion-control'],
-    tags: ['new', 'cheap'],
-    motionControl: true,
-    pricing: {
-      unit: 'per-second',
-      credits: 11,
-      priceFor: ({ durationSeconds = 5, resolution = '720p' }) => {
-        const perSec = resolution === '1080p' ? 18 : 11
-        return perSec * durationSeconds
-      },
-    },
-    // Same single official Motion Control rate as the 3.0 entry above.
-    official: {
-      usdFor: ({ durationSeconds = 5, resolution = '720p' }) =>
-        (resolution === '1080p' ? 0.168 : 0.126) * durationSeconds,
-      source: 'https://klingai.com/dev/pricing',
-    },
-    videoEndpoint: 'createTask',
-    videoConstraints: {
-      durations: [],
-      resolutions: ['720p', '1080p'],
-      default: '720p',
-      aspectRatios: [],
-    },
-  },
-  // Veo 3.1: kie bills PER VIDEO at a flat rate keyed on resolution. Duration
-  // is NOT a request parameter for any Veo variant — kie's API spec exposes
-  // only resolution + aspect ratio + the optional image inputs; clip length
-  // is decided system-side. We therefore (a) declare empty `durations` so
-  // the UI hides the toggle, (b) use unit 'per-call' so estimateCredits
-  // doesn't multiply by a phantom duration, and (c) drop `duration` from
-  // buildVideoInput's Veo branch.
-  // Source: https://kie.ai/pricing (scraped 2026-05-09);
-  //         https://docs.kie.ai/veo3-api/generate-veo-3-video.md
-  {
-    id: 'veo3_fast',
-    displayName: 'Veo 3.1 Fast',
-    provider: 'Google',
-    task: 'video',
-    modes: ['text-to-video', 'image-to-video', 'frames-to-video', 'reference-to-video'],
-    tags: ['fast'],
-    supportsReferenceImages: true,
-    // Veo's REFERENCE_2_VIDEO takes at most 3 reference images.
-    maxReferenceImages: 3,
-    pricing: {
-      unit: 'per-call',
-      credits: 60,
-      priceFor: ({ resolution = '720p' }) => {
-        if (resolution === '4k') return 180
-        if (resolution === '1080p') return 65
-        return 60  // 720p
-      },
-    },
-    // Gemini API bills Veo Fast per second ($0.10/s 720p, $0.12/s 1080p);
-    // kie's flat call is an ~8s clip, so compare against 8s. No published
-    // official 4K rate for Fast → null.
-    official: {
-      usdFor: ({ resolution = '720p' }) => {
-        if (resolution === '4k') return null
-        return (resolution === '1080p' ? 0.12 : 0.10) * 8
-      },
-      source: 'https://ai.google.dev/gemini-api/docs/pricing',
-    },
-    // Higgsfield: 22 credits per 8s Veo Fast clip ≈ $0.86 on the Plus annual
-    // plan ($39/mo → 1,000 credits). Verified 2026-07-09.
-    market: {
-      usdFor: ({ resolution = '720p' }) => (resolution === '4k' ? null : 0.86),
-      source: 'https://www.vo3ai.com/higgsfield-ai-pricing',
-    },
-    videoEndpoint: 'veo',
-    videoConstraints: {
-      durations: [],
-      resolutions: ['720p', '1080p', '4k'],
-      aspectRatios: ['16:9', '9:16'],
-    },
-  },
-  {
-    id: 'veo3_lite',
-    displayName: 'Veo 3.1 Lite',
-    provider: 'Google',
-    task: 'video',
-    modes: ['text-to-video', 'image-to-video', 'frames-to-video'],
-    tags: ['cheap'],
-    pricing: {
-      unit: 'per-call',
-      credits: 30,
-      priceFor: ({ resolution = '720p' }) => {
-        if (resolution === '4k') return 150
-        if (resolution === '1080p') return 35
-        return 30  // 720p
-      },
-    },
-    // Lite: $0.05/s 720p, $0.08/s 1080p × the ~8s clip. No official 4K rate.
-    official: {
-      usdFor: ({ resolution = '720p' }) => {
-        if (resolution === '4k') return null
-        return (resolution === '1080p' ? 0.08 : 0.05) * 8
-      },
-      source: 'https://ai.google.dev/gemini-api/docs/pricing',
-    },
-    videoEndpoint: 'veo',
-    videoConstraints: {
-      durations: [],
-      resolutions: ['720p', '1080p', '4k'],
-      aspectRatios: ['16:9', '9:16'],
-    },
-  },
-  {
-    id: 'veo3',
-    displayName: 'Veo 3.1 Quality',
-    provider: 'Google',
-    task: 'video',
-    modes: ['text-to-video', 'image-to-video', 'frames-to-video'],
-    tags: [],
-    pricing: {
-      unit: 'per-call',
-      credits: 250,
-      priceFor: ({ resolution = '720p' }) => {
-        if (resolution === '4k') return 380
-        if (resolution === '1080p') return 255
-        return 250  // 720p
-      },
-    },
-    // Quality: $0.40/s (720p and 1080p), $0.60/s 4K × the ~8s clip.
-    official: {
-      usdFor: ({ resolution = '720p' }) =>
-        (resolution === '4k' ? 0.60 : 0.40) * 8,
-      source: 'https://ai.google.dev/gemini-api/docs/pricing',
-    },
-    // Higgsfield: 58 credits per 8s premium (1080p) clip ≈ $2.26 on the Plus
-    // annual plan. Official is higher, so this rarely governs — kept for the
-    // record. Verified 2026-07-09.
-    market: {
-      usdFor: ({ resolution = '720p' }) => (resolution === '1080p' ? 2.26 : null),
-      source: 'https://www.vo3ai.com/higgsfield-ai-pricing',
-    },
-    videoEndpoint: 'veo',
-    videoConstraints: {
-      durations: [],
-      resolutions: ['720p', '1080p', '4k'],
-      aspectRatios: ['16:9', '9:16'],
-    },
-  },
+  // Veo 3.1 (Fast / Lite / Quality) is REMOVED from the app (July 2026). The
+  // three registry entries are gone, so nothing can select or fire one; see git
+  // history to restore them. What deliberately stays is the transport around
+  // them — `videoEndpoint: 'veo'`, kieVeoCreate/kieVeoPoll, buildVideoInput's
+  // veo3 branch and the `endpoint: 'veo'` field on B-Roll's persisted cards —
+  // because history rows written while Veo was live still carry it, and the
+  // refresh-resume path reads that field to know which poller to use. Deleting
+  // the transport would strand those clips mid-flight.
   // Gemini Omni Video — Google's multimodal AV generator. Standard
   // createTask transport, but its inputs are unique: alongside up to 7
   // reference images it accepts persistent character ids (from
@@ -1030,14 +1087,57 @@ export function getDefaultModel(appId: string, task: Task, mode?: Mode): ModelEn
   return candidates.find((m) => m.defaultFor?.includes(appId)) ?? candidates[0]
 }
 
-// Convenience for chat-using services. Returns the registered chat endpoint
-// path for the configured chat model, throwing if misconfigured.
-export function getChatEndpointPath(modelId: string = CHAT_MODEL_DEFAULT): string {
+// Everything a chat call needs to reach a model: where to POST, what shape to
+// speak, and (for the shared endpoints) which slug to name in the body.
+// `kieChatCompletions` takes one of these instead of a bare path so a service
+// never has to know which of the three transports its model uses.
+export interface ChatTarget {
+  endpoint: string
+  transport: ChatTransport
+  // Body-level `model` field. Undefined for 'openai-chat', where the URL names it.
+  slug?: string
+}
+
+// Convenience for chat-using services. Resolves the configured chat model to a
+// call target, throwing if misconfigured.
+export function getChatTarget(modelId: string = CHAT_MODEL_DEFAULT): ChatTarget {
   const m = getModel(modelId)
   if (!m?.chatEndpoint) {
     throw new Error(`Chat model ${modelId} is missing a chatEndpoint. Check src/utils/models.ts.`)
   }
-  return m.chatEndpoint
+  const transport = m.chatTransport ?? 'openai-chat'
+  if (transport !== 'openai-chat' && !m.chatSlug) {
+    throw new Error(`Chat model ${modelId} uses the ${transport} transport and needs a chatSlug. Check src/utils/models.ts.`)
+  }
+  return { endpoint: m.chatEndpoint, transport, slug: m.chatSlug }
+}
+
+// The chat models offered in the Scripts / B-Roll picker. A model without a
+// `chatRating` is deliberately not offered — the picker's whole content is the
+// rating and the blurb. Sorted cheapest-first within the caller's grouping.
+export function listScriptModels(): ModelEntry[] {
+  return listModels({ task: 'chat' }).filter((m) => m.chatRating)
+}
+
+// Cost as 1–5 "$" glyphs, DERIVED from the entry's real per-1k rate so a price
+// change moves the glyphs on its own. Thresholds are in blended credits per
+// 1k tokens and are chosen to separate the models we actually list rather than
+// to be a general-purpose scale:
+//   1  ≤0.05   Luna
+//   2  ≤0.15   Gemini 3 Flash
+//   3  ≤0.45   Gemini 3.6, Grok 4.5, Terra
+//   4  ≤1.00   Sonnet 5, Sol
+//   5  >1.00   Opus 5
+// Null when the model has no pricing — the picker then shows no glyphs rather
+// than guessing a tier.
+export function chatCostTier(modelId: string): 1 | 2 | 3 | 4 | 5 | null {
+  const perThousand = estimateCredits(modelId, { tokenCount: 1000 })
+  if (perThousand === null) return null
+  if (perThousand <= 0.05) return 1
+  if (perThousand <= 0.15) return 2
+  if (perThousand <= 0.45) return 3
+  if (perThousand <= 1) return 4
+  return 5
 }
 
 // ── Cost estimation ─────────────────────────────────────────────
@@ -1296,7 +1396,7 @@ export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<
   const duration = opts.duration ?? 5
   const resolution = opts.resolution ?? '720p'
 
-  // ── Kling Motion Control (kling-3.0 / kling-2.6 motion-control) ──
+  // ── Kling Motion Control (kling-3.0/motion-control) ──
   // Character image + driving video + orientation. No aspect/duration params —
   // both are decided by the inputs. `prompt` is optional (kie has its own
   // default); we send it only when the user typed one.

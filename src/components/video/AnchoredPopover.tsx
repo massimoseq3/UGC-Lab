@@ -11,6 +11,12 @@ interface AnchoredPopoverProps {
   // Approximate rendered height. Only used to decide whether to flip above the
   // anchor, so a rough number is fine.
   estimatedHeight?: number
+  // 'auto' (default) opens below when there's room and flips above when there
+  // isn't. 'above' always opens upward — for a trigger pinned near the bottom
+  // of a panel, where "there's room below" is measured against the viewport and
+  // so a menu can technically fit while still covering the button you're about
+  // to press.
+  placement?: 'auto' | 'above'
   className?: string
   children: ReactNode
 }
@@ -25,6 +31,7 @@ export default function AnchoredPopover({
   onClose,
   width,
   estimatedHeight = 80,
+  placement = 'auto',
   className = '',
   children,
 }: AnchoredPopoverProps) {
@@ -41,7 +48,7 @@ export default function AnchoredPopover({
       if (!el) return
       const rect = el.getBoundingClientRect()
       const spaceBelow = window.innerHeight - rect.bottom
-      const below = spaceBelow >= estimatedHeight + 8
+      const below = placement !== 'above' && spaceBelow >= estimatedHeight + 8
       setPos({
         top: below ? rect.bottom + 4 : rect.top - estimatedHeight - 4,
         // Keep the menu on screen when the anchor sits near the right edge.
@@ -55,7 +62,7 @@ export default function AnchoredPopover({
       window.removeEventListener('resize', measure)
       window.removeEventListener('scroll', measure, true)
     }
-  }, [open, anchorRef, estimatedHeight, width])
+  }, [open, anchorRef, estimatedHeight, width, placement])
 
   if (!open || !pos) return null
 

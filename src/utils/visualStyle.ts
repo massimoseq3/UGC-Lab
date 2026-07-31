@@ -13,7 +13,7 @@
 
 import { useSettingsStore } from '../stores/settingsStore'
 import { kieChatCompletions, type ChatMessage } from './kie'
-import { getChatEndpointPath } from './models'
+import { getChatTarget } from './models'
 
 // ── Visual styles ──────────────────────────────────────────────
 // The preset seeds the LLM's STYLE block; the LLM adapts it to the product and
@@ -152,7 +152,7 @@ Output ONLY the paragraph. No preamble, no headings, no bullets, no markdown.`
 export async function analyzeStyleReferences(images: string[]): Promise<string> {
   if (images.length === 0) throw new Error('Attach at least one reference image first.')
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  const endpoint = getChatTarget()
 
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: STYLE_ANALYSIS_SYSTEM }] },

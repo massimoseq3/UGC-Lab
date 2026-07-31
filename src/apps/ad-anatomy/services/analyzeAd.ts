@@ -8,7 +8,7 @@ import {
   CHAT_POLL_ATTEMPTS,
   type ChatMessage,
 } from '../../../utils/kie'
-import { getChatEndpointPath, CHAT_MODEL_DEFAULT } from '../../../utils/models'
+import { getChatTarget, CHAT_MODEL_DEFAULT } from '../../../utils/models'
 
 const CHAT_MODEL_ID = CHAT_MODEL_DEFAULT
 // Streaming fallback timeout — kept generous since chat completions don't
@@ -241,7 +241,7 @@ export async function pollAnalysisTask(taskId: string): Promise<AnalysisResult> 
 // error.
 export async function streamAnalysisFallback(videoFile: File): Promise<AnalysisResult> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath(CHAT_MODEL_ID)
+  const endpoint = getChatTarget(CHAT_MODEL_ID)
   const messages = await buildMessages(videoFile)
   const responseText = await kieChatCompletions(apiKey, endpoint, messages, {
     timeoutMs: STREAM_TIMEOUT_MS,

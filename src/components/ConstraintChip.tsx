@@ -5,6 +5,13 @@ import { useEffect, useRef, useState } from 'react'
 // click the trigger to open the menu, click an option (or outside / Escape) to
 // close it. Shared by Playground, B-Roll and Influencers so the surfaces feel
 // like one app.
+//
+// CLICK-ONLY, deliberately. Playground's footer chips opted into hover-to-open
+// for a while and it came out (July 2026): a menu that opens because the
+// pointer crossed it fires while you're on your way somewhere else, so moving
+// from the prompt box to Generate flashed the resolution and aspect menus open
+// on the way past. Opening a menu is a decision — it takes a click. Don't
+// reintroduce a `hover` prop here or anywhere else in the app.
 export default function ConstraintChip({
   options,
   value,
@@ -16,7 +23,6 @@ export default function ConstraintChip({
   size = 'md',
   grow = false,
   triggerClassName,
-  hover = false,
 }: {
   options: string[]
   value: string
@@ -39,16 +45,9 @@ export default function ConstraintChip({
   // Overrides the trigger's border/background/text classes (the default is a
   // neutral chip). Used by the audio pill to keep its tinted accent when on.
   triggerClassName?: string
-  // Opt-in hover-to-open (Playground footer chips). A short close delay bridges
-  // the trigger→menu gap. Default stays click-only for B-Roll / Influencers.
-  hover?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement>(null)
-  const closeTimer = useRef<number | null>(null)
-  const cancelClose = () => { if (closeTimer.current) { window.clearTimeout(closeTimer.current); closeTimer.current = null } }
-  const openNow = () => { cancelClose(); setOpen(true) }
-  const closeSoon = () => { cancelClose(); closeTimer.current = window.setTimeout(() => setOpen(false), 120) }
 
   // Close on outside click or Escape while the menu is open.
   useEffect(() => {
@@ -68,12 +67,7 @@ export default function ConstraintChip({
   }, [open])
 
   return (
-    <div
-      ref={wrapperRef}
-      className={`relative ${grow ? 'flex-1' : ''}`}
-      onMouseEnter={hover ? openNow : undefined}
-      onMouseLeave={hover ? closeSoon : undefined}
-    >
+    <div ref={wrapperRef} className={`relative ${grow ? 'flex-1' : ''}`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -90,8 +84,6 @@ export default function ConstraintChip({
           className={`absolute z-40 ${
             openDirection === 'up' ? 'bottom-full pb-1' : 'top-full pt-1'
           } ${align === 'right' ? 'right-0' : 'left-0'}`}
-          onMouseEnter={hover ? openNow : undefined}
-          onMouseLeave={hover ? closeSoon : undefined}
         >
           {/* Option rows are a real tap target: 36px tall at the trigger's own
               13px, not the 11px/24px they used to be. These are the resolution

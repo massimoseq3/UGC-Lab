@@ -12,9 +12,9 @@
 // stack — "unedited photorealism, zero bokeh" actively fights a 3D render.
 
 import type { ContinuousConcept, ContinuousFrame, ContinuousResult, ContinuousScene, ReferenceImage, VariationRefs } from '../types'
-import { useSettingsStore } from '../../../stores/settingsStore'
+import { useSettingsStore, resolveScriptModel } from '../../../stores/settingsStore'
 import { kieChatCompletions, LONG_CHAT_TIMEOUT_MS, type ChatMessage } from '../../../utils/kie'
-import { getChatEndpointPath, getModel, snapVideoDurationUp } from '../../../utils/models'
+import { getChatTarget, getModel, snapVideoDurationUp, type ChatTarget } from '../../../utils/models'
 import { IPHONE_REALISM_SUFFIX } from './realism'
 import { extractBlock, extractNumberedBlock } from './xmlBlocks'
 import { parsePhotoPick, productPhotoDataUris, productPhotoInstruction } from './productAngles'
@@ -35,9 +35,6 @@ export const CONTINUOUS_MODEL_IDS = [
   'bytedance/seedance-1.5-pro',
   'kling-3.0/video',
   'grok-imagine-video-1-5-preview',
-  'veo3_fast',
-  'veo3_lite',
-  'veo3',
   'wan/2-7',
   'kling/v3-turbo-image-to-video',
   'gemini-omni-video',
@@ -78,6 +75,13 @@ export {
   styleBriefFor,
 } from '../../../utils/visualStyle'
 import { styleBriefFor, styleUsesRealism } from '../../../utils/visualStyle'
+
+// Every chat call Continuous makes — the storyboard, frame Enhance/Regenerate,
+// motion Enhance/Regenerate — runs on the model picked in B-Roll's left panel.
+// Same slot Line-by-Line reads, since they're one app to the member.
+function chatTarget(): ChatTarget {
+  return getChatTarget(resolveScriptModel('broll-studio'))
+}
 
 // ── Prompt assembly at fire time ───────────────────────────────
 
@@ -630,7 +634,7 @@ export function parseContinuousResult(responseText: string, input: ContinuousInp
 
 export async function generateContinuous(input: ContinuousInput): Promise<ContinuousResult> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  const endpoint = chatTarget()
   const photoUris = await productPhotoDataUris(input.productPhotos)
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: continuousSystemInstruction(photoUris.length) }] },
@@ -742,7 +746,7 @@ const FRAME_ENVELOPE_NOTE =
 // Rewrite the user's draft keyframe prompt richer, same staging.
 export async function enhanceContinuousFrame(draft: string, ctx: FrameContext, frameIndex: number): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  const endpoint = chatTarget()
   const user = `Rewrite the keyframe prompt below to be MORE detailed and specific while keeping the SAME staging, shot size, camera angle, and story state. Sharpen every field — the exact pose and hand position, the named props, the real light source and its colour, the material textures — and fill any of the five fields the draft never covered. Do not change what the image is of.
 
 ${frameBriefBlock(ctx, frameIndex)}
@@ -770,7 +774,7 @@ one flowing paragraph
 // Fresh take on the same keyframe slot — a different staging entirely.
 export async function regenerateContinuousFrame(ctx: FrameContext, frameIndex: number): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  const endpoint = chatTarget()
   const user = `Write a FRESH prompt for this keyframe — a genuinely different staging from any previous version, same story state.
 
 ${frameBriefBlock(ctx, frameIndex)}
@@ -824,7 +828,7 @@ export async function regenerateContinuousMotion(
   ctx: MotionContext,
 ): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  const endpoint = chatTarget()
   const framing = frames.end
     ? `Two images are attached. The FIRST is this clip's fixed START frame; the SECOND is its fixed END frame. The video model begins exactly on the first and must land exactly on the second, inventing everything in between. Study both, find what they share, and write the path that carries one into the other.`
     : `The attached image is this clip's fixed START frame — the end frame has not been chosen yet. Write the path leaving this frame, headed in the story's direction.`
@@ -855,7 +859,7 @@ one flowing paragraph
 // Rewrite the user's draft motion richer — same movement, sharper detail.
 export async function enhanceContinuousMotion(draft: string, ctx: MotionContext): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  const endpoint = chatTarget()
   const user = `Rewrite the motion prompt below to be MORE detailed and specific while keeping the SAME movement, direction, camera move, and sound. Sharpen the motion vectors and the transformation; do not change what happens or add a new beat. If the draft stops at the departure and never crosses or settles, that is exactly what you are here to fix — complete the trajectory.
 
 ${motionBriefBlock(ctx)}

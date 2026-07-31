@@ -2,7 +2,7 @@ import type { CharacterProfile } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { createTask, ensureHostedUrl, kieChatCompletions, type ChatMessage } from '../../../utils/kie'
 import { finishImageAssetTask } from '../../../utils/imageTask'
-import { getDefaultModel, getModel, buildImageInput, getChatEndpointPath, type AspectRatio, type ImageResolution } from '../../../utils/models'
+import { getDefaultModel, getModel, buildImageInput, getChatTarget, type AspectRatio, type ImageResolution } from '../../../utils/models'
 import { isAssetRef, getAsBase64 } from '../../../utils/assetStore'
 
 export interface GenerationResult {
@@ -314,7 +314,7 @@ const ENHANCE_EDIT_SYSTEM = `You are a senior photo-retouching director. You rew
 
 export async function enhanceEditInstruction(draft: string): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  const endpoint = getChatTarget()
 
   const userMessage = `Rewrite the rough image-edit instruction below into a sharper instruction for an image-to-image model editing an existing portrait. Keep the creator's intent; make the requested change concrete and specific. Preserve the person's identity unless they explicitly ask to change it.
 

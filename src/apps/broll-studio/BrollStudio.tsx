@@ -3,7 +3,7 @@ import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
 import type { AdBlueprintPayload, Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
-import { isLineMode, isAdFormat, sanitizeBrollMode, type AdFormat, type BrollResult, type PromptVariation, type ReferenceImage, type VariationTag, type VariationRefs, type CardState, type BrollMode, type BrollDelivery, type ContinuousResult, type ContinuousConcept, type ContinuousSelection, type ContinuousFrameCardState, type ContinuousClipCardState } from './types'
+import { isLineMode, sanitizeBrollMode, type BrollResult, type PromptVariation, type ReferenceImage, type VariationTag, type VariationRefs, type CardState, type BrollMode, type BrollDelivery, type ContinuousResult, type ContinuousConcept, type ContinuousSelection, type ContinuousFrameCardState, type ContinuousClipCardState } from './types'
 import { generateBroll } from './services/generateBroll'
 import { productPhotosOf } from './services/productAngles'
 import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, styleBriefFor, styleUsesRealism, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
@@ -29,9 +29,6 @@ import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersisted
 import { humanizeError } from '../../utils/friendlyError'
 import { fileToDataUri } from '../../utils/kie'
 import { getAsBase64, isAssetRef } from '../../utils/assetStore'
-import { isWriteStyle, isWriteLength, type WriteLength } from '../script-architect/types'
-import { sceneStagingFor } from '../script-architect/services/generateScript'
-import { writeAutoScript } from './services/autoScript'
 import { swapQuotedLine, swapScriptLine } from './services/scriptLineEdit'
 
 type PickerMode = 'products' | 'models' | 'scripts' | 'styleRefs' | null
@@ -230,29 +227,17 @@ export default function BrollStudio() {
     { sanitize: (raw) => (raw === 'dialogue' || readPersistedMode(baseKey) === 'dialogue' ? 'dialogue' : 'silent') },
   )
 
-  // ── Script Style + length (write the script here) ──────────────
-  // For the member who opens B-Roll without a script. Picking a Script Style
-  // makes Generate write one first — the same Write New pipeline Scripts runs —
-  // and storyboard it in the same click. The style also stages the SHOTS when
-  // it's a format (see sceneStaging), so it's not only a writing choice.
+  // ── Scene staging ──────────────────────────────────────────────
+  // B-Roll had an Ad Format pick (Scripts' Formats + Structures list) that
+  // staged the shots. Both it and the state behind it are gone (July 2026):
+  // once the words stopped being written here, the format was only a label the
+  // member had to set before Generate would light up, and leaving the state
+  // without its picker would have meant a persisted format quietly staging
+  // every shot with nothing on screen to see or change it.
   //
-  // Kept even when a script IS present: the panel hides the row in that case,
-  // but the pick survives a paste-then-clear round trip, and the staging still
-  // rides into the storyboard call so a member who pasted a podcast-clip script
-  // gets podcast-clip shots.
-  // A named format/structure from Scripts' list, or 'standard' — B-Roll's own
-  // "no format at all" option (plain organic UGC, no staging). null is unpicked
-  // and blocks Generate; nothing is chosen by default.
-  const [autoScriptStyle, setAutoScriptStyle] = usePersistedState<AdFormat | null>(
-    `${baseKey}:autoScriptStyle`,
-    null,
-    { sanitize: (raw) => (isAdFormat(raw) ? raw : null) },
-  )
-  const [autoScriptLength, setAutoScriptLength] = usePersistedState<WriteLength>(
-    `${baseKey}:autoScriptLength`,
-    30,
-    { sanitize: (raw) => (isWriteLength(raw) ? raw : 30) },
-  )
+  // Staging now has exactly one source: an analysed ad handed over by the Ad
+  // Analyzer. `sceneStagingFor` and `BrollInput.sceneStaging` are untouched, so
+  // restoring the picker is re-adding a row, not rebuilding the seam.
   // A storyboard staged on an analysed ad, handed over from the Ad Analyzer
   // ("Clone this with my product"). It answers the same question the Ad Format
   // row answers — how is this shot — so it OCCUPIES that row rather than adding
@@ -265,11 +250,9 @@ export default function BrollStudio() {
     { sanitize: (raw) => (isAdBlueprint(raw) ? raw : null) },
   )
 
-  // Undefined for a structure (an argument implies no camera) and when nothing
-  // is picked. Shared by both storyboard calls. A blueprint outranks the format
-  // pick: it's the more specific instruction, and it's what the row is showing.
-  const sceneStaging =
-    adBlueprint?.staging || sceneStagingFor(isWriteStyle(autoScriptStyle) ? autoScriptStyle : null)
+  // Undefined unless an analysed ad is driving this session. Shared by both
+  // storyboard calls.
+  const sceneStaging = adBlueprint?.staging
 
   // ── Continuous mode (keyframe chain) state ─────────────────────
   // Until the user actively picks a style, the look falls back to a mode-
@@ -449,15 +432,11 @@ export default function BrollStudio() {
 
     // Ad Analyzer → "Clone this with my product". The ad's transcript becomes
     // the script and its staging drives the shots; the analysed prompts stay
-    // behind on purpose (see ad-anatomy/services/adBlueprint.ts). Generate is
-    // gated on an Ad Format pick, and the blueprint IS that answer — so it
-    // seeds 'standard' when nothing is picked rather than landing the member
-    // on a disabled button with no clue which row is empty.
+    // behind on purpose (see ad-anatomy/services/adBlueprint.ts).
     if (targetField === 'adBlueprint' && isAdBlueprint(data)) {
       setAdBlueprint(data)
       setScriptText(data.script)
       setSelectedScriptId(null)
-      setAutoScriptStyle((prev) => prev ?? 'standard')
       setHighlightField('script')
       setTimeout(() => setHighlightField(null), 800)
     }
@@ -998,51 +977,21 @@ export default function BrollStudio() {
     }
   }
 
-  // The one Generate. Resolves the script first — writing one when the member
-  // hasn't brought their own but has picked a Script Style — then storyboards
-  // it in whichever mode is active. Two chained chat calls behind one click:
-  // the member who opens B-Roll with only a product in mind picks a style, a
-  // length and a look, and gets scenes.
+  // The one Generate: storyboard the script in whichever mode is active.
   //
-  // The written script lands in the panel's script box, so it's visible and
-  // editable straight away and names the history row. It is deliberately NOT
-  // pushed to the Scripts bank or Script History — it belongs to this session.
+  // B-Roll used to write the script too when the box was empty — a second
+  // chained chat call behind the same click, sized by a length toggle under the
+  // Ad Format row. That is gone (July 2026): writing a script is Scripts' job,
+  // it has the modes, the angles and the takes to do it properly, and a
+  // one-take copy living here was a second thing to keep in step with no way to
+  // compare what came back. Bring a script; the Ad Format row keeps its real
+  // job, which is deciding how the ad gets SHOT.
   const handleGenerate = async () => {
     if (isGenerating) return
-    let script = scriptText.trim()
+    const script = scriptText.trim()
+    if (!script) return
     setIsGenerating(true)
     try {
-      if (!script) {
-        if (!autoScriptStyle) return
-        if (!useSettingsStore.getState().kieApiKey) {
-          useAppStore.getState().addToast('Add your kie.ai key in Settings to write a script here', 'info')
-          return
-        }
-        setError(null)
-        try {
-          script = await writeAutoScript({
-            product: selectedProduct ?? null,
-            style: autoScriptStyle,
-            length: autoScriptLength,
-            notes: additionalContext,
-          })
-        } catch (err) {
-          const msg = humanizeError(err, 'Writing the script failed. Check your API key and try again.')
-          setError(msg)
-          useAppStore.getState().addToast(msg, 'error')
-          return
-        }
-        if (!script) {
-          const msg = 'The script came back empty. Try again.'
-          setError(msg)
-          useAppStore.getState().addToast(msg, 'error')
-          return
-        }
-        // Show it before the storyboard call runs — this is the member's script
-        // now, and the second call takes a few seconds.
-        setScriptText(script)
-        setSelectedScriptId(null)
-      }
       if (mode === 'continuous') await handleGenerateContinuous(script)
       else await handleGenerateLine(script)
     } finally {
@@ -1169,12 +1118,6 @@ export default function BrollStudio() {
           onModeChange={setMode}
           lineDelivery={lineDelivery}
           onLineDeliveryChange={setLineDelivery}
-          autoScriptStyle={autoScriptStyle}
-          adBlueprintTitle={adBlueprint?.title ?? null}
-          onClearAdBlueprint={() => setAdBlueprint(null)}
-          onAutoScriptStyleChange={setAutoScriptStyle}
-          autoScriptLength={autoScriptLength}
-          onAutoScriptLengthChange={setAutoScriptLength}
           styleChosen={styleIsPicked}
           styleLabel={styleLabel}
           styleHint={styleHint}

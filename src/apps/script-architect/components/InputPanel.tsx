@@ -7,6 +7,8 @@ import BankPicker from '../../../components/BankPicker'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import ClearAllButton from '../../../components/ClearAllButton'
 import SlideOver from '../../../components/SlideOver'
+import ScriptModelRow from '../../../components/ScriptModelRow'
+import Dropdown from '../../../components/Dropdown'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import { useAppStore } from '../../../stores/appStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
@@ -141,6 +143,11 @@ export default function InputPanel({
   // The scene-rewrite pipeline will run (blueprint detected, no override) —
   // drives the source box chrome, the chip copy, and the button labels.
   const blueprintActive = isBlueprint && !forceTranscript
+  // The two footer dropdowns. Hooks is a fixed batch of one-liners (HOOK_COUNT,
+  // no duration); the blueprint rewrite returns one script and holds the
+  // source's own scene timestamps, so it has neither a count nor a length.
+  const showTakes = !isHooksFormat && !blueprintActive
+  const showLength = !isHooksFormat && (mode === 'write' || !blueprintActive)
 
   // Slide-over footer actions. The edits already live in `editableContext`
   // (used for this generation), so "save for this script" just dismisses;
@@ -782,52 +789,63 @@ export default function InputPanel({
       {/* Generate button — pinned to the app window's bottom edge on mobile.
           Opaque bg: backdrop-filter doesn't re-blur inside the already-blurred
           window frame, so any alpha lets content underneath ghost through. */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 shrink-0 border-t border-ink/5 bg-surface-0 px-5 py-4 md:static md:left-auto md:right-auto md:z-auto md:bg-transparent">
-        {/* Variations — how many takes this generate returns. Shown for both
-            modes; hidden for Hooks (fixed at HOOK_COUNT) and for the blueprint
-            rewrite, which returns a single rewritten script. */}
-        {!isHooksFormat && !blueprintActive && (
-          <div className="mb-3">
-            <SegmentedToggle<string>
-              className="h-12 !p-1"
-              accent="scripts"
-              value={String(variationCount)}
-              onChange={(v) => onVariationCountChange(Number(v) as VariationCount)}
-              options={VARIATION_COUNTS.map((n) => ({ value: String(n), label: `${n} variations` }))}
-            />
+      <div className="fixed bottom-0 left-0 right-0 z-30 shrink-0 border-t border-ink/5 bg-surface-0 px-5 py-3 md:static md:left-auto md:right-auto md:z-auto md:bg-transparent">
+        {/* Variations and length, side by side. Both were full-width segmented
+            toggles — two 48px slabs stacked above Generate, in a column that
+            has to fit a brief as well. As dropdowns they're one 36px row, and
+            neither is a control you sweep through: you pick 3 or 30s and move
+            on. Each hides on its own, so the row can carry either alone.
+            Hooks are ten one-liners with no duration, so both go.
+            Both open UPWARD: they sit directly above the model row and
+            Generate, and a downward menu covers the button you're heading for.
+            'above' rather than AnchoredPopover's default 'auto', which measures
+            room against the viewport and finds plenty on a tall screen. */}
+        {(showTakes || showLength) && (
+          <div className="mb-2 flex items-center gap-2">
+            {showTakes && (
+              <div className="min-w-0 flex-1">
+                <Dropdown
+                  compact
+                  accent="scripts"
+                  placement="above"
+                  label="Variations"
+                  value={String(variationCount)}
+                  options={VARIATION_COUNTS.map(String)}
+                  onChange={(v) => onVariationCountChange(Number(v) as VariationCount)}
+                />
+              </div>
+            )}
+            {showLength && (
+              <div className="min-w-0 flex-1">
+                {/* Remix's list carries a "Default" — the source ad already has
+                    a length, and keeping it is usually the point of remixing a
+                    winner. Write New has no source to inherit from. */}
+                <Dropdown
+                  compact
+                  accent="scripts"
+                  placement="above"
+                  label="Length"
+                  value={mode === 'write' ? `${writeLength}s` : remixLength === 'default' ? 'Default' : `${remixLength}s`}
+                  options={
+                    mode === 'write'
+                      ? WRITE_LENGTHS.map((len) => `${len}s`)
+                      : REMIX_LENGTHS.map((len) => (len === 'default' ? 'Default' : `${len}s`))
+                  }
+                  onChange={(v) => {
+                    if (mode === 'write') onWriteLengthChange(Number(v.replace('s', '')) as WriteLength)
+                    else onRemixLengthChange((v === 'Default' ? 'default' : Number(v.replace('s', ''))) as RemixLength)
+                  }}
+                />
+              </div>
+            )}
           </div>
         )}
-        {/* Length — pinned directly above Generate. Hooks are one-liners, so the
-            format has no duration and the toggle hides. */}
-        {mode === 'write' && !isHooksFormat && (
-          <div className="mb-3">
-            <SegmentedToggle<string>
-              className="h-12 !p-1"
-              accent="scripts"
-              value={String(writeLength)}
-              onChange={(v) => onWriteLengthChange(Number(v) as WriteLength)}
-              options={WRITE_LENGTHS.map((len) => ({ value: String(len), label: `${len}s` }))}
-            />
-          </div>
-        )}
-        {/* Remix's length carries a "Default" — the source ad already has a
-            length, and keeping it is usually the point of remixing a winner.
-            Hidden for the blueprint rewrite, which holds the source's own scene
-            timestamps and can't be re-cut to a different duration. */}
-        {mode !== 'write' && !blueprintActive && (
-          <div className="mb-3">
-            <SegmentedToggle<string>
-              className="h-12 !p-1"
-              accent="scripts"
-              value={String(remixLength)}
-              onChange={(v) => onRemixLengthChange((v === 'default' ? 'default' : Number(v)) as RemixLength)}
-              options={REMIX_LENGTHS.map((len) => ({
-                value: String(len),
-                label: len === 'default' ? 'Default' : `${len}s`,
-              }))}
-            />
-          </div>
-        )}
+        {/* Who writes the takes — directly above Generate, because it's the
+            last thing you'd change before firing and the one that decides what
+            the click costs. Compact: in a pinned footer every pixel is one the
+            brief above doesn't get, and the panel it opens is titled "Script
+            Model" anyway, so the hint line under the name said it twice. */}
+        <ScriptModelRow appId="script-architect" className="mb-2" compact />
         <button
           onClick={() => onGenerate(editableContext)}
           disabled={!canGenerate || isGenerating}

@@ -34,7 +34,7 @@ import {
 } from '../../utils/models'
 import { saveAsset, isAssetRef, getAsBase64 } from '../../utils/assetStore'
 import { kieChatCompletions, type ChatMessage } from '../../utils/kie'
-import { getChatEndpointPath } from '../../utils/models'
+import { getChatTarget } from '../../utils/models'
 import type { ImageHistoryItem, MusicHistoryItem, VideoHistoryItem } from '../../stores/types'
 import type { PlaygroundMode } from './types'
 
@@ -58,7 +58,7 @@ const ENHANCE_MODE_GUIDE: Record<PlaygroundMode, string> = {
 // placeholders verbatim — they resolve to bank refs downstream.
 export async function enhancePlaygroundPrompt(draft: string, mode: PlaygroundMode): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  const endpoint = getChatTarget()
 
   const userMessage = `Rewrite the draft prompt below so it produces a much better result. Keep the user's intent and subject; make it concrete and specific.
 

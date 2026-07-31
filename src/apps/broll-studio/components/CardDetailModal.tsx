@@ -549,7 +549,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         active={cardState.refsCharacter !== false}
                         onToggleActive={() => onUpdateState({ refsCharacter: cardState.refsCharacter === false })}
                         dimmed={refsUnsupportedForVideo}
-                        dimmedReason={`${videoModelName} doesn't accept reference images. Switch to Veo 3.1 Fast or Seedance 2.0 to use them.`}
+                        dimmedReason={`${videoModelName} doesn't accept reference images. Switch to Seedance 2.0 or Gemini Omni to use them.`}
                       />
                       <ReferenceSlotCard
                         icon={<Package className="h-4 w-4 text-gold-400 light:text-gold-600" />}
@@ -562,7 +562,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         active={cardState.refsProduct !== false}
                         onToggleActive={() => onUpdateState({ refsProduct: cardState.refsProduct === false })}
                         dimmed={refsUnsupportedForVideo}
-                        dimmedReason={`${videoModelName} doesn't accept reference images. Switch to Veo 3.1 Fast or Seedance 2.0 to use them.`}
+                        dimmedReason={`${videoModelName} doesn't accept reference images. Switch to Seedance 2.0 or Gemini Omni to use them.`}
                       />
                     </div>
                     {/* Which product photo this shot is built from. Only shown
@@ -589,7 +589,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                     )}
                     {hasActiveRef && refsUnsupportedForVideo && (
                       <p className="mt-2 text-[11px] leading-relaxed text-gold-400/80 light:text-gold-600/80">
-                        {videoModelName} doesn't support reference images — this will generate text-to-video only. Pick Veo 3.1 Fast or Seedance 2.0 to use your character/product.
+                        {videoModelName} doesn't support reference images — this will generate text-to-video only. Pick Seedance 2.0 or Gemini Omni to use your character/product.
                       </p>
                     )}
                   </div>
@@ -736,7 +736,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                       requireMode={tab === 'animate' ? undefined : (hasActiveRef ? 'reference-to-video' : undefined)}
                       requireAnyModes={tab === 'animate' ? ['image-to-video', 'reference-to-video'] : undefined}
                       requireModeNote={tab === 'animate'
-                        ? "Greyed-out models can't animate a still — they take neither a start frame nor reference images. Pick Seedance 2.0, Veo 3.1 Fast, Gemini Omni, or another still-capable model."
+                        ? "Greyed-out models can't animate a still — they take neither a start frame nor reference images. Pick Seedance 2.0, Gemini Omni, or another still-capable model."
                         : "Greyed-out models don't support reference image-to-video. To use these, generate still frames in the Image tab, then send them to Playground for start/end frames."}
                       costParams={{
                         durationSeconds: cardState.cardVideoDurationSeconds,

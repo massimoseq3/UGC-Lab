@@ -435,7 +435,7 @@ const CONTINUOUS_FRAMES = [
 // the Playground video tab (B-Roll-sourced videos are filtered out there).
 const VIDEO_GENS = [
   { w: 540, h: 960, from: '#fb7185', to: '#9f1239', modelId: 'bytedance/seedance-2', mode: 'reference-to-video' as const, aspectRatio: '9:16', label: 'UGC Selfie', sub: 'talking to camera', prompt: 'A young woman in a sunlit apartment holds the serum up to the front camera and talks candidly, natural handheld micro-jitter, UGC selfie framing.' },
-  { w: 540, h: 960, from: '#f59e0b', to: '#b45309', modelId: 'veo3_fast', mode: 'image-to-video' as const, aspectRatio: '9:16', label: 'Product Detail', sub: 'dropper close-up', prompt: 'Extreme close-up of a glass serum bottle on a marble vanity, a single drop sliding down the dropper, soft morning light, slow push-in.' },
+  { w: 540, h: 960, from: '#f59e0b', to: '#b45309', modelId: 'grok-imagine-video-1-5-preview', mode: 'image-to-video' as const, aspectRatio: '9:16', label: 'Product Detail', sub: 'dropper close-up', prompt: 'Extreme close-up of a glass serum bottle on a marble vanity, a single drop sliding down the dropper, soft morning light, slow push-in.' },
   { w: 960, h: 540, from: '#6366f1', to: '#1e3a8a', modelId: 'bytedance/seedance-2', mode: 'text-to-video' as const, aspectRatio: '16:9', label: 'Sleep Tracker Hero', sub: 'nightstand pan', prompt: 'Smart ring resting on a nightstand beside a phone showing a sleep graph, moody blue light, slow camera pan, cinematic.' },
 ]
 

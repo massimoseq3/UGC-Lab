@@ -275,8 +275,8 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
     onChange({ ...state, refs: [...others, ...refs] })
   }
 
-  // A model's own declared cap wins (Veo 3.1 Fast takes 3, the Seedance family
-  // 9 — see `maxReferenceImages` in the registry); anything undeclared keeps the
+  // A model's own declared cap wins (the Seedance family takes 9 — see
+  // `maxReferenceImages` in the registry); anything undeclared keeps the
   // panel's historical 9. Gemini Omni is the exception: its image cap is
   // whatever its 7-slot quota leaves after characters (×1 each) and the source
   // clip (×2), so it's computed here rather than read off the entry.
@@ -725,20 +725,22 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               <div className="relative flex grow flex-col">
                 <div className="relative flex grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
                   {/* UGC Prompt Presets — header row inside the box. Opens the
-                      slide-in picker. */}
+                      slide-in picker. One line at h-12, matching the model
+                      picker trigger in the footer: it's the same kind of
+                      control (tap a row, a panel slides in) and it was two
+                      lines tall at the top of the field the prompt is trying
+                      to fill. The old second line explained what a preset does
+                      — the picker itself does that better, and once. */}
                   {presetsApplicable && (
                     <button
                       type="button"
                       onClick={() => setPresetOpen(true)}
-                      className="flex w-full shrink-0 items-center gap-3 border-b border-dashed border-ink/10 px-3.5 py-3 text-left transition-colors hover:bg-ink/[0.04]"
+                      className="flex h-12 w-full shrink-0 items-center gap-2.5 border-b border-dashed border-ink/10 px-3 text-left transition-colors hover:bg-ink/[0.04]"
                     >
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-playground-500/10 text-playground-400">
-                        <Camera className="h-4 w-4" />
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-playground-500/10 text-playground-400">
+                        <Camera className="h-3.5 w-3.5" />
                       </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13px] font-medium text-ink-100">UGC Prompt Preset</p>
-                        <p className="truncate text-[11px] text-ink-500">Pick a format to prefill the prompt + aspect ratio</p>
-                      </div>
+                      <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-100">UGC Prompt Preset</p>
                       <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
                     </button>
                   )}
@@ -937,7 +939,6 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
           <>
             <ConstraintChip
               grow
-              hover
               openDirection="up"
               options={model.videoConstraints.resolutions}
               value={state.resolution}
@@ -953,7 +954,6 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             {!isMotionControl && model.videoConstraints.aspectRatios.length > 0 && (
             <ConstraintChip
               grow
-              hover
               openDirection="up"
               options={model.videoConstraints.aspectRatios}
               value={state.aspectRatio}
@@ -969,7 +969,6 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             {!isMotionControl && model.videoConstraints.durations.length > 0 && (
               <ConstraintChip
                 grow
-                hover
                 openDirection="up"
                 options={model.videoConstraints.durations.map(String)}
                 value={String(state.durationSeconds)}
@@ -980,7 +979,6 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             {!isMotionControl && model.videoConstraints.supportsAudio && (
               <ConstraintChip
                 grow
-                hover
                 openDirection="up"
                 options={['Audio', 'Mute']}
                 value={state.audio ? 'Audio' : 'Mute'}
@@ -1003,7 +1001,6 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
           <>
             <ConstraintChip
               grow
-              hover
               openDirection="up"
               options={model.imageConstraints.resolutions}
               value={state.resolution}
@@ -1021,7 +1018,6 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             {model.imageConstraints.aspectRatios && (
               <ConstraintChip
                 grow
-                hover
                 openDirection="up"
                 options={model.imageConstraints.aspectRatios}
                 value={state.aspectRatio}
