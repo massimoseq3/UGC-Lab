@@ -543,6 +543,39 @@ textarea,
   .desktop-meteor { display: none; }
 }
 
+/* ── Backgrounded apps stop painting ────────────────────────────────
+   An app stays mounted after its first open (App.tsx) so a dock switch never
+   interrupts a running generation or throws away typed input. It is hidden
+   with opacity-0 — and opacity-0 hides pixels, it does not stop work. Every
+   CSS animation in a backgrounded pane keeps running at full rate, and the
+   Dashboard is the DEFAULT landing app, so for the whole session the members
+   were paying, behind whatever screen they were actually on, for:
+     · two full-viewport starfields animating `background-position`, which the
+       compositor cannot handle — it repaints the layer every frame
+     · two more full-viewport opacity animations (the "breathe")
+     · the orrery's sixteen rotations (eight arms + eight counter-rotations)
+     · every `animate-spin` on an in-flight generation elsewhere in the app
+   `content-visibility: hidden` skips the subtree outright — layout, paint and
+   animation. Unlike `display: none` it keeps scroll positions and does not
+   destroy the layout box, so coming back is a re-render rather than a remount;
+   React state is untouched either way. The `animation-play-state` half covers
+   what content-visibility can't reach (an animation on the pane element
+   itself) and makes the intent explicit.
+
+   NOTE for anything that measures itself (ResizeObserver / getBoundingClientRect):
+   a skipped subtree measures 0. Every current measurer is a ResizeObserver,
+   which fires again with real numbers the moment the pane goes active, so they
+   self-heal. A NEW one-shot measurement taken on mount is fine (an app mounts
+   active); a one-shot re-measure driven by something other than resize is not
+   — give it a ResizeObserver rather than reading layout once. */
+[data-app-pane='inactive'] {
+  content-visibility: hidden;
+}
+[data-app-pane='inactive'],
+[data-app-pane='inactive'] * {
+  animation-play-state: paused !important;
+}
+
 /* Orbits. The arm carries a planet around the sun; the planet counter-rotates
    on the same period so its glyph never turns upside down. Periods are minutes,
    not seconds — at interaction speed a planet is a stationary target, and the

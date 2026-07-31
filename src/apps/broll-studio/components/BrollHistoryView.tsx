@@ -458,7 +458,7 @@ function CoverTile({ media, className = '' }: { media: CoverMedia; className?: s
       />
     )
   }
-  return <img src={url} alt="" className={`${className} h-full w-full object-cover`} />
+  return <img src={url} alt="" loading="lazy" decoding="async" className={`${className} h-full w-full object-cover`} />
 }
 
 // The cover: one still full-bleed, two side by side, three as a big left tile

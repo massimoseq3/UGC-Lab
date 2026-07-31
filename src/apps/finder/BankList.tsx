@@ -107,7 +107,11 @@ function ProductCard({ item, onEdit, onDelete, inFlight }: { item: Product; onEd
       className="group relative aspect-square cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
     >
       {resolvedImage ? (
-        <img src={resolvedImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        // lazy + async decode: bank tiles are full-resolution GENERATIONS —
+        // a 4K still drawn into a 200px square — and a populated bank scrolls
+        // for hundreds of rows. Decoding them all up front is the difference
+        // between opening the Bank and stalling on it.
+        <img src={resolvedImage} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
       ) : (
         <div className="absolute inset-0 flex items-center justify-center bg-ink/[0.04]">
           <Package className="h-12 w-12 text-ink-800" strokeWidth={1} />
@@ -196,6 +200,7 @@ function ModelCard({ item, onEdit, onDelete }: { item: Model; onEdit: () => void
             src={resolvedImage}
             alt=""
             onLoad={(e) => setLandscape(e.currentTarget.naturalWidth > e.currentTarget.naturalHeight)}
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : isPreset ? (
@@ -364,6 +369,7 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
             src={resolvedImage}
             alt=""
             onLoad={(e) => setLandscape(e.currentTarget.naturalWidth > e.currentTarget.naturalHeight)}
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : isVideoOnly ? (
@@ -426,7 +432,9 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
 // One tile of a style card's reference mosaic.
 function StyleThumb({ refId }: { refId: string }) {
   const url = useAssetUrl(refId)
-  return url ? <img src={url} alt="" className="h-full w-full object-cover" /> : <div className="h-full w-full bg-ink/[0.05]" />
+  return url
+    ? <img src={url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+    : <div className="h-full w-full bg-ink/[0.05]" />
 }
 
 function StyleCard({ item, onEdit, onDelete }: { item: StylePreset; onEdit: () => void; onDelete: () => void }) {

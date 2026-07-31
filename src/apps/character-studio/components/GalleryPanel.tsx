@@ -644,7 +644,7 @@ function SingleCard({
             style={frameStyle}
           >
             {a.status === 'ready' && a.url ? (
-              <img src={a.url} alt="" className="absolute inset-0 h-full w-full object-contain" />
+              <img src={a.url} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-contain" />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
                 {a.status === 'loading'
@@ -815,7 +815,7 @@ function HistoryTile({
       className="group relative cursor-pointer overflow-hidden rounded-lg border border-ink/10 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 hover:-translate-y-px card-soft-shadow"
     >
       {a.status === 'ready' && a.url ? (
-        <img src={a.url} alt="" className="block h-auto w-full" />
+        <img src={a.url} alt="" loading="lazy" decoding="async" className="block h-auto w-full" />
       ) : (
         <div className="flex w-full items-center justify-center" style={aspectStyle(item.aspectRatio)}>
           {a.status === 'loading'

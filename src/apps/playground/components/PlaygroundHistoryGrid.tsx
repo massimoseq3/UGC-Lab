@@ -382,6 +382,8 @@ function HistoryListRow({
             <img
               src={url}
               alt=""
+              loading="lazy"
+              decoding="async"
               onClick={onClickImage}
               className={`absolute inset-0 h-full w-full object-contain ${onClickImage ? 'cursor-zoom-in' : ''}`}
             />
@@ -537,7 +539,7 @@ function ImageTile({
         className="group relative cursor-pointer overflow-hidden rounded-lg border border-ink/10 light:border-ink/5 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 light:hover:border-ink/10 hover:-translate-y-px card-soft-shadow"
       >
         {status === 'ready' && url ? (
-          <img src={url} alt="" className="block h-auto w-full" />
+          <img src={url} alt="" loading="lazy" decoding="async" className="block h-auto w-full" />
         ) : (
           <div className="flex aspect-square w-full items-center justify-center">
             {status === 'loading'

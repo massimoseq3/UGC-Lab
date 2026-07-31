@@ -385,29 +385,21 @@ export async function saveProfile(): Promise<void> {
 async function hydrateFromCloud(userId: string): Promise<boolean> {
   const sb = getSupabase()
 
-  const { data: profile } = await sb
+  // Fired here, awaited below. It used to be `await`ed before the bank pull
+  // started, which made it a round trip the bank tables queued behind — and
+  // sign-in is BLOCKING (AuthGate holds the workspace behind "Syncing your
+  // workspace…"), so on a link where a round trip costs 100ms+ rather than
+  // 20ms that wait is dead time the member sits through. Nothing in the bank
+  // pull reads the profile, so the two are independent.
+  const profilePromise = sb
     .from('profiles')
     .select('per_app_model')
     .eq('id', userId)
     .maybeSingle()
 
-  if (profile) {
-    // kieApiKey is browser-local; preserve whatever loadFromStorage already
-    // hydrated from localStorage. Cloud hydration only refreshes perAppModel.
-    const existingKey = useSettingsStore.getState().kieApiKey
-    const nextPerAppModel = (profile.per_app_model as Record<string, string> | null) ?? {}
-    useSettingsStore.setState({ perAppModel: nextPerAppModel })
-    try {
-      localStorage.setItem('ai-ugc-lab-settings', JSON.stringify({
-        kieApiKey: existingKey,
-        perAppModel: nextPerAppModel,
-      }))
-    } catch { /* ignore */ }
-  }
-
   const localState = useBankStore.getState()
   let anyError = false
-  const tables = await Promise.all(
+  const tablesPromise = Promise.all(
     BANK_KEYS.map(async (key) => {
       const table = BANK_TO_TABLE[key]
       const { data, error } = await sb.from(table).select('id, data').eq('user_id', userId)
@@ -432,6 +424,22 @@ async function hydrateFromCloud(userId: string): Promise<boolean> {
       return [key, sorted] as const
     }),
   )
+
+  const [{ data: profile }, tables] = await Promise.all([profilePromise, tablesPromise])
+
+  if (profile) {
+    // kieApiKey is browser-local; preserve whatever loadFromStorage already
+    // hydrated from localStorage. Cloud hydration only refreshes perAppModel.
+    const existingKey = useSettingsStore.getState().kieApiKey
+    const nextPerAppModel = (profile.per_app_model as Record<string, string> | null) ?? {}
+    useSettingsStore.setState({ perAppModel: nextPerAppModel })
+    try {
+      localStorage.setItem('ai-ugc-lab-settings', JSON.stringify({
+        kieApiKey: existingKey,
+        perAppModel: nextPerAppModel,
+      }))
+    } catch { /* ignore */ }
+  }
 
   const next: Partial<Record<BankKey, unknown[]>> = {}
   for (const [key, items] of tables) next[key] = items
