@@ -33,6 +33,7 @@ export const CONTINUOUS_MODEL_IDS = [
   'bytedance/seedance-2-fast',
   'bytedance/seedance-2-mini',
   'bytedance/seedance-1.5-pro',
+  'minimax-h3',
   'kling-3.0/video',
   'grok-imagine-video-1-5-preview',
   'wan/2-7',

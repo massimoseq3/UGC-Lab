@@ -982,6 +982,58 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     defaultFor: ['broll-studio', 'playground'],
   },
 
+  // MiniMax H3 (a.k.a. Hailuo 03) — MiniMax's 2K flagship. It ships on kie as
+  // THREE slugs that differ only by which inputs they accept, so we expose one
+  // virtual id and pick the real slug at generate time (minimaxH3Route, read by
+  // both resolveVideoModelSlug and buildVideoInput):
+  //   minimax-h3/text-to-video       prompt + aspect_ratio + duration
+  //   minimax-h3/image-to-video      first_frame_url / last_frame_url (≥1 of
+  //                                  the two) — and NO aspect_ratio field at
+  //                                  all; the route errors when one is sent
+  //   minimax-h3/reference-to-video  reference_image_urls (≤9) /
+  //                                  reference_video_urls (≤3) /
+  //                                  reference_audio_urls (≤3) + aspect_ratio
+  // Output is 2K on every route — none of the three takes a resolution param.
+  // Audio is generated natively with no toggle, hence supportsAudio: false
+  // (same shape as Grok above: the flag means "offers an audio control").
+  // Docs: minimax-h3/{text,image,reference}-to-video on docs.kie.ai.
+  {
+    id: 'minimax-h3',
+    displayName: 'MiniMax H3',
+    provider: 'MiniMax',
+    task: 'video',
+    modes: ['text-to-video', 'image-to-video', 'frames-to-video', 'reference-to-video'],
+    tags: ['new'],
+    supportsReferenceImages: true,
+    supportsReferenceAudio: true,
+    supportsReferenceVideos: true,
+    maxReferenceImages: 9,
+    // 36.5 credits/s of generated video, plus 11 credits per input image past
+    // the first five (input audio is free). Source (user-supplied kie pricing:
+    // $0.1825/s, $0.055/image at 200 credits/$). Two costs we deliberately do
+    // NOT model: kie also bills the DURATION of any reference video at the same
+    // per-second rate, and no video call site passes an image count. Both can
+    // only push the real figure up, so the estimate reads as a floor.
+    pricing: {
+      unit: 'per-second',
+      credits: 36.5,
+      priceFor: ({ durationSeconds = 6, inputImageCount = 1 }) =>
+        36.5 * durationSeconds + 11 * Math.max(0, inputImageCount - 5),
+    },
+    // No `official` entry on purpose: MiniMax publishes no comparable
+    // per-second list price we can cite, and an unverified baseline would be
+    // inventing a discount. No savings claimed rather than a flattering one.
+    videoEndpoint: 'createTask',
+    videoConstraints: {
+      // The API takes any integer 4–15s; this is the app's usual ladder.
+      durations: [4, 5, 6, 8, 10, 12, 15],
+      resolutions: ['2K'],
+      default: '2K',
+      aspectRatios: ['9:16', '16:9', '1:1', '4:3', '3:4', '21:9'],
+      supportsAudio: false,
+    },
+  },
+
   // ── Music generation (Suno via kie.ai) ────────────────────────
   // Suno is reached through kie.ai's custom endpoint
   //   POST /api/v1/generate     (NOT /jobs/createTask)
@@ -1385,7 +1437,41 @@ export interface VideoGenOptions {
 export function resolveVideoModelSlug(modelId: string, opts: VideoGenOptions): string {
   const hasFrame = !!(opts.firstFrameUrl || opts.lastFrameUrl || opts.imageUrl)
   if (modelId === 'wan/2-7') return hasFrame ? 'wan/2-7-image-to-video' : 'wan/2-7-text-to-video'
+  if (modelId === 'minimax-h3') return `minimax-h3/${minimaxH3Route(opts)}-to-video`
   return modelId
+}
+
+// ── MiniMax H3 route selection ────────────────────────────────
+//
+// H3's three kie slugs are mutually exclusive on the API side: the image route
+// takes frames and no references, the reference route takes references and no
+// frames, and only text/reference accept an aspect_ratio. The choice is made
+// once here so the slug in the URL and the body always agree.
+
+type MinimaxH3Route = 'text' | 'image' | 'reference'
+
+// Start/end frames as a flat list, in shot order.
+function minimaxH3Frames(opts: VideoGenOptions): string[] {
+  const frames: string[] = []
+  const first = opts.firstFrameUrl ?? (opts.mode === 'image-to-video' ? opts.imageUrl : undefined)
+  if (first) frames.push(first)
+  if (opts.lastFrameUrl) frames.push(opts.lastFrameUrl)
+  return frames
+}
+
+function minimaxH3Route(opts: VideoGenOptions): MinimaxH3Route {
+  // Reference audio/video exist ONLY on the reference route. Playground treats
+  // them as orthogonal to the image mode, so they can arrive alongside a start
+  // frame — and silently dropping one would bill a clip that ignores what the
+  // member attached. So any reference wins the route, and the frames ride along
+  // as reference images (see the body builder).
+  const hasRefs = !!(
+    opts.referenceImageUrls?.length ||
+    opts.referenceVideoUrls?.length ||
+    opts.referenceAudioUrls?.length
+  )
+  if (hasRefs) return 'reference'
+  return minimaxH3Frames(opts).length > 0 ? 'image' : 'text'
 }
 
 export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<string, unknown> {
@@ -1534,6 +1620,42 @@ export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<
       resolution,
       duration,
     }
+  }
+
+  // ── MiniMax H3 (Hailuo 03) ──
+  // One virtual id, three routes (see minimaxH3Route). Each body carries only
+  // the fields its own route accepts: the image route rejects aspect_ratio
+  // outright, and the reference route has no frame fields — so a frame that
+  // arrives alongside a reference is sent as a reference image, not dropped.
+  // Duration is a plain integer 4–15; clamped here because a card persisted
+  // under another model can carry an off-grid length (Kling's 3s).
+  if (modelId === 'minimax-h3') {
+    const h3Duration = Math.min(15, Math.max(4, Math.round(duration)))
+    const route = minimaxH3Route(opts)
+    if (route === 'image') {
+      const [first, last] = [
+        opts.firstFrameUrl ?? (opts.mode === 'image-to-video' ? opts.imageUrl : undefined),
+        opts.lastFrameUrl,
+      ]
+      return {
+        prompt: opts.prompt,
+        ...(first ? { first_frame_url: first } : {}),
+        ...(last ? { last_frame_url: last } : {}),
+        duration: h3Duration,
+      }
+    }
+    if (route === 'reference') {
+      const referenceImages = [...minimaxH3Frames(opts), ...(opts.referenceImageUrls ?? [])]
+      return {
+        prompt: opts.prompt,
+        ...(referenceImages.length ? { reference_image_urls: referenceImages.slice(0, 9) } : {}),
+        ...(opts.referenceVideoUrls?.length ? { reference_video_urls: opts.referenceVideoUrls.slice(0, 3) } : {}),
+        ...(opts.referenceAudioUrls?.length ? { reference_audio_urls: opts.referenceAudioUrls.slice(0, 3) } : {}),
+        aspect_ratio: ar,
+        duration: h3Duration,
+      }
+    }
+    return { prompt: opts.prompt, aspect_ratio: ar, duration: h3Duration }
   }
 
   // ── Seedance 1.5 Pro ──
