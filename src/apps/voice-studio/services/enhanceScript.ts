@@ -1,6 +1,6 @@
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { kieChatCompletions, type ChatMessage } from '../../../utils/kie'
-import { getChatEndpointPath } from '../../../utils/models'
+import { getChatTarget } from '../../../utils/models'
 
 // Gemini 3.1 Flash TTS reads inline square-bracket cues in the dialogue text as
 // performance direction (e.g. "[warmly] Hey there. [excited] You have to try
@@ -23,7 +23,7 @@ Return ONLY the tagged script. No preamble, no explanation, no code fences.`
 
 export async function enhanceScriptWithTags(scriptText: string): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  const endpoint = getChatTarget()
 
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: SYSTEM_INSTRUCTION }] },

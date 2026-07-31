@@ -1,7 +1,7 @@
 import { TABS, getTabFields, type VisualDNA } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { kieChatCompletions, fileToDataUri, type ChatMessage } from '../../../utils/kie'
-import { getChatEndpointPath } from '../../../utils/models'
+import { getChatTarget } from '../../../utils/models'
 
 // Chip vocabulary for the truly categorical form fields, pulled from the form
 // config itself so the extractor's allowed values never drift from what the
@@ -101,7 +101,7 @@ Describe only what is visible. When something is hidden (eyes behind sunglasses,
 
 export async function analyzeImage(imageFile: File): Promise<VisualDNA> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath()
+  const endpoint = getChatTarget()
 
   const dataUri = await fileToDataUri(imageFile)
 

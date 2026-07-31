@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Search, Check, Star } from 'lucide-react'
+import { X, Search, Check } from 'lucide-react'
 import {
   listModels,
   getDefaultModel,
@@ -20,6 +20,8 @@ import { useIsDesktop } from '../hooks/useBreakpoint'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import ProviderLogo from './ProviderLogo'
 import SavingsPill from './SavingsPill'
+import { ProviderRail, ProviderHeading, StarBadge } from './modelPalette'
+import { providersOf, groupByProvider } from '../utils/providerGroups'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 
 // Slide-in side-panel model picker (mirrors BankPicker's mechanics). Used by
@@ -31,17 +33,15 @@ import useCloseOnEscape from '../hooks/useCloseOnEscape'
 // Host-app accent for the selected-row tint and check/star icons. Explicit
 // class strings (not template interpolation) so Tailwind sees them; the
 // 100–400 tints auto-flip in light mode, so no `light:` variants needed.
-const ACCENTS: Record<string, { selectedBg: string; icon: string; star: string; pillActive: string }> = {
+const ACCENTS: Record<string, { selectedBg: string; icon: string; pillActive: string }> = {
   'broll-studio': {
     selectedBg: 'bg-broll-500/10',
     icon: 'text-broll-400',
-    star: 'fill-broll-400 text-broll-400',
     pillActive: 'border-broll-500/40 bg-broll-500/15 text-broll-200',
   },
   playground: {
     selectedBg: 'bg-playground-500/15',
     icon: 'text-playground-300',
-    star: 'fill-playground-300 text-playground-300',
     pillActive: 'border-playground-500/40 bg-playground-500/15 text-playground-200',
   },
 }
@@ -118,6 +118,10 @@ export default function ModelSidePanel({
   const [search, setSearch] = useState('')
   // Active capability filters (video only). None = show all.
   const [capFilters, setCapFilters] = useState<Set<Mode>>(new Set())
+  // Provider rail. null = every provider.
+  const [providerFilter, setProviderFilter] = useState<string | null>(null)
+  // The rail's star: show only the recommended models.
+  const [starredOnly, setStarredOnly] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const isDesktop = useIsDesktop()
   const accent = ACCENTS[appId] ?? ACCENTS['broll-studio']
@@ -144,22 +148,39 @@ export default function ModelSidePanel({
     ? VIDEO_CAPABILITY_FILTERS.filter((f) => models.some((m) => m.modes?.includes(f.mode)))
     : []
 
-  // Filter by display name, then by any active capability pill, then split into
-  // Featured (recommended) + the rest.
+  // Filter by display name / provider, then by any active capability pill, then
+  // by the provider rail, then group under provider headings — the same shape
+  // the chat picker uses, so picking a renderer and picking a writer read as
+  // one act. Recommended models keep their star; the old Featured/All split is
+  // gone, because two ways of grouping one list is one too many.
   const searched = search.trim()
-    ? models.filter((m) => m.displayName.toLowerCase().includes(search.toLowerCase()))
+    ? models.filter(
+        (m) =>
+          m.displayName.toLowerCase().includes(search.toLowerCase()) ||
+          m.provider.toLowerCase().includes(search.toLowerCase()),
+      )
     : models
-  const filtered = capFilters.size > 0
+  const capFiltered = capFilters.size > 0
     ? searched.filter((m) => Array.from(capFilters).some((mode) => m.modes?.includes(mode)))
     : searched
-  const featured = filtered.filter((m) => m.tags.includes('recommended'))
-  const rest = filtered.filter((m) => !m.tags.includes('recommended'))
+  const railFiltered = providerFilter ? capFiltered.filter((m) => m.provider === providerFilter) : capFiltered
+  const filtered = starredOnly ? railFiltered.filter((m) => m.tags.includes('recommended')) : railFiltered
+  const providers = providersOf(models)
+  // Selectable before muted inside a provider, then recommended, then A–Z: a
+  // greyed-out model is an explanation, not a candidate, so it sinks.
+  const groups = groupByProvider(filtered, (a, b) =>
+    Number(isMuted(a)) - Number(isMuted(b)) ||
+    Number(b.tags.includes('recommended')) - Number(a.tags.includes('recommended')) ||
+    a.displayName.localeCompare(b.displayName),
+  )
 
-  // Reset search + capability filters + focus the input on open.
+  // Reset search + capability filters + provider rail + focus on open.
   useEffect(() => {
     if (isOpen) {
       setSearch('')
       setCapFilters(new Set())
+      setProviderFilter(null)
+      setStarredOnly(false)
       setTimeout(() => searchRef.current?.focus(), 100)
     }
   }, [isOpen])
@@ -223,7 +244,7 @@ export default function ModelSidePanel({
             visual separating with whitespace alone. */}
         <div className="flex items-start justify-between px-5 pb-2 pt-5">
           <div className="min-w-0">
-            <h3 className="text-[15px] font-semibold tracking-tight text-ink-100">Video Model</h3>
+            <h3 className="text-[15px] font-semibold tracking-tight text-ink-100">{task === 'image' ? 'Image Model' : task === 'video' ? 'Video Model' : 'Model'}</h3>
             <p className="mt-0.5 text-[11px] text-ink-600">{filtered.length} of {models.length} models</p>
           </div>
           <button
@@ -271,53 +292,41 @@ export default function ModelSidePanel({
           </div>
         )}
 
-        {/* Model list — quiet rows, no per-model chrome. Rows breathe via
-            their own padding; sections separate with labels, not borders. */}
-        <div className="flex-1 overflow-y-auto px-2.5 pb-3 pt-1">
-          {filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-1 py-12 text-center">
-              <span className="text-sm text-ink-600">No matches found</span>
-              <span className="text-xs text-ink-700">Try a different search</span>
-            </div>
-          ) : (
-            <div className="flex flex-col">
-              {featured.length > 0 && (
-                <span className="px-3.5 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-wider text-ink-600">
-                  Featured
-                </span>
-              )}
-              {featured.map((m) => (
-                <ModelRow
-                  key={`feat-${m.id}`}
-                  model={m}
-                  active={m.id === resolved}
-                  muted={isMuted(m)}
-                  credits={formatCredits(estimateCredits(m.id, costParams))}
-                  accent={accent}
-                  onClick={() => pick(m.id)}
-                />
-              ))}
-              {featured.length > 0 && rest.length > 0 && (
-                <div className="flex items-center gap-3 px-3.5 pb-1.5 pt-3">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-600">
-                    All models
-                  </span>
-                  <span className="h-px flex-1 bg-ink/10" />
+        {/* Provider rail + grouped list — shared with the chat picker. */}
+        <div className="flex min-h-0 flex-1">
+          <ProviderRail
+            providers={providers}
+            value={providerFilter}
+            onChange={setProviderFilter}
+            starred={starredOnly}
+            onStarredChange={setStarredOnly}
+            activeClass={accent.pillActive}
+          />
+          <div className="min-w-0 flex-1 overflow-y-auto px-2 pb-3 pt-1">
+            {groups.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-1 py-12 text-center">
+                <span className="text-sm text-ink-600">No matches found</span>
+                <span className="text-xs text-ink-700">Try a different search</span>
+              </div>
+            ) : (
+              groups.map((g) => (
+                <div key={g.provider} className="mb-1">
+                  <ProviderHeading provider={g.provider} />
+                  {g.models.map((m) => (
+                    <ModelRow
+                      key={m.id}
+                      model={m}
+                      active={m.id === resolved}
+                      muted={isMuted(m)}
+                      credits={formatCredits(estimateCredits(m.id, costParams))}
+                      accent={accent}
+                      onClick={() => pick(m.id)}
+                    />
+                  ))}
                 </div>
-              )}
-              {rest.map((m) => (
-                <ModelRow
-                  key={m.id}
-                  model={m}
-                  active={m.id === resolved}
-                  muted={isMuted(m)}
-                  credits={formatCredits(estimateCredits(m.id, costParams))}
-                  accent={accent}
-                  onClick={() => pick(m.id)}
-                />
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </div>
 
         {/* Footer — requireMode caveat, mirrors ModelPicker's dropdown footer.
@@ -345,14 +354,22 @@ interface ModelRowProps {
 
 function ModelRow({ model, active, muted, credits, accent, onClick }: ModelRowProps) {
   const isRecommended = model.tags.includes('recommended')
-  const textTags = model.tags.filter((t) => t !== 'recommended')
+  // Only 'cheap' survives as a word beside the name. 'New' and 'Fast' were
+  // removed (July 2026): New ages badly and nobody edits it back off, and Fast
+  // was a third colour competing with the star and the "% off" chip on the same
+  // line. Cheap earns its place because it is the one tag about spend, which is
+  // the axis the whole row is scanned on. `TAG_STYLES` keeps every label for
+  // other surfaces — this is a display choice, not a registry change.
+  const textTags = model.tags.filter((t) => t === 'cheap')
   // Discount vs the provider's official API — only for models with a verified
   // official rate in the registry (see ModelEntry.official).
   const savings = officialSavingsPercent(model.id)
   const c = model.videoConstraints
-  // Metadata line: resolution range (ascending, e.g. "480p–1080p") · duration
-  // range · credit estimate, dot-joined plain text. Per-call models with no
-  // duration toggle (durations === []) read "per clip".
+  // Metadata: resolution range (ascending, e.g. "480p–1080p"), duration range,
+  // credit estimate. Each is its own subtle pill rather than a dot-joined
+  // string — three numbers in one line of prose read as a sentence, and the
+  // list is scanned down a column ("which one is 1080p?"), not read across.
+  // Per-call models with no duration toggle (durations === []) read "per clip".
   const resolution = c?.resolutions.length
     ? c.resolutions.length > 1
       ? `${videoResolutionLabel(c.resolutions[0])}–${videoResolutionLabel(c.resolutions[c.resolutions.length - 1])}`
@@ -365,7 +382,7 @@ function ModelRow({ model, active, muted, credits, accent, onClick }: ModelRowPr
       ? `${c.durations[0]}s`
       : 'per clip'
     : null
-  const meta = [resolution, duration, credits].filter(Boolean).join(' · ')
+  const metaPills = [resolution, duration, credits].filter(Boolean) as string[]
 
   return (
     <button
@@ -373,7 +390,7 @@ function ModelRow({ model, active, muted, credits, accent, onClick }: ModelRowPr
       onClick={onClick}
       disabled={muted}
       aria-disabled={muted}
-      className={`flex w-full items-center gap-3 rounded-full px-3.5 py-2.5 text-left transition-colors ${
+      className={`flex w-full items-center gap-3 rounded-2xl px-3.5 py-2.5 text-left transition-colors ${
         muted
           ? 'cursor-not-allowed opacity-30 grayscale'
           : active
@@ -385,9 +402,7 @@ function ModelRow({ model, active, muted, credits, accent, onClick }: ModelRowPr
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span className={`truncate text-[13px] font-semibold leading-snug text-ink-100 ${muted ? 'line-through decoration-ink-400' : ''}`}>{model.displayName}</span>
-          {isRecommended && (
-            <Star className={`h-3 w-3 shrink-0 ${accent.star}`} strokeWidth={1.5} />
-          )}
+          {isRecommended && <StarBadge />}
           {textTags.map((t) => (
             <span key={t} className={`shrink-0 text-[11px] font-medium ${TAG_TEXT[t]}`}>
               {TAG_STYLES[t].label}
@@ -395,7 +410,18 @@ function ModelRow({ model, active, muted, credits, accent, onClick }: ModelRowPr
           ))}
           {savings != null && <SavingsPill pct={savings} />}
         </div>
-        {meta && <p className="mt-px truncate text-[11px] leading-tight text-ink-500">{meta}</p>}
+        {metaPills.length > 0 && (
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            {metaPills.map((m) => (
+              <span
+                key={m}
+                className="rounded-full bg-ink/[0.06] px-2 py-[3px] text-[10px] font-medium leading-none text-ink-400"
+              >
+                {m}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       {active && <Check className={`h-4 w-4 shrink-0 ${accent.icon}`} />}
     </button>

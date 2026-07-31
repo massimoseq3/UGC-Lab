@@ -1,6 +1,6 @@
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { kieChatCompletions, fileToDataUri, type ChatMessage } from '../../../utils/kie'
-import { getChatEndpointPath, CHAT_MODEL_DEFAULT } from '../../../utils/models'
+import { getChatTarget, CHAT_MODEL_DEFAULT } from '../../../utils/models'
 import { isAssetRef, getAsBase64 } from '../../../utils/assetStore'
 
 export interface ProductExtraction {
@@ -91,7 +91,7 @@ export async function extractProductInfo(
   extraImages: string[] = [],
 ): Promise<ProductExtraction> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath(CHAT_MODEL_DEFAULT)
+  const endpoint = getChatTarget(CHAT_MODEL_DEFAULT)
 
   const dataUri = await toDataUri(image)
   // A broken extra shouldn't sink the read — the hero photo is what matters.

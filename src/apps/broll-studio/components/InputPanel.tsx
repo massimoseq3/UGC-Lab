@@ -1,29 +1,14 @@
 import { useState } from 'react'
-import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote, Video, Clapperboard } from 'lucide-react'
+import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote } from 'lucide-react'
 import type { Product, Model, Script } from '../../../stores/types'
 import { isLineMode, type BrollDelivery, type BrollMode } from '../types'
-import { WRITE_LENGTHS, WRITE_STYLE_META, isWriteStyle, type WriteLength } from '../../script-architect/types'
-import type { AdFormat } from '../types'
-import ScriptStyleList from '../../script-architect/components/ScriptStyleList'
+import ScriptModelRow from '../../../components/ScriptModelRow'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import SegmentedToggle from '../../../components/SegmentedToggle'
-import SlideOver from '../../../components/SlideOver'
 import ClearAllButton from '../../../components/ClearAllButton'
 import { estimatePromptCredits } from '../services/promptCost'
 import { formatCredits } from '../../../utils/models'
-
-// One extra Ad Format option beyond Scripts' list: no format to imitate and no
-// persuasion mechanic imposed, so the storyboard gets no scene staging and the
-// shots come out as plain organic UGC. It is NOT the default — picking it is a
-// decision like any other, and an unpicked Ad Format stays empty.
-//
-// Lives here rather than in Scripts' WRITE_STYLE_META because Scripts always
-// writes in a named style; only B-Roll has a "just make it normal" case.
-const STANDARD_UGC = {
-  label: 'Standard UGC',
-  hint: 'Plain creator footage — no format imposed',
-}
 
 interface InputPanelProps {
   selectedProduct: Product | null
@@ -56,20 +41,6 @@ interface InputPanelProps {
   // the same per-line storyboard, so it rides in the settings band.
   lineDelivery: BrollDelivery
   onLineDeliveryChange: (delivery: BrollDelivery) => void
-  // The ad format — what kind of content this ad imitates. A required, primary
-  // input: it carries the scene staging every prompt is written against, so it
-  // decides how the ad is SHOT, and when no script is supplied it also decides
-  // how the words are written. The length only applies in that second case.
-  autoScriptStyle: AdFormat | null
-  // Set when the Ad Analyzer handed over an analysed ad's staging. It answers
-  // the Ad Format row's question ("how is this shot"), so it takes that row
-  // over rather than adding a competing one — and the row must SAY so, or it
-  // reads "Standard UGC" while a blueprint quietly drives every prompt.
-  adBlueprintTitle?: string | null
-  onClearAdBlueprint?: () => void
-  onAutoScriptStyleChange: (style: AdFormat | null) => void
-  autoScriptLength: WriteLength
-  onAutoScriptLengthChange: (length: WriteLength) => void
   // Visual style — one row, one popup. The presets, the user's saved styles,
   // and the analyse-from-references flow all live in StyleModal (opened by the
   // parent), so this panel only shows what's picked. The video model is NOT
@@ -278,12 +249,6 @@ export default function InputPanel({
   onModeChange,
   lineDelivery,
   onLineDeliveryChange,
-  autoScriptStyle,
-  onAutoScriptStyleChange,
-  adBlueprintTitle,
-  onClearAdBlueprint,
-  autoScriptLength,
-  onAutoScriptLengthChange,
   styleChosen,
   styleLabel,
   styleHint,
@@ -292,20 +257,21 @@ export default function InputPanel({
   onClearStyle,
 }: InputPanelProps) {
   const hasScript = scriptText.trim().length > 0
-  // Two picks gate the run: the look, and the ad format. The script doesn't —
-  // the format writes one when the box is blank. (A session that predates the
-  // format row had a script and no format, so a script alone still passes.)
-  const canGenerate = (!!autoScriptStyle || hasScript) && styleChosen
+  // The script gates the run now that B-Roll no longer writes one, alongside
+  // the look. The ad format is still the pick that shapes the shots, but it
+  // isn't in the gate: sessions that predate the format row have a script and
+  // no format, and a storyboard without staging is a plain UGC storyboard, not
+  // a broken one.
+  const canGenerate = hasScript && styleChosen
   const [scriptExpanded, setScriptExpanded] = useState(false)
   const [instructionsExpanded, setInstructionsExpanded] = useState(false)
-  const [styleSlideOpen, setStyleSlideOpen] = useState(false)
   const isContinuous = mode === 'continuous'
 
   // Estimated cost of the prompt-writing call behind the Generate button. These
   // are chat completions, so it's fractions of a credit — the pill is there so
-  // nothing ever fires unpriced, not because the number is large. With no
-  // script yet there's nothing to measure (the script itself is written first,
-  // and its length is what sets the storyboard's size), so the pill sits out.
+  // nothing ever fires unpriced, not because the number is large. Two ways it
+  // comes back null and hides: no script to measure yet, or a picked chat model
+  // with no verified per-token rate (see the registry's "NO CREDIT FIGURES").
   const promptCredits = hasScript ? formatCredits(estimatePromptCredits(mode, scriptText, lineDelivery)) : null
 
   return (
@@ -554,100 +520,24 @@ export default function InputPanel({
             )}
           </div>
 
-          {/* Ad Format — NOT a fallback for "I have no script": a format
-              carries the scene staging that every prompt is written against,
-              so it decides how the ad is SHOT whether or not the words come
-              from here. With no script it writes those too, at the length
-              below. That double job is why Formats lead its picker. */}
+          {/* The Ad Format row (Formats + Structures, shared out of Scripts)
+              stood here and is REMOVED (July 2026), a week after B-Roll stopped
+              writing scripts. Once the words came from elsewhere, a format was
+              only staging the shots, and the storyboard prompts read better
+              staged by the script and the visual style than by a label the
+              member had to pick before Generate would light up. `AdFormat`,
+              `sceneStagingFor` and `BrollInput.sceneStaging` all survive —
+              `AdBlueprintPayload` still feeds staging through that seam — so
+              restoring the row is re-adding the picker, not rebuilding the
+              plumbing. See git history. */}
 
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => setStyleSlideOpen(true)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
-            className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
-              autoScriptStyle
-                ? 'border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10'
-                : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
-            }`}
-          >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-text">
-              {adBlueprintTitle
-                ? <Clapperboard className="h-5 w-5" strokeWidth={1.75} />
-                : isWriteStyle(autoScriptStyle) && WRITE_STYLE_META[autoScriptStyle].group === 'format'
-                  ? <Video className="h-5 w-5" strokeWidth={1.75} />
-                  : <FileText className="h-5 w-5" strokeWidth={1.75} />}
-            </div>
-            <div className="min-w-0 flex-1">
-              {adBlueprintTitle ? (
-                // Provenance rides the hint line, not a chip beside the title:
-                // an "Analysed ad" chip is wide enough to truncate a real ad
-                // title down to about four characters in this column.
-                <>
-                  <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">{adBlueprintTitle}</div>
-                  <div className="truncate text-[11px] leading-snug text-ink-500">Analysed ad — your product, your character</div>
-                </>
-              ) : autoScriptStyle ? (
-                <>
-                  <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">
-                    {isWriteStyle(autoScriptStyle) ? WRITE_STYLE_META[autoScriptStyle].label : STANDARD_UGC.label}
-                  </div>
-                  <div className="truncate text-[11px] leading-snug text-ink-500">
-                    {isWriteStyle(autoScriptStyle) ? WRITE_STYLE_META[autoScriptStyle].hint : STANDARD_UGC.hint}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="text-[13px] font-medium text-ink-300">Ad Format</div>
-                  <div className="text-[11px] text-ink-600">Sets how the ad is shot</div>
-                </>
-              )}
-            </div>
-            {adBlueprintTitle || autoScriptStyle ? (
-              <div className="flex shrink-0 items-center gap-1">
-                <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
-                  <RefreshCw className="h-2.5 w-2.5" />
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    // Clearing the blueprint hands the row back to the format
-                    // picker; the format pick underneath it survives.
-                    if (adBlueprintTitle) onClearAdBlueprint?.()
-                    else onAutoScriptStyleChange(null)
-                  }}
-                  title={adBlueprintTitle ? 'Clear analysed ad' : 'Clear format'}
-                  aria-label={adBlueprintTitle ? 'Clear analysed ad' : 'Clear format'}
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ) : (
-              <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
-            )}
-          </div>
+          {/* Who writes the shot prompts. Third in the band because it's the
+              least often changed of the three: the look and the format are
+              creative decisions made per ad, the model is a standing one about
+              intelligence vs. spend. className="" because the band spaces its
+              rows with a flex gap, not margins. */}
+          <ScriptModelRow appId="broll-studio" className="" />
 
-          {/* Length only exists to size a script we're about to write: it sets
-              the word budget, the budget sets how many lines come back, and
-              each line is one scene. A script you brought already has a
-              length, so the control goes away rather than sitting there
-              doing nothing. */}
-          {!hasScript && (
-            <SegmentedToggle<string>
-              // Five segments in a 25%-wide column: the dense preset's px-3
-              // truncates them to "2…" / "3…", so the per-segment padding is
-              // tightened here rather than in the shared component, which
-              // everything else sizes correctly against.
-              className="h-9 !p-1 [&>button]:!px-1.5"
-              dense
-              value={String(autoScriptLength)}
-              onChange={(v) => onAutoScriptLengthChange(Number(v) as WriteLength)}
-              accent="broll"
-              options={WRITE_LENGTHS.map((len) => ({ value: String(len), label: `${len}s` }))}
-            />
-          )}
         </div>
 
         <button
@@ -658,11 +548,7 @@ export default function InputPanel({
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>
-                {!hasScript ? 'Writing your script...'
-                  : isContinuous ? 'Storyboarding...'
-                  : 'Generating Prompts...'}
-              </span>
+              <span>{isContinuous ? 'Storyboarding...' : 'Generating Prompts...'}</span>
             </>
           ) : (
             <>
@@ -690,14 +576,10 @@ export default function InputPanel({
             </>
           )}
         </button>
-        {/* No "pick a style first" prompt — a greyed-out Generate says that on
-            its own. This line stays because the button doesn't say it: with an
-            empty script box, the click spends an extra call writing one. */}
-        {!isGenerating && styleChosen && !hasScript && (
-          <p className="mt-2 text-center text-[10px] text-ink-700">
-            Writes a {autoScriptLength}s script first, then storyboards it
-          </p>
-        )}
+        {/* Nothing under the button: a greyed-out Generate says "you're missing
+            something" on its own, and the line that used to sit here only
+            existed to warn that an empty script box spent an extra call
+            writing one. It doesn't any more. */}
       </div>
 
       <ExpandTextModal
@@ -721,50 +603,6 @@ export default function InputPanel({
           : "What's this ad about? Optional — the product's own details already drive the script (angle, audience, what to avoid...)"}
       />
 
-      {/* Script Style picker — the same sectioned list Scripts offers, so a
-          style means the same thing in both apps. Formats lead here: the pick
-          decides what kind of ad gets SHOT, and a format is the half that
-          carries scene staging, so it shapes the storyboard as well as the
-          words. Scripts leads with Structures, where the question is how the
-          argument is built. */}
-      <SlideOver
-        open={styleSlideOpen}
-        onClose={() => setStyleSlideOpen(false)}
-        title="Choose a style"
-        subtitle="What kind of content the ad looks like — and how it's built"
-        size="wide"
-      >
-        {/* Pinned above the two sections: the "no format at all" option, for an
-            ad that shouldn't be imitating anything. Not a default — nothing is
-            picked until the member picks it. */}
-        <div className="px-4 pt-4">
-          <button
-            type="button"
-            onClick={() => { onAutoScriptStyleChange('standard'); setStyleSlideOpen(false) }}
-            className={`flex w-full items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
-              autoScriptStyle === 'standard'
-                ? 'border-broll-500/30 bg-broll-500/10'
-                : 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'
-            }`}
-          >
-            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${autoScriptStyle === 'standard' ? 'bg-broll-500/10 text-broll-400' : 'bg-ink/5 text-ink-500'}`}>
-              <Film className="h-5 w-5" strokeWidth={1.75} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className={`text-[13px] font-medium tracking-tight ${autoScriptStyle === 'standard' ? 'text-broll-300' : 'text-ink-200'}`}>
-                {STANDARD_UGC.label}
-              </div>
-              <div className="text-[11px] leading-snug text-ink-500">{STANDARD_UGC.hint}</div>
-            </div>
-          </button>
-        </div>
-        <ScriptStyleList
-          accent="broll"
-          formatsFirst
-          value={isWriteStyle(autoScriptStyle) ? autoScriptStyle : null}
-          onSelect={(style) => { onAutoScriptStyleChange(style); setStyleSlideOpen(false) }}
-        />
-      </SlideOver>
     </div>
   )
 }

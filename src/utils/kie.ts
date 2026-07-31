@@ -380,12 +380,28 @@ export async function downloadAsBase64(url: string): Promise<{ base64: string; m
   return { base64: btoa(binary), mimeType }
 }
 
-// ── OpenAI-compatible chat completions ─────────────────────────
+// ── Chat completions (three transports) ────────────────────────
 //
-// kie.ai's chat models (Gemini 3 Flash, GPT-5.5, Claude Opus 4, etc.) are
-// served at per-model endpoints that mirror the OpenAI chat completions API:
-//   POST /<model-slug>/v1/chat/completions
-// The endpoint is sync — no taskId polling.
+// kie.ai serves chat models at three different endpoint families, each with
+// its own request and response shape. All three are sync — no taskId polling.
+//
+//   'openai-chat'      POST /<model-slug>/v1/chat/completions   (Gemini family)
+//                      Model is in the URL. { messages } in, choices[].message
+//                      / SSE choices[].delta out.
+//   'claude-messages'  POST /claude/v1/messages                 (Claude family)
+//                      Model is in the body. Same messages array, but the
+//                      system prompt is hoisted to a top-level `system` field
+//                      (Anthropic rejects role:'system' inside messages), and
+//                      the answer comes back as content[] blocks.
+//   'openai-responses' POST /codex/v1/responses, /grok/v1/responses
+//                      Model is in the body. `input` instead of `messages`,
+//                      part types are input_text/input_image, and the answer is
+//                      output[].content[].output_text.
+//
+// The two non-OpenAI transports are called with stream:false: kie's gateway
+// buffers SSE rather than forwarding it (see LONG_CHAT_TIMEOUT_MS), so
+// streaming buys nothing here and a single JSON parse is far easier to debug.
+// They still fall through to an SSE reader if a gateway streams anyway.
 
 export type ChatRole = 'system' | 'developer' | 'user' | 'assistant' | 'tool'
 
@@ -420,18 +436,42 @@ interface ChatCompletionsResponse {
   }>
 }
 
+// What a chat model needs to be reached. Mirrors `ChatTarget` in models.ts —
+// duplicated as a structural type rather than imported so this client stays
+// dependency-free, which is the property that keeps it easy to test in isolation.
+export interface ChatCallTarget {
+  endpoint: string
+  transport?: 'openai-chat' | 'claude-messages' | 'openai-responses'
+  slug?: string
+}
+
+// Anthropic caps output explicitly and defaults low. Our longest chat outputs
+// are whole storyboards, so ask for plenty of room.
+const CLAUDE_MAX_TOKENS = 16_384
+
 export async function kieChatCompletions(
   apiKey: string,
-  endpointPath: string,
+  target: ChatCallTarget,
   messages: ChatMessage[],
   opts: ChatCompletionsOptions = {},
 ): Promise<string> {
   const { signal, reasoningEffort = 'low', includeThoughts = false, timeoutMs = 120_000 } = opts
+  const transport = target.transport ?? 'openai-chat'
 
-  // kie.ai's chat completions default to streaming (SSE). We request streaming
-  // explicitly and accumulate deltas — this is the documented happy path.
+  const body =
+    transport === 'claude-messages'
+      ? claudeBody(target.slug, messages, reasoningEffort)
+      : transport === 'openai-responses'
+        ? responsesBody(target.slug, messages, reasoningEffort)
+        : {
+            messages,
+            stream: true,
+            include_thoughts: includeThoughts,
+            reasoning_effort: reasoningEffort,
+          }
+
   const res = await fetchWithRetry(
-    `https://api.kie.ai${endpointPath}`,
+    `https://api.kie.ai${target.endpoint}`,
     {
       method: 'POST',
       headers: {
@@ -439,12 +479,7 @@ export async function kieChatCompletions(
         Authorization: `Bearer ${apiKey}`,
         Accept: 'text/event-stream',
       },
-      body: JSON.stringify({
-        messages,
-        stream: true,
-        include_thoughts: includeThoughts,
-        reasoning_effort: reasoningEffort,
-      }),
+      body: JSON.stringify(body),
     },
     { signal, timeoutMs },
   )
@@ -455,7 +490,7 @@ export async function kieChatCompletions(
   const looksLikeSSE = contentType.includes('text/event-stream') || raw.startsWith('data:') || raw.includes('\ndata:')
 
   if (looksLikeSSE) {
-    const text = parseSSEContent(raw)
+    const text = parseSSEContent(raw, transport)
     if (text.length > 0) return text
     throw new Error(
       `Chat model produced empty SSE stream. First 200 chars: ${raw.slice(0, 200)}`,
@@ -463,21 +498,119 @@ export async function kieChatCompletions(
   }
 
   // Plain JSON response
-  let body: unknown
+  let body_: unknown
   try {
-    body = JSON.parse(raw)
+    body_ = JSON.parse(raw)
   } catch {
     throw new Error(`Chat model returned non-JSON response: ${raw.slice(0, 200)}`)
   }
-  const text = (body as ChatCompletionsResponse).choices?.[0]?.message?.content
+
+  const text =
+    transport === 'claude-messages'
+      ? parseClaudeContent(body_)
+      : transport === 'openai-responses'
+        ? parseResponsesContent(body_)
+        : (body_ as ChatCompletionsResponse).choices?.[0]?.message?.content
+
   if (typeof text === 'string' && text.length > 0) return text
 
   throw new Error(
-    `Empty response from chat model. Response shape: ${JSON.stringify(body).slice(0, 400)}`,
+    `Empty response from chat model. Response shape: ${JSON.stringify(body_).slice(0, 400)}`,
   )
 }
 
-function parseSSEContent(raw: string): string {
+// ── claude-messages ────────────────────────────────────────────
+
+// Anthropic takes no role:'system' message — the system prompt is a top-level
+// field. Every caller in this app opens with one, so hoist it rather than
+// letting the API 400 on a shape our own services build.
+function claudeBody(slug: string | undefined, messages: ChatMessage[], effort: 'low' | 'high') {
+  const system = messages
+    .filter((m) => m.role === 'system' || m.role === 'developer')
+    .map((m) => (typeof m.content === 'string' ? m.content : textOf(m.content)))
+    .join('\n\n')
+  const rest = messages
+    .filter((m) => m.role !== 'system' && m.role !== 'developer')
+    .map((m) => ({
+      role: m.role === 'assistant' ? 'assistant' : 'user',
+      content: typeof m.content === 'string' ? m.content : m.content.map(claudePart),
+    }))
+  return {
+    model: slug,
+    ...(system ? { system } : {}),
+    messages: rest,
+    max_tokens: CLAUDE_MAX_TOKENS,
+    stream: false,
+    thinkingFlag: effort === 'high',
+  }
+}
+
+// Anthropic image blocks want the media type and raw base64 split out of the
+// data URI; a hosted https URL passes through as a url source.
+function claudePart(part: ChatContentPart) {
+  if (part.type === 'text') return { type: 'text', text: part.text }
+  const url = part.image_url.url
+  const dataUri = /^data:([^;]+);base64,(.*)$/s.exec(url)
+  return dataUri
+    ? { type: 'image', source: { type: 'base64', media_type: dataUri[1], data: dataUri[2] } }
+    : { type: 'image', source: { type: 'url', url } }
+}
+
+function parseClaudeContent(body: unknown): string {
+  const blocks = (body as { content?: Array<{ type?: string; text?: string }> }).content
+  if (!Array.isArray(blocks)) return ''
+  return blocks
+    .filter((b) => b.type === 'text' && typeof b.text === 'string')
+    .map((b) => b.text as string)
+    .join('')
+}
+
+// ── openai-responses ───────────────────────────────────────────
+
+// The Responses API renames everything: `input` not `messages`, and part types
+// gain an `input_` prefix with the image URL flattened onto the part itself.
+function responsesBody(slug: string | undefined, messages: ChatMessage[], effort: 'low' | 'high') {
+  return {
+    model: slug,
+    input: messages.map((m) => ({
+      // 'system'/'developer' are both accepted here, unlike Claude.
+      role: m.role,
+      content:
+        typeof m.content === 'string'
+          ? [{ type: 'input_text', text: m.content }]
+          : m.content.map((p) =>
+              p.type === 'text'
+                ? { type: 'input_text', text: p.text }
+                : { type: 'input_image', image_url: p.image_url.url },
+            ),
+    })),
+    reasoning: { effort },
+    stream: false,
+  }
+}
+
+function parseResponsesContent(body: unknown): string {
+  const output = (body as {
+    output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>
+  }).output
+  if (!Array.isArray(output)) return ''
+  return output
+    // Skip the 'reasoning' blocks that sit alongside the message.
+    .filter((o) => o.type === 'message')
+    .flatMap((o) => o.content ?? [])
+    .filter((c) => c.type === 'output_text' && typeof c.text === 'string')
+    .map((c) => c.text as string)
+    .join('')
+}
+
+function textOf(parts: ChatContentPart[]): string {
+  return parts.filter((p) => p.type === 'text').map((p) => p.text).join('\n')
+}
+
+// Each transport names its incremental text differently. We ask the two newer
+// transports for stream:false, so their branches here are a safety net for a
+// gateway that streams anyway rather than the expected path.
+function parseSSEContent(raw: string, transport: ChatCallTarget['transport'] = 'openai-chat'): string {
   let content = ''
   for (const rawLine of raw.split('\n')) {
     const line = rawLine.trim()
@@ -490,7 +623,32 @@ function parseSSEContent(raw: string): string {
           delta?: { content?: string }
           message?: { content?: string }
         }>
+        // claude-messages sends an object delta ({ text }); openai-responses
+        // sends a bare string on its output_text.delta events.
+        delta?: { type?: string; text?: string } | string
+        // openai-responses: response.output_text.delta events, and the
+        // terminal response.completed carrying the whole assembled response.
+        type?: string
+        response?: unknown
       }
+
+      if (transport === 'claude-messages') {
+        const text = typeof parsed.delta === 'object' ? parsed.delta?.text : undefined
+        if (typeof text === 'string') content += text
+        continue
+      }
+      if (transport === 'openai-responses') {
+        if (parsed.type === 'response.output_text.delta' && typeof parsed.delta === 'string') {
+          content += parsed.delta
+        } else if (parsed.type === 'response.completed' && parsed.response) {
+          // Prefer the assembled response when we get one — it's complete even
+          // if we joined the stream late or a delta event was malformed.
+          const whole = parseResponsesContent(parsed.response)
+          if (whole.length > 0) return whole
+        }
+        continue
+      }
+
       const delta = parsed.choices?.[0]?.delta?.content
       const message = parsed.choices?.[0]?.message?.content
       if (typeof delta === 'string') content += delta
@@ -504,7 +662,10 @@ function parseSSEContent(raw: string): string {
 
 // ── Veo generate (custom endpoint) ──────────────────────────────
 //
-// Veo 3.1 family uses POST /api/v1/veo/generate (NOT /jobs/createTask).
+// The Veo family used POST /api/v1/veo/generate (NOT /jobs/createTask).
+// No registry entry uses this any more — Veo 3.1 was removed in July 2026 — but
+// B-Roll history rows written while it was live carry `videoEndpoint: 'veo'`,
+// and the refresh-resume path needs this poller to finish those clips.
 // Returns a taskId; poll /api/v1/veo/record-info to check status.
 // Different envelope, same shape philosophy as the standard recordInfo.
 

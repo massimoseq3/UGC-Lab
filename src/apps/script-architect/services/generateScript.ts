@@ -1,14 +1,17 @@
 import type { GenerateScriptInput, GeneratedScript, RemixAngle, EditableProductContext, WriteStyle, WriteLength, HookCategory } from '../types'
 import { HOOK_COUNT, REMIX_ANGLES, DEFAULT_VARIATION_COUNT, isVariationCount, WRITE_STYLE_META } from '../types'
-import { useSettingsStore } from '../../../stores/settingsStore'
+import { useSettingsStore, resolveScriptModel } from '../../../stores/settingsStore'
 import { kieChatCompletions, LONG_CHAT_TIMEOUT_MS, type ChatMessage } from '../../../utils/kie'
-import { getChatEndpointPath, CHAT_MODEL_DEFAULT } from '../../../utils/models'
+import { getChatTarget, type ChatTarget } from '../../../utils/models'
 
-// Scripts runs on the app-wide chat model. It spent a stint on the STRONG tier
-// (3.6 Flash) on the theory that prose a human reads is worth ~2.6× the
-// credits — the takes didn't come back visibly better, and members pay for
-// every one on their own key. Back on Gemini 3 Flash.
-const CHAT_MODEL_ID = CHAT_MODEL_DEFAULT
+// Scripts is one of the two apps where the MEMBER picks the writer (the other
+// is B-Roll) — this is prose a person reads, so the intelligence/cost trade is
+// theirs to make, on their own key. Resolved per call rather than at module
+// scope so a pick made mid-session applies to the next Generate.
+// Unpicked, it resolves to the app-wide default and costs what it always did.
+function scriptModel(): ChatTarget {
+  return getChatTarget(resolveScriptModel('script-architect'))
+}
 
 // A batch fires N of these calls at once, so they contend with each other and a
 // take routinely runs past kieChatCompletions' 120s default — which aborts the
@@ -371,7 +374,7 @@ OUTPUT FORMAT — CRITICAL:
 - Valid tags: <EDUCATIONAL> <COMPARISON> <MYTH BUSTING> <STORYTELLING> <AUTHORITY> <DAY IN THE LIFE> <PATTERN INTERRUPT>
 - No numbering, no blank lines, no quotation marks, no commentary, no markdown.`
 
-async function runHooks(input: GenerateScriptInput, apiKey: string, endpoint: string): Promise<string> {
+async function runHooks(input: GenerateScriptInput, apiKey: string, endpoint: ChatTarget): Promise<string> {
   let prompt = `The creator's brief for these hooks:\n\n${input.brief.trim()}\n\n`
 
   const ctxLines = productContextLines(input.productContext)
@@ -548,6 +551,8 @@ const WRITE_LENGTH_BUDGET: Record<WriteLength, { words: string; scenes: string }
   20: { words: '42–56 words', scenes: 'usually 2-4 scenes' },
   30: { words: '62–82 words', scenes: 'usually 3-5 scenes' },
   60: { words: '125–160 words', scenes: 'usually 6-9 scenes' },
+  // ~2.1–2.7 words a second, the same rate as every tier above it.
+  90: { words: '190–240 words', scenes: 'usually 9-13 scenes' },
 }
 
 function formatEndTimestamp(seconds: number): string {
@@ -556,7 +561,7 @@ function formatEndTimestamp(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
-async function runWrite(input: GenerateScriptInput, take: number, takeCount: number, apiKey: string, endpoint: string): Promise<string> {
+async function runWrite(input: GenerateScriptInput, take: number, takeCount: number, apiKey: string, endpoint: ChatTarget): Promise<string> {
   const style = input.writeStyle ?? 'pas'
   const format = input.writeFormat ?? 'script'
   const length = input.writeLength ?? 15
@@ -652,7 +657,7 @@ function spokenProductName(input: GenerateScriptInput): string | undefined {
   return input.productContext?.productName?.trim() || input.productName?.trim()
 }
 
-async function runRemix(input: GenerateScriptInput, angle: RemixAngle, apiKey: string, endpoint: string): Promise<string> {
+async function runRemix(input: GenerateScriptInput, angle: RemixAngle, apiKey: string, endpoint: ChatTarget): Promise<string> {
   let prompt = ''
 
   if (input.winningTranscript) {
@@ -695,7 +700,7 @@ async function runRemix(input: GenerateScriptInput, angle: RemixAngle, apiKey: s
   return nameSpokenTokens(text, spokenProductName(input))
 }
 
-async function runReverseEngineer(input: GenerateScriptInput, apiKey: string, endpoint: string): Promise<string> {
+async function runReverseEngineer(input: GenerateScriptInput, apiKey: string, endpoint: ChatTarget): Promise<string> {
   let prompt = `Original reverse-engineered ad blueprint:\n\n${input.reversePrompt.trim()}\n\n`
 
   const ctxLines = productContextLines(input.productContext)
@@ -730,7 +735,7 @@ function requestedCount(input: GenerateScriptInput): number {
 
 export async function generateScript(input: GenerateScriptInput): Promise<GeneratedScript> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath(CHAT_MODEL_ID)
+  const endpoint = scriptModel()
 
   if (input.mode === 'reverse-engineer') {
     const text = await runReverseEngineer(input, apiKey, endpoint)
@@ -773,19 +778,11 @@ function keepFulfilled(settled: PromiseSettledResult<string>[]): string[] {
   throw first?.reason ?? new Error('Script generation returned nothing.')
 }
 
-// ONE spoken script from a brief + style + length — the strongest take, not a
-// batch. B-Roll calls this when the member has no script yet: it writes one,
-// drops it in the script box, and storyboards it in the same click. Everything
-// (the human-voice rules, the hook library, the style instruction, the length
-// budget) is the same pipeline Scripts' Write New runs, so a script written in
-// B-Roll is the same script Scripts would have written.
-export async function writeOneScript(input: GenerateScriptInput): Promise<string> {
-  const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath(CHAT_MODEL_ID)
-  // Take 0 is the strongest angle in the list (see WRITE_TAKES). Batch size 1 —
-  // there are no siblings to steer away from.
-  return runWrite({ ...input, mode: 'write', writeFormat: 'script' }, 0, 1, apiKey, endpoint)
-}
+// (`writeOneScript` — ONE spoken script, the strongest take rather than a batch
+// — lived here for B-Roll's auto-script. Both are gone as of July 2026: writing
+// a script is Scripts' job, and a one-take copy of it running in another app
+// was a second thing to keep in step. See git history if it's ever wanted back;
+// it was four lines around runWrite(input, 0, 1, …).)
 
 // ── Brief enhancement ──
 // Rewrites the creator's rough "Describe Your Video" brief into a sharper
@@ -795,7 +792,7 @@ const ENHANCE_BRIEF_SYSTEM = `You are a senior UGC ad strategist. You rewrite a 
 
 export async function enhanceBrief(draft: string): Promise<string> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = getChatEndpointPath(CHAT_MODEL_ID)
+  const endpoint = scriptModel()
 
   const userMessage = `Rewrite the rough video brief below into a sharper brief for writing a short-form UGC ad script. Keep the creator's intent and angle; make the target audience, tone, key talking points and call-to-action concrete.
 

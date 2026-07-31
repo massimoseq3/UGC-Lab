@@ -569,7 +569,7 @@ export default function VariationCard(props: VariationCardProps) {
         // renders from the prompt alone — a text-to-video that silently
         // ignores the frame the user picked to animate.
         useAppStore.getState().addToast(
-          `${model.displayName} can't animate a still — pick Veo 3.1 Fast or Seedance 2.0 in the model picker.`,
+          `${model.displayName} can't animate a still — pick Seedance 2.0 or Gemini Omni in the model picker.`,
           'error',
         )
         return

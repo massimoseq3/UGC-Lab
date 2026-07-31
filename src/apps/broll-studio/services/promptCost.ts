@@ -9,7 +9,8 @@
 // video generations that follow are where the credits actually go).
 
 import type { BrollDelivery, BrollMode } from '../types'
-import { estimateCredits, getDefaultModel } from '../../../utils/models'
+import { estimateCredits } from '../../../utils/models'
+import { resolveScriptModel } from '../../../stores/settingsStore'
 import { variationsForDelivery } from './generateBroll'
 import { CONCEPTS_PER_FRAME } from './generateContinuous'
 
@@ -41,7 +42,10 @@ function sentenceCount(scriptText: string): number {
 }
 
 // Estimated credits for the prompt-writing call(s) behind a mode's Generate
-// button. Null when the chat model has no pricing entry (never in practice).
+// button. Null when the picked chat model has no verified per-token rate —
+// which is the case for every model past the Gemini pair, so the pill simply
+// disappears rather than quoting a number we'd be making up. See the "NO CREDIT
+// FIGURES" note in the registry.
 export function estimatePromptCredits(
   mode: BrollMode,
   scriptText: string,
@@ -51,8 +55,7 @@ export function estimatePromptCredits(
   // future change to the shape would land.
   delivery: BrollDelivery = 'silent',
 ): number | null {
-  const chatModelId = getDefaultModel('broll-studio', 'chat')?.id
-  if (!chatModelId) return null
+  const chatModelId = resolveScriptModel('broll-studio')
   const scriptTokens = Math.ceil(scriptText.length / CHARS_PER_TOKEN)
   const scenes = sentenceCount(scriptText)
   const dialogueOverride = mode === 'line' && delivery === 'dialogue' ? DIALOGUE_ADDENDUM_TOKENS : 0

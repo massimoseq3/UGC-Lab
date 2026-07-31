@@ -3,7 +3,7 @@ import type { VoiceSettings } from '../types'
 import { DEFAULT_VOICE_SETTINGS, getVoiceById, VOICE_STYLES, VOICE_PACES, VOICE_ACCENTS } from '../types'
 import { seedColor } from './seedColor'
 import Slider from './Slider'
-import Dropdown from './Dropdown'
+import Dropdown from '../../../components/Dropdown'
 
 // One size for every setting subheading (Voice / Style / Pace / Accent /
 // Expressiveness / Tone / Scene). 13px — a step down from the 14px they were,

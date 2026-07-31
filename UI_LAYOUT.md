@@ -316,13 +316,19 @@ merged into one Remix mode — the source box auto-detects the pasted format).
      Authority · Day in the Life · Pattern Interrupt; the X on a chosen family
      resets to Best Mix).
   4. **Describe Your Ad** textarea (the brief; optional).
-  5. **Length** toggle — 10s / 15s / 20s / 30s / 60s (hidden entirely for Hooks
-     — they're one-liners). No "Default" here: a script written from scratch has
-     no source length to inherit.
+  5. Length lives in the pinned footer now, not here — see below.
 
-**Generate button** (pinned bottom): label varies — "Generate 3 Scripts" /
-"Generate 10 Hooks" / "Generate 3 Scene Drafts" / "Generate 3 Script Variations"
-/ "Rewrite Scene Prompts".
+**Pinned footer**, top→bottom: a **Variations / Length** dropdown pair sharing
+one row, both opening **upward** (each hides on its own — Hooks shows neither;
+the blueprint rewrite shows neither; Remix's Length leads with "Default", and
+Write New's runs 10s/15s/20s/30s/60s/90s) → the **Script Model** row, one line:
+provider logo + model name + cost `$` glyphs + chevron (opens
+a 460px right-edge panel with search, a provider rail — All, then providers
+alphabetically — and models grouped by provider, each with intelligence stars,
+cost glyphs, a one-line blurb, the per-1M-token rate and a "% off" pill) →
+the **Generate button**: label varies — "Generate 3 Scripts" / "Generate 10
+Hooks" / "Generate 3 Scene Drafts" / "Generate 3 Script Variations" /
+"Rewrite Scene Prompts".
 
 ### Right output (`components/OutputPanel.tsx`)
 
@@ -452,15 +458,16 @@ column has → a **BRIEF** box (labelled **INSTRUCTIONS** once a script exists),
 tagged OPTIONAL, which is a plain textarea you type straight into.
 
 The pinned settings band below opens with the **B-Roll Clips / With Dialogue**
-delivery toggle (Line-by-Line only), then the two decisions that shape the
-output as plain rows, the same size as the reference cards above: **Visual
-Style** → **Ad Format** over a **10s / 15s / 20s / 30s / 60s** length toggle
-that appears only while the script box is empty → **Generate B-Roll / Dialogue
-/ Storyboard Prompts** button. Both rows are dashed until picked; there are no Required tags,
-because the button greys out until both are chosen. The Ad Format slide-over
-pins a **Standard UGC** card above the Formats and Structures sections. The one
-line under the button, "Writes a 30s script first, then storyboards it", shows
-only while the script box is empty.
+delivery toggle (Line-by-Line only), then two plain rows the same size as the
+reference cards above: **Visual Style** → **Prompt Model** (provider logo +
+model name + "The prompt writer" + cost `$` glyphs; opens the same picker
+Scripts uses) → **Generate B-Roll / Dialogue / Storyboard Prompts** button.
+Visual Style is dashed until picked; there are no Required tags, because the
+button greys out until the script box and the style are both filled. Nothing
+renders under the button. Two controls that used to sit here are gone: the
+**Ad Format** row (Formats + Structures + a Standard UGC card) and, before it,
+the script-length toggle — B-Roll neither writes scripts nor picks a format any
+more.
 
 ### Right scenes (`components/RightPanel.tsx` → `ScenesView.tsx`)
 

@@ -1,5 +1,5 @@
 import type { BrollInput, BrollResult, Scene, PromptVariation, ReferenceImage, VariationTag, VariationRefs, LinePosition, BrollDelivery } from '../types'
-import { useSettingsStore } from '../../../stores/settingsStore'
+import { useSettingsStore, resolveScriptModel } from '../../../stores/settingsStore'
 import {
   kieChatCompletions,
   ensureHostedUrl,
@@ -7,7 +7,7 @@ import {
   LONG_CHAT_TIMEOUT_MS,
   type ChatMessage,
 } from '../../../utils/kie'
-import { getDefaultModel, getChatEndpointPath, buildImageInput, getModel, type AspectRatio, type ImageResolution } from '../../../utils/models'
+import { getDefaultModel, getChatTarget, buildImageInput, getModel, type ChatTarget, type AspectRatio, type ImageResolution } from '../../../utils/models'
 import { isAssetRef, getAsBase64 } from '../../../utils/assetStore'
 import { finishImageAssetTask } from '../../../utils/imageTask'
 import { useBankStore } from '../../../stores/bankStore'
@@ -16,10 +16,13 @@ import { countProductAngles, parsePhotoPick, productPhotoDataUris, productPhotoI
 import { extractBlock, extractNumberedBlock } from './xmlBlocks'
 import { styleBriefFor, styleUsesRealism } from './generateContinuous'
 
-function getChatEndpoint(): { apiKey: string; endpoint: string } {
+// The single choke point for every chat call B-Roll makes — the storyboard,
+// per-card Regenerate, per-card Enhance. All three run on the model the member
+// picked in the left panel, which falls back to the app-wide default.
+function getChatEndpoint(): { apiKey: string; endpoint: ChatTarget } {
   return {
     apiKey: useSettingsStore.getState().getKieApiKey(),
-    endpoint: getChatEndpointPath(),
+    endpoint: getChatTarget(resolveScriptModel('broll-studio')),
   }
 }
 

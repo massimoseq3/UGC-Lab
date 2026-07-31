@@ -86,8 +86,8 @@ export type WriteFormat = 'script' | 'hooks' | 'scenes'
 export const isWriteFormat = (value: unknown): value is WriteFormat =>
   value === 'script' || value === 'hooks' || value === 'scenes'
 
-export type WriteLength = 10 | 15 | 20 | 30 | 60
-export const WRITE_LENGTHS: WriteLength[] = [10, 15, 20, 30, 60]
+export type WriteLength = 10 | 15 | 20 | 30 | 60 | 90
+export const WRITE_LENGTHS: WriteLength[] = [10, 15, 20, 30, 60, 90]
 
 // Guards persisted / history-restored lengths. The list has grown once (20s was
 // added after launch), so callers coerce a miss back to the default instead of
@@ -237,9 +237,7 @@ export interface EditableProductContext {
 }
 
 // A product bank row as the script writer sees it. Lives here rather than in
-// the input panel because B-Roll writes scripts too now (see writeOneScript) and
-// both have to show the model the same fields — a product that reads one way in
-// Scripts and another in B-Roll is the same bug twice.
+// the input panel so the shape is the service's, not one screen's.
 export function createEditableContext(product: Product): EditableProductContext {
   return {
     productName: product.productName,

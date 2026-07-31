@@ -3,7 +3,7 @@ import { saveProfile } from '../lib/cloudSync'
 import { isCloudEnabled } from '../lib/supabase'
 import { useAuthStore } from './authStore'
 import { useAppStore } from './appStore'
-import { getModel } from '../utils/models'
+import { getModel, getDefaultModel, CHAT_MODEL_DEFAULT } from '../utils/models'
 
 const STORAGE_KEY = 'ai-ugc-lab-settings'
 
@@ -48,6 +48,33 @@ const MIGRATIONS_KEY = 'ai-ugc-lab-settings-migrations'
 // One-shot migrations applied to perAppModel. Each runs once per browser, then
 // its name is recorded under MIGRATIONS_KEY so it never runs again.
 const MODEL_MIGRATIONS: Array<{ name: string; apply: (m: Record<string, string>) => void }> = [
+  {
+    // Veo 3.1 Fast / Lite / Quality removed from the registry. getAppModel
+    // already drops an id that no longer resolves, so this is belt-and-braces
+    // for the picks — but Playground ALSO snapshots modelId inside its draft
+    // `state` blob, which nothing validates against the registry, so a stale
+    // 'veo3_fast' there would reach buildVideoInput. Repair both.
+    name: '2026-07-remove-veo',
+    apply: (m) => {
+      const GONE = ['veo3', 'veo3_fast', 'veo3_lite']
+      for (const k of Object.keys(m)) {
+        if (GONE.includes(m[k])) delete m[k]
+      }
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (!key || !key.endsWith(':playground:state')) continue
+          const raw = localStorage.getItem(key)
+          if (!raw) continue
+          const parsed = JSON.parse(raw)
+          if (parsed && GONE.includes(parsed.modelId)) {
+            parsed.modelId = 'grok-imagine-video-1-5-preview'
+            localStorage.setItem(key, JSON.stringify(parsed))
+          }
+        }
+      } catch { /* ignore */ }
+    },
+  },
   {
     // Earlier builds let users persist Nano Banana 2 as the Characters image
     // model. GPT Image 2 is the registered default for character-studio; clear
@@ -248,3 +275,23 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     return id && getModel(id) ? id : undefined
   },
 }))
+
+// The two apps that let a member choose who writes their words. The slot key
+// matches what ModelSidePanel derives from `${appId}:${task}`, so the panel and
+// the services agree without either knowing about the other.
+export type ScriptModelApp = 'script-architect' | 'broll-studio'
+
+export function scriptModelSlot(appId: ScriptModelApp): string {
+  return `${appId}:chat`
+}
+
+// Which chat model writes this app's scripts and prompts. Falls back to the
+// registry default (Gemini 3 Flash), so a member who never opens the picker
+// pays exactly what they paid before it existed.
+export function resolveScriptModel(appId: ScriptModelApp): string {
+  return (
+    useSettingsStore.getState().getAppModel(scriptModelSlot(appId)) ??
+    getDefaultModel(appId, 'chat')?.id ??
+    CHAT_MODEL_DEFAULT
+  )
+}
