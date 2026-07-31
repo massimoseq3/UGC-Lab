@@ -351,12 +351,14 @@ export default function InputPanel({
           </BankCard>
 
           {/* Script — optional, and labelled as such. Bring your own words from
-              the bank or a paste; leave it empty and the Ad Format below
-              writes them. It splits the column's leftover height evenly with
-              the Instructions box below (both `flex-1 basis-0`), so the two
-              writing surfaces read as a matched pair rather than one big box
-              over a strip. */}
-          <div className={`flex min-h-0 flex-1 basis-0 flex-col overflow-hidden rounded-3xl border transition-colors ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
+              the bank or a paste. It and the Instructions box below share the
+              column's leftover height (`flex-1`, no `basis-0`): each one's base
+              size is its own content, so a pasted script grows its box while an
+              empty brief stays a strip, and whatever is still spare is split
+              between them. With basis-0 they were always an even split whatever
+              was in them — a matched pair on an empty panel, and a script fighting
+              for room the moment one was pasted in. */}
+          <div className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border transition-colors ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
             <BankCard
               icon={FileText}
               label="Script / Hooks"
@@ -393,7 +395,7 @@ export default function InputPanel({
               still one tap away on the expand button for anything longer.
               Doubles as the creative brief when there's no script yet — the
               product row carries the rest, so blank stays a normal answer. */}
-          <div className="relative flex min-h-0 flex-1 basis-0 flex-col overflow-hidden rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-ink/20">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-ink/20">
             <div className="flex items-center justify-between gap-2 px-4 pt-2.5">
               <div className="flex min-w-0 items-center gap-1.5">
                 <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
@@ -420,34 +422,13 @@ export default function InputPanel({
         </div>
       </div>
 
-      {/* Render-settings + Generate band — the clip type and visual style are
-          the controls that shape the output, so they dock together in one
-          tinted panel directly above the Generate button (the Characters tab
-          groups its model + chips + button the same way). Sticky on mobile,
-          static rounded-top card on desktop. */}
-      <div className="sticky bottom-0 z-30 border-t border-ink/5 bg-surface-0 px-5 py-2.5 md:static md:z-auto md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
+      {/* Render-settings + Generate band. It used to be a tinted, bordered card
+          docked at the bottom of the column; the border drew a panel inside the
+          panel, so it's gone and the rows sit straight on the column. Sticky on
+          mobile (where it floats over scrolling content, hence the opaque fill
+          — see the note under bg-surface-0), plain and static on desktop. */}
+      <div className="sticky bottom-0 z-30 bg-surface-0 px-5 py-2.5 md:static md:z-auto md:bg-transparent">
         <div className="mb-2 flex flex-col gap-2">
-
-          {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
-              card silent, for a voiceover laid over in the edit; "With
-              Dialogue" makes all three the character speaking that line,
-              staged three different ways. It sits ABOVE the Visual Style / Ad
-              Format pair rather than between them: those two are one decision
-              about what the ad IS, and splitting them reads as three unrelated
-              rows. Continuous has no deliveries — it's narration over
-              footage — so the toggle isn't rendered there at all. */}
-          {isLineMode(mode) && (
-            <SegmentedToggle<BrollDelivery>
-              className="h-11 !p-1"
-              value={lineDelivery}
-              onChange={onLineDeliveryChange}
-              accent="broll"
-              options={[
-                { value: 'silent', label: 'B-Roll Clips' },
-                { value: 'dialogue', label: 'With Dialogue' },
-              ]}
-            />
-          )}
 
           {/* The two decisions that shape the output, docked together above
               Generate — and the two things Generate is gated on. The
@@ -471,33 +452,33 @@ export default function InputPanel({
             tabIndex={0}
             onClick={onOpenStyle}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenStyle() } }}
-            className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
+            title={styleChosen ? styleHint : 'How every clip looks'}
+            className={`group flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-full border px-3 text-left transition-colors ${
               styleChosen
                 ? 'border-broll-500/25 bg-broll-500/[0.07] hover:border-broll-500/35 hover:bg-broll-500/10'
                 : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-broll-500/30 hover:bg-broll-500/5'
             }`}
           >
-            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${styleIsCustom ? 'bg-broll-500/20 text-broll-300' : 'bg-broll-500/10 text-broll-400 light:text-broll-600'}`}>
-              {styleIsCustom ? <Sparkles className="h-5 w-5" strokeWidth={1.75} /> : <Palette className="h-5 w-5" strokeWidth={1.5} />}
+            <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${styleIsCustom ? 'bg-broll-500/20 text-broll-300' : 'bg-broll-500/10 text-broll-400 light:text-broll-600'}`}>
+              {styleIsCustom ? <Sparkles className="h-4 w-4" strokeWidth={1.75} /> : <Palette className="h-4 w-4" strokeWidth={1.5} />}
             </div>
-            <div className="min-w-0 flex-1">
+            {/* One line, at the delivery toggle's height — the band's three
+                controls are a matched set, and the second line was a hint the
+                picker gives better (unpicked) or a truncated brief every card's
+                StyleNote already carries (picked). It survives as the row's
+                tooltip. */}
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
               {styleChosen ? (
                 <>
-                  <div className="flex items-center gap-1.5">
-                    <span className="truncate text-[13px] font-medium tracking-tight text-broll-200 light:text-broll-700">{styleLabel}</span>
-                    {styleIsCustom && (
-                      <span className="shrink-0 rounded-full bg-broll-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-broll-300 light:text-broll-700">
-                        Custom
-                      </span>
-                    )}
-                  </div>
-                  <div className="truncate text-[11px] leading-snug text-ink-500">{styleHint}</div>
+                  <span className="truncate text-[13px] font-medium tracking-tight text-broll-200 light:text-broll-700">{styleLabel}</span>
+                  {styleIsCustom && (
+                    <span className="shrink-0 rounded-full bg-broll-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-broll-300 light:text-broll-700">
+                      Custom
+                    </span>
+                  )}
                 </>
               ) : (
-                <>
-                  <div className="text-[13px] font-medium text-ink-300">Visual Style</div>
-                  <div className="text-[11px] text-ink-600">How every clip looks</div>
-                </>
+                <span className="truncate text-[13px] font-medium text-ink-300">Visual Style</span>
               )}
             </div>
             {styleChosen ? (
@@ -531,12 +512,34 @@ export default function InputPanel({
               restoring the row is re-adding the picker, not rebuilding the
               plumbing. See git history. */}
 
-          {/* Who writes the shot prompts. Third in the band because it's the
-              least often changed of the three: the look and the format are
-              creative decisions made per ad, the model is a standing one about
-              intelligence vs. spend. className="" because the band spaces its
-              rows with a flex gap, not margins. */}
-          <ScriptModelRow appId="broll-studio" className="" />
+          {/* Who writes the shot prompts. Second in the band because it's the
+              less often changed of the two: the look is a creative decision made
+              per ad, the model is a standing one about intelligence vs. spend.
+              className="" because the band spaces its rows with a flex gap, not
+              margins; `compact` so it matches the Visual Style row above it and
+              the delivery toggle below. */}
+          <ScriptModelRow appId="broll-studio" className="" compact />
+
+          {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
+              card silent, for a voiceover laid over in the edit; "With
+              Dialogue" makes all three the character speaking that line, staged
+              three different ways. It sits LAST, directly above Generate: it's
+              the switch you'd flip on your way to firing, and it changes what
+              comes back more than either row above it. Continuous has no
+              deliveries — it's narration over footage — so the toggle isn't
+              rendered there at all. */}
+          {isLineMode(mode) && (
+            <SegmentedToggle<BrollDelivery>
+              className="h-11 !p-1"
+              value={lineDelivery}
+              onChange={onLineDeliveryChange}
+              accent="broll"
+              options={[
+                { value: 'silent', label: 'B-Roll Clips' },
+                { value: 'dialogue', label: 'With Dialogue' },
+              ]}
+            />
+          )}
 
         </div>
 

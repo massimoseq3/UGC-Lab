@@ -20,9 +20,6 @@ import {
   Trash2,
   Copy,
   ArrowDown,
-  Sparkles,
-  Undo2,
-  Redo2,
   ChevronRight,
   Star,
 } from 'lucide-react'
@@ -33,7 +30,8 @@ import ModelSidePanel from '../../../components/ModelSidePanel'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
-import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
+import ExpandTextModal from '../../../components/ExpandableText'
+import PromptToolbar from '../../../components/PromptToolbar'
 import { ReferenceSlotCard, ExtraRefsRow, ProductPhotoRow, PendingMediaTile, ModalVideoPlayer, StyleNote } from './cardDetailParts'
 import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import type { ContinuousFrameCardState, ContinuousClipCardState, GeneratedVideo, ReferenceImage } from '../types'
@@ -273,7 +271,7 @@ export function ContinuousFrameModal({
         {/* LEFT — model + refs + prompt over a pinned Generate footer */}
         <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 md:border-b-0 md:border-r">
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-            <div className="flex grow flex-col gap-3 px-5 pb-6 pt-3">
+            <div className="flex grow flex-col gap-3 px-5 pb-1 pt-3">
               {/* Output-type tab — Image builds the keyframe; Animate image-to-
                   video's the chosen still on its own (a standalone clip, not
                   chained into the keyframe sequence). */}
@@ -362,49 +360,20 @@ export function ContinuousFrameModal({
                     placeholder="Describe this keyframe as one paragraph — what's in frame, the light, the framing…"
                     className="relative min-h-[200px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                   />
-                  <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <button
-                        type="button"
-                        title="Enhance — same staging, richer detail"
-                        onClick={() => void runPromptTool(onEnhancePrompt, 'Enhance')}
-                        disabled={promptWorking || !draft.trim()}
-                        className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-broll-500/10 hover:text-broll-300 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {promptWorking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                        Enhance Prompt
-                      </button>
-                      <button
-                        type="button"
-                        title="Regenerate — a fresh staging for this keyframe"
-                        onClick={() => void runPromptTool(onRegeneratePrompt, 'Regenerate')}
-                        disabled={promptWorking}
-                        className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <RefreshCw className="h-3 w-3" />
-                        Regenerate Prompt
-                      </button>
-                      <button
-                        type="button"
-                        title="Undo"
-                        onClick={handleUndo}
-                        disabled={!canUndo || promptWorking}
-                        className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        <Undo2 className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Redo"
-                        onClick={handleRedo}
-                        disabled={!canRedo || promptWorking}
-                        className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        <Redo2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <ExpandButton onClick={() => setPromptExpanded(true)} />
-                  </div>
+                  <PromptToolbar
+                    accent="broll"
+                    onEnhance={() => void runPromptTool(onEnhancePrompt, 'Enhance')}
+                    enhanceTitle="Enhance — same staging, richer detail"
+                    enhanceDisabled={!draft.trim()}
+                    busy={promptWorking}
+                    onRegenerate={() => void runPromptTool(onRegeneratePrompt, 'Regenerate')}
+                    regenerateTitle="Regenerate — a fresh staging for this keyframe"
+                    onUndo={handleUndo}
+                    canUndo={canUndo}
+                    onRedo={handleRedo}
+                    canRedo={canRedo}
+                    onExpand={() => setPromptExpanded(true)}
+                  />
                 </div>
               </div>
               </>)}
@@ -455,7 +424,7 @@ export function ContinuousFrameModal({
 
           {/* Pinned footer — output settings + Generate, matching the
               Line-by-Line card modal. */}
-          <div className="shrink-0 border-t border-ink/5 px-5 py-4">
+          <div className="shrink-0 px-5 pb-4 pt-2">
             {frameTab === 'image' ? (
               <>
                 {/* Image model — the same app-wide picker the Line-by-Line card
@@ -947,7 +916,7 @@ export function ContinuousClipModal({
         {/* LEFT — model + endpoints + motion prompt over a pinned Generate footer */}
         <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 md:border-b-0 md:border-r">
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-            <div className="flex grow flex-col gap-3 px-5 pb-6 pt-3">
+            <div className="flex grow flex-col gap-3 px-5 pb-1 pt-3">
               {/* Output-type tab — Continuous clips are videos (frames-to-video
                   between two keyframes). Styled as the Line-by-Line toggle,
                   single option; the h-12 wrapper aligns the separator with the
@@ -990,61 +959,37 @@ export function ContinuousClipModal({
                     placeholder="Describe the animation — what moves, how the camera moves, how it comes to rest, and one sound…"
                     className="relative min-h-[160px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                   />
-                  <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <button
-                        type="button"
-                        title="Enhance — same motion, richer detail"
-                        onClick={() => void runPromptTool(onEnhanceMotion, 'Enhance')}
-                        disabled={promptWorking || !draft.trim()}
-                        className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-broll-500/10 hover:text-broll-300 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {promptWorking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                        Enhance
-                      </button>
-                      <button
-                        type="button"
-                        title={
-                          !startImageRef
-                            ? 'Pick a start keyframe first'
-                            : framesReady
-                              ? 'Rewrite the motion by reading both chosen keyframes'
-                              : 'Rewrite the motion from the chosen start keyframe (pick an end keyframe to read both)'
-                        }
-                        onClick={() => void runPromptTool(onRegenerateMotion, 'Regenerate')}
-                        disabled={promptWorking || !startImageRef}
-                        className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <RefreshCw className="h-3 w-3" />
-                        {framesReady ? 'Regenerate from frames' : 'Regenerate from frame'}
-                      </button>
-                      <button
-                        type="button"
-                        title="Undo"
-                        onClick={handleUndo}
-                        disabled={!canUndo || promptWorking}
-                        className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        <Undo2 className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Redo"
-                        onClick={handleRedo}
-                        disabled={!canRedo || promptWorking}
-                        className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        <Redo2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <ExpandButton onClick={() => setPromptExpanded(true)} />
-                  </div>
+                  <PromptToolbar
+                    accent="broll"
+                    onEnhance={() => void runPromptTool(onEnhanceMotion, 'Enhance')}
+                    enhanceTitle="Enhance — same motion, richer detail"
+                    enhanceDisabled={!draft.trim()}
+                    busy={promptWorking}
+                    onRegenerate={() => void runPromptTool(onRegenerateMotion, 'Regenerate')}
+                    // The one place the label carries more than the verb: this
+                    // Regenerate re-reads the rendered keyframes, and how many it
+                    // can see changes what comes back.
+                    regenerateLabel={framesReady ? 'From frames' : 'From frame'}
+                    regenerateTitle={
+                      !startImageRef
+                        ? 'Pick a start keyframe first'
+                        : framesReady
+                          ? 'Rewrite the motion by reading both chosen keyframes'
+                          : 'Rewrite the motion from the chosen start keyframe (pick an end keyframe to read both)'
+                    }
+                    regenerateDisabled={!startImageRef}
+                    onUndo={handleUndo}
+                    canUndo={canUndo}
+                    onRedo={handleRedo}
+                    canRedo={canRedo}
+                    onExpand={() => setPromptExpanded(true)}
+                  />
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-ink/5 px-5 py-4">
+          <div className="shrink-0 px-5 pb-4 pt-2">
             {/* Video model — sits directly above the output pills it configures
                 (frames-to-video capable models only). */}
             <button

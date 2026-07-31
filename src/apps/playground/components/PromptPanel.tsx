@@ -7,11 +7,6 @@ import {
   ChevronRight,
   Volume2,
   VolumeX,
-  Sparkles,
-  Eraser,
-  Undo2,
-  Redo2,
-  Loader2,
   Coins,
   Star,
 } from 'lucide-react'
@@ -48,7 +43,8 @@ import type { BankType } from '../../../utils/constants'
 import type { BRoll } from '../../../stores/types'
 import PresetCard from './PresetCard'
 import SlideOver from '../../../components/SlideOver'
-import ExpandTextModal, { BracketHighlightArea, ExpandButton } from '../../../components/ExpandableText'
+import ExpandTextModal, { BracketHighlightArea } from '../../../components/ExpandableText'
+import PromptToolbar from '../../../components/PromptToolbar'
 import MentionPopover from './MentionPopover'
 import type { PlaygroundMode, BankReference } from '../types'
 import { VIDEO_PRESETS, IMAGE_PRESETS, type Preset } from '../presets'
@@ -616,7 +612,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
       {/* Middle: scrollable body — model picker, preset, refs, prompt. */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <div className="flex h-full flex-col overflow-y-auto">
-          <div className="flex grow flex-col gap-3 px-5 pb-4 pt-3">
+          <div className="flex grow flex-col gap-3 px-5 pb-1 pt-3">
             {/* Model picker now lives in the footer, above the output-settings
                 pills (see below) — the scrollable body opens straight into the
                 reference inputs. */}
@@ -707,9 +703,11 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               </>
             )}
 
-            {/* Prompt — grows to absorb leftover panel height so the textarea
-                fills the page without making the panel itself scroll; once at
-                max size, overflow scrolls inside the textarea. */}
+            {/* Prompt — grows with its own content, with the column's leftover
+                height as its FLOOR (grow, not grow basis-0): a short prompt fills
+                the gap that would otherwise sit between the box and the pinned
+                footer, and a long one pushes past it rather than scrolling
+                inside a fixed frame. */}
             <div className="relative flex grow flex-col">
               {/* Prompt field — a normal, visible textarea on top of a
                   transparent backdrop that only paints the [bracket] highlights.
@@ -744,15 +742,18 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                       <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
                     </button>
                   )}
-                  {/* basis-0 so the field's own content can't inflate the panel
-                      — its height is the free space the column hands it, and
-                      anything longer scrolls inside. */}
+                  {/* No basis-0: the field's base size is its own content, and
+                      `grow` only tops it up to the free space. With basis-0 the
+                      base was zero, so the box was always exactly the leftover
+                      height and long prompts scrolled inside a frame that never
+                      moved. It still ends up the scroll port when the text
+                      outruns the column, which is what keeps revealCaret honest. */}
                   <BracketHighlightArea
                     value={state.prompt}
                     onChange={handlePromptChange}
                     textareaRef={textareaRef}
                     onBlur={() => { commitPromptDraft(); setTimeout(() => setMentionOpen(false), 150) }}
-                    className="min-h-[120px] grow basis-0"
+                    className="min-h-[120px] grow"
                     padClass="px-3.5 pb-3 pt-3"
                     textClass="text-[13px] leading-[1.5]"
                     textareaClass="text-ink-200 placeholder-ink-600"
@@ -766,51 +767,20 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                         : 'Describe the music — genre, mood, instruments…'
                     }
                   />
-                  {/* Footer toolbar — its own section under a hairline. Enhance +
-                      Undo/Redo bottom-left; Expand bottom-right. */}
-                  <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        title="Enhance prompt"
-                        onClick={handleEnhancePrompt}
-                        disabled={isEnhancing || !state.prompt.trim()}
-                        className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-playground-500/10 hover:text-playground-300 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {isEnhancing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                        Enhance Prompt
-                      </button>
-                      <button
-                        type="button"
-                        title="Clear prompt"
-                        onClick={handlePromptClear}
-                        disabled={isEnhancing || !state.prompt.trim()}
-                        className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        <Eraser className="h-3 w-3" />
-                        Clear Prompt
-                      </button>
-                      <button
-                        type="button"
-                        title="Undo"
-                        onClick={handlePromptUndo}
-                        disabled={!canUndo || isEnhancing}
-                        className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        <Undo2 className="h-3 w-3" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Redo"
-                        onClick={handlePromptRedo}
-                        disabled={!canRedo || isEnhancing}
-                        className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        <Redo2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                    <ExpandButton onClick={() => setPromptExpanded(true)} />
-                  </div>
+                  <PromptToolbar
+                    accent="playground"
+                    onEnhance={handleEnhancePrompt}
+                    enhanceTitle="Enhance prompt"
+                    enhanceDisabled={!state.prompt.trim()}
+                    busy={isEnhancing}
+                    onClear={handlePromptClear}
+                    clearDisabled={!state.prompt.trim()}
+                    onUndo={handlePromptUndo}
+                    canUndo={canUndo}
+                    onRedo={handlePromptRedo}
+                    canRedo={canRedo}
+                    onExpand={() => setPromptExpanded(true)}
+                  />
                 </div>
                 {mentionOpen && state.mode !== 'music' && !isMotionControl && (
                   <div className="absolute bottom-full left-0 z-50 mb-2 w-[300px] max-w-full">
@@ -874,7 +844,9 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
       {/* Bottom: pinned footer — model picker + output settings + big Generate
           button. The model picker sits directly above the output-settings pills
           it configures. */}
-      <div className="shrink-0 border-t border-ink/5 px-5 py-4">
+      {/* No hairline above this: the prompt box now ends where its text ends, so
+          the gap between it and the model row already reads as the seam. */}
+      <div className="shrink-0 px-5 pb-4 pt-2">
         {/* Model — video mode uses the slide-in side panel (matching B-Roll);
             image / music keep the inline dropdown (which auto-opens upward here). */}
         <div className="mb-3">

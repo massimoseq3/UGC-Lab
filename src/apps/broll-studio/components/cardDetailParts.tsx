@@ -18,7 +18,6 @@ import type { BRoll, AnyBankItem } from '../../../stores/types'
 import { useAssetUrlState, useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { getUrl } from '../../../utils/assetStore'
-import { getModel } from '../../../utils/models'
 import { startOfDay, sectionLabel } from '../../../utils/history'
 import { sendClipToPlayground } from '../services/sendClipToPlayground'
 import { downloadImage } from '../../../utils/downloadImage'
@@ -99,8 +98,8 @@ export interface ModalGalleryProps {
 }
 
 type ModalEntry =
-  | { kind: 'image'; idx: number; createdAt: number; imageUrl: string; prompt: string; modelId?: string }
-  | { kind: 'video'; idx: number; createdAt: number; videoUrl: string; aspectRatio: string; prompt: string; modelId: string }
+  | { kind: 'image'; idx: number; createdAt: number; imageUrl: string; prompt: string }
+  | { kind: 'video'; idx: number; createdAt: number; videoUrl: string; aspectRatio: string; prompt: string }
   | { kind: 'in-flight-image'; id: string; createdAt: number; prompt: string; aspectRatio: string; modelId?: string | null; error?: string | null }
   | { kind: 'in-flight-video'; id: string; createdAt: number; prompt: string; mode: 'animating' | 'rendering'; aspectRatio: string; modelId?: string | null; error?: string | null }
 
@@ -153,10 +152,10 @@ export function ModalGallery({
     })
   }
   cardState.images.forEach((img, idx) => {
-    entries.push({ kind: 'image', idx, createdAt: img.createdAt ?? 0, imageUrl: img.imageUrl, prompt: img.prompt, modelId: img.modelId })
+    entries.push({ kind: 'image', idx, createdAt: img.createdAt ?? 0, imageUrl: img.imageUrl, prompt: img.prompt })
   })
   cardState.videos.forEach((v, idx) => {
-    entries.push({ kind: 'video', idx, createdAt: v.createdAt ?? 0, videoUrl: v.url, aspectRatio: v.aspectRatio, prompt: v.prompt, modelId: v.modelId })
+    entries.push({ kind: 'video', idx, createdAt: v.createdAt ?? 0, videoUrl: v.url, aspectRatio: v.aspectRatio, prompt: v.prompt })
   })
   entries.sort((a, b) => b.createdAt - a.createdAt)
 
@@ -238,7 +237,6 @@ export function ModalGallery({
                   <div key={`img-${entry.idx}`} className="mb-2 break-inside-avoid">
                     <ImageTile
                       imageRef={entry.imageUrl}
-                      modelId={entry.modelId}
                       selected={isImageSelected(entry.idx)}
                       saved={savedImageIdxs.has(entry.idx)}
                       saving={savingImageIdxs.has(entry.idx)}
@@ -261,7 +259,6 @@ export function ModalGallery({
                       videoRef={entry.videoUrl}
                       idx={entry.idx}
                       aspectRatio={entry.aspectRatio}
-                      modelId={entry.modelId}
                       prompt={entry.prompt}
                       selected={isVideoSelected(entry.idx)}
                       onClick={() => {
@@ -294,7 +291,6 @@ export function ModalGallery({
 // than the previous h-3 w-3) so they're easier to hit.
 function ImageTile({
   imageRef,
-  modelId,
   selected,
   saved,
   saving,
@@ -305,7 +301,6 @@ function ImageTile({
   onAnimate,
 }: {
   imageRef: string
-  modelId?: string
   selected: boolean
   saved: boolean
   saving: boolean
@@ -316,7 +311,6 @@ function ImageTile({
   onAnimate?: () => void
 }) {
   const { url, status } = useAssetUrlState(imageRef)
-  const modelLabel = modelId ? getModel(modelId)?.displayName ?? modelId : null
   return (
     <div
       onClick={onClick}
@@ -333,10 +327,8 @@ function ImageTile({
           {status === 'loading' ? <Loader2 className="h-5 w-5 animate-spin text-zinc-500" /> : <ImageIcon className="h-6 w-6 text-zinc-700" />}
         </div>
       )}
+      {/* Bottom scrim — the Animate bar sits on it. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
-      {modelLabel && (
-        <p className="pointer-events-none absolute left-2 bottom-1 max-w-[70%] truncate text-[10px] text-zinc-300/90 transition-opacity group-hover:opacity-0">{modelLabel}</p>
-      )}
       {/* Centred, like the tag chip on a scene card — the corners belong to the
           hover actions, and a badge that names the whole tile reads better over
           the middle of it. */}
@@ -392,7 +384,6 @@ function VideoTile({
   videoRef,
   idx,
   aspectRatio,
-  modelId,
   prompt,
   selected,
   onClick,
@@ -404,7 +395,6 @@ function VideoTile({
   // Position in the card's video list — names downloaded files.
   idx: number
   aspectRatio: string
-  modelId: string
   prompt: string
   selected: boolean
   onClick: () => void
@@ -419,7 +409,6 @@ function VideoTile({
   const inline = useInlineVideo()
   const { hovering, unmuted, togglePlay, toggleMute } = inline
   const ratio = aspectStyle(aspectRatio)
-  const modelLabel = getModel(modelId)?.displayName ?? modelId
 
   return (
     <div
@@ -464,17 +453,13 @@ function VideoTile({
         </button>
       )}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
-      {/* Bottom caption column — the Cover badge sits centred ABOVE the model
-          name rather than beside it, which is where the two used to overlap.
-          The top corners are taken by play/mute and the action stack. */}
-      <div className="pointer-events-none absolute inset-x-2 bottom-1 flex flex-col items-center gap-1">
-        {selected && (
-          <span className="rounded-full bg-broll-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
-            Cover
-          </span>
-        )}
-        <p className="max-w-full truncate text-[10px] text-zinc-300/90">{modelLabel}</p>
-      </div>
+      {/* Cover badge, centred on the bottom edge — the top corners are taken by
+          play/mute and the action stack. */}
+      {selected && (
+        <span className="pointer-events-none absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-broll-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
+          Cover
+        </span>
+      )}
       {/* Hover action stack — top-right vertical column, app-wide standard
           order: download · copy · send-to-Playground · delete (video has no
           save-to-bank). Steps aside while the clip plays with sound. */}

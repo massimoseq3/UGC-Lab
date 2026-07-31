@@ -84,12 +84,20 @@
   --color-influencers-500: #F74F9E;
   --color-influencers-600: color-mix(in oklab, #F74F9E 85%, black);
 
-  /* Scripts — navy #24365A (Teenage Engineering "field blue") */
+  /* Scripts — navy #24365A (Teenage Engineering "field blue")
+     500 is the TINT SOURCE: every `bg-scripts-500/10`-style fill and border in
+     the app is this colour at 6–20% opacity. On the dark canvas the brand navy
+     is only a shade off black, so those tints landed invisible — a picked model
+     row in the Script Model picker looked identical to an unpicked one. Dark
+     mode therefore lifts 500 to a legible navy and the light block below pins
+     it back to the brand value, where the surface is white and #24365A is the
+     one that reads. The 100–400 ramp and scripts-text mix from the brand hex
+     either way, so the family's identity doesn't move with it. */
   --color-scripts-100: color-mix(in oklab, #24365A 25%, white);
   --color-scripts-200: color-mix(in oklab, #24365A 40%, white);
   --color-scripts-300: color-mix(in oklab, #24365A 60%, white);
   --color-scripts-400: color-mix(in oklab, #24365A 80%, white);
-  --color-scripts-500: #24365A;
+  --color-scripts-500: #4C6FBF;
   --color-scripts-600: color-mix(in oklab, #24365A 85%, black);
   /* Active accent label/icon (mode + length toggles, chosen Style card, and
      every button label sitting on a scripts tint). A bright periwinkle on
@@ -182,6 +190,8 @@
   --color-scripts-200: color-mix(in oklab, #24365A 50%, black);
   --color-scripts-300: color-mix(in oklab, #24365A 70%, black);
   --color-scripts-400: color-mix(in oklab, #24365A 95%, black);
+  /* Back to the brand navy — see the note in the dark block above. */
+  --color-scripts-500: #24365A;
   --color-scripts-600: color-mix(in oklab, #24365A 85%, black);
   --color-scripts-text: #2C4A78;
 

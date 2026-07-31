@@ -1,7 +1,6 @@
 import { Download, Copy, Music as MusicIcon } from 'lucide-react'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import type { MusicHistoryItem } from '../../../stores/types'
-import { getModel } from '../../../utils/models'
 import { TileDeleteButton } from '../../../components/tileActions'
 
 interface AudioTileProps {
@@ -17,7 +16,6 @@ interface AudioTileProps {
 export default function AudioTile({ item, onDownload, onDelete, onCopyPrompt }: AudioTileProps) {
   const audioUrl = useAssetUrl(item.audioRef)
   const coverUrl = useAssetUrl(item.coverImageRef)
-  const modelLabel = getModel(item.modelId)?.displayName ?? item.modelId
 
   return (
     <div className="overflow-hidden rounded-lg border border-ink/10 bg-ink/[0.02]">
@@ -39,7 +37,7 @@ export default function AudioTile({ item, onDownload, onDelete, onCopyPrompt }: 
 
       <div className="p-2.5">
         <p className="line-clamp-1 text-[11px] font-medium text-ink-200">
-          {item.title || modelLabel}
+          {item.title || 'Untitled track'}
         </p>
         <p className="line-clamp-1 text-[10px] text-ink-500">{item.prompt}</p>
 

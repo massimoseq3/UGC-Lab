@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Loader2, Download, Bookmark, Check, ImagePlus, Wand2, LayoutGrid, Pencil, Upload, FolderOpen, Copy, Maximize2, Coins, Sparkles, Undo2, Redo2, Palette, ChevronRight } from 'lucide-react'
+import { X, Loader2, Download, Bookmark, Check, ImagePlus, Wand2, LayoutGrid, Pencil, Upload, FolderOpen, Copy, Maximize2, Coins, Palette, ChevronRight } from 'lucide-react'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import { useSettingsStore } from '../../../stores/settingsStore'
@@ -23,7 +23,8 @@ import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import BankPicker from '../../../components/BankPicker'
-import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
+import ExpandTextModal from '../../../components/ExpandableText'
+import PromptToolbar from '../../../components/PromptToolbar'
 import { TileActionStack, TileActionButton } from '../../../components/tileActions'
 import {
   buildJsonPrompt,
@@ -536,7 +537,7 @@ export default function InfluencerEditModal({
                 gets generated — an edited portrait or a character sheet — it
                 does not swap the panel, so the references, visual style, and
                 instruction you set up carry across either way. */}
-            <div className="flex grow flex-col gap-3 px-5 pb-6 pt-5">
+            <div className="flex grow flex-col gap-3 px-5 pb-1 pt-5">
                 <>
                   {/* Reference images — Playground-style: picked thumbnails in a
                       four-up strip above a full-width dashed add card (Optional
@@ -667,42 +668,18 @@ export default function InfluencerEditModal({
                         placeholder="Describe the change — e.g. 'change the top to a red hoodie', 'add round glasses', 'softer warm lighting'…"
                         className="relative min-h-[120px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-[1.5] text-ink-200 placeholder-ink-600 outline-none"
                       />
-                      {/* Footer toolbar — Enhance + Undo/Redo bottom-left;
-                          Expand bottom-right, under a hairline (mirrors the
-                          Playground prompt field). */}
-                      <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            title="Enhance prompt"
-                            onClick={handleEnhancePrompt}
-                            disabled={isEnhancing || !prompt.trim()}
-                            className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-influencers-500/10 hover:text-influencers-300 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            {isEnhancing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                            Enhance Prompt
-                          </button>
-                          <button
-                            type="button"
-                            title="Undo"
-                            onClick={handlePromptUndo}
-                            disabled={!canUndoPrompt || isEnhancing}
-                            className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                          >
-                            <Undo2 className="h-3 w-3" />
-                          </button>
-                          <button
-                            type="button"
-                            title="Redo"
-                            onClick={handlePromptRedo}
-                            disabled={!canRedoPrompt || isEnhancing}
-                            className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                          >
-                            <Redo2 className="h-3 w-3" />
-                          </button>
-                        </div>
-                        <ExpandButton onClick={() => setPromptExpanded(true)} />
-                      </div>
+                      <PromptToolbar
+                        accent="influencers"
+                        onEnhance={handleEnhancePrompt}
+                        enhanceTitle="Enhance prompt"
+                        enhanceDisabled={!prompt.trim()}
+                        busy={isEnhancing}
+                        onUndo={handlePromptUndo}
+                        canUndo={canUndoPrompt}
+                        onRedo={handlePromptRedo}
+                        canRedo={canRedoPrompt}
+                        onExpand={() => setPromptExpanded(true)}
+                      />
                     </div>
                   </div>
                 </>
@@ -711,9 +688,10 @@ export default function InfluencerEditModal({
             </div>
 
             {/* Pinned footer — output settings (resolution / aspect) just above
-                the Generate button, separated by a hairline. Matches the
-                Playground panel's sticky footer; chips open upward. */}
-            <div className="shrink-0 border-t border-ink/5 px-5 py-4">
+                the Generate button. No rule above it and barely a gap: the
+                prompt box ends where its controls end, so the footer reads as
+                the same column continuing. Chips open upward. */}
+            <div className="shrink-0 px-5 pb-4 pt-2">
               {/* Edit Character / Character Sheet — what this generation will
                   BE, so it leads the footer's settings stack rather than
                   sitting apart at the top of the panel: pick the output, then

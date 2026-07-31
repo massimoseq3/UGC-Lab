@@ -5,12 +5,7 @@ import {
   ImageIcon,
   Video as VideoIcon,
   Film,
-  RefreshCw,
-  Loader2,
   AlertCircle,
-  Sparkles,
-  Undo2,
-  Redo2,
   Volume2,
   VolumeX,
   User,
@@ -40,7 +35,8 @@ import { humanizeError } from '../../../utils/friendlyError'
 import { resolveImageModelId } from '../services/generateBroll'
 import { productAngleSlots, normalizePhotoSelection } from '../services/productAngles'
 import ModelWaitNotice from '../../../components/ModelWaitNotice'
-import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
+import ExpandTextModal from '../../../components/ExpandableText'
+import PromptToolbar from '../../../components/PromptToolbar'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
 import {
@@ -484,7 +480,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
 
             {/* Scrollable body */}
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-              <div className="flex grow flex-col gap-3 px-5 pb-6 pt-3">
+              <div className="flex grow flex-col gap-3 px-5 pb-1 pt-3">
                 {/* The session's look, read-only at the top of the workspace —
                     same note Continuous' frame and clip modals carry. It's
                     appended at fire time, outside the editable prompt below, so
@@ -612,51 +608,20 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                       placeholder="Write your custom B-roll prompt here..."
                       className="relative min-h-[180px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                     />
-                    {/* Footer toolbar — Enhance + Regenerate + Undo/Redo
-                        bottom-left; Expand bottom-right; under a hairline. */}
-                    <div className="flex items-center justify-between gap-2 border-t border-ink/10 px-2 py-1.5">
-                      <div className="flex flex-wrap items-center gap-1">
-                        <button
-                          type="button"
-                          title="Enhance with framework"
-                          onClick={handleEnhance}
-                          disabled={cardState.isPromptWorking || !draft.trim()}
-                          className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-broll-500/10 hover:text-broll-300 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          {cardState.isPromptWorking ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                          Enhance Prompt
-                        </button>
-                        <button
-                          type="button"
-                          title={`Regenerate prompt — produces a fresh ${tagLabel(variation.tag)} prompt`}
-                          onClick={handleRegeneratePrompt}
-                          disabled={cardState.isPromptWorking}
-                          className="flex items-center gap-1.5 rounded-full px-2 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <RefreshCw className="h-3 w-3" />
-                          Regenerate Prompt
-                        </button>
-                        <button
-                          type="button"
-                          title="Undo"
-                          onClick={handleUndo}
-                          disabled={!canUndo || cardState.isPromptWorking}
-                          className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                        >
-                          <Undo2 className="h-3 w-3" />
-                        </button>
-                        <button
-                          type="button"
-                          title="Redo"
-                          onClick={handleRedo}
-                          disabled={!canRedo || cardState.isPromptWorking}
-                          className="flex h-6 w-6 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-30"
-                        >
-                          <Redo2 className="h-3 w-3" />
-                        </button>
-                      </div>
-                      <ExpandButton onClick={() => setPromptExpanded(true)} />
-                    </div>
+                    <PromptToolbar
+                      accent="broll"
+                      onEnhance={handleEnhance}
+                      enhanceTitle="Enhance with framework"
+                      enhanceDisabled={!draft.trim()}
+                      busy={cardState.isPromptWorking}
+                      onRegenerate={handleRegeneratePrompt}
+                      regenerateTitle={`Regenerate prompt — produces a fresh ${tagLabel(variation.tag)} prompt`}
+                      onUndo={handleUndo}
+                      canUndo={canUndo}
+                      onRedo={handleRedo}
+                      canRedo={canRedo}
+                      onExpand={() => setPromptExpanded(true)}
+                    />
                   </div>
 
                   {cardState.promptError && (
@@ -694,7 +659,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
             {/* Pinned footer — output settings (resolution / aspect / duration
                 / audio) just above the Generate button, separated by a hairline.
                 Matches the Playground panel's sticky footer; chips open upward. */}
-            <div className="shrink-0 border-t border-ink/5 px-5 py-4">
+            <div className="shrink-0 px-5 pb-4 pt-2">
               {/* Model picker — sits directly above the output chips (Playground
                   style); the picker's own dropdown/panel opens upward here. */}
               <div className="mb-3">
