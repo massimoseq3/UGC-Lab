@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
-import { Loader2, RefreshCw, Ban, CheckCircle2, AlertTriangle, ChevronUp, ChevronDown, Search, Download, Clock } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Loader2, RefreshCw, Ban, CheckCircle2, AlertTriangle, ChevronUp, ChevronDown, Search, Download, Clock, Trash2, X } from 'lucide-react'
 import { getSupabase } from '../../lib/supabase'
+import useCloseOnEscape from '../../hooks/useCloseOnEscape'
+import { deleteMember } from './deleteMember'
 import {
   useMembers, memberName, formatBytes, formatDate, formatRelative,
   daysSinceActive, isInactive, isActivated, INACTIVE_DAYS,
@@ -67,6 +69,8 @@ export default function MembersTable() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   async function toggleDisabled(row: MemberRow) {
     setBusyId(row.id)
@@ -151,6 +155,41 @@ export default function MembersTable() {
     return arr
   }, [filteredRows, sortKey, sortDir])
 
+  // Admins are never selectable — the RPC refuses them, and the checkbox
+  // shouldn't offer something the server will reject.
+  const selectableRows = useMemo(() => sortedRows.filter((r) => !r.is_admin), [sortedRows])
+
+  // Selection is scoped to what's on screen: filtering or searching drops
+  // anything that scrolled out of view, so the Delete button can never act on
+  // a row the operator can't see.
+  useEffect(() => {
+    setSelected((prev) => {
+      if (prev.size === 0) return prev
+      const visible = new Set(selectableRows.map((r) => r.id))
+      const next = new Set([...prev].filter((id) => visible.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [selectableRows])
+
+  const selectedRows = useMemo(
+    () => selectableRows.filter((r) => selected.has(r.id)),
+    [selectableRows, selected],
+  )
+  const allSelected = selectableRows.length > 0 && selectedRows.length === selectableRows.length
+
+  function toggleRow(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(selectableRows.map((r) => r.id)))
+  }
+
   // Footer aggregates — rendered independent of sort
   const totals = useMemo(() => {
     const totalBytes = rows.reduce((s, r) => s + r.total_bytes, 0)
@@ -233,6 +272,27 @@ export default function MembersTable() {
         </div>
       </div>
 
+      {selectedRows.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5">
+          <span className="text-[12px] text-ink-200">
+            {selectedRows.length} selected
+            <span className="text-ink-600"> · {formatBytes(selectedRows.reduce((s, r) => s + r.total_bytes, 0))}</span>
+          </span>
+          <button
+            onClick={() => setSelected(new Set())}
+            className="rounded-full px-2 py-0.5 text-[11px] text-ink-400 transition-colors hover:text-ink-200"
+          >
+            Clear
+          </button>
+          <button
+            onClick={() => setConfirmingDelete(true)}
+            className="ml-auto flex items-center gap-1.5 rounded-full bg-red-500 px-3 py-1 text-[11px] font-medium text-white transition-colors hover:bg-red-400"
+          >
+            <Trash2 className="h-3 w-3" /> Delete
+          </button>
+        </div>
+      )}
+
       {storageWarning && (
         <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-200 light:text-amber-800">
           <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
@@ -250,6 +310,16 @@ export default function MembersTable() {
         <table className="w-full text-[12px]">
           <thead className="bg-ink/[0.03] text-[11px] uppercase tracking-wider text-ink-500">
             <tr>
+              <th className="w-8 px-3 py-2">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleAll}
+                  disabled={selectableRows.length === 0}
+                  title={allSelected ? 'Clear selection' : 'Select all shown'}
+                  className="h-3.5 w-3.5 cursor-pointer accent-red-400 disabled:opacity-40"
+                />
+              </th>
               <SortableTh label="Name" k="name" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <SortableTh label="Email" k="email" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <SortableTh label="Joined" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
@@ -263,7 +333,7 @@ export default function MembersTable() {
           <tbody className="divide-y divide-ink/5">
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-6 text-center text-[12px] text-ink-500">
+                <td colSpan={9} className="px-3 py-6 text-center text-[12px] text-ink-500">
                   No members match this filter.
                 </td>
               </tr>
@@ -272,7 +342,17 @@ export default function MembersTable() {
               const name = memberName(r)
               const inactive = isInactive(r)
               return (
-              <tr key={r.id} className="text-ink-300">
+              <tr key={r.id} className={`text-ink-300 ${selected.has(r.id) ? 'bg-red-500/[0.06]' : ''}`}>
+                <td className="px-3 py-2 align-top">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(r.id)}
+                    onChange={() => toggleRow(r.id)}
+                    disabled={r.is_admin}
+                    title={r.is_admin ? 'Admins cannot be deleted here' : undefined}
+                    className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-red-400 disabled:cursor-not-allowed disabled:opacity-30"
+                  />
+                </td>
                 <td className="px-3 py-2 align-top">
                   <div className="font-medium text-ink-200">{name || <span className="text-ink-600">—</span>}</div>
                   {r.is_admin && <div className="text-[10px] uppercase tracking-wider text-amber-400 light:text-amber-600">Admin</div>}
@@ -326,6 +406,142 @@ export default function MembersTable() {
       <p className="text-[10px] text-ink-600">
         Bank counts: <span className="text-ink-500">p</span>roducts · <span className="text-ink-500">i</span>nfluencers · <span className="text-ink-500">s</span>cripts · <span className="text-ink-500">v</span>oices · <span className="text-ink-500">b</span>-rolls · <span className="text-ink-500">vid</span>eos.
       </p>
+
+      {confirmingDelete && (
+        <DeleteMembersModal
+          members={selectedRows}
+          onClose={() => setConfirmingDelete(false)}
+          onDeleted={(deletedIds) => {
+            setSelected((prev) => new Set([...prev].filter((id) => !deletedIds.has(id))))
+            reload()
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Confirm + run a bulk hard delete. Stays open on failure so the per-member
+// errors are readable; the table behind it reloads either way.
+function DeleteMembersModal({
+  members,
+  onClose,
+  onDeleted,
+}: {
+  members: MemberRow[]
+  onClose: () => void
+  onDeleted: (deletedIds: Set<string>) => void
+}) {
+  const [removeFromAllowlist, setRemoveFromAllowlist] = useState(true)
+  const [running, setRunning] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [failures, setFailures] = useState<Array<{ email: string; message: string }>>([])
+  const [warnings, setWarnings] = useState<string[]>([])
+
+  useCloseOnEscape(!running, onClose)
+
+  const totalBytes = members.reduce((s, m) => s + m.total_bytes, 0)
+
+  async function run() {
+    setRunning(true)
+    setProgress(0)
+    setFailures([])
+    setWarnings([])
+    const done = new Set<string>()
+    const failed: Array<{ email: string; message: string }> = []
+    const warned: string[] = []
+
+    // Sequential on purpose: each delete purges R2 and then cascades a whole
+    // account, and a readable per-member failure beats a fast parallel run.
+    for (const m of members) {
+      try {
+        const res = await deleteMember(m.id, { removeFromAllowlist })
+        done.add(m.id)
+        if (res.storageWarning) warned.push(`${m.email}: ${res.storageWarning}`)
+      } catch (e) {
+        failed.push({ email: m.email, message: e instanceof Error ? e.message : String(e) })
+      }
+      setProgress(done.size + failed.length)
+    }
+
+    setRunning(false)
+    setFailures(failed)
+    setWarnings(warned)
+    onDeleted(done)
+    if (failed.length === 0 && warned.length === 0) onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="w-full max-w-md rounded-2xl border border-ink/10 bg-surface-2 p-5 shadow-2xl">
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-ink-100">
+              Delete {members.length} {members.length === 1 ? 'member' : 'members'}?
+            </h3>
+            <p className="mt-0.5 text-[11px] text-ink-500">
+              Their account and everything in it — banks, history, {formatBytes(totalBytes)} of storage. Not reversible.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={running}
+            className="rounded-md p-1 text-ink-500 transition-colors hover:bg-ink/[0.05] hover:text-ink-200 disabled:opacity-40"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-4 max-h-40 overflow-y-auto rounded-lg border border-ink/10 bg-ink/[0.02] p-2 text-[11px]">
+          {members.map((m) => (
+            <div key={m.id} className="flex items-baseline justify-between gap-2">
+              <span className="truncate text-ink-300">{m.email}</span>
+              <span className="shrink-0 text-ink-600">{formatBytes(m.total_bytes)}</span>
+            </div>
+          ))}
+        </div>
+
+        <label className="mt-3 flex cursor-pointer items-center gap-2 text-[12px] text-ink-300">
+          <input
+            type="checkbox"
+            checked={removeFromAllowlist}
+            onChange={(e) => setRemoveFromAllowlist(e.target.checked)}
+            disabled={running}
+            className="h-3.5 w-3.5 accent-red-400"
+          />
+          Also remove from the allowlist
+          <span className="text-ink-600">— otherwise they can sign up again</span>
+        </label>
+
+        {failures.length > 0 && (
+          <div className="mt-3 max-h-32 space-y-1 overflow-y-auto rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-[11px] text-red-300 light:text-red-700">
+            {failures.map((f) => <div key={f.email}><span className="font-medium">{f.email}</span> — {f.message}</div>)}
+          </div>
+        )}
+        {warnings.length > 0 && (
+          <div className="mt-2 max-h-24 space-y-1 overflow-y-auto rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] text-amber-200 light:text-amber-800">
+            {warnings.map((w, i) => <div key={i}>{w}</div>)}
+          </div>
+        )}
+
+        <div className="mt-5 flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={running}
+            className="rounded-lg border border-ink/10 px-3 py-1.5 text-[12px] text-ink-300 transition-colors hover:bg-ink/[0.05] disabled:opacity-50"
+          >
+            {failures.length > 0 || warnings.length > 0 ? 'Close' : 'Cancel'}
+          </button>
+          <button
+            onClick={run}
+            disabled={running || members.length === 0}
+            className="flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-red-400 disabled:opacity-60"
+          >
+            {running && <Loader2 className="h-3 w-3 animate-spin" />}
+            {running ? `Deleting ${progress + 1} of ${members.length}…` : `Delete ${members.length}`}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
