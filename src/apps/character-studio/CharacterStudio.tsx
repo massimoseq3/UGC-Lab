@@ -273,14 +273,20 @@ export default function CharacterStudio() {
     void launchGen({ profile: { ...profile }, resolution, kind: snapshotKind, aspect: snapshotAspect })
   }
 
-  const handleCancelGen = (id: string) => {
+  // Both gallery callbacks are useCallback'd with stable deps, and the gallery
+  // itself is memoized: it renders every character the member has ever made
+  // (characterHistory is uncapped) beside a form of ~28 fields, so a fresh
+  // callback identity meant one keystroke re-rendered the whole history.
+  const handleCancelGen = useCallback((id: string) => {
     const controller = abortersRef.current.get(id)
     controller?.abort()
     // Cancelling drops the entry even if the kie task itself can't be cancelled
     // server-side — the user has signalled they don't want this one.
     setInFlight((prev) => prev.filter((g) => g.id !== id))
     abortersRef.current.delete(id)
-  }
+  }, [setInFlight])
+
+  const handleLaunchGen = useCallback((opts: LaunchGenOptions) => { void launchGen(opts) }, [launchGen])
 
   // Mount-time resume: walk the persisted in-flight list and either resume
   // polling (entries with a taskId) or evict stale / un-started entries. Runs
@@ -356,7 +362,7 @@ export default function CharacterStudio() {
         <GalleryPanel
           inFlight={inFlight}
           onCancelGen={handleCancelGen}
-          onLaunchGen={(opts) => void launchGen(opts)}
+          onLaunchGen={handleLaunchGen}
         />
       </div>
 

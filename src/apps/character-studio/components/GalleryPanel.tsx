@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useEffect } from 'react'
+import { memo, useMemo, useRef, useState, useEffect } from 'react'
 import { Loader2, Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil } from 'lucide-react'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState } from '../../../hooks/useAssetUrl'
@@ -34,7 +34,12 @@ interface GalleryPanelProps {
   onLaunchGen: (opts: LaunchGenOptions) => void
 }
 
-export default function GalleryPanel({
+// Memoized: this panel renders every character the member has ever generated
+// (characterHistory is uncapped) and it sits beside a ~28-field form. Without
+// the bail-out, one keystroke in the form re-rendered the whole history — each
+// row with its own asset lookup. All three props are stable while typing (the
+// parent useCallback's both handlers), so the subtree is skipped entirely.
+export default memo(function GalleryPanel({
   inFlight,
   onCancelGen,
   onLaunchGen,
@@ -231,7 +236,7 @@ export default function GalleryPanel({
       )}
     </div>
   )
-}
+})
 
 // ── View toggle ─────────────────────────────────────────────────
 
@@ -947,6 +952,8 @@ function HistoryListRow({
           <img
             src={a.url}
             alt=""
+            loading="lazy"
+            decoding="async"
             onClick={onClick}
             className="absolute inset-0 h-full w-full cursor-pointer object-contain"
           />

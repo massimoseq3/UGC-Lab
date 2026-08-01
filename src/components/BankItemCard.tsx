@@ -257,7 +257,7 @@ function RowThumbnail({ fallback: Icon, src }: { fallback: React.ElementType; sr
   return (
     <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-ink/5">
       {resolved ? (
-        <img src={resolved} alt="" className="h-full w-full object-cover" />
+        <img src={resolved} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
       ) : (
         <Icon className="h-4 w-4 text-ink-600" />
       )}

@@ -479,11 +479,21 @@ textarea,
 
 /* Starfield, dark mode only. Two tiled layers of dots at different densities,
    each drifting and breathing on its own period — offset periods are what read
-   as twinkling; pulsing one layer alone just reads as flicker. Drift animates
-   `background-position` across exactly one tile, so it loops seamlessly with no
-   oversized element to hide the seam. Deliberately slow enough (3–5 min per
-   tile) that it registers as depth rather than motion.
-   Light mode has no starfield: white dots vanish and dark ones read as dust. */
+   as twinkling; pulsing one layer alone just reads as flicker. Deliberately slow
+   enough (3–5 min per tile) that it registers as depth rather than motion.
+   Light mode has no starfield: white dots vanish and dark ones read as dust.
+
+   Drift animates `transform`, NOT `background-position`. Both move the pattern
+   by exactly one tile so the loop is seamless either way, but a background
+   position is a paint property: the compositor can't run it, so the browser
+   repainted a full-viewport layer on every frame for as long as the Dashboard
+   was on screen — and re-ran the backdrop-filter of all nine widgets sitting on
+   top of it. A transform is composited: the layer is painted once and moved on
+   the GPU. The cost is that each layer now bleeds one tile past every edge (so
+   the translate never drags an unpainted corner into view); the wallpaper root
+   clips it. Geometry lives here rather than on a Tailwind `inset-0` for the
+   same reason — the bleed IS the mechanism, so it belongs beside the keyframes
+   that need it. */
 .desktop-stars-near {
   background-image:
     radial-gradient(1.4px 1.4px at 26px 42px, rgba(255, 255, 255, 0.75), transparent),
@@ -492,6 +502,8 @@ textarea,
     radial-gradient(1.1px 1.1px at 254px 64px, rgba(255, 255, 255, 0.5), transparent),
     radial-gradient(1.3px 1.3px at 210px 268px, rgba(235, 230, 255, 0.6), transparent);
   background-size: 300px 300px;
+  inset: -300px;
+  will-change: transform;
   animation: star-drift 210s linear infinite, star-breathe-a 7s ease-in-out infinite;
 }
 .desktop-stars-far {
@@ -502,15 +514,17 @@ textarea,
     radial-gradient(0.8px 0.8px at 128px 132px, rgba(255, 255, 255, 0.3), transparent),
     radial-gradient(1px 1px at 190px 186px, rgba(255, 255, 255, 0.36), transparent);
   background-size: 200px 200px;
+  inset: -200px;
+  will-change: transform;
   animation: star-drift-far 320s linear infinite, star-breathe-b 11s ease-in-out infinite;
 }
 @keyframes star-drift {
-  from { background-position: 0 0; }
-  to   { background-position: 300px 300px; }
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(300px, 300px, 0); }
 }
 @keyframes star-drift-far {
-  from { background-position: 0 0; }
-  to   { background-position: 200px 200px; }
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(200px, 200px, 0); }
 }
 @keyframes star-breathe-a {
   0%, 100% { opacity: 0.6; }
