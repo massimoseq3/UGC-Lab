@@ -943,7 +943,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // optional image_urls[] (identity/reference), so it runs both text-to-video
   // and image-to-video. aspect_ratio + resolution (480p/720p) + duration
   // (1–15s). Audio is generated automatically (no param). Per-second pricing
-  // keyed on resolution: 1.6/s 480p, 3/s 720p (user-supplied).
+  // keyed on resolution: 2.4/s 480p, 4.5/s 720p — kie raised both by 1.5×
+  // effective 2026-08-03 02:00 UTC (upstream cost increase, announced by kie).
   // Docs: grok-imagine-video-1-5-preview on docs.kie.ai.
   {
     id: 'grok-imagine-video-1-5-preview',
@@ -958,16 +959,19 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsReferenceImages: true,
     pricing: {
       unit: 'per-second',
-      credits: 3,
+      credits: 4.5,
       priceFor: ({ durationSeconds = 8, resolution = '480p' }) =>
-        (resolution === '720p' ? 3 : 1.6) * durationSeconds,
+        (resolution === '720p' ? 4.5 : 2.4) * durationSeconds,
     },
-    // Priced against the official xAI rate so kie lands ~90% off — official ≈
-    // kie / 0.10. No standalone xAI per-second list price to cite, so derived
-    // from that ratio and the kie.ai pricing page.
+    // Priced against the official xAI rate so kie lands ~85% off — official ≈
+    // kie / 0.15, the ratio kie quoted with the August 2026 increase (it was
+    // /0.10 at the old rate, so the derived official USD is unchanged — kie's
+    // discount narrowed, xAI's list price didn't move). No standalone xAI
+    // per-second list price to cite, so derived from that ratio and the
+    // kie.ai pricing page.
     official: {
       usdFor: ({ durationSeconds = 8, resolution = '480p' }) =>
-        creditsToUsd((resolution === '720p' ? 3 : 1.6) * durationSeconds) / 0.1,
+        creditsToUsd((resolution === '720p' ? 4.5 : 2.4) * durationSeconds) / 0.15,
       source: 'https://kie.ai/pricing',
     },
     videoEndpoint: 'createTask',
