@@ -693,13 +693,23 @@ export default function InputPanel({
           // min-height on the section overrides its auto min-size, so it shrinks
           // to a real, known floor and everything inside shrinks with it.
           <div className="mt-2 flex min-h-[120px] flex-1 basis-0 flex-col">
-            <div className="mb-2 flex items-center gap-2">
-              <StepLabel label="Additional Context" optional />
-            </div>
-            {/* Single rounded box (matches the Write New brief): the textarea
-                takes whatever height is left, with Enhance / Clear / Undo /
-                Redo + Expand attached in a footer under a hairline. */}
+            {/* Single rounded box (matches the Write New brief): a header row
+                naming the field, the textarea taking whatever height is left,
+                then Enhance / Clear / Undo / Redo + Expand in a footer. The
+                label used to sit ABOVE the box as a StepLabel; it's the same
+                shape as B-Roll's Instructions/Brief box now — a field's name
+                belongs on the field, and the row it needed outside cost the
+                textarea its height in a column that's already tight. */}
             <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
+              <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-2.5">
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <PenLine className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
+                  <span className="truncate text-[13px] font-medium text-ink-200">Additional Context</span>
+                </div>
+                <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
+                  optional
+                </span>
+              </div>
               <textarea
                 value={additionalContext}
                 onChange={(e) => handleContextType(e.target.value)}
@@ -707,7 +717,7 @@ export default function InputPanel({
                 placeholder={blueprintActive
                   ? "Additional context for the rewrite (e.g. 'Keep tone playful', 'Make the CTA softer')..."
                   : "Additional context for this script (e.g. 'Focus on the self-cleaning feature', 'Summer campaign tone')..."}
-                className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
+                className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 pb-3 pt-1.5 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
               />
               <PromptToolbar
                 accent="scripts"

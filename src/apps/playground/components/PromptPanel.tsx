@@ -612,7 +612,12 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
       {/* Middle: scrollable body — model picker, preset, refs, prompt. */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <div className="flex h-full flex-col overflow-y-auto">
-          <div className="flex grow flex-col gap-3 px-5 pb-1 pt-3">
+          {/* h-full, not grow: the column is exactly the port, so the prompt box
+              below it has a CEILING to shrink against. With `grow` the column
+              stretched to its own content and the box overflowed the port —
+              its toolbar was pushed out of sight and clipped by the box's own
+              overflow-hidden. */}
+          <div className="flex h-full min-h-0 flex-col gap-3 px-5 pb-1 pt-3">
             {/* Model picker now lives in the footer, above the output-settings
                 pills (see below) — the scrollable body opens straight into the
                 reference inputs. */}
@@ -703,12 +708,20 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               </>
             )}
 
-            {/* Prompt — grows with its own content, with the column's leftover
-                height as its FLOOR (grow, not grow basis-0): a short prompt fills
-                the gap that would otherwise sit between the box and the pinned
-                footer, and a long one pushes past it rather than scrolling
-                inside a fixed frame. */}
-            <div className="relative flex grow flex-col">
+            {/* Prompt — takes the column's leftover height, and never more.
+                `grow` fills the gap that would otherwise sit between the box and
+                the pinned footer; every wrapper below is `min-h-0` so the box can
+                also SHRINK, and a long prompt stops at the bottom of the column
+                and scrolls inside itself instead of running past the port and
+                taking the Enhance / Clear toolbar off screen with it.
+                The floor lives HERE, on the section, and never as `min-h-0` plus
+                a min-height on the field: that pair lets the section collapse
+                while the field holds its own floor, and the box's overflow-hidden
+                then slices its footer toolbar off (a short window with the frame
+                + ref rows filled did exactly that). 206px = the 48px preset row,
+                a 120px field and the 38px toolbar — so at the floor the field is
+                still the 120 it used to declare for itself. */}
+            <div className="relative flex min-h-[206px] grow flex-col">
               {/* Prompt field — a normal, visible textarea on top of a
                   transparent backdrop that only paints the [bracket] highlights.
                   The textarea owns every glyph, so the caret, selection and
@@ -720,8 +733,8 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   textarea (bottom-full) instead of overlaying the text being
                   typed. The popover sits outside the overflow-hidden box below
                   so it isn't clipped. */}
-              <div className="relative flex grow flex-col">
-                <div className="relative flex grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
+              <div className="relative flex min-h-0 grow flex-col">
+                <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
                   {/* UGC Prompt Presets — header row inside the box. Opens the
                       slide-in picker. One line at h-12, matching the model
                       picker trigger in the footer: it's the same kind of
@@ -742,18 +755,19 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                       <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
                     </button>
                   )}
-                  {/* No basis-0: the field's base size is its own content, and
-                      `grow` only tops it up to the free space. With basis-0 the
-                      base was zero, so the box was always exactly the leftover
-                      height and long prompts scrolled inside a frame that never
-                      moved. It still ends up the scroll port when the text
-                      outruns the column, which is what keeps revealCaret honest. */}
+                  {/* `grow` with no basis-0: the field's base size is its own
+                      content and grow only tops it up to the free space. It's
+                      the scroll port once the text outruns the column, which is
+                      what keeps revealCaret honest. No min-height of its own —
+                      the section above carries the floor for the whole box, so
+                      this shrinks WITH its siblings rather than holding a size
+                      that pushes the toolbar out through the overflow-hidden. */}
                   <BracketHighlightArea
                     value={state.prompt}
                     onChange={handlePromptChange}
                     textareaRef={textareaRef}
                     onBlur={() => { commitPromptDraft(); setTimeout(() => setMentionOpen(false), 150) }}
-                    className="min-h-[120px] grow"
+                    className="min-h-0 grow"
                     padClass="px-3.5 pb-3 pt-3"
                     textClass="text-[13px] leading-[1.5]"
                     textareaClass="text-ink-200 placeholder-ink-600"
