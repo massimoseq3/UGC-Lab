@@ -16,8 +16,11 @@ export default function DesktopWallpaper() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
       <div className="desktop-wallpaper absolute inset-0" />
-      <div className="desktop-stars-far absolute inset-0 light:hidden" />
-      <div className="desktop-stars-near absolute inset-0 light:hidden" />
+      {/* No `inset-0` on the star layers: each one bleeds a tile past every edge
+          so its drift can be a composited transform. Geometry is in index.css,
+          beside the keyframes that depend on it. */}
+      <div className="desktop-stars-far absolute light:hidden" />
+      <div className="desktop-stars-near absolute light:hidden" />
       {/* Two meteors on the same 22s cycle, offset so they never share a pass.
           Both are delayed — the sky should be still when the page arrives, not
           throwing a meteor on mount. The delay only works because

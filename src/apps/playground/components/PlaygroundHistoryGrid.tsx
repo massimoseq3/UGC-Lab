@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { memo, useMemo, useState, useEffect } from 'react'
 import {
   Loader2, Download, Bookmark, Check, Film, Image as ImageIcon,
   Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy,
@@ -48,7 +48,14 @@ interface PlaygroundHistoryGridProps {
   onAnimateImage?: (item: ImageHistoryItem) => void
 }
 
-export default function PlaygroundHistoryGrid({ inFlight, filterMode, onAnimateImage }: PlaygroundHistoryGridProps) {
+// Memoized: this grid renders every generation the member has ever made (the
+// history banks are uncapped), and it sits beside the prompt bar. Without the
+// bail-out, typing one character re-rendered the whole list — hundreds of rows,
+// each with an asset lookup and its own hover machinery. Its three props are
+// all stable while typing, so the subtree is skipped entirely.
+//
+// Keep them stable: `onAnimateImage` is wrapped in useCallback by the parent.
+export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAnimateImage }: PlaygroundHistoryGridProps) {
   const imageHistory = useBankStore((s) => s.imageHistory)
   const videoHistory = useBankStore((s) => s.videoHistory)
   const musicHistory = useBankStore((s) => s.musicHistory)
@@ -287,7 +294,7 @@ export default function PlaygroundHistoryGrid({ inFlight, filterMode, onAnimateI
       )}
     </div>
   )
-}
+})
 
 // ── View toggle ─────────────────────────────────────────────────
 

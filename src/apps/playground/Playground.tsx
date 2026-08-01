@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
 import type { VideoSourceClipPayload, ImageHistoryItem } from '../../stores/types'
@@ -72,6 +72,37 @@ function resolveImageModelForRefs(pickedId: string, hasRefs: boolean): string {
   return useSettingsStore.getState().getAppModel(`playground:image:${targetMode}`)
     ?? getDefaultModel('playground', 'image', targetMode)?.id
     ?? pickedId
+}
+
+// Finish one persisted in-flight task (the resume-on-mount walk below).
+//
+// Module scope on purpose: this lives outside the component so the component
+// itself stays compilable. The React Compiler cannot lower a `try`/`finally`,
+// and one anywhere inside a component makes it skip optimizing the whole thing
+// — which for Playground means the history grid re-renders on every character
+// typed into the prompt bar.
+async function finishResumedTask(gen: InFlightGen): Promise<void> {
+  if (gen.mode === 'image' && gen.imageParams) {
+    await finishPlaygroundImageTask(gen.taskId!, gen.modelId, {
+      prompt: gen.prompt,
+      aspectRatio: gen.imageParams.aspectRatio,
+      resolution: gen.imageParams.resolution,
+    })
+  } else if (gen.mode === 'video' && gen.videoParams) {
+    await finishPlaygroundVideoTask(gen.taskId!, gen.modelId, gen.videoParams.videoEndpoint, {
+      prompt: gen.prompt,
+      mode: gen.videoParams.mode,
+      aspectRatio: gen.videoParams.aspectRatio,
+      durationSeconds: gen.videoParams.durationSeconds,
+      resolution: gen.videoParams.resolution,
+      audio: gen.videoParams.audio,
+    })
+  } else if (gen.mode === 'music' && gen.musicParams) {
+    await finishPlaygroundMusicTask(gen.taskId!, gen.modelId, {
+      prompt: gen.prompt,
+      instrumental: gen.musicParams.instrumental,
+    })
+  }
 }
 
 // For video, a silent ref-drop is harder to recover from — duration / aspect
@@ -160,6 +191,18 @@ export default function Playground() {
       }),
     },
   )
+  // The live draft, read by handlers that must NOT be re-created on every
+  // keystroke. `handleAnimateImage` is handed to the history grid: closing it
+  // over `state` directly gave the grid a new prop on every character typed
+  // into the prompt bar, which re-rendered every history row — at a few hundred
+  // generations that alone was tens of milliseconds per keystroke. Reading
+  // through the ref keeps the handler's identity stable, so React skips the
+  // whole grid while you type.
+  const stateRef = useRef(state)
+  useEffect(() => { stateRef.current = state }, [state])
+  const promptStashRef = useRef(promptStash)
+  useEffect(() => { promptStashRef.current = promptStash }, [promptStash])
+
   const interAppPayload = useAppStore((s) => s.interAppPayload)
   const consumePayload = useAppStore((s) => s.consumePayload)
   const activeApp = useAppStore((s) => s.activeApp)
@@ -241,8 +284,22 @@ export default function Playground() {
   // double-invoke. Only runs once on mount — new entries added during this
   // session don't need resume, they already run in handleSubmit.
   const resuming = useRef<Set<string>>(new Set())
+  // Read the queue through a ref rather than closing over it with a suppressed
+  // exhaustive-deps warning: a disabled React lint rule tells the React
+  // Compiler the file breaks its rules, and it then skips optimizing this
+  // WHOLE component — which is the one holding the prompt draft, so every
+  // keystroke re-rendered the history grid beside it.
+  const inFlightRef = useRef(inFlight)
+  useEffect(() => { inFlightRef.current = inFlight }, [inFlight])
+  // The deps below are stable identities, so this fires once — but the ref now
+  // tracks the LIVE queue, so a re-fire would try to resume this session's own
+  // gens (which handleSubmit already owns) and download each result twice.
+  // The flag makes "once" structural rather than a property of the deps.
+  const didResumeRef = useRef(false)
   useEffect(() => {
-    for (const gen of inFlight) {
+    if (didResumeRef.current) return
+    didResumeRef.current = true
+    for (const gen of inFlightRef.current) {
       if (resuming.current.has(gen.id)) continue
       if (!gen.taskId) {
         setInFlight((prev) => prev.filter((g) => g.id !== gen.id))
@@ -254,47 +311,26 @@ export default function Playground() {
         continue
       }
       resuming.current.add(gen.id)
-      void (async () => {
-        try {
-          if (gen.mode === 'image' && gen.imageParams) {
-            await finishPlaygroundImageTask(gen.taskId!, gen.modelId, {
-              prompt: gen.prompt,
-              aspectRatio: gen.imageParams.aspectRatio,
-              resolution: gen.imageParams.resolution,
-            })
-          } else if (gen.mode === 'video' && gen.videoParams) {
-            await finishPlaygroundVideoTask(gen.taskId!, gen.modelId, gen.videoParams.videoEndpoint, {
-              prompt: gen.prompt,
-              mode: gen.videoParams.mode,
-              aspectRatio: gen.videoParams.aspectRatio,
-              durationSeconds: gen.videoParams.durationSeconds,
-              resolution: gen.videoParams.resolution,
-              audio: gen.videoParams.audio,
-            })
-          } else if (gen.mode === 'music' && gen.musicParams) {
-            await finishPlaygroundMusicTask(gen.taskId!, gen.modelId, {
-              prompt: gen.prompt,
-              instrumental: gen.musicParams.instrumental,
-            })
-          }
+      void finishResumedTask(gen)
+        .then(() => {
           addToast(`${gen.mode} resumed and ready`, 'success')
           setInFlight((prev) => prev.filter((g) => g.id !== gen.id))
-        } catch (err) {
+        })
+        .catch((err: unknown) => {
           if (isPollTimeout(err)) {
             // The poll budget ran out but kie may still be rendering. Leave the
             // entry persisted so a later refresh resumes it again; the staleness
             // guard above evicts it once it crosses STALE_TASK_MS.
-          } else {
-            addToast(humanizeError(err, `Resume failed (${gen.mode})`), 'error')
-            setInFlight((prev) => prev.filter((g) => g.id !== gen.id))
+            return
           }
-        } finally {
-          resuming.current.delete(gen.id)
-        }
-      })()
+          addToast(humanizeError(err, `Resume failed (${gen.mode})`), 'error')
+          setInFlight((prev) => prev.filter((g) => g.id !== gen.id))
+        })
+        .finally(() => { resuming.current.delete(gen.id) })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    // Mount-only in effect: `resuming` dedupes, and both deps are stable
+    // identities (a zustand action and a useState setter).
+  }, [addToast, setInFlight])
 
   async function handleSubmit() {
     const promptText = state.prompt.trim()
@@ -534,7 +570,11 @@ export default function Playground() {
   // Refs carry a renderable URL, not an asset id (FrameSlot renders the value
   // straight into an <img>), so the history item's asset is inlined first —
   // same conversion the Bank's own Animate button does.
-  async function handleAnimateImage(item: ImageHistoryItem) {
+  //
+  // useCallback with only stable deps, because this is the grid's prop and the
+  // grid is memoized: a fresh identity here would re-render every history row
+  // on every keystroke in the prompt bar. The live draft comes from the refs.
+  const handleAnimateImage = useCallback(async (item: ImageHistoryItem) => {
     let url = item.imageUrl
     if (isAssetRef(url)) {
       const asset = await getAsBase64(url)
@@ -547,15 +587,18 @@ export default function Playground() {
     const startRef: PromptRef = { url, label: 'start', source: 'upload', slot: 'start' }
     const seedPrompt = item.prompt?.trim()
 
+    // Read the draft through the ref, not the closure — see stateRef above.
+    const draft = stateRef.current
+
     // Already on Video (the grid is mode-filtered, so this only happens on a
     // deep link): just swap the start frame and leave the draft alone.
-    if (state.mode === 'video') {
+    if (draft.mode === 'video') {
       setState((s) => ({ ...s, refs: [...s.refs.filter((r) => r.slot !== 'start'), startRef] }))
       return
     }
 
-    setPromptStash((prev) => ({ ...prev, [state.mode]: { prompt: state.prompt, refs: state.refs } }))
-    const restored = promptStash.video ?? { prompt: '', refs: [] }
+    setPromptStash((prev) => ({ ...prev, [draft.mode]: { prompt: draft.prompt, refs: draft.refs } }))
+    const restored = promptStashRef.current.video ?? { prompt: '', refs: [] }
     setState((s) => ({
       ...s,
       mode: 'video',
@@ -564,7 +607,7 @@ export default function Playground() {
       prompt: seedPrompt || restored.prompt,
       refs: [...restored.refs.filter((r) => r.slot !== 'start'), startRef],
     }))
-  }
+  }, [addToast, setState, setPromptStash])
 
   // Filter the history grid to the active mode. Users frequently bounce
   // between modes and want to see what they just made, not noise from the
