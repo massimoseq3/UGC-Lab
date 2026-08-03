@@ -83,6 +83,13 @@ export interface DiscoverFilters {
   country: string
   /** Meta only. */
   activeOnly: boolean
+  /**
+   * Meta only. Meta's own keyword search is loose by default — it matches
+   * advertiser names and its own relevance model, which is why a search for
+   * one product returns ads for other things. This switches it to
+   * `keyword_exact_phrase`, the only lever the API exposes over that.
+   */
+  exactPhrase: boolean
 }
 
 export const DEFAULT_FILTERS: DiscoverFilters = {
@@ -91,4 +98,5 @@ export const DEFAULT_FILTERS: DiscoverFilters = {
   sort: 'outlier',
   country: 'US',
   activeOnly: true,
+  exactPhrase: false,
 }

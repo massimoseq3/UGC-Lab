@@ -192,6 +192,23 @@ export function sortResults(results: DiscoverResult[], sort: DiscoverSort): Disc
 
 // ── Entry point ─────────────────────────────────────────────────
 
+/**
+ * Shouts when a page came back full and normalised to nothing.
+ *
+ * That combination means the vendor changed a field name, not that the search
+ * found nothing — and it is otherwise indistinguishable from "no results" in
+ * the UI. It's exactly how the `aweme_info` wrapper silently emptied every
+ * TikTok search: the rows were all there, and every one failed its id check.
+ */
+function warnIfAllDropped(platform: string, raw: number, kept: number): void {
+  if (raw > 0 && kept === 0) {
+    console.warn(
+      `[outliers] ${platform}: ${raw} row(s) came back and all were dropped in normalisation. ` +
+      'The response shape has probably changed — check the field names in utils/scrapecreators.ts.',
+    )
+  }
+}
+
 export async function runSearch(
   apiKey: string,
   platform: 'tiktok' | 'meta',
@@ -213,6 +230,7 @@ export async function runSearch(
     const results = page.items
       .map(normaliseTikTok)
       .filter((r): r is DiscoverResult => r !== null)
+    warnIfAllDropped('tiktok', page.items.length, results.length)
     return { results, cursor: page.cursor, creditsRemaining: page.creditsRemaining }
   }
 
@@ -220,11 +238,13 @@ export async function runSearch(
     query,
     country: filters.country,
     status: filters.activeOnly ? 'ACTIVE' : 'ALL',
+    exactPhrase: filters.exactPhrase,
     cursor: typeof cursor === 'string' ? cursor : undefined,
   })
   const results = page.items
     .map(normaliseMeta)
     .filter((r): r is DiscoverResult => r !== null)
+  warnIfAllDropped('meta', page.items.length, results.length)
   return { results, cursor: page.cursor, creditsRemaining: page.creditsRemaining }
 }
 

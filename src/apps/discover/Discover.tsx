@@ -48,6 +48,13 @@ const SORT_OPTIONS: Record<DiscoverPlatform, Array<{ value: DiscoverSort; label:
 
 const MIN_VIEW_OPTIONS = [0, 10_000, 100_000, 1_000_000]
 
+/** Where a card's transcript has got to. 'empty' is a normal outcome, not a failure. */
+export type TranscriptState =
+  | { phase: 'loading' }
+  | { phase: 'ready'; text: string }
+  | { phase: 'empty' }
+  | { phase: 'error'; message: string }
+
 export default function Discover() {
   const baseKey = useProjectScopedKey('discover')
   const [platform, setPlatform] = usePersistedState<DiscoverPlatform>(`${baseKey}:platform`, 'tiktok')
@@ -65,6 +72,11 @@ export default function Discover() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [busyKind, setBusyKind] = useState<'analyze' | 'remix' | null>(null)
 
+  // Transcripts, keyed by card. Fetched once when a card is opened and reused
+  // by Remix, so reading the words and then sending them is ONE credit rather
+  // than two. Lives here (not in the modal) so it survives closing the modal.
+  const [transcripts, setTranscripts] = useState<Record<string, TranscriptState>>({})
+
   const apiKey = useSettingsStore((s) => s.scrapeCreatorsKey)
 
   // Onboarding pops up the first time Outliers is opened without a key. Seeded
@@ -80,6 +92,11 @@ export default function Discover() {
   // keystroke would hand the memoized card grid a fresh handler identity.
   const queryRef = useRef(query)
   queryRef.current = query
+
+  // The resolved text behind `transcripts`, in a ref so ensureTranscript can
+  // check the cache without taking the state as a dependency — which would
+  // hand the memoized card grid a new handler on every transcript that lands.
+  const transcriptCache = useRef<Record<string, string>>({})
 
   const search = useCallback(async (nextCursor?: string | number) => {
     const q = queryRef.current.trim()
@@ -123,31 +140,71 @@ export default function Discover() {
     }
   }, [sendToApp, openApp, addToast])
 
+  /**
+   * Resolves a card's transcript, fetching it at most once.
+   *
+   * Returns the text (empty string when the video genuinely has no captions).
+   * `useAi` forces a re-fetch through the 10-credit AI path, which is the only
+   * reason a cached entry is ever discarded.
+   */
+  const ensureTranscript = useCallback(async (
+    result: DiscoverResult,
+    useAi = false,
+  ): Promise<string> => {
+    if (!apiKey) return ''
+    const cacheKey = `${result.platform}:${result.id}`
+    const cached = transcriptCache.current[cacheKey]
+    if (cached && !useAi) return cached
+
+    setTranscripts((t) => ({ ...t, [cacheKey]: { phase: 'loading' } }))
+    try {
+      const { text, creditsRemaining } = await fetchResultTranscript(apiKey, result, useAi)
+      if (creditsRemaining !== null) setCredits(creditsRemaining)
+      transcriptCache.current[cacheKey] = text
+      setTranscripts((t) => ({
+        ...t,
+        [cacheKey]: text.trim() ? { phase: 'ready', text } : { phase: 'empty' },
+      }))
+      return text
+    } catch (e) {
+      const message = humanizeError(e, "Couldn't pull that transcript.")
+      setTranscripts((t) => ({ ...t, [cacheKey]: { phase: 'error', message } }))
+      throw e
+    }
+  }, [apiKey])
+
   const handleRemix = useCallback(async (result: DiscoverResult, useAi = false) => {
     if (!apiKey) return
     setBusyId(result.id)
     setBusyKind('remix')
     try {
-      const { text, creditsRemaining } = await fetchResultTranscript(apiKey, result, useAi)
-      if (creditsRemaining !== null) setCredits(creditsRemaining)
+      const text = await ensureTranscript(result, useAi)
       if (!text.trim()) {
-        // The detail modal turns this into the explicit 10-credit AI retry;
-        // from a card it's just a toast, since there's nowhere to put a button.
-        if (openResult?.id === result.id) throw new Error('NO_TRANSCRIPT')
-        addToast('This video has no captions to pull. Open it to transcribe with AI.', 'info')
+        addToast(
+          'This video has no captions to pull. Open it and try AI transcription.',
+          'info',
+        )
         return
       }
       sendToApp({ targetApp: 'script-architect', targetField: 'winningTranscript', data: text })
       openApp('script-architect')
       setOpenResult(null)
     } catch (e) {
-      if (e instanceof Error && e.message === 'NO_TRANSCRIPT') throw e
       addToast(humanizeError(e, "Couldn't pull that transcript. Try again in a moment."), 'error')
     } finally {
       setBusyId(null)
       setBusyKind(null)
     }
-  }, [apiKey, sendToApp, openApp, addToast, openResult])
+  }, [apiKey, ensureTranscript, sendToApp, openApp, addToast])
+
+  // Opening a card pulls its transcript straight away, so the words are on
+  // screen rather than one click and one credit away. On Meta this is free
+  // when the ad has no video — that endpoint only charges when it returns
+  // something. Errors surface inside the modal, so nothing is toasted here.
+  const openCard = useCallback((result: DiscoverResult) => {
+    setOpenResult(result)
+    void ensureTranscript(result).catch(() => {})
+  }, [ensureTranscript])
 
   const isTikTok = platform === 'tiktok'
   // A member who picked "Most viewed" on TikTok and switched to Meta has a
@@ -259,6 +316,18 @@ export default function Discover() {
                 ]}
                 onChange={(v) => setFilters((f) => ({ ...f, activeOnly: v === 'active' }))}
               />
+              {/* The only lever Meta's API gives over its own loose matching —
+                  by default it scores relevance its own way and matches
+                  advertiser names, so a product search returns unrelated ads. */}
+              <FilterSelect
+                label="Match"
+                value={filters.exactPhrase ? 'exact' : 'broad'}
+                options={[
+                  { value: 'broad', label: 'Broad' },
+                  { value: 'exact', label: 'Exact phrase' },
+                ]}
+                onChange={(v) => setFilters((f) => ({ ...f, exactPhrase: v === 'exact' }))}
+              />
             </>
           )}
 
@@ -304,7 +373,7 @@ export default function Discover() {
                 result={result}
                 onAnalyze={handleAnalyze}
                 onRemix={handleRemix}
-                onOpen={setOpenResult}
+                onOpen={openCard}
                 busy={busyId === result.id ? busyKind : null}
               />
             ))}
@@ -331,6 +400,7 @@ export default function Discover() {
       {openResult && (
         <ResultDetailModal
           result={openResult}
+          transcript={transcripts[`${openResult.platform}:${openResult.id}`] ?? { phase: 'loading' }}
           onClose={() => setOpenResult(null)}
           onAnalyze={handleAnalyze}
           onRemix={handleRemix}

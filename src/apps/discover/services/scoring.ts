@@ -51,6 +51,38 @@ export function scoreOutlier(
   return { multiple, band: hit.band }
 }
 
+/**
+ * Engagement rate: every interaction as a share of the views that produced it.
+ *
+ *   (likes + comments + shares + saves) ÷ views
+ *
+ * Reverse-engineered from the reference tool and checked against four of its
+ * cards — 134.6K views / 976 / 7 / 16 / 86 gives 0.81% against its printed
+ * 0.8%, and 10.3K / 860 / 24 / 4 / 53 gives 9.14% against its 9.1%. Saves are
+ * IN the numerator, which is the part worth not "simplifying" later: on a UGC
+ * ad a save is the strongest buying signal of the four.
+ *
+ * Distinct from the outlier multiple: ER asks how hard a video worked the
+ * people who saw it, the multiple asks how far it travelled beyond its own
+ * audience. A video can be strong on one and flat on the other.
+ */
+export function engagementRate(stats: {
+  views: number
+  likes: number
+  comments: number
+  shares: number
+  saves: number
+}): number | null {
+  if (!stats.views || !Number.isFinite(stats.views)) return null
+  const interactions = stats.likes + stats.comments + stats.shares + stats.saves
+  return (interactions / stats.views) * 100
+}
+
+/** "9.1%" — one decimal, which is the precision the numbers deserve. */
+export function formatRate(rate: number): string {
+  return `${rate.toFixed(1)}%`
+}
+
 /** "12.4x" / "3.1x" — one decimal below 10, whole numbers above. */
 export function formatMultiple(multiple: number): string {
   return multiple >= 10 ? `${Math.round(multiple)}x` : `${multiple.toFixed(1)}x`

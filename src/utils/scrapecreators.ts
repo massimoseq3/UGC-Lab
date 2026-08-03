@@ -84,10 +84,19 @@ export interface TikTokSearchItem {
   author?: TikTokAuthor
 }
 
+// A row of `search_item_list`. ScrapeCreators' own docs disagree with their own
+// example here: the endpoint DESCRIPTION says each row wraps the video in
+// `aweme_info`, while the example response shows the fields sitting at the top
+// level of the row. Reading only the top level meant every row failed the
+// `aweme_id` check and the grid came back empty on every search. Accept both.
+interface TikTokSearchRow extends TikTokSearchItem {
+  aweme_info?: TikTokSearchItem
+}
+
 interface TikTokSearchResponse {
   success?: boolean
   credits_remaining?: number
-  search_item_list?: TikTokSearchItem[]
+  search_item_list?: TikTokSearchRow[]
   cursor?: number
 }
 
@@ -141,6 +150,15 @@ interface TranscriptResponse {
   success?: boolean
   credits_remaining?: number
   transcript?: string
+}
+
+interface MetaTranscriptResponse {
+  success?: boolean
+  credits_remaining?: number
+  data?: {
+    transcript?: string | null
+    transcript_available?: boolean
+  }
 }
 
 /** What every endpoint hands back: the rows, a cursor, and the live balance. */
@@ -236,7 +254,10 @@ export async function searchTikTokKeyword(
     cursor: opts.cursor,
   })
 
-  const items = body.search_item_list ?? []
+  // Unwrap here rather than downstream, so everything past this point sees one
+  // shape whichever variant the API is serving today.
+  const items = (body.search_item_list ?? []).map((row) => row.aweme_info ?? row)
+
   return {
     items,
     // TikTok keeps handing back a cursor forever; a short page is the real
@@ -304,6 +325,32 @@ export async function fetchTikTokTranscript(
 
   return {
     transcript: body.transcript ?? '',
+    creditsRemaining: body.credits_remaining ?? null,
+  }
+}
+
+/**
+ * The words SPOKEN in a Meta ad's video, by archive id.
+ *
+ * Not to be confused with the ad's body copy, which rides on the search result
+ * already — that's the written caption, and remixing it gives you somebody's
+ * ad copy rather than the script their creator actually performed.
+ *
+ * Uses Facebook's captions when exposed and transcribes the public video URL
+ * otherwise. **Credits are only charged when a transcript comes back**, so
+ * calling this speculatively on an image ad is free — which is what makes
+ * auto-fetching it on modal open reasonable.
+ */
+export async function fetchMetaAdTranscript(
+  apiKey: string,
+  adArchiveId: string,
+): Promise<{ transcript: string; creditsRemaining: number | null }> {
+  const body = await scFetch<MetaTranscriptResponse>(apiKey, '/v1/facebook/adLibrary/ad/transcript', {
+    id: adArchiveId,
+  }, 90_000)
+
+  return {
+    transcript: body.data?.transcript ?? '',
     creditsRemaining: body.credits_remaining ?? null,
   }
 }
