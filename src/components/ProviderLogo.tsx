@@ -26,8 +26,14 @@ interface LogoEntry {
   // 'evenodd' is required for ring/donut paths (outer + inner subpath).
   // Defaults to 'nonzero' (SVG default) when omitted.
   fillRule?: 'evenodd' | 'nonzero'
-  // Optional rendered SVG for multicolor or composite logos.
-  svg?: () => React.ReactNode
+  // Optional component for multicolor or composite logos. It MUST be rendered
+  // as an element (`<Mark />`), never called as `Mark()`: the React Compiler
+  // gives each of these its own `useMemoCache(n)` hook, so calling one inline
+  // runs that hook in ProviderLogo's own slot. The marks ask for different
+  // cache sizes (Google 2, Kling 9), so switching provider mismatched the slot
+  // and React kept rendering the previous mark — Grok showed Google's G — or
+  // nothing at all.
+  Mark?: React.ComponentType
 }
 
 const GoogleSvg = () => (
@@ -119,7 +125,7 @@ const PROVIDERS: Record<string, LogoEntry> = {
   Google: {
     bg: 'bg-ink/[0.04]',
     fg: '',
-    svg: GoogleSvg,
+    Mark: GoogleSvg,
   },
   OpenAI: {
     bg: 'bg-ink/[0.04]',
@@ -136,27 +142,27 @@ const PROVIDERS: Record<string, LogoEntry> = {
   ByteDance: {
     bg: 'bg-ink/[0.04]',
     fg: '',
-    svg: ByteDanceSvg,
+    Mark: ByteDanceSvg,
   },
   'Kling AI': {
     bg: 'bg-ink/[0.04]',
     fg: '',
-    svg: KlingSvg,
+    Mark: KlingSvg,
   },
   xAI: {
     bg: 'bg-ink/[0.04]',
     fg: '',
-    svg: GrokSvg,
+    Mark: GrokSvg,
   },
   MiniMax: {
     bg: 'bg-ink/[0.04]',
     fg: '',
-    svg: MinimaxSvg,
+    Mark: MinimaxSvg,
   },
   'Alibaba Tongyi': {
     bg: 'bg-ink/[0.04]',
     fg: '',
-    svg: WanSvg,
+    Mark: WanSvg,
   },
   ElevenLabs: {
     bg: 'bg-ink/[0.04]',
@@ -190,10 +196,12 @@ export default function ProviderLogo({ provider, size = 'md' }: ProviderLogoProp
   const entry = PROVIDERS[provider]
   if (!entry) return <FallbackLetter provider={provider} size={size} />
 
+  const Mark = entry.Mark
+
   return (
     <div className={`flex shrink-0 items-center justify-center rounded-full ${entry.bg} ${SIZE_CLASS[size]} ${ICON_PADDING[size]}`}>
-      {entry.svg ? (
-        entry.svg()
+      {Mark ? (
+        <Mark />
       ) : (
         <svg viewBox={entry.viewBox} className={`h-full w-full ${entry.fg}`} fill="currentColor" aria-hidden>
           <path d={entry.path} fillRule={entry.fillRule} />
