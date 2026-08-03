@@ -1,0 +1,397 @@
+import { useCallback, useRef, useState } from 'react'
+import { Key, Loader2, Radar, Search } from 'lucide-react'
+import GridCanvas, { AwaitingBody } from '../../components/GridCanvas'
+import SegmentedToggle from '../../components/SegmentedToggle'
+import ResultCard from './components/ResultCard'
+import ResultDetailModal from './components/ResultDetailModal'
+import ConnectScrapeCreators from './components/ConnectScrapeCreators'
+import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
+import { useSettingsStore } from '../../stores/settingsStore'
+import { useAppStore } from '../../stores/appStore'
+import { humanizeError } from '../../utils/friendlyError'
+import { applyMinViews, mergeResults, runSearch, sortResults } from './services/search'
+import { downloadResultVideo, fetchResultTranscript } from './services/handoff'
+import { DEFAULT_FILTERS, type DiscoverFilters, type DiscoverPlatform, type DiscoverResult, type DiscoverSort } from './types'
+
+// Outliers — search TikTok and the Meta Ad Library for ads worth stealing,
+// then hand one straight to the Ad Analyzer or to Scripts.
+//
+// Unlike every generation surface in the app, nothing here costs kie credits:
+// the searches run on the member's own ScrapeCreators key (1 credit a page)
+// and the transcript path never touches a model at all.
+
+const DATE_OPTIONS: Array<{ value: DiscoverFilters['datePosted']; label: string }> = [
+  { value: 'this-week', label: 'This week' },
+  { value: 'this-month', label: 'This month' },
+  { value: 'last-3-months', label: '3 months' },
+  { value: 'last-6-months', label: '6 months' },
+  { value: 'all-time', label: 'All time' },
+]
+
+// Sort labels are platform-specific because the underlying signal is. The
+// default 'outlier' sort falls back to days-running on a Meta card (see
+// sortResults), so on that tab it is HONESTLY named "Longest running" — Meta
+// publishes no view counts, and a control offering to rank by a score that
+// doesn't exist would be a lie in a dropdown. 'views' isn't offered there at
+// all for the same reason.
+const SORT_OPTIONS: Record<DiscoverPlatform, Array<{ value: DiscoverSort; label: string }>> = {
+  tiktok: [
+    { value: 'outlier', label: 'Outlier score' },
+    { value: 'views', label: 'Most viewed' },
+    { value: 'recent', label: 'Newest' },
+  ],
+  meta: [
+    { value: 'outlier', label: 'Longest running' },
+    { value: 'recent', label: 'Newest' },
+  ],
+}
+
+const MIN_VIEW_OPTIONS = [0, 10_000, 100_000, 1_000_000]
+
+export default function Discover() {
+  const baseKey = useProjectScopedKey('discover')
+  const [platform, setPlatform] = usePersistedState<DiscoverPlatform>(`${baseKey}:platform`, 'tiktok')
+  const [filters, setFilters] = usePersistedState<DiscoverFilters>(`${baseKey}:filters`, DEFAULT_FILTERS)
+  const [query, setQuery] = useState('')
+
+  const [results, setResults] = useState<DiscoverResult[]>([])
+  const [cursor, setCursor] = useState<string | number | null>(null)
+  const [credits, setCredits] = useState<number | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [searched, setSearched] = useState(false)
+
+  const [openResult, setOpenResult] = useState<DiscoverResult | null>(null)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [busyKind, setBusyKind] = useState<'analyze' | 'remix' | null>(null)
+
+  const apiKey = useSettingsStore((s) => s.scrapeCreatorsKey)
+
+  // Onboarding pops up the first time Outliers is opened without a key. Seeded
+  // from the store at mount and never re-armed, so dismissing it is respected
+  // for as long as the app stays open — the empty state behind it keeps a
+  // "Connect key" button, so closing this is never a dead end.
+  const [connectOpen, setConnectOpen] = useState(!apiKey)
+  const addToast = useAppStore((s) => s.addToast)
+  const sendToApp = useAppStore((s) => s.sendToApp)
+  const openApp = useAppStore((s) => s.openApp)
+
+  // The live query, read by callbacks without closing over it — otherwise every
+  // keystroke would hand the memoized card grid a fresh handler identity.
+  const queryRef = useRef(query)
+  queryRef.current = query
+
+  const search = useCallback(async (nextCursor?: string | number) => {
+    const q = queryRef.current.trim()
+    if (!q || !apiKey) return
+
+    const more = nextCursor !== undefined
+    if (more) setLoadingMore(true)
+    else { setSearching(true); setResults([]) }
+
+    try {
+      const page = await runSearch(apiKey, platform, q, filters, nextCursor)
+      setResults((prev) => (more ? mergeResults(prev, page.results) : page.results))
+      setCursor(page.cursor)
+      if (page.creditsRemaining !== null) setCredits(page.creditsRemaining)
+      setSearched(true)
+    } catch (e) {
+      addToast(humanizeError(e, 'That search failed. Try again in a moment.'), 'error')
+    } finally {
+      setSearching(false)
+      setLoadingMore(false)
+    }
+  }, [apiKey, platform, filters, addToast])
+
+  const handleAnalyze = useCallback(async (result: DiscoverResult) => {
+    setBusyId(result.id)
+    setBusyKind('analyze')
+    try {
+      const file = await downloadResultVideo(result)
+      sendToApp({
+        targetApp: 'ad-anatomy',
+        targetField: 'adVideo',
+        data: { file, sourceUrl: result.postUrl, caption: result.caption },
+      })
+      openApp('ad-anatomy')
+      setOpenResult(null)
+    } catch (e) {
+      addToast(humanizeError(e, "Couldn't import that video. Try opening the original instead."), 'error')
+    } finally {
+      setBusyId(null)
+      setBusyKind(null)
+    }
+  }, [sendToApp, openApp, addToast])
+
+  const handleRemix = useCallback(async (result: DiscoverResult, useAi = false) => {
+    if (!apiKey) return
+    setBusyId(result.id)
+    setBusyKind('remix')
+    try {
+      const { text, creditsRemaining } = await fetchResultTranscript(apiKey, result, useAi)
+      if (creditsRemaining !== null) setCredits(creditsRemaining)
+      if (!text.trim()) {
+        // The detail modal turns this into the explicit 10-credit AI retry;
+        // from a card it's just a toast, since there's nowhere to put a button.
+        if (openResult?.id === result.id) throw new Error('NO_TRANSCRIPT')
+        addToast('This video has no captions to pull. Open it to transcribe with AI.', 'info')
+        return
+      }
+      sendToApp({ targetApp: 'script-architect', targetField: 'winningTranscript', data: text })
+      openApp('script-architect')
+      setOpenResult(null)
+    } catch (e) {
+      if (e instanceof Error && e.message === 'NO_TRANSCRIPT') throw e
+      addToast(humanizeError(e, "Couldn't pull that transcript. Try again in a moment."), 'error')
+    } finally {
+      setBusyId(null)
+      setBusyKind(null)
+    }
+  }, [apiKey, sendToApp, openApp, addToast, openResult])
+
+  const isTikTok = platform === 'tiktok'
+  // A member who picked "Most viewed" on TikTok and switched to Meta has a
+  // persisted sort with no option on this tab — coerce rather than render an
+  // empty select.
+  const sortOptions = SORT_OPTIONS[platform]
+  const activeSort: DiscoverSort = sortOptions.some((o) => o.value === filters.sort)
+    ? filters.sort
+    : 'outlier'
+  // Both derived on every render: moving Min views or Sort re-ranks what's on
+  // screen without spending another credit.
+  const sorted = sortResults(applyMinViews(results, filters.minViews), activeSort)
+
+  return (
+    <div className="flex h-full flex-col">
+      <header className="flex h-[57px] shrink-0 items-center gap-3 border-b border-ink/5 px-4">
+        <SegmentedToggle
+          options={[
+            { value: 'tiktok', label: 'TikTok' },
+            { value: 'meta', label: 'Meta Ads' },
+          ]}
+          value={platform}
+          onChange={(v) => {
+            setPlatform(v)
+            // Results from the other platform would be answering a different
+            // question — clear rather than leave a stale grid under a new tab.
+            setResults([])
+            setCursor(null)
+            setSearched(false)
+          }}
+          fitContent
+          dense
+        />
+
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-600" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void search() }}
+            placeholder={isTikTok ? 'Search TikTok — a product, a pain point, a hook…' : 'Search the Meta Ad Library…'}
+            className="w-full rounded-full border border-ink/10 bg-ink/5 py-2 pl-10 pr-4 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void search()}
+          disabled={!query.trim() || !apiKey || searching}
+          className="flex shrink-0 items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-ink-900 transition-colors hover:bg-ink-200 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {searching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Radar className="h-3.5 w-3.5" />}
+          Search
+        </button>
+
+        {credits !== null && (
+          <span className="shrink-0 rounded-full bg-ink/5 px-2.5 py-1 text-[11px] text-ink-500" title="ScrapeCreators credits remaining">
+            {credits.toLocaleString()} credits
+          </span>
+        )}
+      </header>
+
+      {apiKey && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink/5 px-4 py-2.5">
+          <FilterSelect
+            label="Sort"
+            value={activeSort}
+            options={sortOptions}
+            onChange={(sort) => setFilters((f) => ({ ...f, sort }))}
+          />
+          {isTikTok ? (
+            <>
+              <FilterSelect
+                label="Posted"
+                value={filters.datePosted}
+                options={DATE_OPTIONS}
+                onChange={(datePosted) => setFilters((f) => ({ ...f, datePosted }))}
+              />
+              <FilterSelect
+                label="Min views"
+                value={String(filters.minViews)}
+                options={MIN_VIEW_OPTIONS.map((v) => ({
+                  value: String(v),
+                  label: v === 0 ? 'Any' : v >= 1_000_000 ? `${v / 1_000_000}M+` : `${v / 1000}K+`,
+                }))}
+                onChange={(v) => setFilters((f) => ({ ...f, minViews: Number(v) }))}
+              />
+            </>
+          ) : (
+            <>
+              <FilterSelect
+                label="Country"
+                value={filters.country}
+                options={[
+                  { value: 'US', label: 'United States' },
+                  { value: 'GB', label: 'United Kingdom' },
+                  { value: 'CA', label: 'Canada' },
+                  { value: 'AU', label: 'Australia' },
+                  { value: 'DE', label: 'Germany' },
+                ]}
+                onChange={(country) => setFilters((f) => ({ ...f, country }))}
+              />
+              <FilterSelect
+                label="Status"
+                value={filters.activeOnly ? 'active' : 'all'}
+                options={[
+                  { value: 'active', label: 'Active only' },
+                  { value: 'all', label: 'All ads' },
+                ]}
+                onChange={(v) => setFilters((f) => ({ ...f, activeOnly: v === 'active' }))}
+              />
+            </>
+          )}
+
+          {/* Says out loud that Meta has no performance numbers, so the missing
+              outlier badge reads as honesty rather than a broken feature. */}
+          {!isTikTok && (
+            <span className="ml-auto text-[11px] text-ink-600">
+              Meta publishes no view counts — ads rank by how long they've run.
+            </span>
+          )}
+        </div>
+      )}
+
+      {!apiKey ? (
+        <ConnectKeyPanel onConnect={() => setConnectOpen(true)} />
+      ) : searching ? (
+        <GridCanvas>
+          <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-ink-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Searching {isTikTok ? 'TikTok' : 'the Meta Ad Library'}…
+          </div>
+        </GridCanvas>
+      ) : sorted.length === 0 ? (
+        <GridCanvas>
+          <AwaitingBody
+            icon={Radar}
+            title={searched ? 'No results' : 'Awaiting search'}
+            hint={
+              searched
+                ? 'Nothing came back for that phrase. Try a broader keyword, or widen the date range.'
+                : isTikTok
+                  ? 'Search a phrase and Outliers ranks what comes back by views against each creator’s own following.'
+                  : 'Search a phrase to see the ads running against it, ranked by how long they’ve been live.'
+            }
+          />
+        </GridCanvas>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+            {sorted.map((result) => (
+              <ResultCard
+                key={`${result.platform}:${result.id}`}
+                result={result}
+                onAnalyze={handleAnalyze}
+                onRemix={handleRemix}
+                onOpen={setOpenResult}
+                busy={busyId === result.id ? busyKind : null}
+              />
+            ))}
+          </div>
+
+          {cursor !== null && (
+            <div className="flex justify-center py-6">
+              <button
+                type="button"
+                onClick={() => void search(cursor)}
+                disabled={loadingMore}
+                className="flex items-center gap-2 rounded-full border border-ink/10 px-5 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:opacity-50"
+              >
+                {loadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {loadingMore ? 'Loading…' : 'Load more — 1 credit'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {connectOpen && <ConnectScrapeCreators onClose={() => setConnectOpen(false)} />}
+
+      {openResult && (
+        <ResultDetailModal
+          result={openResult}
+          onClose={() => setOpenResult(null)}
+          onAnalyze={handleAnalyze}
+          onRemix={handleRemix}
+          busy={busyId === openResult.id ? busyKind : null}
+        />
+      )}
+    </div>
+  )
+}
+
+/** A compact labelled select for the filter row. */
+function FilterSelect<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: T
+  options: Array<{ value: T; label: string }>
+  onChange: (value: T) => void
+}) {
+  return (
+    <label className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] py-1.5 pl-3 pr-2 text-[12px]">
+      <span className="text-ink-600">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as T)}
+        className="cursor-pointer bg-transparent pr-1 text-ink-200 outline-none"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value} className="bg-surface-2 text-ink-200">
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  )
+}
+
+/** Shown until a ScrapeCreators key is saved, behind the onboarding popup. */
+function ConnectKeyPanel({ onConnect }: { onConnect: () => void }) {
+  return (
+    <GridCanvas>
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+        <Key className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
+        <p className="text-sm text-ink-500">Connect ScrapeCreators</p>
+        <p className="max-w-[340px] text-xs leading-relaxed text-ink-600">
+          Outliers searches TikTok and the Meta Ad Library on your own key —
+          1 credit a search, and 100 free when you sign up.
+        </p>
+        {/* Reopens the popup rather than linking out, so dismissing the
+            onboarding can't strand a member with nowhere to paste a key. */}
+        <button
+          type="button"
+          onClick={onConnect}
+          className="rounded-full bg-ink px-4 py-2 text-[12px] font-medium text-paper transition-opacity hover:opacity-90"
+        >
+          Connect key
+        </button>
+      </div>
+    </GridCanvas>
+  )
+}

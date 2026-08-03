@@ -5,9 +5,11 @@ import { TEAM } from '../../utils/team'
 import CrabSprite from '../../components/CrabSprite'
 import { DISPLAY_FONT } from './Widget'
 
-// The crew in orbit — the desktop's launcher and its signature. Eight apps,
-// eight planets, the workspace at the centre: the app already frames itself as
+// The crew in orbit — the desktop's launcher and its signature. One planet per
+// crew member, the workspace at the centre: the app already frames itself as
 // one system everything else revolves around, so the dashboard says it outright.
+// The ring spacing tightened when the ninth app (Outliers) joined — the outer
+// radius is pinned by the 400px box, so a new planet divides the same space.
 //
 // Three things keep it usable rather than merely pretty:
 //   · Orbits run in minutes (5 → 15), so a planet is a stationary target at the
@@ -30,15 +32,18 @@ const CENTRE = SIZE / 2
 // outer one would look wrong to anyone who has seen an orrery. The negative
 // delay is what sets each planet's starting angle: it drops the animation into
 // a period already in progress, so they don't launch from a single line.
+// There must be one entry here per TEAM member — the two are zipped by index,
+// so a crew member with no orbit simply never renders.
 const ORBITS = [
-  { radius: 58, period: 300, offset: -16 },   //  20°
-  { radius: 75, period: 372, offset: -160 },  // 155°
-  { radius: 92, period: 444, offset: -358 },  // 290°
-  { radius: 109, period: 520, offset: -94 },  //  65°
-  { radius: 126, period: 600, offset: -334 }, // 200°
-  { radius: 143, period: 688, offset: -640 }, // 335°
-  { radius: 160, period: 780, offset: -238 }, // 110°
-  { radius: 177, period: 880, offset: -598 }, // 245°
+  { radius: 55, period: 300, offset: -16 },   //  20°
+  { radius: 70, period: 366, offset: -160 },  // 155°
+  { radius: 85, period: 432, offset: -358 },  // 290°
+  { radius: 100, period: 500, offset: -94 },  //  65°
+  { radius: 115, period: 570, offset: -334 }, // 200°
+  { radius: 130, period: 645, offset: -640 }, // 335°
+  { radius: 145, period: 725, offset: -238 }, // 110°
+  { radius: 161, period: 800, offset: -598 }, // 245°
+  { radius: 177, period: 880, offset: -430 }, // 175°
 ]
 
 export default function SolarSystem({ className = '' }: { className?: string }) {

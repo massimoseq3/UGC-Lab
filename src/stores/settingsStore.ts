@@ -26,11 +26,16 @@ async function pushProfile(): Promise<void> {
 
 interface SettingsState {
   kieApiKey: string
+  // ScrapeCreators key, powering Outliers. Same doctrine as the kie key: the
+  // member's own, browser-local, never written to Supabase.
+  scrapeCreatorsKey: string
   perAppModel: Record<string, string>
 
   setKieApiKey: (key: string) => void
+  setScrapeCreatorsKey: (key: string) => void
 
   getKieApiKey: () => string
+  getScrapeCreatorsKey: () => string
 
   setAppModel: (appId: string, modelId: string) => void
   getAppModel: (appId: string) => string | undefined
@@ -38,10 +43,16 @@ interface SettingsState {
 
 interface PersistedShape {
   kieApiKey?: string
+  scrapeCreatorsKey?: string
   perAppModel?: Record<string, string>
   // Legacy field — read once during migration, never written again.
   googleApiKey?: string
 }
+
+// Everything persisted under STORAGE_KEY. Named so the write paths below can't
+// silently drop a field the way a hand-built object literal did when the
+// ScrapeCreators key was added to a shape that only listed two.
+type PersistedSettings = Pick<SettingsState, 'kieApiKey' | 'scrapeCreatorsKey' | 'perAppModel'>
 
 const MIGRATIONS_KEY = 'ai-ugc-lab-settings-migrations'
 
@@ -192,7 +203,7 @@ const MODEL_MIGRATIONS: Array<{ name: string; apply: (m: Record<string, string>)
   },
 ]
 
-function loadFromStorage(): { kieApiKey: string; perAppModel: Record<string, string> } {
+function loadFromStorage(): PersistedSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
@@ -213,26 +224,39 @@ function loadFromStorage(): { kieApiKey: string; perAppModel: Record<string, str
           migrated = true
         }
       }
-      if (migrated) {
-        localStorage.setItem(MIGRATIONS_KEY, JSON.stringify(ranMigrations))
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-          kieApiKey: parsed.kieApiKey ?? '',
-          perAppModel,
-        }))
-      }
-      return {
+      const next: PersistedSettings = {
         kieApiKey: parsed.kieApiKey ?? '',
+        scrapeCreatorsKey: parsed.scrapeCreatorsKey ?? '',
         perAppModel,
       }
+      if (migrated) {
+        localStorage.setItem(MIGRATIONS_KEY, JSON.stringify(ranMigrations))
+        // Writes the WHOLE snapshot. An earlier version rebuilt a literal with
+        // only the two fields it knew about, which would wipe any key added to
+        // the shape later the first time a migration ran.
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+      }
+      return next
     }
   } catch {
     // Corrupted data — start fresh
   }
-  return { kieApiKey: '', perAppModel: {} }
+  return { kieApiKey: '', scrapeCreatorsKey: '', perAppModel: {} }
 }
 
-function saveToStorage(state: { kieApiKey: string; perAppModel: Record<string, string> }) {
+function saveToStorage(state: PersistedSettings) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+}
+
+// The persisted slice of the live store. Every setter spreads this and
+// overrides its own field, so adding a key to PersistedSettings can never
+// leave one setter quietly writing a snapshot that drops it.
+function snapshot(s: SettingsState): PersistedSettings {
+  return {
+    kieApiKey: s.kieApiKey,
+    scrapeCreatorsKey: s.scrapeCreatorsKey,
+    perAppModel: s.perAppModel,
+  }
 }
 
 // Wipe the in-memory settings and the localStorage snapshot. Called on
@@ -240,7 +264,7 @@ function saveToStorage(state: { kieApiKey: string; perAppModel: Record<string, s
 // up the previous user's kie.ai API key or per-app model picks.
 export function resetSettingsStore(): void {
   try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
-  useSettingsStore.setState({ kieApiKey: '', perAppModel: {} })
+  useSettingsStore.setState({ kieApiKey: '', scrapeCreatorsKey: '', perAppModel: {} })
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -250,9 +274,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     // The kie.ai key lives in localStorage only — it is never written to the
     // cloud. No pushProfile() call here (per-app model picks still sync via
     // setAppModel below).
-    const next = { kieApiKey: key, perAppModel: get().perAppModel }
-    saveToStorage(next)
+    saveToStorage({ ...snapshot(get()), kieApiKey: key })
     set({ kieApiKey: key })
+  },
+
+  setScrapeCreatorsKey: (key) => {
+    // Same rule as the kie key above: browser-local, never synced.
+    saveToStorage({ ...snapshot(get()), scrapeCreatorsKey: key })
+    set({ scrapeCreatorsKey: key })
   },
 
   getKieApiKey: () => {
@@ -261,10 +290,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     return key
   },
 
+  getScrapeCreatorsKey: () => {
+    const key = get().scrapeCreatorsKey
+    if (!key) throw new Error('No ScrapeCreators API key configured. Open Settings to add it.')
+    return key
+  },
+
   setAppModel: (appId, modelId) => {
-    const next = { kieApiKey: get().kieApiKey, perAppModel: { ...get().perAppModel, [appId]: modelId } }
-    saveToStorage(next)
-    set({ perAppModel: next.perAppModel })
+    const perAppModel = { ...get().perAppModel, [appId]: modelId }
+    saveToStorage({ ...snapshot(get()), perAppModel })
+    set({ perAppModel })
     pushProfile().catch(() => { /* toast already raised */ })
   },
 

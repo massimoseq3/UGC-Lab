@@ -32,7 +32,12 @@ import { useBackdropClose } from '../hooks/useBackdropClose'
 
 const SERIF = { fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }
 
-const DEFAULT_CAPTION = 'Eight teammates, one workspace — and everything they make lands in the shared Bank.'
+// Counted off TEAM rather than written out, so adding a crew member can't
+// leave the headline claiming the old number (it said "Eight" for a day after
+// Outliers made nine).
+const TEAM_COUNT_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
+const teamCountWord = TEAM_COUNT_WORDS[TEAM.length] ?? String(TEAM.length)
+const DEFAULT_CAPTION = `${teamCountWord[0].toUpperCase()}${teamCountWord.slice(1)} teammates, one workspace — and everything they make lands in the shared Bank.`
 
 // The Create chain, in dock order. Category comes from constants.ts so this
 // can't drift if an app moves group.
@@ -160,7 +165,14 @@ function Crew({ onVisit }: { onVisit: (appId: string) => void }) {
       </p>
 
       <SectionLabel className="mt-4">Always on call</SectionLabel>
-      <div className="mt-2 grid grid-cols-3 gap-1">
+      {/* Column count follows the roster: hardcoded at 3, the fourth on-call
+          member (Outliers) wrapped onto a line of its own, left-aligned under
+          the others. The workflow row above is a fixed chain of five, so only
+          this half moves when an app is added. */}
+      <div
+        className="mt-2 grid gap-1"
+        style={{ gridTemplateColumns: `repeat(${ON_CALL.length}, minmax(0, 1fr))` }}
+      >
         {ON_CALL.map((member) => (
           <CrewCard key={member.appId} member={member} onVisit={onVisit} onHover={setHovered} />
         ))}
