@@ -255,7 +255,12 @@ export default function Discover() {
   // something. Errors surface inside the modal, so nothing is toasted here.
   const openCard = useCallback((result: DiscoverResult) => {
     setOpenResult(result)
-    void ensureTranscript(result).catch(() => {})
+    // TikTok only. Meta's ad-transcript endpoint reads Facebook's exposed
+    // captions, which Ad Library video ads don't carry, so it came back empty
+    // every time — the modal drops the Transcript block there and routes the
+    // words through Analyze Ad instead. `fetchResultTranscript` keeps its Meta
+    // branch so re-enabling this is a one-line change if that ever improves.
+    if (result.platform === 'tiktok') void ensureTranscript(result).catch(() => {})
   }, [ensureTranscript])
 
   const isTikTok = platform === 'tiktok'
@@ -468,6 +473,8 @@ export default function Discover() {
           onClose={() => setOpenResult(null)}
           onAnalyze={handleAnalyze}
           onRemix={handleRemix}
+          onSave={handleSave}
+          saved={savedKeys.has(`${openResult.platform}:${openResult.id}`)}
           busy={busyId === openResult.id ? busyKind : null}
         />
       )}

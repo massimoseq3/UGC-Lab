@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowUpRight, Eye, ExternalLink, Loader2, PenLine, Sparkles, X } from 'lucide-react'
+import { ArrowUpRight, Bookmark, BookmarkCheck, Eye, ExternalLink, Loader2, PenLine, Sparkles, X } from 'lucide-react'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
@@ -18,6 +18,8 @@ interface ResultDetailModalProps {
   /** `useAi` spends 10 extra credits, so it's only ever passed from the
       explicit retry below — never from the first attempt. */
   onRemix: (result: DiscoverResult, useAi?: boolean) => Promise<void>
+  onSave: (result: DiscoverResult) => void
+  saved?: boolean
   busy?: 'analyze' | 'remix' | 'save' | null
 }
 
@@ -27,6 +29,8 @@ export default function ResultDetailModal({
   onClose,
   onAnalyze,
   onRemix,
+  onSave,
+  saved = false,
   busy = null,
 }: ResultDetailModalProps) {
   // Called above any early return — the hook order has to be stable.
@@ -37,6 +41,7 @@ export default function ResultDetailModal({
 
   const er = result.stats ? engagementRate(result.stats) : null
   const hasTranscript = transcript.phase === 'ready'
+  const isTikTok = result.platform === 'tiktok'
 
   return (
     <div
@@ -136,9 +141,13 @@ export default function ResultDetailModal({
               </p>
             </Section>
 
-            {/* The spoken words, which is what Remix actually sends — shown
-                here so you can read them before deciding, rather than finding
-                out what you sent once you're already in Scripts. */}
+            {/* TikTok only. Meta's ad-transcript endpoint returns nothing for
+                the ads that actually matter here — it reads Facebook's exposed
+                captions, and video ads in the Ad Library don't carry them — so
+                showing an empty Transcript block on every Meta ad was a promise
+                the platform can't keep. On that tab the route to the words is
+                Analyze Ad, which reads the video itself. */}
+            {result.platform === 'tiktok' && (
             <Section label="Transcript">
               {transcript.phase === 'loading' && (
                 <p className="flex items-center gap-2 text-[12px] text-ink-500">
@@ -154,21 +163,17 @@ export default function ResultDetailModal({
               {transcript.phase === 'empty' && (
                 <div>
                   <p className="text-[12px] leading-relaxed text-ink-500">
-                    {result.platform === 'meta'
-                      ? 'No captions on this ad — it may be an image, or have no speech.'
-                      : 'This video has no captions to pull.'}
+                    This video has no captions to pull.
                   </p>
-                  {result.platform === 'tiktok' && (
-                    <button
-                      type="button"
-                      onClick={() => void onRemix(result, true)}
-                      disabled={busy === 'remix'}
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:opacity-50"
-                    >
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Transcribe with AI — 10 credits
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => void onRemix(result, true)}
+                    disabled={busy === 'remix'}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:opacity-50"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Transcribe with AI — 10 credits
+                  </button>
                 </div>
               )}
               {transcript.phase === 'error' && (
@@ -177,6 +182,7 @@ export default function ResultDetailModal({
                 </p>
               )}
             </Section>
+            )}
 
             {result.ad?.landingUrl && (
               <a
@@ -191,34 +197,66 @@ export default function ResultDetailModal({
             )}
           </div>
 
-          {/* Both buttons LEAVE this app, so both carry the arrow — the label
-              names the job and the glyph says you're being taken somewhere. */}
-          <footer className="flex shrink-0 gap-2 border-t border-ink/5 p-4">
-            <button
-              type="button"
-              onClick={() => onAnalyze(result)}
-              disabled={busy === 'analyze' || !result.videoUrl}
-              title="Opens in Ad Analyzer"
-              className="flex flex-1 items-center justify-center gap-2 rounded-full bg-ink py-2.5 text-[13px] font-medium text-ink-900 transition-colors hover:bg-ink-200 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {busy === 'analyze' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-              Analyze Ad
-              <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
-            </button>
-            <button
-              type="button"
-              onClick={() => void onRemix(result)}
-              // Held back until there are words to send: the whole point of
-              // this button is the transcript, and firing it on an empty one
-              // would bounce you to Scripts with nothing in the box.
-              disabled={busy === 'remix' || !hasTranscript}
-              title={hasTranscript ? 'Opens in Scripts' : 'No transcript to remix yet'}
-              className="flex flex-1 items-center justify-center gap-2 rounded-full border border-ink/10 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {busy === 'remix' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
-              Remix Transcript
-              <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
-            </button>
+          {/* Anything that LEAVES the app carries the arrow — the label names
+              the job and the glyph says you're being taken somewhere. On Meta,
+              Analyze is also the only route to the words, so it stands alone
+              on the top row rather than beside a Remix that can't fire. */}
+          <footer className="shrink-0 border-t border-ink/5 p-4">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onAnalyze(result)}
+                disabled={busy === 'analyze' || !result.videoUrl}
+                title={isTikTok ? 'Opens in Ad Analyzer' : 'Reads the video itself — the way to get this ad’s script'}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full bg-ink py-2.5 text-[13px] font-medium text-ink-900 transition-colors hover:bg-ink-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {busy === 'analyze' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                Analyze Ad
+                <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
+              </button>
+              {isTikTok && (
+                <button
+                  type="button"
+                  onClick={() => void onRemix(result)}
+                  // Held back until there are words to send: the whole point of
+                  // this button is the transcript, and firing it on an empty
+                  // one would bounce you to Scripts with nothing in the box.
+                  disabled={busy === 'remix' || !hasTranscript}
+                  title={hasTranscript ? 'Opens in Scripts' : 'No transcript to remix yet'}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-full border border-ink/10 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {busy === 'remix' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+                  Remix Transcript
+                  <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
+                </button>
+              )}
+            </div>
+
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => onSave(result)}
+                disabled={busy === 'save'}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-full border py-2.5 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  saved
+                    ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300 light:text-emerald-700'
+                    : 'border-ink/10 text-ink-200 hover:border-ink/20 hover:bg-ink/5'
+                }`}
+              >
+                {busy === 'save'
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+                {saved ? 'Saved to Swipe File' : 'Save to Swipe File'}
+              </button>
+              <button
+                type="button"
+                onClick={() => window.open(result.postUrl, '_blank', 'noopener,noreferrer')}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-ink/10 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5"
+              >
+                {isTikTok ? 'Open on TikTok' : 'Open in Meta Ad Library'}
+                <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
+              </button>
+            </div>
           </footer>
         </div>
       </div>

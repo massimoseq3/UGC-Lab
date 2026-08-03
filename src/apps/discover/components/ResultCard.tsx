@@ -1,4 +1,4 @@
-import { memo, type ElementType } from 'react'
+import { memo, useState, type ElementType } from 'react'
 import {
   Bookmark, BookmarkCheck, Eye, ExternalLink, Heart, ImageOff, Loader2,
   MessageCircle, PenLine, Play, Share2, Volume2, VolumeX,
@@ -28,8 +28,15 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onOpen, saved = fa
   const video = useInlineVideo()
   const hasVideo = !!result.videoUrl
   const er = result.stats ? engagementRate(result.stats) : null
+
+  // TikTok's image CDN refuses plenty of its own cover URLs from a browser, so
+  // a card that has a coverUrl still can't be trusted to render one — the grid
+  // came back as rows of black rectangles with a broken-image glyph in each.
+  // Failing over to the video means the card shows SOMETHING either way.
+  const [coverFailed, setCoverFailed] = useState(false)
+  const showCover = !!result.coverUrl && !coverFailed
   /** A clip with nothing to show behind it — it has to be its own thumbnail. */
-  const posterless = hasVideo && !result.coverUrl
+  const posterless = hasVideo && !showCover
 
   return (
     <div
@@ -45,11 +52,15 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onOpen, saved = fa
               which is exactly where UGC puts its hook text and its caption.
               Cropping the hook off an ad-research tool defeats the tool. */}
       <div className="relative aspect-[4/5] overflow-hidden bg-black">
-        {result.coverUrl && (
+        {showCover && (
           <img
             src={result.coverUrl}
             alt=""
             loading="lazy"
+            // A broken <img> doesn't just fail quietly — the browser paints its
+            // own placeholder box, which is where the stray outlines around
+            // every TikTok card were coming from. Drop the element entirely.
+            onError={() => setCoverFailed(true)}
             className="absolute inset-0 h-full w-full object-contain"
           />
         )}
@@ -58,18 +69,20 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onOpen, saved = fa
             {...video.videoProps}
             // `#t=0.1` asks the browser to seek a tenth of a second in, which
             // makes it decode and PAINT that frame. Without it a poster-less
-            // <video> renders as an empty black box — which is exactly how
-            // Meta video ads looked, since many carry no poster image at all.
-            src={posterless ? `${result.videoUrl}#t=0.1` : result.videoUrl}
-            poster={result.coverUrl}
-            preload={posterless ? 'metadata' : undefined}
+            // <video> renders as an empty black box. The fragment is always in
+            // the src (it costs nothing when a cover is showing) so that a
+            // cover FAILING later only flips `preload` — changing the src would
+            // tear down and reload the element mid-grid.
+            src={`${result.videoUrl}#t=0.1`}
+            poster={showCover ? result.coverUrl : undefined}
+            preload={posterless ? 'metadata' : 'none'}
             // A poster-less clip IS the thumbnail, so it can't fade out.
             className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-200 ${
               video.playing || posterless ? 'opacity-100' : 'opacity-0'
             }`}
           />
         )}
-        {!hasVideo && !result.coverUrl && (
+        {!hasVideo && !showCover && (
           <div className="absolute inset-0 flex items-center justify-center">
             <ImageOff className="h-6 w-6 text-white/25" strokeWidth={1.5} />
           </div>
@@ -192,13 +205,24 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onOpen, saved = fa
             {result.platform === 'tiktok' ? `@${result.author.handle}` : result.author.name}
           </span>
         </div>
-        {result.author.followerCount != null && (
-          <span className="-mt-1.5 pl-[26px] text-[10px] text-ink-600">
-            {formatCount(result.author.followerCount)} {result.platform === 'tiktok' ? 'followers' : 'likes'}
-          </span>
-        )}
+        {/* Rendered even when the count is missing, so the caption below starts
+            at the same height on every card in the row. */}
+        <span className="-mt-1.5 flex h-[14px] items-center gap-1 pl-[26px] text-[10px] text-ink-600">
+          {result.author.followerCount != null && (
+            <>
+              {result.platform === 'meta' && <Heart className="h-2.5 w-2.5 shrink-0" />}
+              {formatCount(result.author.followerCount)} {result.platform === 'tiktok' ? 'followers' : 'likes'}
+            </>
+          )}
+        </span>
 
-        <p className="line-clamp-2 text-[11px] leading-relaxed text-ink-500">
+        {/* EXACTLY two lines tall, whatever the caption. The stats row below is
+            meant to be read ACROSS the grid — comparing five numbers on four
+            cards at once — which only works if it sits at the same height on
+            every card. `leading-relaxed` is 1.625, so two lines is 3.25em; a
+            min-height short of that (2.6em) still let a two-line caption push
+            its own card 7px lower than its neighbours. */}
+        <p className="line-clamp-2 h-[3.25em] overflow-hidden text-[11px] leading-relaxed text-ink-500">
           {result.caption || 'No caption'}
         </p>
 
