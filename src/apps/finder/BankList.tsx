@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
-import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, Loader2, ChevronDown, Sparkles, Check, LayoutGrid, Copy, Bookmark, Star, Palette } from 'lucide-react'
+import { useState, useMemo, useRef, useEffect, type ElementType } from 'react'
+import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, Loader2, ChevronDown, Sparkles, Check, LayoutGrid, Copy, Bookmark, Star, Palette, Eye, Heart, MessageCircle, Share2 } from 'lucide-react'
 import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, SwipeItem } from '../../stores/types'
 import type { BankType } from '../../utils/constants'
 import type { ModelFilter } from './Finder'
@@ -12,6 +12,9 @@ import { copyToClipboard } from '../../utils/clipboard'
 import GeneratingBackdrop from '../../components/GeneratingBackdrop'
 import { TileActionStack, TileActionButton, TileStarButton, TileDeleteButton } from '../../components/tileActions'
 import { sortByOrder, type SortOrder } from './bankSort'
+// The swipe file is Outliers' data shown in the Bank, and its cards have to
+// read the same in both places — one formatter, not a second copy that drifts.
+import { formatCount } from '../discover/services/scoring'
 import { groupByDay, sectionLabel } from '../../utils/history'
 
 // Custom sort dropdown — replaces the native <select> so the menu is themed
@@ -502,6 +505,12 @@ function StyleCard({ item, onEdit, onDelete }: { item: StylePreset; onEdit: () =
  * thumbnail is our own stored asset (see SwipeItem) — every URL on the row is
  * a signed CDN link that expires, so the picture is the one part guaranteed
  * still to be there in a month.
+ *
+ * Shaped exactly like the Outliers card it was saved from: the picture in its
+ * own 4:5 frame, then a static block of author / caption / numbers underneath.
+ * It used to read its caption off a gradient laid over the frame, which put
+ * text across the ad's own hook — the one thing you saved it for — and left the
+ * snapshotted stats with nowhere to live.
  */
 function SwipeCard({ item, onDelete }: { item: SwipeItem; onDelete: () => void }) {
   const [confirm, setConfirm] = useState(false)
@@ -518,57 +527,110 @@ function SwipeCard({ item, onDelete }: { item: SwipeItem; onDelete: () => void }
     setTimeout(() => setCopied(false), 1500)
   }
 
+  // Only rendered when the platform gave us numbers — Meta publishes none, so
+  // a Meta swipe shows its runtime badge and nothing else.
+  const hasStats = item.views != null
+
   return (
     <div
       onClick={() => window.open(item.postUrl, '_blank', 'noopener,noreferrer')}
-      className="group relative flex aspect-[4/5] cursor-pointer flex-col overflow-hidden rounded-2xl border border-ink/5 bg-black transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
+      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.02] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
     >
-      {url
-        ? <img src={url} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-contain" />
-        : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Bookmark className="h-6 w-6 text-white/20" strokeWidth={1.5} />
-          </div>
-        )}
+      <div className="relative aspect-[4/5] overflow-hidden bg-black">
+        {url
+          ? <img src={url} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-contain" />
+          : (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Bookmark className="h-6 w-6 text-white/20" strokeWidth={1.5} />
+            </div>
+          )}
 
-      <div className="pointer-events-none absolute left-2 top-2 flex flex-col gap-1">
-        {item.outlierMultiple != null && (
-          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-semibold text-black">
-            {item.outlierMultiple >= 10 ? Math.round(item.outlierMultiple) : item.outlierMultiple.toFixed(1)}x
-          </span>
-        )}
-        {item.daysRunning != null && (
-          <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-semibold text-white">
-            {item.daysRunning}d running
-          </span>
-        )}
+        <div className="pointer-events-none absolute left-2 top-2 flex flex-col gap-1">
+          {item.outlierMultiple != null && (
+            <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-semibold text-black shadow-sm">
+              {item.outlierMultiple >= 10 ? Math.round(item.outlierMultiple) : item.outlierMultiple.toFixed(1)}x
+            </span>
+          )}
+          {item.daysRunning != null && (
+            <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm">
+              {item.daysRunning}d running
+            </span>
+          )}
+        </div>
+
+        <TileActionStack forceVisible={confirm}>
+          <TileStarButton starred={!!item.starred} onToggle={() => toggleStar('swipes', item.id)} />
+          <TileActionButton
+            title={copied ? 'Copied' : item.transcript ? 'Copy transcript' : 'Copy caption'}
+            onClick={handleCopy}
+          >
+            {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+          </TileActionButton>
+          <TileDeleteButton onDelete={onDelete} onArmedChange={setConfirm} />
+        </TileActionStack>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-3 pt-12">
-        <span className="block truncate text-[13px] font-semibold tracking-tight text-zinc-100">
+      <div className="flex flex-col gap-2 p-2.5">
+        <span className="truncate text-[13px] font-semibold tracking-tight text-ink-200">
           {item.platform === 'tiktok' ? `@${item.authorHandle}` : item.authorName}
         </span>
-        <span className="mt-0.5 block line-clamp-2 text-[10px] leading-snug text-zinc-400">{item.caption}</span>
-      </div>
+        {/* Rendered even when the count is missing, so the caption below starts
+            at the same height on every card in the row. */}
+        <span className="-mt-1.5 flex h-[14px] items-center gap-1 text-[10px] text-ink-600">
+          {item.followerCount != null && (
+            <>
+              {item.platform === 'meta' && <Heart className="h-2.5 w-2.5 shrink-0" />}
+              {formatCount(item.followerCount)} {item.platform === 'tiktok' ? 'followers' : 'likes'}
+            </>
+          )}
+        </span>
 
-      <TileActionStack forceVisible={confirm}>
-        <TileStarButton starred={!!item.starred} onToggle={() => toggleStar('swipes', item.id)} />
-        <TileActionButton
-          title={copied ? 'Copied' : item.transcript ? 'Copy transcript' : 'Copy caption'}
-          onClick={handleCopy}
-        >
-          {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
-        </TileActionButton>
-        <TileDeleteButton onDelete={onDelete} onArmedChange={setConfirm} />
-      </TileActionStack>
+        {/* Exactly two lines tall, whatever the caption — same reasoning as the
+            Outliers grid: the numbers under it are read ACROSS the row. */}
+        <p className="line-clamp-2 h-[3.25em] overflow-hidden text-[11px] leading-relaxed text-ink-500">
+          {item.caption || 'No caption'}
+        </p>
+
+        {hasStats && (
+          <div className="flex items-center justify-between gap-1 border-t border-ink/5 pt-2 text-[10px] text-ink-500">
+            <SwipeStat icon={Eye} value={item.views} title="Views" strong />
+            <SwipeStat icon={Heart} value={item.likes} title="Likes" />
+            <SwipeStat icon={MessageCircle} value={item.comments} title="Comments" />
+            <SwipeStat icon={Share2} value={item.shares} title="Shares" />
+            <SwipeStat icon={Bookmark} value={item.saves} title="Saves" />
+          </div>
+        )}
+      </div>
     </div>
+  )
+}
+
+/** One glyph-led figure in a swipe card's snapshotted engagement row. */
+function SwipeStat({
+  icon: Icon,
+  value,
+  title,
+  strong = false,
+}: {
+  icon: ElementType
+  value: number | undefined
+  title: string
+  strong?: boolean
+}) {
+  return (
+    <span className={`flex items-center gap-0.5 ${strong ? 'text-ink-200' : ''}`} title={title}>
+      <Icon className="h-3 w-3 shrink-0" />
+      <span className="tabular-nums">{formatCount(value)}</span>
+    </span>
   )
 }
 
 function SwipesList({ items, onDelete, sort }: { items: SwipeItem[]; onDelete: (id: string) => void; sort: SortOrder }) {
   const sorted = useMemo(() => sortByOrder(items, sort, (s) => s.authorName), [items, sort])
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+    // Five across, matching the Outliers grid: the card now carries a five-figure
+    // engagement row, which stops being readable at six columns.
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {sorted.map((s) => (
         <SwipeCard key={s.id} item={s} onDelete={() => onDelete(s.id)} />
       ))}

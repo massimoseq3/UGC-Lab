@@ -1,11 +1,12 @@
 import { memo, useState, type ElementType } from 'react'
 import {
-  Bookmark, BookmarkCheck, Eye, ExternalLink, Heart, ImageOff, Loader2,
-  MessageCircle, PenLine, Play, Share2, Volume2, VolumeX,
+  Bookmark, BookmarkCheck, Download, Eye, ExternalLink, Heart, ImageOff, Loader2,
+  MessageCircle, Pause, PenLine, Play, Share2, Volume2, VolumeX,
 } from 'lucide-react'
 import { TileActionStack, TileActionButton } from '../../../components/tileActions'
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { engagementRate, formatCount, formatMultiple, formatRate } from '../services/scoring'
+import type { DiscoverAction } from '../Discover'
 import type { DiscoverResult } from '../types'
 
 // The action icons are the DESTINATION app's dock glyph — Eye is Ad Analyzer,
@@ -17,14 +18,16 @@ interface ResultCardProps {
   onAnalyze: (result: DiscoverResult) => void
   onRemix: (result: DiscoverResult) => void
   onSave: (result: DiscoverResult) => void
+  /** Saves the ad's video to the member's own disk. */
+  onDownload: (result: DiscoverResult) => void
   onOpen: (result: DiscoverResult) => void
   /** Already in the swipe file — the button becomes a filled un-save. */
   saved?: boolean
   /** Which action is mid-flight, so its button shows a spinner. */
-  busy?: 'analyze' | 'remix' | 'save' | null
+  busy?: DiscoverAction | null
 }
 
-function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onOpen, saved = false, busy = null }: ResultCardProps) {
+function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen, saved = false, busy = null }: ResultCardProps) {
   const video = useInlineVideo()
   const hasVideo = !!result.videoUrl
   const er = result.stats ? engagementRate(result.stats) : null
@@ -129,8 +132,23 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onOpen, saved = fa
           </span>
         )}
 
-        <TileActionStack hidden={video.watching} forceVisible={saved}>
-          {/* Save leads the stack and, once filed, stays visible without a
+        {/* Deliberately NOT hidden while the clip is playing. On a generated
+            media tile the picture is the point, so the stack steps aside — but
+            these are research cards, and Save / Analyze / Remix are decisions
+            you make WHILE watching the ad. Stepping aside meant pausing the
+            video to reach the button that saves it. */}
+        <TileActionStack forceVisible={saved}>
+          {/* Download leads, per the canonical stack order. */}
+          <TileActionButton
+            title="Download the video"
+            onClick={() => onDownload(result)}
+            disabled={busy === 'download' || !hasVideo}
+          >
+            {busy === 'download'
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : <Download className="h-3.5 w-3.5" />}
+          </TileActionButton>
+          {/* Save sits under it and, once filed, stays visible without a
               hover — same rule as TileStarButton: a pin you can't see isn't
               telling you anything. */}
           <TileActionButton
@@ -181,7 +199,9 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onOpen, saved = fa
               title={video.watching ? 'Pause' : 'Play with sound'}
               className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white transition-colors hover:bg-black/70"
             >
-              <Play className="h-3 w-3" />
+              {/* The glyph has to agree with the title — a Play triangle on a
+                  button whose job is Pause is why pausing felt like a hunt. */}
+              {video.watching ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
             </button>
             <button
               type="button"
