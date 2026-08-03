@@ -67,7 +67,7 @@ export const CATEGORY_LABELS: Record<AppCategory, string> = {
   system: 'System',
 }
 
-export type BankType = 'products' | 'models' | 'scripts' | 'voices' | 'brolls' | 'styles'
+export type BankType = 'products' | 'models' | 'scripts' | 'voices' | 'brolls' | 'styles' | 'swipes'
 
 export const BANK_CONFIG: Record<BankType, { label: string; icon: ElementType; accent: string }> = {
   products: { label: 'Products', icon: Package, accent: '#4C1D95' },
@@ -76,6 +76,8 @@ export const BANK_CONFIG: Record<BankType, { label: string; icon: ElementType; a
   voices: { label: 'Voices', icon: Mic, accent: '#007AFF' },
   brolls: { label: 'B-Rolls', icon: Film, accent: '#7165FF' },
   styles: { label: 'Visual Styles', icon: Palette, accent: '#0D9488' },
+  // The swipe file behind Outliers — same gold accent as the app that fills it.
+  swipes: { label: 'Swipe File', icon: Bookmark, accent: '#D9A404' },
 }
 
 export function getAppConfig(appId: string): AppConfig | undefined {

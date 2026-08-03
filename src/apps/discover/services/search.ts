@@ -97,21 +97,31 @@ function normaliseMeta(ad: MetaAdItem): DiscoverResult | null {
   if (!id) return null
 
   const snap = ad.snapshot ?? {}
-  const video = snap.videos?.[0]
-  const image = snap.images?.[0]
+
+  // Meta files an ad's creative in one of four places depending on its format,
+  // and a plain video ad populates ONLY `videos` — no images and, in the live
+  // payload, no `video_preview_image_url` either. Reading just videos[0] +
+  // images[0] therefore left every carousel and every poster-less video ad
+  // with no cover at all, which is what rendered them as empty black tiles.
+  const video = snap.videos?.[0] ?? snap.extra_videos?.[0] ?? snap.cards?.[0]
+  const image = snap.images?.[0] ?? snap.extra_images?.[0] ?? snap.cards?.[0]
 
   return {
     id,
     platform: 'meta',
-    // The ad's body copy IS its script — that's what the member wants to read,
-    // and on Meta there's no separate transcript endpoint feeding the remix.
+    // The written caption. NOT the script — that's the transcript, fetched
+    // separately, and the modal labels the two apart.
     caption: snap.body?.text ?? snap.title ?? '',
     postUrl: ad.url ?? `https://www.facebook.com/ads/library/?id=${id}`,
+    // May be undefined even now (a video ad with no poster anywhere). The card
+    // handles that by painting a frame of the video itself.
     coverUrl:
       video?.video_preview_image_url ??
       image?.original_image_url ??
       image?.resized_image_url,
-    videoUrl: video?.video_hd_url ?? video?.video_sd_url,
+    videoUrl:
+      video?.video_hd_url ?? video?.video_sd_url ??
+      video?.video_hd_handle ?? video?.video_sd_handle,
     createdAt: ad.start_date ? ad.start_date * 1000 : 0,
     author: {
       handle: ad.page_name ?? snap.page_name ?? '',
@@ -238,6 +248,7 @@ export async function runSearch(
     query,
     country: filters.country,
     status: filters.activeOnly ? 'ACTIVE' : 'ALL',
+    mediaType: filters.mediaType,
     exactPhrase: filters.exactPhrase,
     cursor: typeof cursor === 'string' ? cursor : undefined,
   })

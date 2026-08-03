@@ -1,7 +1,7 @@
 import { memo, type ElementType } from 'react'
 import {
-  Bookmark, Eye, ExternalLink, Heart, Loader2, MessageCircle,
-  PenLine, Play, Share2, Volume2, VolumeX,
+  Bookmark, BookmarkCheck, Eye, ExternalLink, Heart, ImageOff, Loader2,
+  MessageCircle, PenLine, Play, Share2, Volume2, VolumeX,
 } from 'lucide-react'
 import { TileActionStack, TileActionButton } from '../../../components/tileActions'
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
@@ -16,15 +16,20 @@ interface ResultCardProps {
   result: DiscoverResult
   onAnalyze: (result: DiscoverResult) => void
   onRemix: (result: DiscoverResult) => void
+  onSave: (result: DiscoverResult) => void
   onOpen: (result: DiscoverResult) => void
+  /** Already in the swipe file — the button becomes a filled un-save. */
+  saved?: boolean
   /** Which action is mid-flight, so its button shows a spinner. */
-  busy?: 'analyze' | 'remix' | null
+  busy?: 'analyze' | 'remix' | 'save' | null
 }
 
-function ResultCardImpl({ result, onAnalyze, onRemix, onOpen, busy = null }: ResultCardProps) {
+function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onOpen, saved = false, busy = null }: ResultCardProps) {
   const video = useInlineVideo()
   const hasVideo = !!result.videoUrl
   const er = result.stats ? engagementRate(result.stats) : null
+  /** A clip with nothing to show behind it — it has to be its own thumbnail. */
+  const posterless = hasVideo && !result.coverUrl
 
   return (
     <div
@@ -51,12 +56,23 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onOpen, busy = null }: Res
         {hasVideo && (
           <video
             {...video.videoProps}
-            src={result.videoUrl}
+            // `#t=0.1` asks the browser to seek a tenth of a second in, which
+            // makes it decode and PAINT that frame. Without it a poster-less
+            // <video> renders as an empty black box — which is exactly how
+            // Meta video ads looked, since many carry no poster image at all.
+            src={posterless ? `${result.videoUrl}#t=0.1` : result.videoUrl}
             poster={result.coverUrl}
+            preload={posterless ? 'metadata' : undefined}
+            // A poster-less clip IS the thumbnail, so it can't fade out.
             className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-200 ${
-              video.playing ? 'opacity-100' : 'opacity-0'
+              video.playing || posterless ? 'opacity-100' : 'opacity-0'
             }`}
           />
+        )}
+        {!hasVideo && !result.coverUrl && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <ImageOff className="h-6 w-6 text-white/25" strokeWidth={1.5} />
+          </div>
         )}
 
         {/* Badge: an outlier multiple where we have one, days-running where we
@@ -67,8 +83,13 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onOpen, busy = null }: Res
               {formatMultiple(result.outlier.multiple)}
             </span>
           )}
+          {/* Green, not the house monochrome. On the Meta tab this is the ONLY
+              performance signal there is — a long-running ad is a profitable
+              one — so it has to read as a score at a glance rather than as
+              another grey timestamp. Emerald matches the app's other
+              "this is good" affordance (the saved/connected states). */}
           {result.ad?.daysRunning != null && (
-            <span className="rounded-full bg-black/70 px-2 py-0.5 text-[11px] font-medium text-white">
+            <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-semibold text-white shadow-sm">
               {result.ad.daysRunning}d running
             </span>
           )}
@@ -95,7 +116,22 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onOpen, busy = null }: Res
           </span>
         )}
 
-        <TileActionStack hidden={video.watching}>
+        <TileActionStack hidden={video.watching} forceVisible={saved}>
+          {/* Save leads the stack and, once filed, stays visible without a
+              hover — same rule as TileStarButton: a pin you can't see isn't
+              telling you anything. */}
+          <TileActionButton
+            title={saved ? 'Remove from swipe file' : 'Save to swipe file'}
+            onClick={() => onSave(result)}
+            tone={saved ? 'saved' : 'default'}
+            disabled={busy === 'save'}
+          >
+            {busy === 'save'
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              : saved
+                ? <BookmarkCheck className="h-3.5 w-3.5" />
+                : <Bookmark className="h-3.5 w-3.5" />}
+          </TileActionButton>
           <TileActionButton
             title="Analyze Ad — opens in Ad Analyzer"
             onClick={() => onAnalyze(result)}

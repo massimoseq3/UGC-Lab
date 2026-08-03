@@ -22,6 +22,7 @@ import { assetIdFromRef, deleteAsset, isAssetRef } from './assetStore'
 // type-only import of BankKey keeps this free of the cloudSync import cycle.
 const BANK_KEYS = Object.keys({
   products: true, models: true, scripts: true, voices: true, brolls: true, styles: true,
+  swipes: true,
   voiceHistory: true, videoHistory: true, imageHistory: true, musicHistory: true,
   scriptHistory: true, brollHistory: true, characterHistory: true, adAnatomyHistory: true,
   usageDays: true,

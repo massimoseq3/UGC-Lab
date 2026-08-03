@@ -6,6 +6,7 @@
 
 import { fetchMetaAdTranscript, fetchTikTokTranscript, vttToPlainText } from '../../../utils/scrapecreators'
 import { ensureFreshSession } from '../../../lib/supabase'
+import { saveAsset } from '../../../utils/assetStore'
 import type { DiscoverResult } from '../types'
 
 /**
@@ -55,6 +56,30 @@ export async function downloadResultVideo(result: DiscoverResult): Promise<File>
     throw new Error(body?.error ?? `Could not download that video (${proxied.status}).`)
   }
   return await toFile(proxied)
+}
+
+/**
+ * Copies a card's cover image into our own storage and returns the asset ref.
+ *
+ * This is what makes a swipe file durable. Every image URL a search hands back
+ * is a signed CDN link that expires within days, so a row that merely
+ * remembered the URL would be a broken image by the time it mattered.
+ *
+ * Returns undefined rather than throwing when there's nothing to copy or the
+ * fetch fails: a swipe with no thumbnail is still a useful record, and losing
+ * the save over a missing picture would be the wrong trade.
+ */
+export async function saveThumbnail(result: DiscoverResult): Promise<string | undefined> {
+  if (!result.coverUrl) return undefined
+  try {
+    const res = await fetch(result.coverUrl)
+    if (!res.ok) return undefined
+    const blob = await res.blob()
+    if (!blob.size) return undefined
+    return await saveAsset(blob, blob.type || 'image/jpeg')
+  } catch {
+    return undefined
+  }
 }
 
 /**

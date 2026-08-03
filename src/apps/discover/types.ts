@@ -90,6 +90,12 @@ export interface DiscoverFilters {
    * `keyword_exact_phrase`, the only lever the API exposes over that.
    */
   exactPhrase: boolean
+  /**
+   * Meta only. The Ad Library is mostly static images, which are no use when
+   * you're hunting UGC video ads to tear down — this filters at the API rather
+   * than client-side, so a page of 30 is 30 videos instead of 30 mixed.
+   */
+  mediaType: 'ALL' | 'VIDEO' | 'IMAGE'
 }
 
 export const DEFAULT_FILTERS: DiscoverFilters = {
@@ -99,4 +105,7 @@ export const DEFAULT_FILTERS: DiscoverFilters = {
   country: 'US',
   activeOnly: true,
   exactPhrase: false,
+  // Defaults to video: this is a tool for finding UGC ads to take apart, and
+  // a static image has no hook, no delivery and no transcript to remix.
+  mediaType: 'VIDEO',
 }

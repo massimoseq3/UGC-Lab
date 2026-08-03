@@ -18,7 +18,7 @@ interface ResultDetailModalProps {
   /** `useAi` spends 10 extra credits, so it's only ever passed from the
       explicit retry below — never from the first attempt. */
   onRemix: (result: DiscoverResult, useAi?: boolean) => Promise<void>
-  busy?: 'analyze' | 'remix' | null
+  busy?: 'analyze' | 'remix' | 'save' | null
 }
 
 export default function ResultDetailModal({

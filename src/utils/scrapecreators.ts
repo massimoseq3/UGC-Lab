@@ -105,10 +105,23 @@ interface MetaImage {
   resized_image_url?: string
 }
 
+// `video_preview_image_url` is NOT always present — a plain video ad in the
+// live payload carries only the four url/handle fields and no poster at all,
+// which is why those cards rendered as empty black tiles. Everything here is
+// optional and the card falls back to painting a frame of the video itself.
 interface MetaVideo {
   video_hd_url?: string
   video_sd_url?: string
   video_preview_image_url?: string
+  video_hd_handle?: string
+  video_sd_handle?: string
+}
+
+/** A carousel/DCO slot. Meta puts the creative here instead of images/videos. */
+interface MetaCard extends MetaImage, MetaVideo {
+  body?: string
+  title?: string
+  link_url?: string
 }
 
 interface MetaSnapshot {
@@ -122,6 +135,11 @@ interface MetaSnapshot {
   page_like_count?: number
   images?: MetaImage[]
   videos?: MetaVideo[]
+  extra_images?: MetaImage[]
+  extra_videos?: MetaVideo[]
+  cards?: MetaCard[]
+  /** IMAGE / VIDEO / CAROUSEL / DCO / MEME … */
+  display_format?: string
 }
 
 export interface MetaAdItem {

@@ -8,9 +8,10 @@ import ConnectScrapeCreators from './components/ConnectScrapeCreators'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useAppStore } from '../../stores/appStore'
+import { useBankStore } from '../../stores/bankStore'
 import { humanizeError } from '../../utils/friendlyError'
 import { applyMinViews, mergeResults, runSearch, sortResults } from './services/search'
-import { downloadResultVideo, fetchResultTranscript } from './services/handoff'
+import { downloadResultVideo, fetchResultTranscript, saveThumbnail } from './services/handoff'
 import { DEFAULT_FILTERS, type DiscoverFilters, type DiscoverPlatform, type DiscoverResult, type DiscoverSort } from './types'
 
 // Outliers — search TikTok and the Meta Ad Library for ads worth stealing,
@@ -70,7 +71,7 @@ export default function Discover() {
 
   const [openResult, setOpenResult] = useState<DiscoverResult | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [busyKind, setBusyKind] = useState<'analyze' | 'remix' | null>(null)
+  const [busyKind, setBusyKind] = useState<'analyze' | 'remix' | 'save' | null>(null)
 
   // Transcripts, keyed by card. Fetched once when a card is opened and reused
   // by Remix, so reading the words and then sending them is ONE credit rather
@@ -78,6 +79,12 @@ export default function Discover() {
   const [transcripts, setTranscripts] = useState<Record<string, TranscriptState>>({})
 
   const apiKey = useSettingsStore((s) => s.scrapeCreatorsKey)
+
+  // Which cards are already filed. Derived as a Set of "platform:sourceId" so
+  // a card can answer "am I saved?" without scanning the whole bank per tile —
+  // the grid is 30+ cards and the swipe file grows without bound.
+  const swipes = useBankStore((s) => s.swipes)
+  const savedKeys = new Set(swipes.map((s) => `${s.platform}:${s.sourceId}`))
 
   // Onboarding pops up the first time Outliers is opened without a key. Seeded
   // from the store at mount and never re-armed, so dismissing it is respected
@@ -197,6 +204,51 @@ export default function Discover() {
     }
   }, [apiKey, ensureTranscript, sendToApp, openApp, addToast])
 
+  /**
+   * Files an ad in the swipe bank, or takes it back out if it's already there.
+   *
+   * The transcript rides along when it's already been fetched — never re-billed
+   * for the sake of the save. Numbers are snapshotted as they are today,
+   * because a swipe is a record of what a winner looked like when you found it.
+   */
+  const handleSave = useCallback(async (result: DiscoverResult) => {
+    const existing = useBankStore.getState().getSwipeBySource(result.platform, result.id)
+    if (existing) {
+      await useBankStore.getState().deleteSwipe(existing.id)
+      return
+    }
+
+    setBusyId(result.id)
+    setBusyKind('save')
+    try {
+      const thumbRef = await saveThumbnail(result)
+      await useBankStore.getState().addSwipe({
+        platform: result.platform,
+        sourceId: result.id,
+        postUrl: result.postUrl,
+        thumbRef,
+        mediaUrl: result.videoUrl,
+        authorHandle: result.author.handle,
+        authorName: result.author.name,
+        caption: result.caption,
+        transcript: transcriptCache.current[`${result.platform}:${result.id}`] || undefined,
+        views: result.stats?.views,
+        likes: result.stats?.likes,
+        comments: result.stats?.comments,
+        shares: result.stats?.shares,
+        saves: result.stats?.saves,
+        followerCount: result.author.followerCount,
+        outlierMultiple: result.outlier?.multiple,
+        daysRunning: result.ad?.daysRunning ?? undefined,
+      })
+    } catch (e) {
+      addToast(humanizeError(e, "Couldn't save that to your swipe file."), 'error')
+    } finally {
+      setBusyId(null)
+      setBusyKind(null)
+    }
+  }, [addToast])
+
   // Opening a card pulls its transcript straight away, so the words are on
   // screen rather than one click and one credit away. On Meta this is free
   // when the ad has no video — that endpoint only charges when it returns
@@ -308,6 +360,16 @@ export default function Discover() {
                 onChange={(country) => setFilters((f) => ({ ...f, country }))}
               />
               <FilterSelect
+                label="Media"
+                value={filters.mediaType}
+                options={[
+                  { value: 'VIDEO', label: 'Videos' },
+                  { value: 'IMAGE', label: 'Images' },
+                  { value: 'ALL', label: 'All' },
+                ]}
+                onChange={(mediaType) => setFilters((f) => ({ ...f, mediaType }))}
+              />
+              <FilterSelect
                 label="Status"
                 value={filters.activeOnly ? 'active' : 'all'}
                 options={[
@@ -373,7 +435,9 @@ export default function Discover() {
                 result={result}
                 onAnalyze={handleAnalyze}
                 onRemix={handleRemix}
+                onSave={handleSave}
                 onOpen={openCard}
+                saved={savedKeys.has(`${result.platform}:${result.id}`)}
                 busy={busyId === result.id ? busyKind : null}
               />
             ))}
