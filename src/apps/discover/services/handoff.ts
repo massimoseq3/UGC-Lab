@@ -43,8 +43,10 @@ export async function downloadResultVideo(result: DiscoverResult): Promise<File>
 
   const token = await ensureFreshSession()
   if (!token) {
+    // Deliberately neutral about WHY the video is being fetched — the same
+    // download backs Analyze and the Download button.
     throw new Error(
-      'Importing this video needs you to be signed in. Sign in and try again.',
+      'Fetching this video needs you to be signed in. Sign in and try again.',
     )
   }
 
@@ -56,6 +58,35 @@ export async function downloadResultVideo(result: DiscoverResult): Promise<File>
     throw new Error(body?.error ?? `Could not download that video (${proxied.status}).`)
   }
   return await toFile(proxied)
+}
+
+/**
+ * Saves a card's video to the member's own disk.
+ *
+ * Goes through `downloadResultVideo` rather than a plain anchor with a
+ * `download` attribute: TikTok's CDN neither sends CORS headers nor serves
+ * without a Referer, and a cross-origin `download` attribute is ignored by
+ * browsers anyway — the click would open the video in a tab rather than save
+ * it. Fetching to a blob first is what makes the filename ours, too.
+ */
+export async function saveResultVideoToDisk(result: DiscoverResult): Promise<void> {
+  const file = await downloadResultVideo(result)
+  const url = URL.createObjectURL(file)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = adFileName(result)
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+/** "tiktok-comfofeet-7412345.mp4" — whose ad it is, readable in a Downloads folder. */
+function adFileName(result: DiscoverResult): string {
+  const who = (result.author.handle || result.author.name || 'ad')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 40)
+  return `${result.platform}-${who || 'ad'}-${result.id}.mp4`
 }
 
 /**

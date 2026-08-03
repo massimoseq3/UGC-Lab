@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { Key, Loader2, Radar, Search } from 'lucide-react'
 import GridCanvas, { AwaitingBody } from '../../components/GridCanvas'
 import SegmentedToggle from '../../components/SegmentedToggle'
+import Dropdown from '../../components/Dropdown'
 import ResultCard from './components/ResultCard'
 import ResultDetailModal from './components/ResultDetailModal'
 import ConnectScrapeCreators from './components/ConnectScrapeCreators'
@@ -11,7 +12,7 @@ import { useAppStore } from '../../stores/appStore'
 import { useBankStore } from '../../stores/bankStore'
 import { humanizeError } from '../../utils/friendlyError'
 import { applyMinViews, mergeResults, runSearch, sortResults } from './services/search'
-import { downloadResultVideo, fetchResultTranscript, saveThumbnail } from './services/handoff'
+import { downloadResultVideo, fetchResultTranscript, saveResultVideoToDisk, saveThumbnail } from './services/handoff'
 import { DEFAULT_FILTERS, type DiscoverFilters, type DiscoverPlatform, type DiscoverResult, type DiscoverSort } from './types'
 
 // Outliers — search TikTok and the Meta Ad Library for ads worth stealing,
@@ -49,6 +50,9 @@ const SORT_OPTIONS: Record<DiscoverPlatform, Array<{ value: DiscoverSort; label:
 
 const MIN_VIEW_OPTIONS = [0, 10_000, 100_000, 1_000_000]
 
+/** The per-card actions that can be mid-flight, so the right button spins. */
+export type DiscoverAction = 'analyze' | 'remix' | 'save' | 'download'
+
 /** Where a card's transcript has got to. 'empty' is a normal outcome, not a failure. */
 export type TranscriptState =
   | { phase: 'loading' }
@@ -71,7 +75,7 @@ export default function Discover() {
 
   const [openResult, setOpenResult] = useState<DiscoverResult | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [busyKind, setBusyKind] = useState<'analyze' | 'remix' | 'save' | null>(null)
+  const [busyKind, setBusyKind] = useState<DiscoverAction | null>(null)
 
   // Transcripts, keyed by card. Fetched once when a card is opened and reused
   // by Remix, so reading the words and then sending them is ONE credit rather
@@ -146,6 +150,22 @@ export default function Discover() {
       setBusyKind(null)
     }
   }, [sendToApp, openApp, addToast])
+
+  // Saves the ad itself to disk. Same fetch as Analyze — CDN direct, then our
+  // proxy for TikTok — because a cross-origin `download` link would open the
+  // video in a tab rather than save it.
+  const handleDownload = useCallback(async (result: DiscoverResult) => {
+    setBusyId(result.id)
+    setBusyKind('download')
+    try {
+      await saveResultVideoToDisk(result)
+    } catch (e) {
+      addToast(humanizeError(e, "Couldn't download that video. Try opening the original instead."), 'error')
+    } finally {
+      setBusyId(null)
+      setBusyKind(null)
+    }
+  }, [addToast])
 
   /**
    * Resolves a card's transcript, fetching it at most once.
@@ -397,14 +417,6 @@ export default function Discover() {
               />
             </>
           )}
-
-          {/* Says out loud that Meta has no performance numbers, so the missing
-              outlier badge reads as honesty rather than a broken feature. */}
-          {!isTikTok && (
-            <span className="ml-auto text-[11px] text-ink-600">
-              Meta publishes no view counts — ads rank by how long they've run.
-            </span>
-          )}
         </div>
       )}
 
@@ -441,6 +453,7 @@ export default function Discover() {
                 onAnalyze={handleAnalyze}
                 onRemix={handleRemix}
                 onSave={handleSave}
+                onDownload={handleDownload}
                 onOpen={openCard}
                 saved={savedKeys.has(`${result.platform}:${result.id}`)}
                 busy={busyId === result.id ? busyKind : null}
@@ -474,6 +487,7 @@ export default function Discover() {
           onAnalyze={handleAnalyze}
           onRemix={handleRemix}
           onSave={handleSave}
+          onDownload={handleDownload}
           saved={savedKeys.has(`${openResult.platform}:${openResult.id}`)}
           busy={busyId === openResult.id ? busyKind : null}
         />
@@ -482,7 +496,13 @@ export default function Discover() {
   )
 }
 
-/** A compact labelled select for the filter row. */
+/**
+ * A compact labelled select for the filter row.
+ *
+ * Wraps the app's own `Dropdown` rather than a native `<select>`: the browser's
+ * stock popup is the one piece of unstyled OS chrome left in the app, and it
+ * ignores the theme entirely (a white system menu over the dark workspace).
+ */
 function FilterSelect<T extends string>({
   label,
   value,
@@ -495,20 +515,17 @@ function FilterSelect<T extends string>({
   onChange: (value: T) => void
 }) {
   return (
-    <label className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] py-1.5 pl-3 pr-2 text-[12px]">
-      <span className="text-ink-600">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className="cursor-pointer bg-transparent pr-1 text-ink-200 outline-none"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value} className="bg-surface-2 text-ink-200">
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
+    <Dropdown
+      compact
+      fitContent
+      // No app accent: this row is chrome above the grid, sitting under a
+      // monochrome search field and Search button.
+      accent="neutral"
+      label={label}
+      value={value}
+      options={options}
+      onChange={(v) => onChange(v as T)}
+    />
   )
 }
 
