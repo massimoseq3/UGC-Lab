@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { Key, Loader2, Radar, Search } from 'lucide-react'
+import { Key, Loader2, Plus, Radar, Search } from 'lucide-react'
 import GridCanvas, { AwaitingBody } from '../../components/GridCanvas'
 import SegmentedToggle from '../../components/SegmentedToggle'
 import Dropdown from '../../components/Dropdown'
@@ -53,6 +53,21 @@ const MIN_VIEW_OPTIONS = [0, 10_000, 100_000, 1_000_000]
 /** The per-card actions that can be mid-flight, so the right button spins. */
 export type DiscoverAction = 'analyze' | 'remix' | 'save' | 'download'
 
+/** One tab's search: what was asked, what came back, and where the next page starts. */
+interface PlatformSearch {
+  query: string
+  results: DiscoverResult[]
+  cursor: string | number | null
+  /** True once a search has actually run — tells "no results" from "not yet". */
+  searched: boolean
+}
+
+const BLANK_SEARCH: PlatformSearch = { query: '', results: [], cursor: null, searched: false }
+const EMPTY_SEARCHES: Record<DiscoverPlatform, PlatformSearch> = {
+  tiktok: BLANK_SEARCH,
+  meta: BLANK_SEARCH,
+}
+
 /** Where a card's transcript has got to. 'empty' is a normal outcome, not a failure. */
 export type TranscriptState =
   | { phase: 'loading' }
@@ -63,15 +78,46 @@ export type TranscriptState =
 export default function Discover() {
   const baseKey = useProjectScopedKey('discover')
   const [platform, setPlatform] = usePersistedState<DiscoverPlatform>(`${baseKey}:platform`, 'tiktok')
-  const [filters, setFilters] = usePersistedState<DiscoverFilters>(`${baseKey}:filters`, DEFAULT_FILTERS)
-  const [query, setQuery] = useState('')
+  // Merged over the defaults on every hydrate, not just when the slot is
+  // empty. `usePersistedState` hands back a stored blob verbatim, so a filter
+  // saved before a field existed carries that field as `undefined` for good —
+  // which is how a member could end up searching with no Media filter at all
+  // rather than the VIDEO default. Any field added to DiscoverFilters from
+  // here on gets its default on the next load.
+  const [filters, setFilters] = usePersistedState<DiscoverFilters>(
+    `${baseKey}:filters`,
+    DEFAULT_FILTERS,
+    { sanitize: (f) => ({ ...DEFAULT_FILTERS, ...f }) },
+  )
+  // One search per platform, kept side by side. Flipping to the other tab used
+  // to throw the grid away, which meant a credit spent and a page of 30 winners
+  // lost to a glance. Each tab keeps its own query too, so the box always says
+  // what produced the grid under it.
+  //
+  // Session memory, deliberately not localStorage: a result carries signed CDN
+  // urls that expire within days, so a restored grid would be a wall of broken
+  // thumbnails — and 60 rows of captions is not what the quota is for. Its real
+  // lifetime is the app staying mounted, which covers dock switches too.
+  const [searches, setSearches] = useState<Record<DiscoverPlatform, PlatformSearch>>(EMPTY_SEARCHES)
+  const active = searches[platform]
+  const { query, results, cursor, searched } = active
 
-  const [results, setResults] = useState<DiscoverResult[]>([])
-  const [cursor, setCursor] = useState<string | number | null>(null)
   const [credits, setCredits] = useState<number | null>(null)
   const [searching, setSearching] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [searched, setSearched] = useState(false)
+
+  // Always writes the tab it was given rather than "the current tab", so a
+  // search that lands after a toggle flip fills its own grid, not the one on
+  // screen.
+  const patchSearch = useCallback((
+    target: DiscoverPlatform,
+    patch: Partial<PlatformSearch> | ((s: PlatformSearch) => Partial<PlatformSearch>),
+  ) => {
+    setSearches((all) => ({
+      ...all,
+      [target]: { ...all[target], ...(typeof patch === 'function' ? patch(all[target]) : patch) },
+    }))
+  }, [])
 
   const [openResult, setOpenResult] = useState<DiscoverResult | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -113,23 +159,28 @@ export default function Discover() {
     const q = queryRef.current.trim()
     if (!q || !apiKey) return
 
+    // Pinned for the whole call: the member can flip tabs while a page is in
+    // flight, and the results belong to the tab that asked for them.
+    const target = platform
     const more = nextCursor !== undefined
     if (more) setLoadingMore(true)
-    else { setSearching(true); setResults([]) }
+    else { setSearching(true); patchSearch(target, { results: [] }) }
 
     try {
-      const page = await runSearch(apiKey, platform, q, filters, nextCursor)
-      setResults((prev) => (more ? mergeResults(prev, page.results) : page.results))
-      setCursor(page.cursor)
+      const page = await runSearch(apiKey, target, q, filters, nextCursor)
+      patchSearch(target, (s) => ({
+        results: more ? mergeResults(s.results, page.results) : page.results,
+        cursor: page.cursor,
+        searched: true,
+      }))
       if (page.creditsRemaining !== null) setCredits(page.creditsRemaining)
-      setSearched(true)
     } catch (e) {
       addToast(humanizeError(e, 'That search failed. Try again in a moment.'), 'error')
     } finally {
       setSearching(false)
       setLoadingMore(false)
     }
-  }, [apiKey, platform, filters, addToast])
+  }, [apiKey, platform, filters, addToast, patchSearch])
 
   const handleAnalyze = useCallback(async (result: DiscoverResult) => {
     setBusyId(result.id)
@@ -304,14 +355,10 @@ export default function Discover() {
             { value: 'meta', label: 'Meta Ads' },
           ]}
           value={platform}
-          onChange={(v) => {
-            setPlatform(v)
-            // Results from the other platform would be answering a different
-            // question — clear rather than leave a stale grid under a new tab.
-            setResults([])
-            setCursor(null)
-            setSearched(false)
-          }}
+          // Nothing is thrown away on a flip — each tab keeps its own search
+          // and its own grid, so glancing at the other platform costs nothing
+          // and coming back costs no credits.
+          onChange={setPlatform}
           fitContent
           dense
         />
@@ -320,7 +367,7 @@ export default function Discover() {
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-600" />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => patchSearch(platform, { query: e.target.value })}
             onKeyDown={(e) => { if (e.key === 'Enter') void search() }}
             placeholder={isTikTok ? 'Search TikTok — a product, a pain point, a hook…' : 'Search the Meta Ad Library…'}
             className="w-full rounded-full border border-ink/10 bg-ink/5 py-2 pl-10 pr-4 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
@@ -341,6 +388,23 @@ export default function Discover() {
           <span className="shrink-0 rounded-full bg-ink/5 px-2.5 py-1 text-[11px] text-ink-500" title="ScrapeCreators credits remaining">
             {credits.toLocaleString()} credits
           </span>
+        )}
+
+        {/* The same + every panel header carries: back to a blank slate. It
+            clears THIS tab only — the other platform's search is the thing the
+            per-tab state exists to protect, and a member reaching for a fresh
+            search on TikTok isn't asking to bin the Meta grid too. Nothing here
+            is recoverable by re-running for free, so it only appears once there
+            is something to clear. */}
+        {(query || results.length > 0) && (
+          <button
+            type="button"
+            title="New search — clears this tab"
+            onClick={() => patchSearch(platform, BLANK_SEARCH)}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
         )}
       </header>
 

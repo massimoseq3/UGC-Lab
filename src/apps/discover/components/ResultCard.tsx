@@ -30,6 +30,7 @@ interface ResultCardProps {
 function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen, saved = false, busy = null }: ResultCardProps) {
   const video = useInlineVideo()
   const hasVideo = !!result.videoUrl
+  const isMeta = result.platform === 'meta'
   const er = result.stats ? engagementRate(result.stats) : null
 
   // TikTok's image CDN refuses plenty of its own cover URLs from a browser, so
@@ -40,6 +41,13 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
   const showCover = !!result.coverUrl && !coverFailed
   /** A clip with nothing to show behind it — it has to be its own thumbnail. */
   const posterless = hasVideo && !showCover
+
+  // Only TikTok publishes a runtime; Meta's payload carries none at all, so a
+  // Meta card would never show one. The browser knows it either way once it
+  // has the file's metadata, which is why every video card preloads that far
+  // below — a runtime that only appears on hover isn't a thing you can scan.
+  const [probedDuration, setProbedDuration] = useState<number | null>(null)
+  const duration = result.durationSeconds ?? probedDuration
 
   return (
     <div
@@ -78,7 +86,18 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
             // tear down and reload the element mid-grid.
             src={`${result.videoUrl}#t=0.1`}
             poster={showCover ? result.coverUrl : undefined}
-            preload={posterless ? 'metadata' : 'none'}
+            // 'metadata' on EVERY video card, not just the poster-less ones.
+            // It costs a small range request per card, and it buys the runtime
+            // pill on cards whose platform doesn't publish a duration — which
+            // is every Meta ad. A card you have to hover to identify isn't
+            // doing the job the grid exists for.
+            preload="metadata"
+            onLoadedMetadata={(e) => {
+              // Infinity for a live/unseekable stream; guard rather than
+              // rendering "Infinity:NaN".
+              const d = e.currentTarget.duration
+              if (Number.isFinite(d) && d > 0) setProbedDuration(Math.round(d))
+            }}
             // A poster-less clip IS the thumbnail, so it can't fade out.
             className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-200 ${
               video.playing || posterless ? 'opacity-100' : 'opacity-0'
@@ -116,19 +135,54 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
           )}
         </div>
 
-        {/* Engagement rate rides the media, bottom-left, opposite the runtime.
-            It answers a different question from the outlier badge above it —
-            how hard the video worked the people who saw it, versus how far it
-            travelled past its own audience — so the two never merge. */}
-        {er !== null && (
-          <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white">
-            ER {formatRate(er)}
-          </span>
-        )}
+        {/* Bottom-left column: engagement rate over the media controls.
+            ER rides the media, opposite the runtime, and answers a different
+            question from the outlier badge above it — how hard the video
+            worked the people who saw it, versus how far it travelled past its
+            own audience — so the two never merge into one figure. It stacks
+            ABOVE the controls rather than sharing the corner with them:
+            both used to sit at bottom-2 left-2 and only got away with it
+            because the controls appeared on hover. Now that they're always on,
+            that overlap would be permanent. */}
+        <div className="absolute bottom-2 left-2 flex flex-col items-start gap-1.5">
+          {er !== null && (
+            <span className="pointer-events-none rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white">
+              ER {formatRate(er)}
+            </span>
+          )}
 
-        {result.durationSeconds != null && (
+          {/* Always visible, never hover-gated: these two buttons are how you
+              tell a video card from a still one at a glance, which is most of
+              what the grid is scanned for. */}
+          {hasVideo && (
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={video.togglePlay}
+                title={video.watching ? 'Pause' : 'Play with sound'}
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white transition-colors hover:bg-black/70"
+              >
+                {/* The glyph has to agree with the title — a Play triangle on a
+                    button whose job is Pause is why pausing felt like a hunt. */}
+                {video.watching ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+              </button>
+              <button
+                type="button"
+                onClick={video.toggleMute}
+                title={video.unmuted ? 'Mute' : 'Unmute'}
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white transition-colors hover:bg-black/70"
+              >
+                {video.unmuted ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* The runtime, opposite the controls. `duration` prefers what the
+            platform published and falls back to what the file itself reports. */}
+        {duration != null && (
           <span className="pointer-events-none absolute bottom-2 right-2 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-medium text-white">
-            {formatDuration(result.durationSeconds)}
+            {formatDuration(duration)}
           </span>
         )}
 
@@ -188,31 +242,6 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
             <ExternalLink className="h-3.5 w-3.5" />
           </TileActionButton>
         </TileActionStack>
-
-        {/* Media controls live ON the media, and are the only thing left when
-            the member is actually watching with sound. */}
-        {hasVideo && (
-          <div className={`absolute bottom-2 left-2 flex gap-1 ${video.watching ? '' : 'opacity-0 transition-opacity group-hover:opacity-100'}`}>
-            <button
-              type="button"
-              onClick={video.togglePlay}
-              title={video.watching ? 'Pause' : 'Play with sound'}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white transition-colors hover:bg-black/70"
-            >
-              {/* The glyph has to agree with the title — a Play triangle on a
-                  button whose job is Pause is why pausing felt like a hunt. */}
-              {video.watching ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-            </button>
-            <button
-              type="button"
-              onClick={video.toggleMute}
-              title={video.unmuted ? 'Mute' : 'Unmute'}
-              className="flex h-7 w-7 items-center justify-center rounded-full border border-white/20 bg-black/55 text-white transition-colors hover:bg-black/70"
-            >
-              {video.unmuted ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
-            </button>
-          </div>
-        )}
       </div>
 
       <div className="flex flex-col gap-2 p-2.5">
@@ -226,13 +255,26 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
           </span>
         </div>
         {/* Rendered even when the count is missing, so the caption below starts
-            at the same height on every card in the row. */}
-        <span className="-mt-1.5 flex h-[14px] items-center gap-1 pl-[26px] text-[10px] text-ink-600">
+            at the same height on every card in the row. Height is per-platform
+            because the two carry different things: on TikTok this is the
+            creator's following — context for the outlier score above it, and
+            dim on purpose — while on Meta it's page likes, the only audience
+            figure the Ad Library gives at all, so it takes a pill. As dim text
+            beside a dim glyph it was the easiest thing on the card to miss. */}
+        <span
+          className={`-mt-1.5 flex items-center gap-1 pl-[26px] ${
+            isMeta ? 'h-[18px]' : 'h-[14px] text-[10px] text-ink-600'
+          }`}
+        >
           {result.author.followerCount != null && (
-            <>
-              {result.platform === 'meta' && <Heart className="h-2.5 w-2.5 shrink-0" />}
-              {formatCount(result.author.followerCount)} {result.platform === 'tiktok' ? 'followers' : 'likes'}
-            </>
+            isMeta ? (
+              <span className="flex items-center gap-1 rounded-full bg-ink/[0.07] px-2 py-0.5 text-[10px] font-medium text-ink-300">
+                <Heart className="h-2.5 w-2.5 shrink-0" />
+                {formatCount(result.author.followerCount)} likes
+              </span>
+            ) : (
+              <>{formatCount(result.author.followerCount)} followers</>
+            )
           )}
         </span>
 
