@@ -945,6 +945,16 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // (1–15s). Audio is generated automatically (no param). Per-second pricing
   // keyed on resolution: 2.4/s 480p, 4.5/s 720p — kie raised both by 1.5×
   // effective 2026-08-03 02:00 UTC (upstream cost increase, announced by kie).
+  //
+  // The API schema accepts resolution: '1080p' and we deliberately don't offer
+  // it. kie publishes exactly two SKUs for this model (480p and 720p) and no
+  // rate for 1080p, so a 1080p gen would be billed at a figure we can't quote —
+  // every credits pill, batch-confirm total and the Dashboard money-saved
+  // metric would under-report it. The neighbouring grok-imagine (1.0) entry on
+  // kie's price list is the tell: it carries a native 1080p tier (8/s) AND
+  // separate upscale SKUs (720p→1080p 20/upscale, 480p→1080p 30/upscale), so an
+  // unpriced 1080p here is as likely to be an upscale as a native render.
+  // Re-add only when kie lists a per-second 1080p price for THIS model id.
   // Docs: grok-imagine-video-1-5-preview on docs.kie.ai.
   {
     id: 'grok-imagine-video-1-5-preview',
@@ -963,15 +973,14 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       priceFor: ({ durationSeconds = 8, resolution = '480p' }) =>
         (resolution === '720p' ? 4.5 : 2.4) * durationSeconds,
     },
-    // Priced against the official xAI rate so kie lands ~85% off — official ≈
-    // kie / 0.15, the ratio kie quoted with the August 2026 increase (it was
-    // /0.10 at the old rate, so the derived official USD is unchanged — kie's
-    // discount narrowed, xAI's list price didn't move). No standalone xAI
-    // per-second list price to cite, so derived from that ratio and the
-    // kie.ai pricing page.
+    // kie's own "Official / Fal Price" column, read per resolution rather than
+    // derived from a single ratio: $0.08/s at 480p and $0.14/s at 720p (both
+    // verified on kie.ai/pricing 2026-08-03). A flat kie/0.15 quoted 85% off on
+    // both tiers; the real discounts differ (−85% at 480p, −84% at 720p)
+    // because kie raised 720p by more than xAI's own gap between the tiers.
     official: {
       usdFor: ({ durationSeconds = 8, resolution = '480p' }) =>
-        creditsToUsd((resolution === '720p' ? 4.5 : 2.4) * durationSeconds) / 0.15,
+        (resolution === '720p' ? 0.14 : 0.08) * durationSeconds,
       source: 'https://kie.ai/pricing',
     },
     videoEndpoint: 'createTask',
