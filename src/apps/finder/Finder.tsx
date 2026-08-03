@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Package, UserRound, FileText, Mic, Film, Upload, LayoutGrid, Palette } from 'lucide-react'
+import { Plus, Package, UserRound, FileText, Mic, Film, Upload, LayoutGrid, Palette, Bookmark } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useBankStore } from '../../stores/bankStore'
 import type { BankType } from '../../utils/constants'
@@ -25,9 +25,10 @@ const SIDEBAR_ICONS: Record<BankType, React.ElementType> = {
   voices: Mic,
   brolls: Film,
   styles: Palette,
+  swipes: Bookmark,
 }
 
-const BANK_TYPES: BankType[] = ['products', 'models', 'scripts', 'voices', 'brolls', 'styles']
+const BANK_TYPES: BankType[] = ['products', 'models', 'scripts', 'voices', 'brolls', 'styles', 'swipes']
 
 // Photos arrive from the Product form as data URIs on first add; already-saved
 // ones come back as asset:// refs and pass through untouched.
@@ -77,6 +78,7 @@ export default function Finder() {
   const voices = useBankStore((s) => s.voices)
   const brolls = useBankStore((s) => s.brolls)
   const styles = useBankStore((s) => s.styles)
+  const swipes = useBankStore((s) => s.swipes)
   const addProduct = useBankStore((s) => s.addProduct)
   const updateProduct = useBankStore((s) => s.updateProduct)
   const addModel = useBankStore((s) => s.addModel)
@@ -124,6 +126,7 @@ export default function Finder() {
     voices: voices.length,
     brolls: brolls.length,
     styles: styles.length,
+    swipes: swipes.length,
   }
 
   const [sort, setSort, sortOptions] = useBankSort(activeBank)

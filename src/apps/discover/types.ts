@@ -83,6 +83,19 @@ export interface DiscoverFilters {
   country: string
   /** Meta only. */
   activeOnly: boolean
+  /**
+   * Meta only. Meta's own keyword search is loose by default — it matches
+   * advertiser names and its own relevance model, which is why a search for
+   * one product returns ads for other things. This switches it to
+   * `keyword_exact_phrase`, the only lever the API exposes over that.
+   */
+  exactPhrase: boolean
+  /**
+   * Meta only. The Ad Library is mostly static images, which are no use when
+   * you're hunting UGC video ads to tear down — this filters at the API rather
+   * than client-side, so a page of 30 is 30 videos instead of 30 mixed.
+   */
+  mediaType: 'ALL' | 'VIDEO' | 'IMAGE'
 }
 
 export const DEFAULT_FILTERS: DiscoverFilters = {
@@ -91,4 +104,8 @@ export const DEFAULT_FILTERS: DiscoverFilters = {
   sort: 'outlier',
   country: 'US',
   activeOnly: true,
+  exactPhrase: false,
+  // Defaults to video: this is a tool for finding UGC ads to take apart, and
+  // a static image has no hook, no delivery and no transcript to remix.
+  mediaType: 'VIDEO',
 }

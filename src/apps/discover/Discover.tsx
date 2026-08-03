@@ -8,9 +8,10 @@ import ConnectScrapeCreators from './components/ConnectScrapeCreators'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useAppStore } from '../../stores/appStore'
+import { useBankStore } from '../../stores/bankStore'
 import { humanizeError } from '../../utils/friendlyError'
 import { applyMinViews, mergeResults, runSearch, sortResults } from './services/search'
-import { downloadResultVideo, fetchResultTranscript } from './services/handoff'
+import { downloadResultVideo, fetchResultTranscript, saveThumbnail } from './services/handoff'
 import { DEFAULT_FILTERS, type DiscoverFilters, type DiscoverPlatform, type DiscoverResult, type DiscoverSort } from './types'
 
 // Outliers — search TikTok and the Meta Ad Library for ads worth stealing,
@@ -48,6 +49,13 @@ const SORT_OPTIONS: Record<DiscoverPlatform, Array<{ value: DiscoverSort; label:
 
 const MIN_VIEW_OPTIONS = [0, 10_000, 100_000, 1_000_000]
 
+/** Where a card's transcript has got to. 'empty' is a normal outcome, not a failure. */
+export type TranscriptState =
+  | { phase: 'loading' }
+  | { phase: 'ready'; text: string }
+  | { phase: 'empty' }
+  | { phase: 'error'; message: string }
+
 export default function Discover() {
   const baseKey = useProjectScopedKey('discover')
   const [platform, setPlatform] = usePersistedState<DiscoverPlatform>(`${baseKey}:platform`, 'tiktok')
@@ -63,9 +71,20 @@ export default function Discover() {
 
   const [openResult, setOpenResult] = useState<DiscoverResult | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [busyKind, setBusyKind] = useState<'analyze' | 'remix' | null>(null)
+  const [busyKind, setBusyKind] = useState<'analyze' | 'remix' | 'save' | null>(null)
+
+  // Transcripts, keyed by card. Fetched once when a card is opened and reused
+  // by Remix, so reading the words and then sending them is ONE credit rather
+  // than two. Lives here (not in the modal) so it survives closing the modal.
+  const [transcripts, setTranscripts] = useState<Record<string, TranscriptState>>({})
 
   const apiKey = useSettingsStore((s) => s.scrapeCreatorsKey)
+
+  // Which cards are already filed. Derived as a Set of "platform:sourceId" so
+  // a card can answer "am I saved?" without scanning the whole bank per tile —
+  // the grid is 30+ cards and the swipe file grows without bound.
+  const swipes = useBankStore((s) => s.swipes)
+  const savedKeys = new Set(swipes.map((s) => `${s.platform}:${s.sourceId}`))
 
   // Onboarding pops up the first time Outliers is opened without a key. Seeded
   // from the store at mount and never re-armed, so dismissing it is respected
@@ -80,6 +99,11 @@ export default function Discover() {
   // keystroke would hand the memoized card grid a fresh handler identity.
   const queryRef = useRef(query)
   queryRef.current = query
+
+  // The resolved text behind `transcripts`, in a ref so ensureTranscript can
+  // check the cache without taking the state as a dependency — which would
+  // hand the memoized card grid a new handler on every transcript that lands.
+  const transcriptCache = useRef<Record<string, string>>({})
 
   const search = useCallback(async (nextCursor?: string | number) => {
     const q = queryRef.current.trim()
@@ -123,31 +147,121 @@ export default function Discover() {
     }
   }, [sendToApp, openApp, addToast])
 
+  /**
+   * Resolves a card's transcript, fetching it at most once.
+   *
+   * Returns the text (empty string when the video genuinely has no captions).
+   * `useAi` forces a re-fetch through the 10-credit AI path, which is the only
+   * reason a cached entry is ever discarded.
+   */
+  const ensureTranscript = useCallback(async (
+    result: DiscoverResult,
+    useAi = false,
+  ): Promise<string> => {
+    if (!apiKey) return ''
+    const cacheKey = `${result.platform}:${result.id}`
+    const cached = transcriptCache.current[cacheKey]
+    if (cached && !useAi) return cached
+
+    setTranscripts((t) => ({ ...t, [cacheKey]: { phase: 'loading' } }))
+    try {
+      const { text, creditsRemaining } = await fetchResultTranscript(apiKey, result, useAi)
+      if (creditsRemaining !== null) setCredits(creditsRemaining)
+      transcriptCache.current[cacheKey] = text
+      setTranscripts((t) => ({
+        ...t,
+        [cacheKey]: text.trim() ? { phase: 'ready', text } : { phase: 'empty' },
+      }))
+      return text
+    } catch (e) {
+      const message = humanizeError(e, "Couldn't pull that transcript.")
+      setTranscripts((t) => ({ ...t, [cacheKey]: { phase: 'error', message } }))
+      throw e
+    }
+  }, [apiKey])
+
   const handleRemix = useCallback(async (result: DiscoverResult, useAi = false) => {
     if (!apiKey) return
     setBusyId(result.id)
     setBusyKind('remix')
     try {
-      const { text, creditsRemaining } = await fetchResultTranscript(apiKey, result, useAi)
-      if (creditsRemaining !== null) setCredits(creditsRemaining)
+      const text = await ensureTranscript(result, useAi)
       if (!text.trim()) {
-        // The detail modal turns this into the explicit 10-credit AI retry;
-        // from a card it's just a toast, since there's nowhere to put a button.
-        if (openResult?.id === result.id) throw new Error('NO_TRANSCRIPT')
-        addToast('This video has no captions to pull. Open it to transcribe with AI.', 'info')
+        addToast(
+          'This video has no captions to pull. Open it and try AI transcription.',
+          'info',
+        )
         return
       }
       sendToApp({ targetApp: 'script-architect', targetField: 'winningTranscript', data: text })
       openApp('script-architect')
       setOpenResult(null)
     } catch (e) {
-      if (e instanceof Error && e.message === 'NO_TRANSCRIPT') throw e
       addToast(humanizeError(e, "Couldn't pull that transcript. Try again in a moment."), 'error')
     } finally {
       setBusyId(null)
       setBusyKind(null)
     }
-  }, [apiKey, sendToApp, openApp, addToast, openResult])
+  }, [apiKey, ensureTranscript, sendToApp, openApp, addToast])
+
+  /**
+   * Files an ad in the swipe bank, or takes it back out if it's already there.
+   *
+   * The transcript rides along when it's already been fetched — never re-billed
+   * for the sake of the save. Numbers are snapshotted as they are today,
+   * because a swipe is a record of what a winner looked like when you found it.
+   */
+  const handleSave = useCallback(async (result: DiscoverResult) => {
+    const existing = useBankStore.getState().getSwipeBySource(result.platform, result.id)
+    if (existing) {
+      await useBankStore.getState().deleteSwipe(existing.id)
+      return
+    }
+
+    setBusyId(result.id)
+    setBusyKind('save')
+    try {
+      const thumbRef = await saveThumbnail(result)
+      await useBankStore.getState().addSwipe({
+        platform: result.platform,
+        sourceId: result.id,
+        postUrl: result.postUrl,
+        thumbRef,
+        mediaUrl: result.videoUrl,
+        authorHandle: result.author.handle,
+        authorName: result.author.name,
+        caption: result.caption,
+        transcript: transcriptCache.current[`${result.platform}:${result.id}`] || undefined,
+        views: result.stats?.views,
+        likes: result.stats?.likes,
+        comments: result.stats?.comments,
+        shares: result.stats?.shares,
+        saves: result.stats?.saves,
+        followerCount: result.author.followerCount,
+        outlierMultiple: result.outlier?.multiple,
+        daysRunning: result.ad?.daysRunning ?? undefined,
+      })
+    } catch (e) {
+      addToast(humanizeError(e, "Couldn't save that to your swipe file."), 'error')
+    } finally {
+      setBusyId(null)
+      setBusyKind(null)
+    }
+  }, [addToast])
+
+  // Opening a card pulls its transcript straight away, so the words are on
+  // screen rather than one click and one credit away. On Meta this is free
+  // when the ad has no video — that endpoint only charges when it returns
+  // something. Errors surface inside the modal, so nothing is toasted here.
+  const openCard = useCallback((result: DiscoverResult) => {
+    setOpenResult(result)
+    // TikTok only. Meta's ad-transcript endpoint reads Facebook's exposed
+    // captions, which Ad Library video ads don't carry, so it came back empty
+    // every time — the modal drops the Transcript block there and routes the
+    // words through Analyze Ad instead. `fetchResultTranscript` keeps its Meta
+    // branch so re-enabling this is a one-line change if that ever improves.
+    if (result.platform === 'tiktok') void ensureTranscript(result).catch(() => {})
+  }, [ensureTranscript])
 
   const isTikTok = platform === 'tiktok'
   // A member who picked "Most viewed" on TikTok and switched to Meta has a
@@ -251,6 +365,16 @@ export default function Discover() {
                 onChange={(country) => setFilters((f) => ({ ...f, country }))}
               />
               <FilterSelect
+                label="Media"
+                value={filters.mediaType}
+                options={[
+                  { value: 'VIDEO', label: 'Videos' },
+                  { value: 'IMAGE', label: 'Images' },
+                  { value: 'ALL', label: 'All' },
+                ]}
+                onChange={(mediaType) => setFilters((f) => ({ ...f, mediaType }))}
+              />
+              <FilterSelect
                 label="Status"
                 value={filters.activeOnly ? 'active' : 'all'}
                 options={[
@@ -258,6 +382,18 @@ export default function Discover() {
                   { value: 'all', label: 'All ads' },
                 ]}
                 onChange={(v) => setFilters((f) => ({ ...f, activeOnly: v === 'active' }))}
+              />
+              {/* The only lever Meta's API gives over its own loose matching —
+                  by default it scores relevance its own way and matches
+                  advertiser names, so a product search returns unrelated ads. */}
+              <FilterSelect
+                label="Match"
+                value={filters.exactPhrase ? 'exact' : 'broad'}
+                options={[
+                  { value: 'broad', label: 'Broad' },
+                  { value: 'exact', label: 'Exact phrase' },
+                ]}
+                onChange={(v) => setFilters((f) => ({ ...f, exactPhrase: v === 'exact' }))}
               />
             </>
           )}
@@ -304,7 +440,9 @@ export default function Discover() {
                 result={result}
                 onAnalyze={handleAnalyze}
                 onRemix={handleRemix}
-                onOpen={setOpenResult}
+                onSave={handleSave}
+                onOpen={openCard}
+                saved={savedKeys.has(`${result.platform}:${result.id}`)}
                 busy={busyId === result.id ? busyKind : null}
               />
             ))}
@@ -331,9 +469,12 @@ export default function Discover() {
       {openResult && (
         <ResultDetailModal
           result={openResult}
+          transcript={transcripts[`${openResult.platform}:${openResult.id}`] ?? { phase: 'loading' }}
           onClose={() => setOpenResult(null)}
           onAnalyze={handleAnalyze}
           onRemix={handleRemix}
+          onSave={handleSave}
+          saved={savedKeys.has(`${openResult.platform}:${openResult.id}`)}
           busy={busyId === openResult.id ? busyKind : null}
         />
       )}

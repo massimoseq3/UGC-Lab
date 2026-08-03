@@ -4,8 +4,9 @@
 // browser tab: find a winner, then tear it down or remix it without saving
 // files or switching apps.
 
-import { fetchTikTokTranscript, vttToPlainText } from '../../../utils/scrapecreators'
+import { fetchMetaAdTranscript, fetchTikTokTranscript, vttToPlainText } from '../../../utils/scrapecreators'
 import { ensureFreshSession } from '../../../lib/supabase'
+import { saveAsset } from '../../../utils/assetStore'
 import type { DiscoverResult } from '../types'
 
 /**
@@ -58,11 +59,41 @@ export async function downloadResultVideo(result: DiscoverResult): Promise<File>
 }
 
 /**
- * The words of a TikTok, as plain prose.
+ * Copies a card's cover image into our own storage and returns the asset ref.
  *
- * `useAiFallback` costs 10 extra credits, so it is never passed automatically —
- * the UI offers it as an explicit retry after a miss. Plenty of TikToks have no
- * caption track at all, which is a normal outcome rather than an error.
+ * This is what makes a swipe file durable. Every image URL a search hands back
+ * is a signed CDN link that expires within days, so a row that merely
+ * remembered the URL would be a broken image by the time it mattered.
+ *
+ * Returns undefined rather than throwing when there's nothing to copy or the
+ * fetch fails: a swipe with no thumbnail is still a useful record, and losing
+ * the save over a missing picture would be the wrong trade.
+ */
+export async function saveThumbnail(result: DiscoverResult): Promise<string | undefined> {
+  if (!result.coverUrl) return undefined
+  try {
+    const res = await fetch(result.coverUrl)
+    if (!res.ok) return undefined
+    const blob = await res.blob()
+    if (!blob.size) return undefined
+    return await saveAsset(blob, blob.type || 'image/jpeg')
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * The words actually SPOKEN in a result's video, as plain prose.
+ *
+ * Both platforms go through a real transcript endpoint. Meta used to short-
+ * circuit to the ad's body copy — which is the written caption, so "remix the
+ * transcript" was quietly handing Scripts somebody's ad copy instead of the
+ * script their creator performed. Meta's transcript endpoint only charges when
+ * a transcript actually comes back, so asking costs nothing on an image ad.
+ *
+ * `useAiFallback` (TikTok only) costs 10 EXTRA credits, so it is never passed
+ * automatically — the UI offers it as an explicit retry after a miss. Plenty of
+ * videos have no caption track, which is a normal outcome, not an error.
  */
 export async function fetchResultTranscript(
   apiKey: string,
@@ -70,8 +101,11 @@ export async function fetchResultTranscript(
   useAiFallback = false,
 ): Promise<{ text: string; creditsRemaining: number | null }> {
   if (result.platform === 'meta') {
-    // A Meta ad's body copy IS its script — already in hand, no call needed.
-    return { text: result.caption, creditsRemaining: null }
+    const { transcript, creditsRemaining } = await fetchMetaAdTranscript(apiKey, result.id)
+    // Meta hands back plain prose, not WEBVTT — but run it through the same
+    // stripper anyway, since a captions-derived transcript can arrive cued and
+    // the function is a no-op on text that carries no timings.
+    return { text: vttToPlainText(transcript), creditsRemaining }
   }
 
   const { transcript, creditsRemaining } = await fetchTikTokTranscript(

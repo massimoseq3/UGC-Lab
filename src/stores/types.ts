@@ -98,6 +98,54 @@ export interface StylePreset {
   createdAt: number
 }
 
+/**
+ * A saved ad — the swipe file behind Outliers.
+ *
+ * The thumbnail is copied into our OWN storage as an asset, because every URL
+ * on this row points at a signed CDN link that expires within days. The row
+ * would otherwise turn into a wall of broken images a week after it was saved,
+ * which is the one thing a swipe file must not do.
+ *
+ * The VIDEO is deliberately not copied, following the same rule as the B-Rolls
+ * bank (stills are saveable, clips are not): a swipe file is meant to hold
+ * hundreds of ads, and a few MB each would eat the member's storage cap for
+ * footage they can re-fetch. `postUrl` always survives, so the original is one
+ * click away; `mediaUrl` is a best-effort shortcut that may go stale.
+ */
+export interface SwipeItem {
+  id: string
+  platform: 'tiktok' | 'meta'
+  /** The platform's own id, so re-saving the same ad can be detected. */
+  sourceId: string
+  /** Permalink to the original — the one link guaranteed not to rot. */
+  postUrl: string
+  /** Our own copy of the cover image. */
+  thumbRef?: string
+  /** Signed CDN link to the media. Expires; treat as a bonus, never a promise. */
+  mediaUrl?: string
+
+  authorHandle: string
+  authorName: string
+  caption: string
+  /** Pulled at save time when it had already been fetched — never re-billed. */
+  transcript?: string
+
+  /** Snapshot of the numbers AS SAVED. Live stats move; a swipe is a record. */
+  views?: number
+  likes?: number
+  comments?: number
+  shares?: number
+  saves?: number
+  followerCount?: number
+  outlierMultiple?: number
+  daysRunning?: number
+
+  /** Free-text grouping — "hooks to steal", "competitor X". */
+  tag?: string
+  starred?: boolean
+  createdAt: number
+}
+
 export interface BRollVideo {
   url: string
   aspectRatio: string

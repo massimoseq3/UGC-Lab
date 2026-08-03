@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, Loader2, ChevronDown, Sparkles, Check, LayoutGrid, Copy, Bookmark, Star, Palette } from 'lucide-react'
-import type { Product, Model, Script, VoicePreset, BRoll, StylePreset } from '../../stores/types'
+import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, SwipeItem } from '../../stores/types'
 import type { BankType } from '../../utils/constants'
 import type { ModelFilter } from './Finder'
 import { useBankStore } from '../../stores/bankStore'
@@ -494,6 +494,88 @@ function StyleCard({ item, onEdit, onDelete }: { item: StylePreset; onEdit: () =
   )
 }
 
+/**
+ * One saved ad in the swipe file.
+ *
+ * Opens the ORIGINAL rather than an edit form: a swipe is a record of somebody
+ * else's ad, not a document of yours, so there is nothing here to edit. The
+ * thumbnail is our own stored asset (see SwipeItem) — every URL on the row is
+ * a signed CDN link that expires, so the picture is the one part guaranteed
+ * still to be there in a month.
+ */
+function SwipeCard({ item, onDelete }: { item: SwipeItem; onDelete: () => void }) {
+  const [confirm, setConfirm] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const toggleStar = useBankStore((s) => s.toggleStar)
+  const url = useAssetUrl(item.thumbRef ?? '')
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    // The transcript is the reusable half; fall back to the caption when the
+    // ad had no captions to pull.
+    await copyToClipboard(item.transcript || item.caption)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div
+      onClick={() => window.open(item.postUrl, '_blank', 'noopener,noreferrer')}
+      className="group relative flex aspect-[4/5] cursor-pointer flex-col overflow-hidden rounded-2xl border border-ink/5 bg-black transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
+    >
+      {url
+        ? <img src={url} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-contain" />
+        : (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Bookmark className="h-6 w-6 text-white/20" strokeWidth={1.5} />
+          </div>
+        )}
+
+      <div className="pointer-events-none absolute left-2 top-2 flex flex-col gap-1">
+        {item.outlierMultiple != null && (
+          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[11px] font-semibold text-black">
+            {item.outlierMultiple >= 10 ? Math.round(item.outlierMultiple) : item.outlierMultiple.toFixed(1)}x
+          </span>
+        )}
+        {item.daysRunning != null && (
+          <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[11px] font-semibold text-white">
+            {item.daysRunning}d running
+          </span>
+        )}
+      </div>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-3 pt-12">
+        <span className="block truncate text-[13px] font-semibold tracking-tight text-zinc-100">
+          {item.platform === 'tiktok' ? `@${item.authorHandle}` : item.authorName}
+        </span>
+        <span className="mt-0.5 block line-clamp-2 text-[10px] leading-snug text-zinc-400">{item.caption}</span>
+      </div>
+
+      <TileActionStack forceVisible={confirm}>
+        <TileStarButton starred={!!item.starred} onToggle={() => toggleStar('swipes', item.id)} />
+        <TileActionButton
+          title={copied ? 'Copied' : item.transcript ? 'Copy transcript' : 'Copy caption'}
+          onClick={handleCopy}
+        >
+          {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
+        </TileActionButton>
+        <TileDeleteButton onDelete={onDelete} onArmedChange={setConfirm} />
+      </TileActionStack>
+    </div>
+  )
+}
+
+function SwipesList({ items, onDelete, sort }: { items: SwipeItem[]; onDelete: (id: string) => void; sort: SortOrder }) {
+  const sorted = useMemo(() => sortByOrder(items, sort, (s) => s.authorName), [items, sort])
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+      {sorted.map((s) => (
+        <SwipeCard key={s.id} item={s} onDelete={() => onDelete(s.id)} />
+      ))}
+    </div>
+  )
+}
+
 function VoiceCard({ item, onEdit, onDelete }: { item: VoicePreset; onEdit: () => void; onDelete: () => void }) {
   return (
     <div onClick={onEdit} className="group flex cursor-pointer items-center gap-3 rounded-full border border-ink/5 bg-ink/[0.03] p-3 transition-colors hover:border-ink/10 hover:bg-ink/[0.05] card-soft-shadow">
@@ -524,12 +606,14 @@ export default function BankList({ bankType, onEdit, onAdd, sort, modelFilter = 
   const voices = useBankStore((s) => s.voices)
   const brolls = useBankStore((s) => s.brolls)
   const styles = useBankStore((s) => s.styles)
+  const swipes = useBankStore((s) => s.swipes)
   const deleteProduct = useBankStore((s) => s.deleteProduct)
   const deleteModel = useBankStore((s) => s.deleteModel)
   const deleteScript = useBankStore((s) => s.deleteScript)
   const deleteVoice = useBankStore((s) => s.deleteVoice)
   const deleteBRoll = useBankStore((s) => s.deleteBRoll)
   const deleteStyle = useBankStore((s) => s.deleteStyle)
+  const deleteSwipe = useBankStore((s) => s.deleteSwipe)
 
   if (bankType === 'products') {
     return (
@@ -583,6 +667,23 @@ export default function BankList({ bankType, onEdit, onAdd, sort, modelFilter = 
   if (bankType === 'styles') {
     if (styles.length === 0) return <EmptyState icon={Palette} label="visual styles" singular="visual style" onAdd={onAdd} />
     return <StylesList items={styles} onEdit={onEdit} onDelete={deleteStyle} sort={sort} />
+  }
+
+  if (bankType === 'swipes') {
+    // No `onAdd`: a swipe file is filled from Outliers, never typed in here.
+    if (swipes.length === 0) {
+      return (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 py-16 text-center">
+          <Bookmark className="h-8 w-8 text-ink-700" strokeWidth={1.5} />
+          <p className="text-sm text-ink-500">No saved ads yet</p>
+          <p className="max-w-[300px] text-xs leading-relaxed text-ink-600">
+            Save an ad from Outliers and it lands here — thumbnail, numbers and
+            transcript kept, so it's still readable long after the links expire.
+          </p>
+        </div>
+      )
+    }
+    return <SwipesList items={swipes} onDelete={deleteSwipe} sort={sort} />
   }
 
   // brolls

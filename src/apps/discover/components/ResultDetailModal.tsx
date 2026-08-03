@@ -1,27 +1,36 @@
-import { useState } from 'react'
-import { Eye, ExternalLink, Loader2, PenLine, Sparkles, X } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { ArrowUpRight, Bookmark, BookmarkCheck, Eye, ExternalLink, Loader2, PenLine, Sparkles, X } from 'lucide-react'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
 import { useExclusiveVideo } from '../../../hooks/useInlineVideo'
-import { formatCount, formatMultiple } from '../services/scoring'
+import { engagementRate, formatCount, formatMultiple, formatRate } from '../services/scoring'
+import type { TranscriptState } from '../Discover'
 import type { DiscoverResult } from '../types'
 
 interface ResultDetailModalProps {
   result: DiscoverResult
+  /** Fetched by the parent when the card opens, so it's on screen by the time
+      you've read the caption — and already paid for when Remix fires. */
+  transcript: TranscriptState
   onClose: () => void
   onAnalyze: (result: DiscoverResult) => void
   /** `useAi` spends 10 extra credits, so it's only ever passed from the
       explicit retry below — never from the first attempt. */
   onRemix: (result: DiscoverResult, useAi?: boolean) => Promise<void>
-  busy?: 'analyze' | 'remix' | null
+  onSave: (result: DiscoverResult) => void
+  saved?: boolean
+  busy?: 'analyze' | 'remix' | 'save' | null
 }
 
 export default function ResultDetailModal({
   result,
+  transcript,
   onClose,
   onAnalyze,
   onRemix,
+  onSave,
+  saved = false,
   busy = null,
 }: ResultDetailModalProps) {
   // Called above any early return — the hook order has to be stable.
@@ -30,19 +39,9 @@ export default function ResultDetailModal({
   useCloseOnAppSwitch(true, onClose)
   const video = useExclusiveVideo()
 
-  // Set when the cheap transcript call came back empty, which is a normal
-  // outcome: plenty of TikToks have no caption track at all.
-  const [noCaptions, setNoCaptions] = useState(false)
-
-  async function handleRemix(useAi: boolean) {
-    setNoCaptions(false)
-    try {
-      await onRemix(result, useAi)
-    } catch (e) {
-      if (e instanceof Error && e.message === 'NO_TRANSCRIPT') setNoCaptions(true)
-      // Anything else has already been toasted by the caller.
-    }
-  }
+  const er = result.stats ? engagementRate(result.stats) : null
+  const hasTranscript = transcript.phase === 'ready'
+  const isTikTok = result.platform === 'tiktok'
 
   return (
     <div
@@ -102,6 +101,11 @@ export default function ResultDetailModal({
                   {formatMultiple(result.outlier.multiple)} outlier
                 </span>
               )}
+              {er !== null && (
+                <span className="rounded-full bg-ink/10 px-2.5 py-1 text-[12px] font-medium text-ink-200">
+                  {formatRate(er)} engagement
+                </span>
+              )}
               {result.ad?.daysRunning != null && (
                 <span className="rounded-full bg-ink/10 px-2.5 py-1 text-[12px] font-medium text-ink-200">
                   Running {result.ad.daysRunning} days
@@ -115,24 +119,70 @@ export default function ResultDetailModal({
             </div>
 
             {result.stats && (
-              <div className="mt-3 grid grid-cols-4 gap-2 text-center">
+              <div className="mt-3 grid grid-cols-5 gap-1.5 text-center">
                 {([
                   ['Views', result.stats.views],
                   ['Likes', result.stats.likes],
                   ['Comments', result.stats.comments],
                   ['Shares', result.stats.shares],
+                  ['Saves', result.stats.saves],
                 ] as const).map(([label, value]) => (
                   <div key={label} className="rounded-xl bg-ink/[0.03] py-2">
-                    <div className="text-[13px] font-medium text-ink-100">{formatCount(value)}</div>
+                    <div className="text-[13px] font-medium tabular-nums text-ink-100">{formatCount(value)}</div>
                     <div className="text-[10px] text-ink-600">{label}</div>
                   </div>
                 ))}
               </div>
             )}
 
-            <p className="mt-4 text-[13px] leading-relaxed whitespace-pre-wrap text-ink-300">
-              {result.caption || 'No caption'}
-            </p>
+            <Section label={result.platform === 'meta' ? 'Ad copy' : 'Caption'}>
+              <p className="text-[13px] leading-relaxed whitespace-pre-wrap text-ink-300">
+                {result.caption || 'No caption'}
+              </p>
+            </Section>
+
+            {/* TikTok only. Meta's ad-transcript endpoint returns nothing for
+                the ads that actually matter here — it reads Facebook's exposed
+                captions, and video ads in the Ad Library don't carry them — so
+                showing an empty Transcript block on every Meta ad was a promise
+                the platform can't keep. On that tab the route to the words is
+                Analyze Ad, which reads the video itself. */}
+            {result.platform === 'tiktok' && (
+            <Section label="Transcript">
+              {transcript.phase === 'loading' && (
+                <p className="flex items-center gap-2 text-[12px] text-ink-500">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Pulling the transcript…
+                </p>
+              )}
+              {transcript.phase === 'ready' && (
+                <p className="max-h-52 overflow-y-auto whitespace-pre-wrap text-[13px] leading-relaxed text-ink-300">
+                  {transcript.text}
+                </p>
+              )}
+              {transcript.phase === 'empty' && (
+                <div>
+                  <p className="text-[12px] leading-relaxed text-ink-500">
+                    This video has no captions to pull.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void onRemix(result, true)}
+                    disabled={busy === 'remix'}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:opacity-50"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Transcribe with AI — 10 credits
+                  </button>
+                </div>
+              )}
+              {transcript.phase === 'error' && (
+                <p className="text-[12px] leading-relaxed text-red-300 light:text-red-700">
+                  {transcript.message}
+                </p>
+              )}
+            </Section>
+            )}
 
             {result.ad?.landingUrl && (
               <a
@@ -147,47 +197,86 @@ export default function ResultDetailModal({
             )}
           </div>
 
+          {/* Anything that LEAVES the app carries the arrow — the label names
+              the job and the glyph says you're being taken somewhere. On Meta,
+              Analyze is also the only route to the words, so it stands alone
+              on the top row rather than beside a Remix that can't fire. */}
           <footer className="shrink-0 border-t border-ink/5 p-4">
-            {noCaptions && (
-              <div className="mb-2.5 rounded-xl bg-ink/[0.03] p-3">
-                <p className="text-[12px] leading-relaxed text-ink-400">
-                  This video has no captions to pull.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => handleRemix(true)}
-                  disabled={busy === 'remix'}
-                  className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:opacity-50"
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Transcribe with AI — 10 credits
-                </button>
-              </div>
-            )}
-
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => onAnalyze(result)}
                 disabled={busy === 'analyze' || !result.videoUrl}
+                title={isTikTok ? 'Opens in Ad Analyzer' : 'Reads the video itself — the way to get this ad’s script'}
                 className="flex flex-1 items-center justify-center gap-2 rounded-full bg-ink py-2.5 text-[13px] font-medium text-ink-900 transition-colors hover:bg-ink-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {busy === 'analyze' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-                Analyze
+                Analyze Ad
+                <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
+              </button>
+              {isTikTok && (
+                <button
+                  type="button"
+                  onClick={() => void onRemix(result)}
+                  // Held back until there are words to send: the whole point of
+                  // this button is the transcript, and firing it on an empty
+                  // one would bounce you to Scripts with nothing in the box.
+                  disabled={busy === 'remix' || !hasTranscript}
+                  title={hasTranscript ? 'Opens in Scripts' : 'No transcript to remix yet'}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-full border border-ink/10 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {busy === 'remix' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+                  Remix Transcript
+                  <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
+                </button>
+              )}
+            </div>
+
+            <div className="mt-2 flex gap-2">
+              <button
+                type="button"
+                onClick={() => onSave(result)}
+                disabled={busy === 'save'}
+                className={`flex flex-1 items-center justify-center gap-2 rounded-full border py-2.5 text-[13px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                  saved
+                    ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300 light:text-emerald-700'
+                    : 'border-ink/10 text-ink-200 hover:border-ink/20 hover:bg-ink/5'
+                }`}
+              >
+                {busy === 'save'
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+                {saved ? 'Saved to Swipe File' : 'Save to Swipe File'}
               </button>
               <button
                 type="button"
-                onClick={() => handleRemix(false)}
-                disabled={busy === 'remix'}
-                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-ink/10 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => window.open(result.postUrl, '_blank', 'noopener,noreferrer')}
+                className="flex flex-1 items-center justify-center gap-2 rounded-full border border-ink/10 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5"
               >
-                {busy === 'remix' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
-                {result.platform === 'meta' ? 'Remix copy' : 'Remix transcript'}
+                {isTikTok ? 'Open on TikTok' : 'Open in Meta Ad Library'}
+                <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
               </button>
             </div>
           </footer>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * A labelled block in the reading column.
+ *
+ * The label earns its keep on Caption vs Transcript especially: they are two
+ * different pieces of text with two different jobs — what the advertiser wrote
+ * versus what the creator said — and the Remix button sends only one of them.
+ * Unlabelled, the pair reads as one wall of copy.
+ */
+function Section({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="mt-4">
+      <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-600">{label}</p>
+      {children}
     </div>
   )
 }

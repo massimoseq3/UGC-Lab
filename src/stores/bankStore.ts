@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, VoiceHistoryItem, VideoHistoryItem, ImageHistoryItem, MusicHistoryItem, ScriptHistoryItem, BrollHistoryItem, CharacterHistoryItem, AdAnatomyHistoryItem, UsageDay, UsageKind } from './types'
+import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, SwipeItem, VoiceHistoryItem, VideoHistoryItem, ImageHistoryItem, MusicHistoryItem, ScriptHistoryItem, BrollHistoryItem, CharacterHistoryItem, AdAnatomyHistoryItem, UsageDay, UsageKind } from './types'
 import { isAssetRef, assetIdFromRef, deleteAsset, saveFromDataUrl } from '../utils/assetStore'
 import { useAuthStore } from './authStore'
 import { isCloudEnabled } from '../lib/supabase'
@@ -22,6 +22,7 @@ interface BankState {
   voices: VoicePreset[]
   brolls: BRoll[]
   styles: StylePreset[]
+  swipes: SwipeItem[]
   voiceHistory: VoiceHistoryItem[]
   videoHistory: VideoHistoryItem[]
   imageHistory: ImageHistoryItem[]
@@ -80,6 +81,11 @@ interface BankState {
   deleteStyle: (id: string) => Promise<BankActionResult>
   getStyleById: (id: string) => StylePreset | undefined
 
+  addSwipe: (swipe: Omit<SwipeItem, 'id' | 'createdAt'>) => Promise<string>
+  updateSwipe: (id: string, updates: Partial<SwipeItem>) => Promise<BankActionResult>
+  deleteSwipe: (id: string) => Promise<BankActionResult>
+  getSwipeBySource: (platform: SwipeItem['platform'], sourceId: string) => SwipeItem | undefined
+
   // Star toggle — the starrable banks share one action. Starred items
   // surface first in the bank pickers.
   toggleStar: (bank: StarrableBank, id: string) => void
@@ -133,7 +139,7 @@ interface BankState {
 }
 
 // Banks whose items can be starred (pinned) by the user.
-export type StarrableBank = 'products' | 'models' | 'scripts' | 'brolls' | 'styles'
+export type StarrableBank = 'products' | 'models' | 'scripts' | 'brolls' | 'styles' | 'swipes'
 
 export interface UsageEvent {
   kind: UsageKind
@@ -185,7 +191,7 @@ function generateId(): string {
   return crypto.randomUUID()
 }
 
-type BankData = Pick<BankState, 'products' | 'models' | 'scripts' | 'voices' | 'brolls' | 'styles' | 'voiceHistory' | 'videoHistory' | 'imageHistory' | 'musicHistory' | 'scriptHistory' | 'brollHistory' | 'characterHistory' | 'adAnatomyHistory' | 'usageDays'>
+type BankData = Pick<BankState, 'products' | 'models' | 'scripts' | 'voices' | 'brolls' | 'styles' | 'swipes' | 'voiceHistory' | 'videoHistory' | 'imageHistory' | 'musicHistory' | 'scriptHistory' | 'brollHistory' | 'characterHistory' | 'adAnatomyHistory' | 'usageDays'>
 
 function migrateVoiceShape<T>(arr: unknown): T[] {
   if (!Array.isArray(arr)) return []
@@ -218,6 +224,7 @@ const EMPTY_BANKS: BankData = {
   voices: [],
   brolls: [],
   styles: [],
+  swipes: [],
   voiceHistory: [],
   videoHistory: [],
   imageHistory: [],
@@ -251,6 +258,7 @@ function loadFromStorage(): BankData {
         voices: migrateVoiceShape<VoicePreset>(parsed.voices),
         brolls: parsed.brolls ?? [],
         styles: Array.isArray(parsed.styles) ? parsed.styles : [],
+        swipes: Array.isArray(parsed.swipes) ? parsed.swipes : [],
         voiceHistory: migrateVoiceShape<VoiceHistoryItem>(parsed.voiceHistory),
         videoHistory: Array.isArray(parsed.videoHistory) ? parsed.videoHistory : [],
         imageHistory: Array.isArray(parsed.imageHistory) ? parsed.imageHistory : [],
@@ -284,6 +292,7 @@ function flushSaveToStorage() {
       voices: state.voices,
       brolls: state.brolls,
       styles: state.styles,
+      swipes: state.swipes,
       voiceHistory: state.voiceHistory,
       videoHistory: state.videoHistory,
       imageHistory: state.imageHistory,
@@ -757,6 +766,51 @@ export const useBankStore = create<BankState>((set, get) => ({
   },
 
   getStyleById: (id) => get().styles.find((s) => s.id === id),
+
+  // ── Swipe file ───────────────────────────────────────────────────
+  // Saved ads from Outliers. Like styles, the thumbnail is this bank's own
+  // asset (nothing else links it), so a delete purges it outright.
+  addSwipe: async (swipe) => {
+    const newSwipe: SwipeItem = { ...swipe, id: generateId(), createdAt: Date.now() }
+    set((state) => {
+      const next = { swipes: [newSwipe, ...state.swipes] }
+      saveToStorage({ ...state, ...next })
+      return next
+    })
+    pushRow('swipes', newSwipe)
+    reportSuccess('Saved to swipe file')
+    return newSwipe.id
+  },
+
+  updateSwipe: async (id, updates) => {
+    const old = get().swipes.find((s) => s.id === id)
+    if (!old) return
+    const updated: SwipeItem = { ...old, ...updates }
+    set((state) => {
+      const next = { swipes: state.swipes.map((s) => (s.id === id ? updated : s)) }
+      saveToStorage({ ...state, ...next })
+      return next
+    })
+    pushRow('swipes', updated)
+  },
+
+  deleteSwipe: async (id) => {
+    const item = get().swipes.find((s) => s.id === id)
+    if (!item) return
+    set((state) => {
+      const next = { swipes: state.swipes.filter((s) => s.id !== id) }
+      saveToStorage({ ...state, ...next })
+      return next
+    })
+    dropRow('swipes', id)
+    if (item.thumbRef) void cleanupAssets(item.thumbRef)
+    reportSuccess('Removed from swipe file')
+  },
+
+  // Lets the Save button read as "Saved" on an ad already in the file, and
+  // stops the same ad being filed twice across two different searches.
+  getSwipeBySource: (platform, sourceId) =>
+    get().swipes.find((s) => s.platform === platform && s.sourceId === sourceId),
 
   // ── Star toggle ──────────────────────────────────────────────────
   // Deliberately silent (no toast): starring is a lightweight pin, not a
