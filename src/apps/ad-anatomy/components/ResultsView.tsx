@@ -9,8 +9,16 @@ import {
   Film,
   Bookmark,
   Lightbulb,
+  Palette,
+  AudioLines,
 } from 'lucide-react'
-import type { AnalysisResult, Scene } from '../types'
+import type {
+  AnalysisResult,
+  MasterVisualStyle,
+  MasterVoiceProfile,
+  ReverseEngineeredPrompt,
+  Scene,
+} from '../types'
 import { useAppStore } from '../../../stores/appStore'
 import { useBankStore } from '../../../stores/bankStore'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -263,6 +271,159 @@ function joinScenes(scenes: Scene[]): string {
     .join('\n\n')
 }
 
+// The two master blocks as plain text. Each scene prompt is self-contained (it
+// is fired as its own clip), so these aren't needed to render a single shot —
+// they exist so the LOOK and the VOICE can't drift between clips, which is what
+// makes a set of separately-generated clips read as one ad.
+function styleText(style: MasterVisualStyle): string {
+  return `${style.label} — ${style.liveAction ? 'live action' : 'animated / rendered'}\n${style.brief}`
+}
+
+function voiceText(voice: MasterVoiceProfile): string {
+  const head = [voice.label, voice.traits.join(' · '), voice.delivery].filter(Boolean).join('\n')
+  return `${head}\n\n${voice.profile}`
+}
+
+// The whole recreation as one pasteable artifact — the masters, then the
+// scenes. Header wording mirrors the "=== VOICE PROFILE ... ===" block Scripts
+// emits at the end of a blueprint, so a member moving text between the two apps
+// sees the same shape. Scripts' blueprint detection matches on scene headers
+// anywhere in the source, so a preamble in front of them is safe.
+function buildFullPrompt(rep: ReverseEngineeredPrompt): string {
+  const masters: string[] = []
+  if (rep.masterVisualStyle) {
+    masters.push(`=== MASTER VISUAL STYLE (every scene is shot in this look) ===\n${styleText(rep.masterVisualStyle)}`)
+  }
+  if (rep.masterVoiceProfile) {
+    masters.push(`=== MASTER VOICE PROFILE (same voice in every scene) ===\n${voiceText(rep.masterVoiceProfile)}`)
+  }
+  const scenes = joinScenes(rep.scenes)
+  return masters.length > 0 ? `${masters.join('\n\n')}\n\n${scenes}` : scenes
+}
+
+/* Master blocks — the ad-wide look and voice, above the per-scene cards. */
+
+// Shared shell: the Breakdown card's labelled block, plus a title row that can
+// carry pills and its own actions.
+function MasterBlock({
+  label,
+  icon: Icon,
+  title,
+  pills,
+  actions,
+  children,
+}: {
+  label: string
+  icon: React.ElementType
+  title: string
+  pills?: React.ReactNode
+  actions?: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-xl bg-surface-0 px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <span className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-tight text-ink-600">
+          <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+          {label}
+        </span>
+        {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
+        <span className="text-[13px] font-medium tracking-tight text-ink-100">{title}</span>
+        {pills}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function MiniButton({ onClick, icon: Icon, label }: { onClick: () => void; icon: React.ElementType; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
+    >
+      <Icon className="h-3 w-3" strokeWidth={1.75} />
+      {label}
+    </button>
+  )
+}
+
+// The look, saveable to the Styles bank: `brief` is written to the same
+// contract a bank style holds (how it looks, never what's in it), so the member
+// can render their OWN ad in the analysed ad's look.
+function VisualStyleBlock({ style, adTitle }: { style: MasterVisualStyle; adTitle: string }) {
+  const { copied, copy } = useCopy()
+  const addStyle = useBankStore((s) => s.addStyle)
+  // The saved brief, not a boolean: this component stays mounted when the
+  // member picks a different analysis in the History rail, so a flag would
+  // leave the next ad's style reading "Saved" before it ever was.
+  const [savedBrief, setSavedBrief] = useState<string | null>(null)
+  const saved = savedBrief === style.brief
+
+  const handleSave = () => {
+    // addStyle toasts on success; a second click would just write a duplicate row.
+    void addStyle({ name: `${adTitle} — Visual Style`, brief: style.brief })
+    setSavedBrief(style.brief)
+  }
+
+  return (
+    <MasterBlock
+      label="Visual Style"
+      icon={Palette}
+      title={style.label}
+      pills={
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-tight ${
+            style.liveAction
+              ? 'bg-emerald-500/10 text-emerald-300 light:text-emerald-700'
+              : 'bg-violet-500/10 text-violet-300 light:text-violet-700'
+          }`}
+        >
+          {style.liveAction ? 'Live action' : 'Animated'}
+        </span>
+      }
+      actions={
+        <>
+          <MiniButton
+            onClick={saved ? () => {} : handleSave}
+            icon={saved ? Check : Bookmark}
+            label={saved ? 'Saved' : 'Save style'}
+          />
+          <MiniButton onClick={() => copy(styleText(style))} icon={copied ? Check : Copy} label={copied ? 'Copied' : 'Copy'} />
+        </>
+      }
+    >
+      <p className="mt-1.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-200">{style.brief}</p>
+    </MasterBlock>
+  )
+}
+
+function VoiceProfileBlock({ voice }: { voice: MasterVoiceProfile }) {
+  const { copied, copy } = useCopy()
+  return (
+    <MasterBlock
+      label="Voice"
+      icon={AudioLines}
+      title={voice.label}
+      pills={voice.traits.map((t) => (
+        <span key={t} className="rounded-full bg-ink/5 px-2 py-0.5 text-[10px] text-ink-400">
+          {t}
+        </span>
+      ))}
+      actions={
+        <MiniButton onClick={() => copy(voiceText(voice))} icon={copied ? Check : Copy} label={copied ? 'Copied' : 'Copy'} />
+      }
+    >
+      {voice.delivery && (
+        <p className="mt-1.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-400">{voice.delivery}</p>
+      )}
+      <p className="mt-1.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-200">{voice.profile}</p>
+    </MasterBlock>
+  )
+}
+
 function SceneCard({ scene }: { scene: Scene }) {
   const { copied, copy } = useCopy()
   return (
@@ -296,7 +457,7 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
   const { copied, copy } = useCopy()
   const { reverseEngineeredPrompt } = result
   const scenes = reverseEngineeredPrompt.scenes
-  const fullPrompt = useMemo(() => joinScenes(scenes), [scenes])
+  const fullPrompt = useMemo(() => buildFullPrompt(reverseEngineeredPrompt), [reverseEngineeredPrompt])
   const sendToApp = useAppStore((s) => s.sendToApp)
   const addToast = useAppStore((s) => s.addToast)
   const addScript = useBankStore((s) => s.addScript)
@@ -354,7 +515,13 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
             className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
           >
             {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
-            {copied ? 'Copied' : scenes.length > 1 ? 'Copy All' : 'Copy Prompt'}
+            {/* "Copy Prompt" only when the copy IS one prompt — with a master
+                block in front of it, or several scenes, it's the whole set. */}
+            {copied
+              ? 'Copied'
+              : scenes.length > 1 || fullPrompt !== scenes[0]?.prompt
+                ? 'Copy All'
+                : 'Copy Prompt'}
           </button>
         }
       />
@@ -368,6 +535,16 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
             {scenes.length === 1 ? '1 scene' : `${scenes.length} scenes (≤15s each)`}
           </span>
         </div>
+
+        {/* The ad-wide look and voice, above the shots they hold together.
+            Both are absent on results analysed before they existed, and the
+            voice is absent on an ad with no speech. */}
+        {reverseEngineeredPrompt.masterVisualStyle && (
+          <VisualStyleBlock style={reverseEngineeredPrompt.masterVisualStyle} adTitle={adTitle} />
+        )}
+        {reverseEngineeredPrompt.masterVoiceProfile && (
+          <VoiceProfileBlock voice={reverseEngineeredPrompt.masterVoiceProfile} />
+        )}
 
         <div className="flex flex-col gap-3">
           {scenes.map((scene) => (
