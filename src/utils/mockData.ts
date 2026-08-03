@@ -478,6 +478,18 @@ const AD_ANALYSES = [
       reverseEngineeredPrompt: {
         totalDurationSeconds: 25,
         isSingleClip: false,
+        masterVisualStyle: {
+          styleId: 'ugc',
+          label: 'UGC Realism',
+          liveAction: true,
+          brief: 'Handheld phone footage with the flat wide-lens rendering of a front camera: mild sensor noise in the shadows, a slight wobble on every movement, and no grade at all. Skin keeps its real texture, stray hairs and a shine on the forehead; the cream sweater wrinkles where an arm bends. Colour runs warm and slightly uneven — daylight through one window against a cooler bulb further back — with open shadows and a blown highlight on the wall behind. Framing sits casually off-centre, sharp edge to edge with almost no falloff, no vignette and no gloss anywhere.',
+        },
+        masterVoiceProfile: {
+          label: 'Bright American Female, Mid-20s',
+          traits: ['Female, mid-20s', 'General American', 'Fast, conversational', 'Slight vocal fry'],
+          delivery: 'On camera throughout, talking straight into the lens with her mouth in sync; the same voice continues over the product close-up as a voiceover.',
+          profile: 'A mid-pitched female voice in her mid-twenties, General American with no regional colour, running fast and conversational with the pace of someone telling a friend something before they forget it. The texture is warm and slightly breathy at the top of a sentence, dropping into a light vocal fry on the last two or three words of every line. Energy is up but never announced — she sounds amused rather than excited. Sentences trail upward at the end like a question even when they are not, and she half-laughs through the word before her punchline.',
+        },
         scenes: [
           { index: 1, startTime: '00:00', endTime: '00:09', durationSeconds: 9, label: 'Hook — Skeptic', prompt: 'Young woman talking candidly to the front camera in a sunlit apartment, raw UGC selfie, handheld.' },
           { index: 2, startTime: '00:09', endTime: '00:15', durationSeconds: 6, label: 'Mechanism', prompt: 'Close-up of the serum bottle, dropper detail, soft morning light.' },
@@ -511,6 +523,14 @@ const AD_ANALYSES = [
       reverseEngineeredPrompt: {
         totalDurationSeconds: 0,
         isSingleClip: true,
+        // No voice profile on purpose — a static ad has nothing to hear, which
+        // is exactly how a real analysis of one comes back.
+        masterVisualStyle: {
+          styleId: 'other',
+          label: 'Premium product still',
+          liveAction: true,
+          brief: 'Studio product photography finished like a brand campaign: one hero object, critically sharp, on a seamless dark surface with a soft reflection under it. Forms read as machined and exact — polished titanium against matte charcoal, every edge clean, no clutter in frame. The palette is near-monochrome navy and graphite with a single cool cyan accent glowing from a screen just off the subject. Light is a large soft source from high camera-left plus a hard rim along the far edge, shadows deep and controlled with no fill spill. Shallow depth of field, gentle falloff into black, faint bloom on the accent, no grain.',
+        },
         scenes: [
           { index: 1, startTime: '00:00', endTime: '00:00', durationSeconds: 0, label: 'Static Hero', prompt: 'Smart ring on a dark nightstand beside a glowing sleep-graph phone, premium product photography, moody blue light.' },
         ],

@@ -15,9 +15,14 @@ const CHAT_MODEL_ID = CHAT_MODEL_DEFAULT
 // to stay on the safe side.
 const VIDEO_TOKENS_PER_SEC = 300
 // The system + user prompts. Rounded up.
-const OVERHEAD_TOKENS = 3_000
-// One JSON output — scorecard, breakdown, transcript and every scene prompt.
-const OUTPUT_TOKENS = 8_000
+const OVERHEAD_TOKENS = 4_000
+// One JSON output — scorecard, breakdown, transcript, the master visual style
+// and voice profile, and every scene prompt. The scene prompts dominate it and
+// they grew: reproduction-grade prompts account for every shot's camera,
+// lighting, action, dialogue, on-screen text and audio, and repeat the full
+// character and product description in each scene because each one is fired on
+// its own.
+const OUTPUT_TOKENS = 14_000
 // Fallback when a clip's duration can't be read from its metadata.
 const DEFAULT_DURATION_SEC = 30
 

@@ -113,6 +113,21 @@ const RETIRED_STYLES: ContinuousStyle[] = [
 // legacy style id resolves to (it also decides `realism`).
 const FALLBACK_STYLE = CONTINUOUS_STYLES.find((s) => s.id === 'zack-3d')!
 
+// Whether an id names a style that's still on the picker. Unlike
+// `getContinuousStyle`, which always resolves to something, this answers "is
+// this one of ours?" — the Ad Analyzer uses it to decide whether an ad it
+// classified matches a real family or falls to its own free-text descriptor.
+export function isContinuousStyleId(id: string): boolean {
+  return CONTINUOUS_STYLES.some((s) => s.id === id)
+}
+
+// The live families as a menu an LLM can classify an existing ad into. Built
+// off CONTINUOUS_STYLES rather than hand-kept, so a style added to the picker
+// is immediately a style the Ad Analyzer can name.
+export function styleFamilyMenu(): string {
+  return CONTINUOUS_STYLES.map((s) => `- "${s.id}" — ${s.label}: ${s.hint}`).join('\n')
+}
+
 export function getContinuousStyle(id: string): ContinuousStyle {
   return CONTINUOUS_STYLES.find((s) => s.id === id)
     ?? RETIRED_STYLES.find((s) => s.id === id)
@@ -132,18 +147,24 @@ export function styleUsesRealism(styleId: string, hasCustomBrief: boolean): bool
 // the AESTHETIC ONLY — never the subjects, products, or scenes in them — into a
 // STYLE paragraph that then drives every keyframe and clip.
 
-const STYLE_ANALYSIS_SYSTEM = `You are an art director reverse-engineering a visual style from reference frames.
-
-Your ONLY job is to describe HOW these images look, never WHAT is in them. Your output is appended to unrelated image and video prompts for a completely different script, so any subject matter you carry over is a bug: no characters, no products, no locations, no story, no specific objects from these references.
-
-Describe, in ONE dense paragraph of 90-150 words:
+// The five axes a style brief covers, and the rules for writing one. Exported
+// because the Ad Analyzer distils a master visual style off a whole ad and its
+// brief lands in the same `styles` bank — one spec, so a brief written there is
+// interchangeable with one written here.
+export const STYLE_BRIEF_SPEC = `Describe, in ONE dense paragraph of 90-150 words:
 - MEDIUM & RENDER: the technique (3D render, 2D cel animation, claymation, papercraft, live-action photography, mixed media), how stylized vs photoreal it is, surface quality (glossy, matte, grainy, painterly), and the apparent render engine or film-stock character.
 - FORMS: how shapes and figures are treated — proportions (realistic vs exaggerated), edge quality (hard linework, soft rounded, cut-paper crisp), geometric detail level, texture density.
 - PALETTE: the actual dominant colours and their relationships (name the colours; never just "vibrant"), saturation, contrast, and any consistent grade or tint.
 - LIGHT: the lighting register — sources, softness, direction tendencies, rim and volumetric effects, shadow depth, bloom or haze.
 - CAMERA & FINISH: typical framing and lens character, depth-of-field behaviour, grain or noise, and any post treatment (vignette, chromatic aberration, halation).
 
-Write it as direct style direction an image model can act on, present tense, one flowing paragraph. Name concrete visual qualities, never vague praise ("beautiful", "high quality", "professional"). If the references disagree, describe the dominant look and ignore the outlier.
+Write it as direct style direction an image model can act on, present tense, one flowing paragraph. Name concrete visual qualities, never vague praise ("beautiful", "high quality", "professional").`
+
+const STYLE_ANALYSIS_SYSTEM = `You are an art director reverse-engineering a visual style from reference frames.
+
+Your ONLY job is to describe HOW these images look, never WHAT is in them. Your output is appended to unrelated image and video prompts for a completely different script, so any subject matter you carry over is a bug: no characters, no products, no locations, no story, no specific objects from these references.
+
+${STYLE_BRIEF_SPEC} If the references disagree, describe the dominant look and ignore the outlier.
 
 Output ONLY the paragraph. No preamble, no headings, no bullets, no markdown.`
 

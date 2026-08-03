@@ -3,6 +3,7 @@ import { HOOK_COUNT, REMIX_ANGLES, DEFAULT_VARIATION_COUNT, isVariationCount, WR
 import { useSettingsStore, resolveScriptModel } from '../../../stores/settingsStore'
 import { kieChatCompletions, LONG_CHAT_TIMEOUT_MS, type ChatMessage } from '../../../utils/kie'
 import { getChatTarget, type ChatTarget } from '../../../utils/models'
+import { VOICE_PROFILE_SPEC } from '../../../utils/voiceProfile'
 
 // Scripts is one of the two apps where the MEMBER picks the writer (the other
 // is B-Roll) — this is prose a person reads, so the intelligence/cost trade is
@@ -63,11 +64,11 @@ const SELF_AUDIT = `SELF-AUDIT BEFORE YOU ANSWER (do this silently; output ONLY 
 4. Find one vague claim and make it specific. Find one oversell and undersell it.
 5. Read the whole thing out loud in your head. Any line you wouldn't actually say to a friend gets rewritten or cut.`
 
-// The voice-consistency spec. The scenes format emits this so the SAME
-// on-camera voice can be reproduced across every clip in (and beyond) an ad.
-// Plain spoken scripts deliberately omit it — that text is piped straight to
-// Voiceovers TTS, where the voice is picked in the ElevenLabs catalog instead.
-const VOICE_PROFILE_SPEC = `VOICE — describe, in rich and reproducible detail, HOW the speaker sounds, so the exact same voice can be reused across every video. Cover: the perceived age and gender of the voice, accent / region, pitch (low / mid / high), pace (slow, measured, fast), texture (warm, raspy, breathy, smooth, nasal, gravelly), energy (calm, hyped, deadpan, bubbly), and 1-2 signature quirks (uptalk, slight vocal fry, a laugh living in the voice, clipped consonants). Write it as one dense paragraph you could hand to a voice actor or a TTS engine and get the same person every single time. Describe ONLY the sound — never physical appearance.`
+// The voice-consistency spec (shared — see utils/voiceProfile.ts). The scenes
+// format emits this so the SAME on-camera voice can be reproduced across every
+// clip in (and beyond) an ad. Plain spoken scripts deliberately omit it — that
+// text is piped straight to Voiceovers TTS, where the voice is picked from the
+// Gemini catalog instead.
 
 // Short clips drown when the model tries to cram the whole product brief in.
 // This is length-tiered discipline: ≤15s = one idea, 20s = one idea with a
