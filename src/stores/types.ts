@@ -413,6 +413,20 @@ export interface VideoSourceClipPayload {
   label?: string
 }
 
+// Payload for the Outliers → Ad Analyzer handoff (targetField 'adVideo').
+//
+// Carries a live `File`, not an asset:// ref: the Ad Analyzer's own upload path
+// already takes Files and saves the asset itself, and `appStore` is not
+// persisted, so an in-memory File is safe here in a way it wouldn't be inside
+// a stored draft. A refresh mid-handoff simply loses the payload, which is the
+// correct outcome — the analysis hasn't started yet.
+export interface DiscoverVideoPayload {
+  file: File
+  /** Permalink to the original post, for the history row's provenance. */
+  sourceUrl: string
+  caption: string
+}
+
 // Payload for the Ad Analyzer → B-Roll handoff (targetField 'adBlueprint').
 // Deliberately carries STAGING, not the analysed prompts: `script` is the ad's
 // own transcript and `staging` is its beat map + shot craft, which rides the

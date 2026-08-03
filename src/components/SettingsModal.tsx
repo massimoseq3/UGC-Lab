@@ -10,6 +10,7 @@ import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import { useAuthStore } from '../stores/authStore'
 import { isCloudEnabled } from '../lib/supabase'
 import { kieTestConnection } from '../utils/kie'
+import { scTestConnection } from '../utils/scrapecreators'
 import { seedMockData, removeMockData, hasMockData } from '../utils/mockData'
 import {
   findOrphanAssets,
@@ -47,6 +48,8 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   useCloseOnAppSwitch(open, onClose)
   const storedKieKey = useSettingsStore((s) => s.kieApiKey)
   const setKieApiKey = useSettingsStore((s) => s.setKieApiKey)
+  const storedScKey = useSettingsStore((s) => s.scrapeCreatorsKey)
+  const setScrapeCreatorsKey = useSettingsStore((s) => s.setScrapeCreatorsKey)
   const openApp = useAppStore((s) => s.openApp)
   const profile = useAuthStore((s) => s.profile)
   const signOut = useAuthStore((s) => s.signOut)
@@ -60,6 +63,15 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
 
   const [kieDraft, setKieDraft] = useState(storedKieKey)
   const [showKie, setShowKie] = useState(false)
+
+  // ScrapeCreators — the Outliers search key. Optional: everything else in the
+  // app works without it, so it never gates the rail's alert dot.
+  const [scDraft, setScDraft] = useState(storedScKey)
+  const [showSc, setShowSc] = useState(false)
+  const [scSaving, setScSaving] = useState(false)
+  const [scSaved, setScSaved] = useState(false)
+  const [scTesting, setScTesting] = useState(false)
+  const [scTestResult, setScTestResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   // "What should we call you?" — edits profiles.display_name.
   const storedName = profile?.display_name ?? ''
@@ -140,6 +152,35 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handleSaveSc() {
+    setScSaving(true)
+    // Same cosmetic delay as the kie save — the write itself is synchronous.
+    await new Promise((resolve) => setTimeout(resolve, 350))
+    setScrapeCreatorsKey(scDraft.trim())
+    setScSaving(false)
+    setScSaved(true)
+    setTimeout(() => setScSaved(false), 2000)
+  }
+
+  async function handleTestSc() {
+    if (!scDraft.trim()) return
+    setScTesting(true)
+    setScTestResult(null)
+    // Infra surface — show ScrapeCreators' own message, not humanizeError copy.
+    const result = await scTestConnection(scDraft.trim())
+    if (result.ok) {
+      setScTestResult({
+        ok: true,
+        message: result.credits === null
+          ? 'Connected.'
+          : `Connected — ${result.credits.toLocaleString()} credits remaining.`,
+      })
+    } else {
+      setScTestResult({ ok: false, message: result.error })
+    }
+    setScTesting(false)
   }
 
   async function handleSaveName() {
@@ -228,7 +269,10 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   // The rail is built from what this member actually has — a local-only build
   // has no Account or Storage pane, and Advanced only exists for me.
   const sections: Array<{ id: SectionId; label: string; icon: ElementType; alert?: boolean }> = [
-    { id: 'api', label: 'kie.ai key', icon: Key, alert: !hasKey },
+    // Two keys live here now (kie.ai + the optional ScrapeCreators one), so the
+    // label is plural. The alert dot still tracks kie.ai alone — it's the only
+    // one the app can't function without.
+    { id: 'api', label: 'API keys', icon: Key, alert: !hasKey },
     ...(cloudOn && profile ? [{ id: 'account' as const, label: 'Account', icon: User }] : []),
     { id: 'appearance', label: 'Appearance', icon: Palette },
     ...(cloudOn ? [{ id: 'storage' as const, label: 'Storage', icon: HardDrive }] : []),
@@ -382,6 +426,105 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                       {testResult.message}
                     </Banner>
                   )}
+                </Card>
+
+                <Card>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[12px] font-medium text-ink-300">
+                      ScrapeCreators key
+                      <span className="ml-1.5 text-[11px] font-normal text-ink-600">Optional — powers Outliers</span>
+                    </label>
+                    <a
+                      href="https://scrapecreators.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-[11px] text-ink-500 transition-colors hover:text-ink-300"
+                    >
+                      Get key
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+                  <div className="relative mt-2">
+                    <input
+                      type={showSc ? 'text' : 'password'}
+                      value={scDraft}
+                      onChange={(e) => {
+                        setScDraft(e.target.value)
+                        setScTestResult(null)
+                      }}
+                      placeholder="Paste your ScrapeCreators key"
+                      className="w-full rounded-full border border-ink/10 bg-ink/5 px-4 py-2.5 pr-10 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSc(!showSc)}
+                      aria-label={showSc ? 'Hide ScrapeCreators key' : 'Show ScrapeCreators key'}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-500 transition-colors hover:text-ink-300"
+                    >
+                      {showSc ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+
+                  <div className="mt-2.5 flex items-center gap-2 text-[11px] text-ink-500">
+                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${storedScKey ? 'bg-emerald-500' : 'bg-ink/20'}`} />
+                    {storedScKey ? 'Key saved.' : 'No key saved yet.'}
+                  </div>
+
+                  {(() => {
+                    const trimmedDraft = scDraft.trim()
+                    const hasPendingChange = trimmedDraft !== storedScKey
+                    const disabled = scSaving || scSaved || !hasPendingChange
+                    const primary = hasPendingChange && !scSaving && !scSaved
+                    return (
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleTestSc}
+                          disabled={!trimmedDraft || scTesting}
+                          className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-ink/[0.03]"
+                        >
+                          {scTesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5 text-ink-400" />}
+                          {scTesting ? 'Testing…' : 'Test connection'}
+                        </button>
+                        <button
+                          onClick={handleSaveSc}
+                          disabled={disabled}
+                          className={`flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-[13px] font-medium transition-colors ${
+                            scSaved
+                              ? 'bg-emerald-500/15 text-emerald-300 light:text-emerald-700'
+                              : primary
+                                ? 'bg-ink text-ink-900 hover:bg-ink-200'
+                                : 'bg-ink/10 text-ink-400 disabled:cursor-not-allowed disabled:opacity-60'
+                          }`}
+                        >
+                          {scSaving ? (
+                            <>
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Saving…</span>
+                            </>
+                          ) : scSaved ? (
+                            <>
+                              <Check className="h-4 w-4" />
+                              <span>Saved</span>
+                            </>
+                          ) : (
+                            'Save'
+                          )}
+                        </button>
+                      </div>
+                    )
+                  })()}
+
+                  {scTestResult && (
+                    <Banner tone={scTestResult.ok ? 'ok' : 'error'} className="mt-3">
+                      {scTestResult.message}
+                    </Banner>
+                  )}
+
+                  <p className="mt-3 text-[11px] leading-relaxed text-ink-500">
+                    Testing spends 1 credit — there's no free balance endpoint, so the
+                    check runs a real search and reads the balance off it.
+                  </p>
                 </Card>
 
                 <p className="text-[11px] leading-relaxed text-ink-500">

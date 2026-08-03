@@ -14,6 +14,7 @@ export type CrabVariant =
   | 'playground'
   | 'edit-studio'
   | 'ad-anatomy'
+  | 'discover'
   | 'kie'
 
 interface Px {
@@ -130,6 +131,18 @@ const COSTUMES: Record<CrabVariant, Px[]> = {
     { x: 9, y: 5, w: 1, h: 1, fill: '#EAF1F4' }, // glass — reveals the eye
     { x: 11, y: 7, w: 1, h: 1, fill: DARK }, // handle
     { x: 12, y: 8, w: 1, h: 1, fill: DARK },
+  ],
+
+  // Trend Spotter — a radar dish on a mast, sweeping. The dish is drawn in the
+  // gold app accent rather than DARK: unlike Ad Analyzer's magnifier it sits
+  // clear of the eyes on open shell, so it needs to read as an instrument
+  // rather than as a silhouette, and gold is what separates the two scouts at
+  // a glance. The ping dot is what stops the mast reading as an antenna.
+  discover: [
+    { x: 7, y: 3, w: 1, h: 2, fill: DARK }, // mast
+    { x: 5, y: 2, w: 5, h: 1, fill: '#D9A404' }, // dish rim
+    { x: 6, y: 1, w: 3, h: 1, fill: '#D9A404' }, // dish bowl
+    { x: 11, y: 0, w: 1, h: 1, fill: '#FFD84D' }, // the ping it just caught
   ],
 
   // kie.ai — the power source. Golden body (set in CrabSprite below) with

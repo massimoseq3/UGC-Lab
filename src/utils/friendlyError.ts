@@ -13,6 +13,43 @@
 // Each rule matches case-insensitively against the raw error message. Order
 // matters: most specific first, generic codes last. The first match wins.
 const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
+  // ── ScrapeCreators (Outliers search) ──
+  //
+  // These MUST stay above the kie.ai rules below: both services use 401 and
+  // 402, and the generic kie rules would otherwise tell a member to go and
+  // replace their kie.ai key when it's the ScrapeCreators one that's wrong.
+  // ScrapeCreatorsError prefixes every message with the vendor name so this
+  // test can't be fooled by a kie error that happens to contain a number.
+  {
+    test: (m) => m.includes('scrapecreators') && m.includes('401'),
+    message:
+      "That ScrapeCreators API key isn't valid. Open Settings, paste a fresh key from scrapecreators.com, and try again.",
+  },
+  {
+    // ScrapeCreators answers an UNRECOGNISED key with 402 "out of credits",
+    // not 401 — verified against the live API. So this one message has to cover
+    // both causes, or a member who typo'd their key is sent off to buy credits
+    // they already have.
+    test: (m) => m.includes('scrapecreators') && (m.includes('402') || m.includes('credit')),
+    message:
+      "ScrapeCreators turned that search down — either the key is wrong or you're out of credits. Check the key in Settings, then top up at scrapecreators.com if it's correct.",
+  },
+  {
+    test: (m) => m.includes('scrapecreators') && m.includes('429'),
+    message:
+      'ScrapeCreators is rate-limiting requests right now. Wait a few seconds and search again.',
+  },
+  {
+    test: (m) => m.includes('scrapecreators') && /\b(0|5\d\d)\b/.test(m),
+    message:
+      'Could not reach ScrapeCreators. Check your internet connection and try the search again.',
+  },
+  {
+    test: (m) => m.includes('scrapecreators'),
+    message:
+      'That search failed. Try a different phrase, or check your ScrapeCreators key in Settings.',
+  },
+
   // ── Veo: Google's per-prompt audio-generation failure (HTTP 400) ──
   {
     test: (m) => m.includes('unable to generate audio') || (m.includes('google model') && m.includes('audio')),

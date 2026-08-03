@@ -12,6 +12,7 @@ const APP_ID_TO_SLUG: Record<string, string> = {
   'script-architect': 'scripts',
   'voice-studio': 'voiceovers',
   'broll-studio': 'broll',
+  'discover': 'outliers',
   'ad-anatomy': 'ad-analyzer',
   'playground': 'playground',
   'edit-studio': 'edit',

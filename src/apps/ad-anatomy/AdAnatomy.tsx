@@ -4,12 +4,13 @@ import UploadView from './components/UploadView'
 import ResultsView from './components/ResultsView'
 import HistoryRail from './components/HistoryRail'
 import type { AnalysisResult } from './types'
-import type { AdAnatomyHistoryItem } from '../../stores/types'
+import type { AdAnatomyHistoryItem, DiscoverVideoPayload } from '../../stores/types'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
 import { saveAsset, deleteAsset } from '../../utils/assetStore'
 import { enqueueAnalysis, resumeAnalysis } from './services/analysisQueue'
 import { useBankStore } from '../../stores/bankStore'
+import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
 
 
@@ -18,6 +19,10 @@ export default function AdAnatomy() {
   const [selectedId, setSelectedId] = usePersistedState<string | null>(`${baseKey}:selectedId`, null)
 
   const adAnatomyHistory = useBankStore((s) => s.adAnatomyHistory)
+
+  const activeApp = useAppStore((s) => s.activeApp)
+  const interAppPayload = useAppStore((s) => s.interAppPayload)
+  const consumePayload = useAppStore((s) => s.consumePayload)
 
   // Pulse the dock dot while any analysis row is still working.
   useReportActivity('ad-anatomy', adAnatomyHistory.some((h) => h.status === 'analyzing'))
@@ -128,6 +133,22 @@ export default function AdAnatomy() {
     }
     if (firstId) setSelectedId(firstId)
   }
+
+  // Outliers hands over a found ad as a live File (targetField 'adVideo') and
+  // switches here. It goes through the same handleAnalyze the drop zone uses,
+  // so a searched ad and an uploaded one are the same thing from here on.
+  useEffect(() => {
+    if (activeApp !== 'ad-anatomy') return
+    if (!interAppPayload || interAppPayload.targetApp !== 'ad-anatomy') return
+    if (interAppPayload.targetField !== 'adVideo') return
+
+    const payload = interAppPayload.data as DiscoverVideoPayload
+    consumePayload()
+    if (payload?.file) void handleAnalyze([payload.file])
+    // handleAnalyze is redefined every render; keying on the payload is what
+    // makes this fire once per handoff.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interAppPayload, activeApp])
 
   const handleDelete = (id: string) => {
     void deleteAdAnatomyHistory(id)

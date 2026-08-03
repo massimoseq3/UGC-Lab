@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Scissors,
   Palette,
+  Radar,
 } from 'lucide-react'
 import type { ElementType } from 'react'
 
@@ -47,7 +48,12 @@ export const APP_REGISTRY: AppConfig[] = [
   { id: 'broll-studio', name: 'B-Roll', icon: Film, accent: '#7165FF', category: 'create' },
   { id: 'edit-studio', name: 'Edit', icon: Scissors, accent: '#F77646', category: 'create' },
   // Tools sit past the divider after Edit — free-form surfaces that aren't a
-  // step in the production line.
+  // step in the production line. Outliers leads the group because the research
+  // loop runs left to right: find a winning ad → tear it down → remix it.
+  //
+  // The id is 'discover' and stays that way: it keys the persisted search,
+  // filters and sort. The display name is free to change.
+  { id: 'discover', name: 'Outliers', icon: Radar, accent: '#D9A404', category: 'tools' },
   { id: 'ad-anatomy', name: 'Ad Analyzer', icon: Eye, accent: '#FF5257', category: 'tools' },
   { id: 'playground', name: 'Playground', icon: ImagePlay, accent: '#015C52', category: 'tools' },
   { id: 'admin', name: 'Admin', icon: Shield, accent: '#fafafa', category: 'admin' },

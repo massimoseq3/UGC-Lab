@@ -57,6 +57,12 @@ export const TEAM: TeamMember[] = [
     blurb: 'Cuts your script, voiceover and B-roll into a finished captioned ad.',
   },
   {
+    appId: 'discover',
+    name: 'Pearl',
+    role: 'Trend Spotter',
+    blurb: 'Finds the ads already winning, so you know what to make before you make it.',
+  },
+  {
     appId: 'ad-anatomy',
     name: 'Scout',
     role: 'Strategist',
