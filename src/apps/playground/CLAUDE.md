@@ -1,0 +1,7 @@
+# Playground — `playground/`
+
+Tools section of UGC OS. This file loads when Claude works with files under `src/apps/playground/`; the app-wide rules stay in the root [CLAUDE.md](../../../CLAUDE.md).
+
+## Job
+
+Free-form Image / Video / Music — tabs in that order, landing on **Image**, because the loop it's used for is "make a still, then animate it". That loop is one click: an image tile's hover stack (and the preview modal) carries an **Animate** action that switches to Video with the still inlined as the start frame and the prompt that made it seeded in the bar (`handleAnimateImage`), going through the same `promptStash` as a manual tab switch so the Image tab keeps its own draft. Each mode remembers its own model under `playground:<task>[:<mode>]` — Image/Music via `ModelPicker`'s own persistence, Video written by the panel itself since `ModelSidePanel` leaves persistence to its caller; without that write every Image → Video flip reset the pick to the registry default. Prompt bar, mode tabs, model picker, model-aware ref slots + drag-drop (images everywhere; Seedance 2 adds audio/video reference clips; Gemini Omni adds characters / designed voices / a trimmed source clip under a 7-slot quota). `@`-mentions reference Products / Influencers / B-Rolls and auto-attach the asset. Uploaded audio/video refs are memory-only (pruned from the persisted draft — too big for localStorage).
