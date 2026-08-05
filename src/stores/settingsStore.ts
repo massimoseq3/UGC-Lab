@@ -267,20 +267,91 @@ export function resetSettingsStore(): void {
   useSettingsStore.setState({ kieApiKey: '', scrapeCreatorsKey: '', perAppModel: {} })
 }
 
+// ---------------------------------------------------------------------------
+// Per-user key vault
+//
+// The kie.ai and ScrapeCreators keys are the only settings a member types by
+// hand, and by design they are never cloud-synced — so the sign-out wipe above
+// (which exists so the next person on a shared browser can't inherit them) also
+// meant re-pasting both on every sign-in. They are therefore mirrored into a
+// vault keyed BY USER ID, which the wipe deliberately leaves alone: signing
+// back in adopts your own entry, and a different member adopts theirs (or
+// nothing), so nobody ever sees a key that isn't theirs. The trade-off is that
+// a signed-out member's keys stay on that browser's disk until they clear the
+// fields in Settings — which is what makes "log back in and it's still there"
+// possible at all.
+// ---------------------------------------------------------------------------
+
+const KEY_VAULT_KEY = 'ai-ugc-lab-keys'
+
+type VaultEntry = { kieApiKey: string; scrapeCreatorsKey: string }
+
+function readVault(): Record<string, VaultEntry> {
+  try {
+    const raw = localStorage.getItem(KEY_VAULT_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, VaultEntry>) : {}
+  } catch {
+    return {}
+  }
+}
+
+function rememberKeysFor(userId: string, s: PersistedSettings): void {
+  try {
+    const vault = readVault()
+    // Both cleared means "forget me on this browser" — drop the entry outright
+    // rather than storing a pair of empty strings that would outlive the intent.
+    if (!s.kieApiKey && !s.scrapeCreatorsKey) delete vault[userId]
+    else vault[userId] = { kieApiKey: s.kieApiKey, scrapeCreatorsKey: s.scrapeCreatorsKey }
+    localStorage.setItem(KEY_VAULT_KEY, JSON.stringify(vault))
+  } catch { /* localStorage unavailable — the live session still has the key */ }
+}
+
+// Mirror the current keys into the signed-in member's vault entry. No-op when
+// signed out: local-only mode never wipes, so the main snapshot is enough.
+function rememberKeys(s: PersistedSettings): void {
+  const userId = useAuthStore.getState().user?.id
+  if (userId) rememberKeysFor(userId, s)
+}
+
+// Restore this member's keys after a wipe. Called from authStore at every point
+// where a user becomes the signed-in one (bootstrap, sign-in, another tab), and
+// always AFTER wipeLocalUserData has run. A member with no vault entry yet has
+// theirs seeded from whatever the live settings already hold, which is how a
+// browser that predates the vault keeps the key it is currently signed in with.
+export function adoptUserKeys(userId: string): void {
+  const current = snapshot(useSettingsStore.getState())
+  const stored = readVault()[userId]
+  const next: PersistedSettings = {
+    ...current,
+    kieApiKey: stored?.kieApiKey || current.kieApiKey,
+    scrapeCreatorsKey: stored?.scrapeCreatorsKey || current.scrapeCreatorsKey,
+  }
+  try { saveToStorage(next) } catch { /* quota — in-memory state below still stands */ }
+  rememberKeysFor(userId, next)
+  useSettingsStore.setState({ kieApiKey: next.kieApiKey, scrapeCreatorsKey: next.scrapeCreatorsKey })
+}
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   ...loadFromStorage(),
 
   setKieApiKey: (key) => {
     // The kie.ai key lives in localStorage only — it is never written to the
     // cloud. No pushProfile() call here (per-app model picks still sync via
-    // setAppModel below).
-    saveToStorage({ ...snapshot(get()), kieApiKey: key })
+    // setAppModel below). rememberKeys mirrors it into the per-user vault so
+    // the sign-out wipe doesn't cost the member a re-paste.
+    const next = { ...snapshot(get()), kieApiKey: key }
+    saveToStorage(next)
+    rememberKeys(next)
     set({ kieApiKey: key })
   },
 
   setScrapeCreatorsKey: (key) => {
-    // Same rule as the kie key above: browser-local, never synced.
-    saveToStorage({ ...snapshot(get()), scrapeCreatorsKey: key })
+    // Same rule as the kie key above: browser-local, never synced, vaulted.
+    const next = { ...snapshot(get()), scrapeCreatorsKey: key }
+    saveToStorage(next)
+    rememberKeys(next)
     set({ scrapeCreatorsKey: key })
   },
 
