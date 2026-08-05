@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { Session, User } from '@supabase/supabase-js'
 import { getSupabase, isCloudEnabled } from '../lib/supabase'
 import { resetBankStore } from './bankStore'
-import { resetSettingsStore } from './settingsStore'
+import { resetSettingsStore, adoptUserKeys } from './settingsStore'
 import { resetAssetStore } from '../utils/assetStore'
 
 // Remove every localStorage key whose name starts with any of these prefixes.
@@ -14,6 +14,11 @@ import { resetAssetStore } from '../utils/assetStore'
 //     image data-URIs), keyed `ai-ugc-lab:draft:*`
 //   • custom-chips — Character Studio custom trait chips
 // All of these otherwise survive sign-out and surface for the next person.
+// Deliberately NOT listed: `ai-ugc-lab-keys`, the per-user API-key vault. It is
+// keyed by user id and adopted only by its own owner (see settingsStore), so it
+// can't surface for the next person — and purging it here would put the member
+// back to re-pasting both keys on every sign-in. Don't widen these prefixes to
+// a bare `ai-ugc-lab`.
 const LOCAL_RESIDUE_PREFIXES = ['ugc-lab:sync-outbox', 'ai-ugc-lab:draft', 'ai-ugc-lab-custom-chips']
 
 function clearLocalResidue(): void {
@@ -138,6 +143,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     }
     set({ session, user, profile, bootstrapping: false })
+    // Restore this member's own API keys (see the vault note in settingsStore):
+    // they survive the sign-out wipe, so a returning member doesn't re-paste.
+    if (user) adoptUserKeys(user.id)
 
     // Keep state in sync with auth changes (other-tab sign-in, refresh, etc.)
     sb.auth.onAuthStateChange(async (_event, nextSession) => {
@@ -160,6 +168,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await wipeLocalUserData()
       }
       set({ session: nextSession, user: nextUser, profile: nextProfile })
+      // After any wipe, never before — the incoming member adopts their own
+      // vaulted keys, which is also what stops them adopting the outgoing one's.
+      if (nextUser) adoptUserKeys(nextUser.id)
     })
   },
 
@@ -176,6 +187,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return { ok: false, error: 'Your access has been revoked.', revoked: true }
       }
       set({ session: data.session, user: data.user, profile, accessRevoked: false })
+      adoptUserKeys(data.user.id)
     }
     return { ok: true }
   },
