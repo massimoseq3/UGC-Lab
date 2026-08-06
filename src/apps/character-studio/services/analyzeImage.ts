@@ -2,6 +2,17 @@ import { TABS, getTabFields, type VisualDNA } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { kieChatCompletions, fileToDataUri, type ChatMessage } from '../../../utils/kie'
 import { getChatTarget } from '../../../utils/models'
+import { makeVisionImage } from '../utils/thumbnail'
+
+// kie's gateway buffers the SSE stream rather than forwarding it, so this bounds
+// the WHOLE analysis, not time-to-first-token. This call was the last vision
+// surface left on kieChatCompletions' 120s default while its siblings (product
+// auto-fill, visual style) had long since moved to 180s — and a forensic read of
+// ~30 fields off a multi-megabyte phone photo runs past two minutes often enough
+// that members were seeing "the request was dropped" on a call kie had completed
+// and billed. Raising the ceiling is half the fix; the downscale below is the
+// other half, since the upload itself was inside the window.
+const ANALYZE_TIMEOUT_MS = 180_000
 
 // Chip vocabulary for the truly categorical form fields, pulled from the form
 // config itself so the extractor's allowed values never drift from what the
@@ -103,7 +114,8 @@ export async function analyzeImage(imageFile: File): Promise<VisualDNA> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const endpoint = getChatTarget()
 
-  const dataUri = await fileToDataUri(imageFile)
+  // Re-encoded small enough to upload quickly; the original only if that fails.
+  const dataUri = (await makeVisionImage(imageFile)) ?? (await fileToDataUri(imageFile))
 
   const prompt = `Extract the complete visual DNA from this photo with forensic precision — exact shades, lengths, shapes, materials, and placements for the person's appearance, garments, pose, setting, and camera. Return as JSON.`
 
@@ -118,7 +130,9 @@ export async function analyzeImage(imageFile: File): Promise<VisualDNA> {
     },
   ]
 
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages)
+  const responseText = await kieChatCompletions(apiKey, endpoint, messages, {
+    timeoutMs: ANALYZE_TIMEOUT_MS,
+  })
 
   const cleaned = responseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
   // The model is asked for pure JSON, but occasionally wraps it in a sentence

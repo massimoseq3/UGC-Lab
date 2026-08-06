@@ -817,11 +817,16 @@ export interface VisualDNA {
   camera: CameraDNA
 }
 
+// Tolerant by design: the model is asked for all five groups, but one coming
+// back null (or as a bare string) must cost that group only. Object.entries(null)
+// throws, which would drop a whole extraction the member already paid for
+// because one field of thirty was missing.
 export function flattenDna(dna: VisualDNA): Partial<CharacterProfile> {
   const flat: Record<string, string> = {}
-  for (const fields of Object.values(dna)) {
+  for (const fields of Object.values(dna ?? {})) {
+    if (!fields || typeof fields !== 'object') continue
     for (const [key, value] of Object.entries(fields as Record<string, string>)) {
-      flat[key] = value
+      if (typeof value === 'string') flat[key] = value
     }
   }
   return flat
