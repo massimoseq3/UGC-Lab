@@ -129,7 +129,6 @@ Most files are self-explanatory. These carry behaviour worth knowing before you 
 - `lib/cloudSync.ts` — pull on sign-in + debounced diff-push + persistent localStorage outbox + non-destructive hydrate. `saveRow`/`deleteRow` are serialised per row (a stalled upsert can't land after a delete) and outbox markers are token-guarded (a late success can't clear a newer pending write). `walkAssetRefs` normalises `asset://` refs to bare ids so the sweep/reconcile match the bare-keyed `assets` table.
 - `lib/supabase.ts` — `ensureFreshSession()` (3s race + cached-token fallback) and a custom non-blocking `auth.lock`.
 - `hooks/useAssetUrl.ts` — resolves `asset://` refs to blob URLs.
-- `UI_LAYOUT.md` (repo root) — spatial map of the rendered interface (pane splits, tab orders, button positions, modals) for every screen. Read it before any UI-driven / tutorial automation so you don't guess where a control sits.
 
 ## Banks
 
