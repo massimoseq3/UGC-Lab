@@ -26,6 +26,7 @@ import {
   videoResolutionLabel,
   snapVideoDuration,
   officialSavingsPercent,
+  referenceClipCapacitySeconds,
   type Task,
   type Mode,
 } from '../../../utils/models'
@@ -287,6 +288,9 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
   const supportsEndFrame = !!model?.modes?.includes('frames-to-video')
   const supportsRefAudio = state.mode === 'video' && !!model?.supportsReferenceAudio
   const supportsRefVideos = state.mode === 'video' && !!model?.supportsReferenceVideos
+  // Combined seconds per media strip — 15s on the Seedance 2.0 family, 30s on
+  // 2.5. Read off the registry so the drop handler and both strips agree.
+  const refClipSeconds = referenceClipCapacitySeconds(state.modelId)
   const isOmni = state.mode === 'video' && !!model?.omniInputs
   // Whether the model accepts any input at all — a text-only model shows no
   // attachment row rather than an empty one.
@@ -499,7 +503,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
   }
 
   // Adds a dropped audio/video file to the matching media strip, enforcing
-  // the same 15s-total cap as the strip's own upload button.
+  // the same total-length cap as the strip's own upload button.
   async function addDroppedMedia(slot: 'audio' | 'video', file: File) {
     const existing = mediaStripValues(slot)
     if (existing.length >= 3) return
@@ -510,8 +514,8 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
     } catch { /* let kie validate */ }
     if (durationSeconds) {
       const total = existing.reduce((s, v) => s + (v.durationSeconds ?? 0), 0) + durationSeconds
-      if (total > 15) {
-        addToast(`Combined ${slot} length can't exceed 15s — this clip would make it ${Math.ceil(total)}s.`, 'error')
+      if (total > refClipSeconds) {
+        addToast(`Combined ${slot} length can't exceed ${refClipSeconds}s — this clip would make it ${Math.ceil(total)}s.`, 'error')
         return
       }
     }
@@ -675,7 +679,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                         values={mediaStripValues('audio')}
                         onChange={(v) => setMediaStrip('audio', v)}
                         max={3}
-                        maxTotalSeconds={15}
+                        maxTotalSeconds={refClipSeconds}
                         onLimitError={(m) => addToast(m, 'error')}
                       />
                     )}
@@ -686,7 +690,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                         values={mediaStripValues('video')}
                         onChange={(v) => setMediaStrip('video', v)}
                         max={3}
-                        maxTotalSeconds={15}
+                        maxTotalSeconds={refClipSeconds}
                         onLimitError={(m) => addToast(m, 'error')}
                       />
                     )}
