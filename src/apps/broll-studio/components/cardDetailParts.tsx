@@ -462,8 +462,10 @@ function VideoTile({
       )}
       {/* Hover action stack — top-right vertical column, app-wide standard
           order: download · copy · send-to-Playground · delete (video has no
-          save-to-bank). Steps aside while the clip plays with sound. */}
-      <TileActionStack hidden={inline.watching}>
+          save-to-bank). Stays put while the clip plays with sound: watching a
+          take is when you decide to keep it, and it's clear of the play/mute
+          buttons on the left. */}
+      <TileActionStack>
         <TileActionButton
           title="Download"
           onClick={async (e) => {
@@ -539,8 +541,10 @@ export function ModalVideoPlayer({
 }: {
   url: string | null | undefined
   children?: React.ReactNode
-  // The hover action column. Split out from `children` because it's the part
-  // that steps aside while the clip plays with sound — badges stay.
+  // The hover action column, kept a separate slot from `children` so a caller
+  // can position it against the badges. Both stay on screen while the clip
+  // plays — the actions used to step aside and it just meant pausing to reach
+  // Download.
   actions?: React.ReactNode
   // Border/ring classes only — the frame's own layout classes are fixed. Used
   // by the Continuous take gallery to mark the picked cover.
@@ -585,7 +589,7 @@ export function ModalVideoPlayer({
           {unmuted ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
         </button>
       )}
-      {!inline.watching && actions}
+      {actions}
       {children}
     </div>
   )

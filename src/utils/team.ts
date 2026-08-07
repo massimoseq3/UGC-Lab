@@ -51,6 +51,13 @@ export const TEAM: TeamMember[] = [
     blurb: 'Turns scripts into scenes and shoots four takes of every one.',
   },
   {
+    appId: 'playground',
+    name: 'Sebastian',
+    role: 'Creative Director',
+    blurb: 'The do-anything senior — freeform images, video and music on demand.',
+    roleColor: '#1FA08C',
+  },
+  {
     appId: 'edit-studio',
     name: 'Snips',
     role: 'Video Editor',
@@ -67,13 +74,6 @@ export const TEAM: TeamMember[] = [
     name: 'Scout',
     role: 'Strategist',
     blurb: 'Tears down winning ads and tells you exactly why they work.',
-  },
-  {
-    appId: 'playground',
-    name: 'Sebastian',
-    role: 'Creative Director',
-    blurb: 'The do-anything senior — freeform images, video and music on demand.',
-    roleColor: '#1FA08C',
   },
 ]
 

@@ -1,26 +1,48 @@
-// Pick-what-you-zip download picker, shared by both B-Roll modes.
+// Pick-what-you-zip download picker, shared by B-Roll and Playground.
 //
-// "Download all" used to sweep every take of every card into the zip, so a card
-// the member regenerated three times landed three clips and the folder had to
-// be weeded by hand. This lists every rendered clip instead, pre-ticked to each
-// card's COVER take (the one its card face shows), and zips exactly what stays
-// ticked.
+// B-Roll's "Download all" used to sweep every take of every card into the zip,
+// so a card the member regenerated three times landed three clips and the
+// folder had to be weeded by hand. This lists every rendered clip instead and
+// zips exactly what stays ticked.
+//
+// What's ticked on open is the CALLER's call, because the two apps mean
+// different things by a list of clips. B-Roll's is a storyboard — one cover take
+// per card, and the rest are alternates you opt into — so it pre-ticks the
+// covers. Playground's is everything you have ever generated in that tab, going
+// back weeks; pre-ticking all of it would mean unticking dozens of clips to get
+// the two you came for, so it opens with nothing picked.
 
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Download, Loader2, Check, Star } from 'lucide-react'
-import { useAssetUrl } from '../../../hooks/useAssetUrl'
-import { useAppStore } from '../../../stores/appStore'
-import { downloadAssetsZip } from '../../../utils/downloadZip'
-import { humanizeError } from '../../../utils/friendlyError'
-import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
-import { useBackdropClose } from '../../../hooks/useBackdropClose'
-import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
+import { useAssetUrl } from '../hooks/useAssetUrl'
+import { useAppStore } from '../stores/appStore'
+import { downloadAssetsZip } from '../utils/downloadZip'
+import { humanizeError } from '../utils/friendlyError'
+import useCloseOnEscape from '../hooks/useCloseOnEscape'
+import { useBackdropClose } from '../hooks/useBackdropClose'
+import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 
 function aspectStyle(ar: string): React.CSSProperties {
   const [w, h] = ar.split(':').map(Number)
   if (!w || !h) return { aspectRatio: '9 / 16' }
   return { aspectRatio: `${w} / ${h}` }
+}
+
+// Accent classes are written out in full: Tailwind scans source text, so a
+// `bg-${accent}-500` template would never be generated.
+type Accent = 'broll' | 'playground'
+const ACCENT: Record<Accent, { frame: string; check: string; cta: string }> = {
+  broll: {
+    frame: 'border-broll-500/70 ring-2 ring-broll-500/40',
+    check: 'border-broll-300 bg-broll-500 text-white',
+    cta: 'bg-broll-500 hover:bg-broll-400',
+  },
+  playground: {
+    frame: 'border-playground-500/70 ring-2 ring-playground-500/40',
+    check: 'border-playground-300 bg-playground-500 text-white',
+    cta: 'bg-playground-500 hover:bg-playground-400',
+  },
 }
 
 export interface ClipDownloadEntry {
@@ -30,22 +52,28 @@ export interface ClipDownloadEntry {
   ref: string
   // File name inside the zip, without extension. Kept unique by the caller.
   name: string
-  // What the tile reads, e.g. "Scene 02 · Option 1" or "Clip 3".
+  // What the tile reads, e.g. "Scene 02 · Option 1", or the prompt that made it.
   label: string
-  // Only when the card holds more than one take, e.g. "Take 2 of 3".
-  takeLabel?: string
-  // This card's cover take — ticked when the picker opens.
-  isCover: boolean
+  // Dim second line — "Take 2 of 3" in B-Roll, "2h ago · Grok Imagine" here.
+  meta?: string
+  // Ticked when the picker opens. See the note at the top of the file.
+  preselected?: boolean
+  // Small pill on the tile, e.g. "Cover".
+  badge?: string
   aspectRatio?: string
 }
 
 export default function ClipDownloadModal({
   entries,
   zipBasename,
+  subtitle,
+  accent = 'broll',
   onClose,
 }: {
   entries: ClipDownloadEntry[]
   zipBasename: string
+  subtitle: string
+  accent?: Accent
   onClose: () => void
 }) {
   useCloseOnEscape(true, onClose)
@@ -54,11 +82,12 @@ export default function ClipDownloadModal({
   // Mounted fresh per open (the callers render it conditionally), so seeding
   // from props here is the whole reset story.
   const [picked, setPicked] = useState<Set<string>>(
-    () => new Set(entries.filter((e) => e.isCover).map((e) => e.id)),
+    () => new Set(entries.filter((e) => e.preselected).map((e) => e.id)),
   )
   const [zipping, setZipping] = useState(false)
 
   const backdrop = useBackdropClose(onClose)
+  const tint = ACCENT[accent]
 
   const toggle = (id: string) =>
     setPicked((prev) => {
@@ -99,9 +128,7 @@ export default function ClipDownloadModal({
         <div className="flex items-center justify-between gap-3 border-b border-ink/5 px-5 py-3.5">
           <div className="min-w-0">
             <h3 className="text-sm font-medium text-ink-100">Download clips</h3>
-            <p className="mt-0.5 text-[11px] text-ink-500">
-              Every card&rsquo;s cover clip is picked — tick the extra takes you also want.
-            </p>
+            <p className="mt-0.5 text-[11px] text-ink-500">{subtitle}</p>
           </div>
           <button
             type="button"
@@ -120,6 +147,7 @@ export default function ClipDownloadModal({
                 key={entry.id}
                 entry={entry}
                 picked={picked.has(entry.id)}
+                tint={tint}
                 onToggle={() => toggle(entry.id)}
               />
             ))}
@@ -143,7 +171,7 @@ export default function ClipDownloadModal({
             type="button"
             onClick={() => void download()}
             disabled={zipping || picked.size === 0}
-            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-4 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className={`flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${tint.cta}`}
           >
             {zipping ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
             {zipping ? 'Zipping…' : `Download ${picked.size} clip${picked.size === 1 ? '' : 's'}`}
@@ -157,10 +185,12 @@ export default function ClipDownloadModal({
 function ClipTile({
   entry,
   picked,
+  tint,
   onToggle,
 }: {
   entry: ClipDownloadEntry
   picked: boolean
+  tint: { frame: string; check: string }
   onToggle: () => void
 }) {
   const url = useAssetUrl(entry.ref)
@@ -171,7 +201,7 @@ function ClipTile({
         onClick={onToggle}
         title={picked ? 'Leave out of the zip' : 'Add to the zip'}
         className={`group relative overflow-hidden rounded-xl border bg-black light:bg-zinc-200 transition-colors ${
-          picked ? 'border-broll-500/70 ring-2 ring-broll-500/40' : 'border-ink/10 hover:border-ink/30'
+          picked ? tint.frame : 'border-ink/10 hover:border-ink/30'
         }`}
         style={aspectStyle(entry.aspectRatio ?? '9:16')}
       >
@@ -193,20 +223,23 @@ function ClipTile({
         )}
         <span
           className={`absolute left-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full border transition-colors ${
-            picked ? 'border-broll-300 bg-broll-500 text-white' : 'border-white/40 bg-black/50'
+            picked ? tint.check : 'border-white/40 bg-black/50'
           }`}
         >
           {picked && <Check className="h-3 w-3" strokeWidth={3} />}
         </span>
-        {entry.isCover && (
+        {entry.badge && (
           <span className="pointer-events-none absolute right-1.5 top-1.5 flex items-center gap-1 rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur-sm">
-            <Star className="h-2.5 w-2.5 fill-white" /> Cover
+            <Star className="h-2.5 w-2.5 fill-white" /> {entry.badge}
           </span>
         )}
       </button>
       <div className="min-w-0 px-0.5 text-center">
-        <p className="truncate text-[10px] font-medium text-ink-300">{entry.label}</p>
-        {entry.takeLabel && <p className="truncate text-[9px] text-ink-600">{entry.takeLabel}</p>}
+        {/* Two lines, not one: B-Roll's labels are short ("Scene 02 · Option 1")
+            but Playground has no title field, so the label IS the prompt and a
+            single truncated line of one identifies nothing. */}
+        <p className="line-clamp-2 text-[10px] font-medium leading-snug text-ink-300">{entry.label}</p>
+        {entry.meta && <p className="truncate text-[9px] text-ink-600">{entry.meta}</p>}
       </div>
     </div>
   )

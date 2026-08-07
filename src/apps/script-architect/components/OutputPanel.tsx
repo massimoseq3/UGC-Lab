@@ -229,7 +229,7 @@ function SpokenLine({ speaker, text }: { speaker: string | null; text: string })
   return (
     <div className="relative rounded-xl border border-scripts-500/15 bg-scripts-500/[0.05] py-2.5 pl-3.5 pr-10">
       {speaker && (
-        <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-tight text-scripts-300/80">
+        <div className="mb-1 flex select-none items-center gap-1.5 text-[10px] font-semibold uppercase tracking-tight text-scripts-300/80">
           <Quote className="h-2.5 w-2.5" strokeWidth={2.5} />
           {speaker.replace(/^\[|\]$/g, '').toLowerCase()}
         </div>
@@ -239,7 +239,7 @@ function SpokenLine({ speaker, text }: { speaker: string | null; text: string })
         onClick={handleCopy}
         title="Copy line"
         aria-label="Copy line"
-        className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
+        className="absolute right-1.5 top-1.5 flex h-6 w-6 select-none items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
       >
         {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
       </button>
@@ -422,8 +422,16 @@ function VariationCard({
   }
 
   return (
+    // Every chrome row in this panel — headers, chips, copy/edit buttons, the
+    // take switcher — is `select-none`, so dragging across a take highlights the
+    // script and nothing else. Two symptoms came from letting chrome be
+    // selectable: the highlight swept up "SCENE 1 — HOOK" and the word "Copy"
+    // alongside the line you wanted, and clicking a button whose own label was
+    // inside that highlight left the selection stuck (Chrome reads a mousedown
+    // inside a selection as a drag-start, and the click's re-render then
+    // interrupts the collapse). Prose stays selectable — it's what gets copied.
     <div ref={cardRef} className="flex shrink-0 flex-col rounded-3xl border border-ink/10 bg-ink/[0.06] light:bg-[#F1F1F2] overflow-hidden card-soft-shadow">
-      <div className="relative flex items-center justify-center border-b border-ink/5 px-12 py-2.5">
+      <div className="relative flex select-none items-center justify-center border-b border-ink/5 px-12 py-2.5">
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-scripts-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-tight text-scripts-300">
             {cardTitle}
@@ -500,8 +508,8 @@ function VariationCard({
           </>
         ) : scenes ? (
           <>
-            {scenes.map((scene, i) => <SceneChunkCard key={i} chunk={scene} />)}
             {voiceProfile && <VoiceProfileCard body={voiceProfile} />}
+            {scenes.map((scene, i) => <SceneChunkCard key={i} chunk={scene} />)}
           </>
         ) : mode === 'reverse-engineer' ? (
           <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed tracking-tight text-ink-100">
@@ -521,7 +529,7 @@ function VariationCard({
         )}
       </div>
 
-      <div className="flex flex-col gap-2 border-t border-ink/5 p-3">
+      <div className="flex select-none flex-col gap-2 border-t border-ink/5 p-3">
         {editing ? (
           <div className="flex gap-2">
             <button
@@ -545,7 +553,7 @@ function VariationCard({
               onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
               placeholder="Script title..."
               autoFocus
-              className="flex-1 rounded-full border border-ink/10 bg-transparent px-4 py-2 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-scripts-500/30"
+              className="flex-1 select-text rounded-full border border-ink/10 bg-transparent px-4 py-2 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-scripts-500/30"
             />
             <button
               onClick={handleSave}
@@ -617,7 +625,11 @@ function VariationCard({
 }
 
 // The shared voice spec for a scene blueprint — the same on-camera voice every
-// scene's clip should be read in. Rendered once, below the scenes.
+// scene's clip should be read in. Rendered once, ABOVE the scenes: it's pasted
+// into every scene's prompt, so it's the first thing copied, and at the bottom
+// of a ten-scene column most members never scrolled far enough to find it. The
+// model still emits it last (the prompt says so); `splitVoiceProfile` lifts it
+// out either way, so only the render order moved.
 function VoiceProfileCard({ body }: { body: string }) {
   const [copied, setCopied] = useState(false)
   const addToast = useAppStore((s) => s.addToast)
@@ -633,7 +645,7 @@ function VoiceProfileCard({ body }: { body: string }) {
   }
   return (
     <div className="rounded-2xl border border-scripts-500/15 bg-scripts-500/[0.04] p-3 card-soft-shadow">
-      <div className="relative mb-2 flex items-center justify-center gap-2 px-8">
+      <div className="relative mb-2 flex select-none items-center justify-center gap-2 px-8">
         <span className="flex items-center gap-1.5 text-center text-[10px] font-semibold uppercase tracking-tight text-scripts-300">
           <Mic className="h-3 w-3 text-scripts-300" strokeWidth={2} />
           Voice Profile · same in every scene
@@ -670,7 +682,7 @@ function HookLineCard({ hook, index }: { hook: ParsedHook; index: number }) {
   }
   return (
     <div className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 card-soft-shadow">
-      <div className="mb-1.5 flex items-center justify-between gap-2">
+      <div className="mb-1.5 flex select-none items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="shrink-0 text-[10px] font-semibold tabular-nums text-ink-600">{index + 1}</span>
           {hook.category && (
@@ -690,6 +702,20 @@ function HookLineCard({ hook, index }: { hook: ParsedHook; index: number }) {
       <p className="text-sm font-light leading-normal tracking-tight text-ink-100">{hook.text}</p>
     </div>
   )
+}
+
+// The other half of the `select-none` chrome rule. Marking a header or a Copy
+// button unselectable keeps it out of the highlight, but it ALSO tells Chrome to
+// leave an existing selection alone when you press on it — the behaviour a
+// rich-text toolbar wants, and the reason a highlight in this panel could look
+// stuck: clicking the nearest thing to "somewhere else" (a scene header, a copy
+// button) did nothing to it. Collapse it ourselves, which is what a click on
+// ordinary page background does anyway.
+function clearSelectionOnChrome(e: React.MouseEvent) {
+  const target = e.target as Element | null
+  if (!target || getComputedStyle(target).userSelect !== 'none') return
+  const selection = window.getSelection()
+  if (selection && !selection.isCollapsed) selection.removeAllRanges()
 }
 
 function SceneChunkCard({ chunk }: { chunk: SceneChunk }) {
@@ -712,7 +738,7 @@ function SceneChunkCard({ chunk }: { chunk: SceneChunk }) {
   const hasSpoken = segments.some((s) => s.kind === 'line')
   return (
     <div className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 card-soft-shadow">
-      <div className="relative mb-2 flex items-center justify-center gap-2 px-8">
+      <div className="relative mb-2 flex select-none items-center justify-center gap-2 px-8">
         <span className="text-center text-[10px] font-semibold uppercase tracking-tight text-scripts-300">
           {chunk.header.replace(/^---\s*|\s*---$/g, '')}
         </span>
@@ -871,9 +897,9 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
   // No canvas once the takes are in: the grid marks an empty stage waiting for
   // work, and behind finished output it's just texture under the reading.
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden" onMouseDown={clearSelectionOnChrome}>
       {variations.length > 1 && (
-        <div className="flex items-center justify-center border-b border-ink/5 px-5 py-2.5">
+        <div className="flex select-none items-center justify-center border-b border-ink/5 px-5 py-2.5">
           <div className="flex items-center gap-1 rounded-full border border-ink/10 bg-ink/[0.02] p-0.5">
             {variations.map((_, i) => (
               <button

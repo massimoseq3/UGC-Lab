@@ -173,7 +173,11 @@ export default function CharacterStudio() {
     try {
       const assetId = await finishCharacterTask(gen.taskId, gen.modelId, controller.signal)
       addCharacterHistory({
-        id: crypto.randomUUID(),
+        // The row keeps the GENERATION's id rather than a fresh one, so anything
+        // anchored to the in-flight tile — the editor opened by clicking it —
+        // resolves to the finished row the moment it lands, with nothing to
+        // re-target. Gen ids are already uuids, so this is as unique as before.
+        id: gen.id,
         imageRef: assetId,
         profile: (gen.profile as CharacterProfile | undefined) ?? createEmptyProfile(),
         modelId: gen.modelId,

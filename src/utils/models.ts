@@ -900,8 +900,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     videoConstraints: {
       durations: [4, 6, 8, 10],
       resolutions: ['720p', '1080p', '4k'],
-      // 1080p costs the same as 720p for Omni (see priceFor), so default to it.
-      default: '1080p',
+      // 720p is the floor tier and what a member expects to land on. 1080p held
+      // this slot because it costs the same credits (see priceFor), but "free"
+      // isn't the same as "wanted" — a heavier file and a slower render on every
+      // pick nobody asked for. 1080p is one click away.
+      default: '720p',
       aspectRatios: ['16:9', '9:16'],
     },
     // Ref-capable, but no 'image-to-video' mode — it takes every image as a

@@ -702,11 +702,19 @@ async function runRemix(input: GenerateScriptInput, angle: RemixAngle, apiKey: s
 }
 
 async function runReverseEngineer(input: GenerateScriptInput, apiKey: string, endpoint: ChatTarget): Promise<string> {
+  // No target length means the 'default' pick: the rewrite inherits the source
+  // blueprint's own scene count and timings, which is what a rewrite usually
+  // wants. A picked length RE-CUTS it, so the two clauses below that promise to
+  // preserve the timing have to stand down for it.
+  const length = input.remixLength
+  const keepTiming = !length
+
   let prompt = `Original reverse-engineered ad blueprint:\n\n${input.reversePrompt.trim()}\n\n`
 
   const ctxLines = productContextLines(input.productContext)
   if (ctxLines) {
-    prompt += `Rewrite this blueprint for the following NEW product. Replace only the product/brand references and the [CHARACTER]'s dialogue/voiceover. Keep camera, framing, scene count, durations, and the [CHARACTER] token unchanged.\n\n${ctxLines}\n\n`
+    const preserved = keepTiming ? 'camera, framing, scene count, durations,' : 'camera and framing style'
+    prompt += `Rewrite this blueprint for the following NEW product. Replace only the product/brand references and the [CHARACTER]'s dialogue/voiceover. Keep ${preserved} and the [CHARACTER] token unchanged.\n\n${ctxLines}\n\n`
   } else if (input.productId) {
     prompt += `Rewrite this blueprint for a new product using the product details provided.\n\n`
   } else {
@@ -717,7 +725,12 @@ async function runReverseEngineer(input: GenerateScriptInput, apiKey: string, en
     prompt += `Additional context and instructions:\n${input.additionalContext}\n\n`
   }
 
-  prompt += `Generate the rewritten scene blueprint now, preserving the "--- Scene N ---" headers exactly.`
+  if (length) {
+    const budget = WRITE_LENGTH_BUDGET[length]
+    prompt += `${lengthDiscipline(length)}\n\nLENGTH: the rewritten blueprint must run about ${length} seconds end to end — ${budget.scenes}, and the spoken lines across ALL scenes together must read aloud as ${budget.words}. Re-time every scene to fit and DROP or MERGE whole scenes out of the middle when the source is longer than that; keep the opening scene and the scene carrying the CTA. Renumber the "--- Scene N ---" headers so they stay consecutive from 1, and update any per-scene timings you keep. Count the spoken words across the whole blueprint before you answer.\n\n`
+  }
+
+  prompt += `Generate the rewritten scene blueprint now, ${keepTiming ? 'preserving the "--- Scene N ---" headers exactly' : 'using consecutive "--- Scene N ---" headers in the same format'}.`
 
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: REVERSE_ENGINEER_SYSTEM }] },

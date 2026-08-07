@@ -104,13 +104,16 @@ export function AddTile({
   )
 }
 
-// A wider card for an attached non-image reference (audio / video clip, source
-// clip). Icon + name + optional meta + remove, with room for extra controls
-// (e.g. the Omni trim window) via children.
+// A wider card for one attached reference of any kind. Icon + name + optional
+// meta + remove, with room for extra controls (e.g. the Omni trim window) via
+// children. `thumb` swaps the icon chip for the picture itself, so an image
+// reference reads as the same card as a voice or a clip — one row shape for
+// every input the model takes, instead of a tile grid above a card list.
 export function MediaCard({
   icon: Icon,
   label,
   meta,
+  thumb,
   accent = false,
   onRemove,
   children,
@@ -118,6 +121,7 @@ export function MediaCard({
   icon: LucideIcon
   label: string
   meta?: string
+  thumb?: string
   accent?: boolean
   onRemove: () => void
   children?: ReactNode
@@ -130,13 +134,17 @@ export function MediaCard({
           : 'border-ink/10 bg-ink/[0.03] text-ink-200'
       }`}
     >
-      <span
-        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
-          accent ? 'bg-playground-500/15 text-playground-300' : 'bg-ink/[0.06] text-ink-500'
-        }`}
-      >
-        <Icon className="h-3.5 w-3.5" />
-      </span>
+      {thumb ? (
+        <img src={thumb} alt="" className="h-7 w-7 shrink-0 rounded-lg object-cover" />
+      ) : (
+        <span
+          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${
+            accent ? 'bg-playground-500/15 text-playground-300' : 'bg-ink/[0.06] text-ink-500'
+          }`}
+        >
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+      )}
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[12px] font-medium leading-tight">{label}</span>
         {meta && <span className="text-[10px] leading-tight text-ink-500">{meta}</span>}

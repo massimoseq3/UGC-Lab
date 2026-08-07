@@ -148,7 +148,7 @@ export default function InfluencerEditModal({
   const closeRefMenuSoon = () => { refMenuTimer.current = window.setTimeout(() => setRefMenuOpen(false), 120) }
   // Newest-first so fresh gens land at the top of the strip (mirrors the old
   // prepend behaviour). Falls back to the clicked item if the row isn't in
-  // history yet (shouldn't happen — the editor only opens on persisted rows).
+  // history yet.
   const outputs = useMemo<SessionOutput[]>(() => {
     const rows = characterHistory
       .filter((h) => (h.lineageId ?? h.id) === lineageKey)
@@ -161,9 +161,17 @@ export default function InfluencerEditModal({
         styleName: h.styleName,
         linkedModelId: h.linkedModelId,
       }))
-    return rows.length > 0
-      ? rows
-      : [{ id: item.id, imageRef: item.imageRef, aspectRatio: item.aspectRatio, kind: item.kind ?? 'portrait', styleName: item.styleName }]
+    if (rows.length > 0) return rows
+    // The editor can be opened on a generation that is still running (clicking
+    // an in-flight tile), and that has no row and no image yet. Return NOTHING
+    // rather than a synthetic entry: its imageRef would be empty, so the tile
+    // would spin forever and Generate would fire with no base image. The
+    // in-flight tiles below are what's on screen until the row appears — and it
+    // appears under this same id, because finishGen writes the row with the
+    // generation's own id.
+    return item.imageRef
+      ? [{ id: item.id, imageRef: item.imageRef, aspectRatio: item.aspectRatio, kind: item.kind ?? 'portrait', styleName: item.styleName }]
+      : []
   }, [characterHistory, lineageKey, item])
   const [selectedId, setSelectedId] = useState(item.id)
   const [prompt, setPrompt] = useState('')
@@ -232,8 +240,12 @@ export default function InfluencerEditModal({
   }
   // In-flight gens started from this editor. Derived from the app-level list, so
   // reopening the modal mid-generation shows the tile again instead of losing it.
+  // A gen fired from the main form carries no lineageId — its own id IS its
+  // lineage key, which is the same rule `outputs` reads history rows with.
+  // Matching both is what lets the editor opened on a running FORM generation
+  // show that generation instead of an empty column.
   const lineageInFlight = useMemo(
-    () => inFlight.filter((g) => g.lineageId === lineageKey),
+    () => inFlight.filter((g) => (g.lineageId ?? g.id) === lineageKey),
     [inFlight, lineageKey],
   )
   // Count only — never a gate. Edits queue in parallel (CharacterStudio owns the

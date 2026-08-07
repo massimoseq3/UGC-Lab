@@ -40,22 +40,26 @@ export const APP_REGISTRY: AppConfig[] = [
   { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard, accent: '#059669', category: 'system' },
   { id: 'finder', name: 'Bank', icon: Bookmark, accent: '#a1a1aa', category: 'library' },
   // The create group runs the production line in order: character → script →
-  // voice → B-Roll → Edit, which closes the row (everything produced on its
-  // left gets cut into a finished ad via the /video-editor Claude skill).
+  // voice → B-Roll → Playground → Edit, which closes the row (everything
+  // produced on its left gets cut into a finished ad via the /video-editor
+  // Claude skill). Playground sits beside B-Roll because it's the other place
+  // footage gets made — the pick-up shot you go and grab when the storyboard
+  // came back one clip short — so it belongs next to it rather than a divider
+  // away with the research tools.
   { id: 'character-studio', name: 'Characters', icon: UserRound, accent: '#F74F9E', category: 'create' },
   { id: 'script-architect', name: 'Scripts', icon: PenLine, accent: '#24365A', category: 'create' },
   { id: 'voice-studio', name: 'Voiceovers', icon: Mic, accent: '#007AFF', category: 'create' },
   { id: 'broll-studio', name: 'B-Roll', icon: Film, accent: '#7165FF', category: 'create' },
+  { id: 'playground', name: 'Playground', icon: ImagePlay, accent: '#015C52', category: 'create' },
   { id: 'edit-studio', name: 'Edit', icon: Scissors, accent: '#F77646', category: 'create' },
-  // Tools sit past the divider after Edit — free-form surfaces that aren't a
-  // step in the production line. Outliers leads the group because the research
-  // loop runs left to right: find a winning ad → tear it down → remix it.
+  // Tools sit past the divider after Edit — research surfaces that aren't a
+  // step in the production line. Outliers leads the group because the loop runs
+  // left to right: find a winning ad → tear it down.
   //
   // The id is 'discover' and stays that way: it keys the persisted search,
   // filters and sort. The display name is free to change.
   { id: 'discover', name: 'Outliers', icon: Radar, accent: '#D9A404', category: 'tools' },
   { id: 'ad-anatomy', name: 'Ad Analyzer', icon: Eye, accent: '#FF5257', category: 'tools' },
-  { id: 'playground', name: 'Playground', icon: ImagePlay, accent: '#015C52', category: 'tools' },
   { id: 'admin', name: 'Admin', icon: Shield, accent: '#fafafa', category: 'admin' },
 ]
 
