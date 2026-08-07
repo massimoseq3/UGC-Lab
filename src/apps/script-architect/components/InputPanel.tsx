@@ -145,10 +145,12 @@ export default function InputPanel({
   // drives the source box chrome, the chip copy, and the button labels.
   const blueprintActive = isBlueprint && !forceTranscript
   // The two footer dropdowns. Hooks is a fixed batch of one-liners (HOOK_COUNT,
-  // no duration); the blueprint rewrite returns one script and holds the
-  // source's own scene timestamps, so it has neither a count nor a length.
+  // no duration), and the blueprint rewrite returns ONE script, so it has no
+  // count. It does get a length: it defaults to keeping the source's own scene
+  // timings (the 'default' pick), but re-cutting a 60s blueprint to 30 is a
+  // real thing to want, and `runReverseEngineer` re-times the scenes for it.
   const showTakes = !isHooksFormat && !blueprintActive
-  const showLength = !isHooksFormat && (mode === 'write' || !blueprintActive)
+  const showLength = !isHooksFormat
 
   // Slide-over footer actions. The edits already live in `editableContext`
   // (used for this generation), so "save for this script" just dismisses;
@@ -587,8 +589,11 @@ export default function InputPanel({
                 Context note below for why the floor sits on the SECTION. */}
             <div className="mt-3 flex min-h-[160px] flex-1 basis-0 flex-col">
               <div className="mb-3 flex items-center gap-2">
+                {/* Same name as the box the remix modes get, because it's the
+                    same job — the free-text steer on top of the product. Only
+                    one of the two ever renders. */}
                 <StepLabel
-                  label="Describe Your Ad"
+                  label="Additional Instructions"
                   optional
                   tooltip="What should this video say or focus on? Vibe, angle, key points — anything goes. Leave it blank and the model will come up with the angle for you."
                 />
@@ -682,9 +687,9 @@ export default function InputPanel({
             block above, between Output and the brief) */}
         {mode !== 'write' && productSection}
 
-        {/* Final step — Additional Context. Write New folds this into the
-            "Describe Your Video" brief (step 3), so it's only shown for the
-            remix / scene-rewrite modes. */}
+        {/* Final step — the free-text steer. Write New has its own copy of this
+            box higher up (it doubles as the brief there), so this one is only
+            shown for the remix / scene-rewrite modes. */}
         {mode !== 'write' && (
           // flex-1 basis-0 with the floor on the SECTION, never min-h-0 plus a
           // min-height on the textarea: that shape let the section shrink to
@@ -704,7 +709,7 @@ export default function InputPanel({
               <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-2.5">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <PenLine className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
-                  <span className="truncate text-[13px] font-medium text-ink-200">Additional Context</span>
+                  <span className="truncate text-[13px] font-medium text-ink-200">Additional Instructions</span>
                 </div>
                 <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
                   optional
@@ -715,8 +720,8 @@ export default function InputPanel({
                 onChange={(e) => handleContextType(e.target.value)}
                 onBlur={commitContextDraft}
                 placeholder={blueprintActive
-                  ? "Additional context for the rewrite (e.g. 'Keep tone playful', 'Make the CTA softer')..."
-                  : "Additional context for this script (e.g. 'Focus on the self-cleaning feature', 'Summer campaign tone')..."}
+                  ? "Extra instructions for the rewrite (e.g. 'Keep tone playful', 'Make the CTA softer')..."
+                  : "Extra instructions for this script (e.g. 'Focus on the self-cleaning feature', 'Summer campaign tone')..."}
                 className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 pb-3 pt-1.5 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
               />
               <PromptToolbar
@@ -946,7 +951,7 @@ export default function InputPanel({
         onClose={() => { commitBriefDraft(); setExpandedField(null) }}
         value={brief}
         onChange={handleBriefType}
-        title="Describe Your Ad"
+        title="Additional Instructions"
         accent="scripts"
         placeholder="What should this video say or focus on? Vibe, angle, key points…"
       />
@@ -965,9 +970,9 @@ export default function InputPanel({
         onClose={() => { commitContextDraft(); setExpandedField(null) }}
         value={additionalContext}
         onChange={handleContextType}
-        title="Additional Context"
+        title="Additional Instructions"
         accent="scripts"
-        placeholder="Additional context for this generation…"
+        placeholder="Extra instructions for this generation…"
       />
     </div>
   )

@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react'
-import { X, Plus, Mic, Film, Loader2 } from 'lucide-react'
+import { X, Plus, Mic, Film, User, Loader2 } from 'lucide-react'
 import BankPicker from '../../../components/BankPicker'
 import SlotActionMenu from '../../../components/video/SlotActionMenu'
 import AnchoredPopover from '../../../components/video/AnchoredPopover'
-import { RefGroup, ImageTile, AddTile, MediaCard, MediaAddCard } from '../../../components/video/refInputParts'
+import { RefGroup, MediaCard, MediaAddCard } from '../../../components/video/refInputParts'
 import { readMediaDuration } from '../../../utils/media'
 import { fileToDataUri } from '../../../utils/kie'
 import { isAssetRef, getAsBase64 } from '../../../utils/assetStore'
@@ -148,27 +148,37 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
   }
 
   // Three labelled groups — characters, voices, source clip — each stacking in
-  // the parent's reference column below the image slots.
+  // the parent's reference column below the image slots. Every one of them is a
+  // 2-column grid of the same media card, so the whole Omni column reads as one
+  // list of attachments rather than a tile grid sitting above a card list.
   return (
     <>
       <RefGroup label="Characters" count={characterRefs.length} max={MAX_CHARACTERS}>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="grid grid-cols-2 gap-2">
           {characterRefs.map((r) => (
-            <ImageTile
+            <MediaCard
               key={r.bankModelId ?? r.omniId}
-              src={r.url}
+              icon={User}
+              thumb={r.url}
               label={r.label}
-              accent
               onRemove={() => removeRef(r)}
             />
           ))}
           {uploadingCharacter && (
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-ink/10 bg-ink/[0.03] text-ink-400">
-              <Loader2 className="h-4 w-4 animate-spin" />
+            <div className="flex items-center gap-2 rounded-xl border border-ink/10 bg-ink/[0.03] px-2.5 py-1.5 text-ink-400">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-ink/[0.06]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              </span>
+              <span className="truncate text-[12px] font-medium leading-tight">Adding…</span>
             </div>
           )}
           {characterRefs.length < MAX_CHARACTERS && (
-            <AddTile triggerRef={characterTriggerRef} onClick={() => setCharacterMenuOpen((v) => !v)} />
+            <MediaAddCard
+              icon={User}
+              label="Add character"
+              triggerRef={characterTriggerRef}
+              onClick={() => setCharacterMenuOpen((v) => !v)}
+            />
           )}
         </div>
       </RefGroup>

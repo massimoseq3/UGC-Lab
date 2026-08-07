@@ -85,7 +85,7 @@ import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
 import { getModel, getDefaultModel, snapVideoDurationUp, estimateCredits, formatCredits, officialSavingsPercent, type VideoMode, type ImageResolution } from '../../../utils/models'
 import { humanizeError } from '../../../utils/friendlyError'
 import { downloadImage } from '../../../utils/downloadImage'
-import ClipDownloadModal, { type ClipDownloadEntry } from './ClipDownloadModal'
+import ClipDownloadModal, { type ClipDownloadEntry } from '../../../components/ClipDownloadModal'
 import { copyToClipboard } from '../../../utils/clipboard'
 import { sendClipToPlayground } from '../services/sendClipToPlayground'
 import type { ContinuousStoryboardOp } from '../continuousEdits'
@@ -1082,8 +1082,9 @@ export default function ContinuousView({
       ref: v.url,
       name: vids.length > 1 ? `clip-${scene}-take${i + 1}` : `clip-${scene}`,
       label: `Clip ${s.index}`,
-      takeLabel: vids.length > 1 ? `Take ${i + 1} of ${vids.length}` : undefined,
-      isCover: i === cover,
+      meta: vids.length > 1 ? `Take ${i + 1} of ${vids.length}` : undefined,
+      preselected: i === cover,
+      badge: i === cover ? 'Cover' : undefined,
       aspectRatio: v.aspectRatio,
     }))
   })
@@ -1605,6 +1606,7 @@ export default function ContinuousView({
         <ClipDownloadModal
           entries={allClipEntries}
           zipBasename="continuous-clips"
+          subtitle="Every card&rsquo;s cover clip is picked — tick the extra takes you also want."
           onClose={() => setDownloadOpen(false)}
         />
       )}
@@ -2342,9 +2344,11 @@ function ClipCard({
         )}
 
         {/* Hover action stack — top-right, app-wide order: download · copy ·
-            send-to-Playground. No save (video) and no trash (structural card). */}
+            send-to-Playground. No save (video) and no trash (structural card).
+            Stays put while the clip plays with sound — watching a take is when
+            you decide to keep it, and it's clear of the play/mute buttons. */}
         {currentVideo && (
-          <TileActionStack hidden={inline.watching}>
+          <TileActionStack>
             <TileActionButton
               title="Download video"
               onClick={() => { void handleDownload() }}
@@ -2378,7 +2382,7 @@ function ClipCard({
             open. Before that the card is covered by its own copy ("Pick
             keyframes for Frame N" / "Keyframes ready") and the whole face is
             already clickable, so a button just crowded it. */}
-        {currentVideo && !inline.watching && (
+        {currentVideo && (
           <div className="absolute inset-x-2 bottom-2 z-10 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
             <button
               type="button"

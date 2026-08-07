@@ -21,7 +21,7 @@ import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
 import VariationCard from './VariationCard'
 import { humanizeError } from '../../../utils/friendlyError'
-import ClipDownloadModal, { type ClipDownloadEntry } from './ClipDownloadModal'
+import ClipDownloadModal, { type ClipDownloadEntry } from '../../../components/ClipDownloadModal'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
@@ -728,8 +728,9 @@ export default function ScenesView({
         ref: v.url,
         name: `scene${scene}-option${i + 1}${vids.length > 1 ? `-take${vi + 1}` : ''}`,
         label: `Scene ${s.number} · Option ${i + 1}`,
-        takeLabel: vids.length > 1 ? `Take ${vi + 1} of ${vids.length}` : undefined,
-        isCover: vi === cover,
+        meta: vids.length > 1 ? `Take ${vi + 1} of ${vids.length}` : undefined,
+        preselected: vi === cover,
+        badge: vi === cover ? 'Cover' : undefined,
         aspectRatio: v.aspectRatio,
       }))
     }),
@@ -1130,6 +1131,7 @@ export default function ScenesView({
         <ClipDownloadModal
           entries={allClipEntries}
           zipBasename="broll-clips"
+          subtitle="Every card&rsquo;s cover clip is picked — tick the extra takes you also want."
           onClose={() => setDownloadOpen(false)}
         />
       )}

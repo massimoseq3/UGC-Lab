@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useState, useEffect } from 'react'
-import { Loader2, Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil } from 'lucide-react'
+import { Loader2, Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil, Frame, History } from 'lucide-react'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState } from '../../../hooks/useAssetUrl'
 import { getUrl } from '../../../utils/assetStore'
@@ -8,7 +8,7 @@ import { usePersistedState } from '../../../hooks/usePersistedState'
 import { humanizeError } from '../../../utils/friendlyError'
 import { sectionLabel, groupByDay, formatRelative } from '../../../utils/history'
 import type { CharacterHistoryItem } from '../../../stores/types'
-import type { CharacterProfile, InFlightCharacterGen, LaunchGenOptions } from '../types'
+import { createEmptyProfile, type CharacterProfile, type InFlightCharacterGen, type LaunchGenOptions } from '../types'
 import { getModel } from '../../../utils/models'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
@@ -44,7 +44,11 @@ export default memo(function GalleryPanel({
   onCancelGen,
   onLaunchGen,
 }: GalleryPanelProps) {
-  const [previewItem, setPreviewItem] = useState<CharacterHistoryItem | null>(null)
+  // The editor is anchored by ID, not by a snapshot of the row: a generation
+  // can be opened while it's still running, and `finishGen` writes its history
+  // row under the generation's own id — so the same anchor resolves to the
+  // pending gen first and the finished row the moment it lands.
+  const [previewId, setPreviewId] = useState<string | null>(null)
   // Which mode the edit pop-up opens in. "Make Sheet" on a tile opens straight
   // into sheet mode so the user just hits Generate; a normal click is edit.
   const [previewMode, setPreviewMode] = useState<'edit' | 'sheet'>('edit')
@@ -89,12 +93,51 @@ export default memo(function GalleryPanel({
 
   const isEmpty = characterHistory.length === 0 && inFlight.length === 0
 
+  const newestId = characterHistory[0]?.id ?? 'none'
+
   // Single view's "clear the frame" state. Holds the id that was cleared, so a
   // newer generation (or one still running) fills the frame again on its own —
   // no effect, no stale flag to reset.
   const [clearedId, setClearedId] = useState<string | null>(null)
-  const frameCleared = inFlight.length === 0 && clearedId === (characterHistory[0]?.id ?? 'none')
-  const singleItem = frameCleared ? undefined : characterHistory[0]
+  const frameCleared = inFlight.length === 0 && clearedId === newestId
+
+  // Which character the Single view is showing. Default is the newest, which is
+  // what this view has always done; pinning one from the grid or list puts THAT
+  // character on the stage instead — the view is for screen recording, and the
+  // character you want on camera isn't always the last one you made.
+  //
+  // The pin remembers which row was newest when it was set, so it retires
+  // itself the moment a newer generation lands (the same self-resetting trick
+  // as `clearedId`): finishing a character and then finding the stage still
+  // holding an older one would read as the generation having failed. A pin
+  // whose row has since been deleted falls through to the newest too.
+  const [pin, setPin] = usePersistedState<{ id: string; newestId: string } | null>(
+    'ai-ugc-lab:influencers:single-pin',
+    null,
+  )
+  const pinnedItem = pin && pin.newestId === newestId
+    ? characterHistory.find((h) => h.id === pin.id)
+    : undefined
+  const singleItem = frameCleared ? undefined : (pinnedItem ?? characterHistory[0])
+
+  // Put a character on the Single stage and go there, so the click has a
+  // visible result rather than silently arming a view the member isn't on.
+  function showInSingle(item: CharacterHistoryItem) {
+    setPin({ id: item.id, newestId })
+    setClearedId(null)
+    setViewMode('single')
+  }
+
+  // The editor's anchor: the finished row if there is one, otherwise the
+  // still-running generation shaped as the row it is about to become.
+  const previewRow = previewId ? characterHistory.find((h) => h.id === previewId) : undefined
+  const previewGen = previewId && !previewRow ? inFlight.find((g) => g.id === previewId) : undefined
+  const previewItem = previewRow ?? (previewGen ? pendingItemFromGen(previewGen) : null)
+
+  function openEditor(id: string, mode: 'edit' | 'sheet' = 'edit') {
+    setPreviewMode(mode)
+    setPreviewId(id)
+  }
 
   return (
     <div className="flex h-full min-w-0 flex-col">
@@ -108,11 +151,25 @@ export default memo(function GalleryPanel({
             {/* Single view only: empty the frame back to "Awaiting generation".
                 Nothing is deleted — the history is one toggle away, and the next
                 generation fills the frame again. */}
+            {/* Only while a character is pinned to the stage — the way back to
+                "whatever I just made", so a pin is never a state the member is
+                stuck in wondering why new work isn't showing. */}
+            {viewMode === 'single' && pinnedItem && (
+              <button
+                type="button"
+                title="Show the newest character instead"
+                onClick={() => setPin(null)}
+                className="flex h-9 items-center gap-1.5 rounded-full border border-influencers-500/30 bg-influencers-500/10 px-3 text-[11px] font-medium text-influencers-300 transition-colors hover:bg-influencers-500/20"
+              >
+                <History className="h-3.5 w-3.5" />
+                Newest
+              </button>
+            )}
             {viewMode === 'single' && !frameCleared && (
               <button
                 type="button"
                 title="Clear the frame"
-                onClick={() => setClearedId(characterHistory[0]?.id ?? 'none')}
+                onClick={() => setClearedId(newestId)}
                 className="flex h-9 w-9 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
               >
                 <Plus className="h-4 w-4" />
@@ -152,14 +209,19 @@ export default memo(function GalleryPanel({
           hint="Configure parameters on the left and hit Generate. Every character you make lands here, sorted by day."
         />
       ) : viewMode === 'single' ? (
+        // Every callback targets the item ACTUALLY on the stage. They used to
+        // read characterHistory[0] directly, which was the same row only
+        // because the stage was always the newest one; with a pin it would
+        // delete or edit a character the member isn't looking at.
         <SingleView
           inFlight={inFlight}
           item={singleItem}
           onCancelGen={onCancelGen}
-          onClick={() => { setPreviewMode('edit'); setPreviewItem(characterHistory[0]) }}
-          onDelete={() => deleteCharacterHistory(characterHistory[0].id)}
-          onMakeSheet={() => { setPreviewMode('sheet'); setPreviewItem(characterHistory[0]) }}
-          onCopyPrompt={() => handleCopyPrompt(characterHistory[0])}
+          onOpenGen={(id) => openEditor(id)}
+          onClick={() => singleItem && openEditor(singleItem.id)}
+          onDelete={() => singleItem && deleteCharacterHistory(singleItem.id)}
+          onMakeSheet={() => singleItem && openEditor(singleItem.id, 'sheet')}
+          onCopyPrompt={() => singleItem && handleCopyPrompt(singleItem)}
         />
       ) : (
         <>
@@ -172,14 +234,14 @@ export default memo(function GalleryPanel({
                   <div className="grid grid-cols-2 gap-2 [grid-auto-flow:dense] lg:grid-cols-3">
                     {inFlight.map((gen) => (
                       <div key={gen.id} className={isWide(gen.aspectRatio) ? 'col-span-2 lg:col-span-3' : ''}>
-                        <InFlightTile gen={gen} onCancel={() => onCancelGen(gen.id)} />
+                        <InFlightTile gen={gen} onCancel={() => onCancelGen(gen.id)} onClick={() => openEditor(gen.id)} />
                       </div>
                     ))}
                   </div>
                 ) : (
                   <div className="flex flex-col gap-3">
                     {inFlight.map((gen) => (
-                      <InFlightRow key={gen.id} gen={gen} mediaAspect={mediaAspect} onCancel={() => onCancelGen(gen.id)} />
+                      <InFlightRow key={gen.id} gen={gen} mediaAspect={mediaAspect} onCancel={() => onCancelGen(gen.id)} onClick={() => openEditor(gen.id)} />
                     ))}
                   </div>
                 )}
@@ -195,10 +257,11 @@ export default memo(function GalleryPanel({
                       <div key={item.id} className={isWide(item.aspectRatio) ? 'col-span-2 lg:col-span-3' : ''}>
                         <HistoryTile
                           item={item}
-                          onClick={() => { setPreviewMode('edit'); setPreviewItem(item) }}
+                          onClick={() => openEditor(item.id)}
                           onDelete={() => deleteCharacterHistory(item.id)}
-                          onMakeSheet={() => { setPreviewMode('sheet'); setPreviewItem(item) }}
+                          onMakeSheet={() => openEditor(item.id, 'sheet')}
                           onCopyPrompt={() => handleCopyPrompt(item)}
+                          onShowInSingle={() => showInSingle(item)}
                         />
                       </div>
                     ))}
@@ -210,10 +273,11 @@ export default memo(function GalleryPanel({
                         key={item.id}
                         item={item}
                         mediaAspect={mediaAspect}
-                        onClick={() => { setPreviewMode('edit'); setPreviewItem(item) }}
+                        onClick={() => openEditor(item.id)}
                         onDelete={() => deleteCharacterHistory(item.id)}
-                        onMakeSheet={() => { setPreviewMode('sheet'); setPreviewItem(item) }}
+                        onMakeSheet={() => openEditor(item.id, 'sheet')}
                         onCopyPrompt={() => handleCopyPrompt(item)}
+                        onShowInSingle={() => showInSingle(item)}
                       />
                     ))}
                   </div>
@@ -226,12 +290,16 @@ export default memo(function GalleryPanel({
 
       {previewItem && (
         <InfluencerEditModal
+          // Keyed on the anchor so the editor re-seeds its own state when the
+          // member opens a different character; the pending → finished swap of
+          // ONE generation keeps the same id, so it doesn't remount there.
+          key={previewItem.id}
           item={previewItem}
           initialMode={previewMode}
           inFlight={inFlight}
           onLaunchGen={onLaunchGen}
           onCancelGen={onCancelGen}
-          onClose={() => setPreviewItem(null)}
+          onClose={() => setPreviewId(null)}
         />
       )}
     </div>
@@ -530,6 +598,7 @@ function SingleView({
   inFlight,
   item,
   onCancelGen,
+  onOpenGen,
   onClick,
   onDelete,
   onMakeSheet,
@@ -538,6 +607,7 @@ function SingleView({
   inFlight: InFlightCharacterGen[]
   item: CharacterHistoryItem | undefined
   onCancelGen: (id: string) => void
+  onOpenGen: (id: string) => void
   onClick: () => void
   onDelete: () => void | Promise<unknown>
   onMakeSheet: () => void
@@ -554,7 +624,7 @@ function SingleView({
     <div className="flex min-h-[420px] flex-1 flex-col gap-3 px-4 py-4">
       {active ? (
         <>
-          <SingleInFlight gen={active} onCancel={() => onCancelGen(active.id)} />
+          <SingleInFlight gen={active} onCancel={() => onCancelGen(active.id)} onClick={() => onOpenGen(active.id)} />
           <PromptData profile={active.profile as CharacterProfile | undefined} />
           <p className="text-center text-[10px] font-medium tracking-wider text-influencers-300">
             {others > 0 ? `Generating · +${others} more in the queue` : 'Generating…'}
@@ -597,7 +667,7 @@ function AwaitingFrame() {
 // The running generation, at the shape it will land in: the frame is already
 // the output's aspect ratio, and the scanning sweep + accent glow read as the
 // picture being developed inside it.
-function SingleInFlight({ gen, onCancel }: { gen: InFlightCharacterGen; onCancel: () => void }) {
+function SingleInFlight({ gen, onCancel, onClick }: { gen: InFlightCharacterGen; onCancel: () => void; onClick: () => void }) {
   return (
     <Stage aspectRatio={gen.aspectRatio}>
       {(frameStyle) => (
@@ -610,6 +680,7 @@ function SingleInFlight({ gen, onCancel }: { gen: InFlightCharacterGen; onCancel
             kind={gen.kind}
             aspectRatio={gen.aspectRatio}
             onCancel={onCancel}
+            onClick={onClick}
             fill
           />
         </div>
@@ -796,18 +867,41 @@ function PromptData({ profile }: { profile: CharacterProfile | undefined }) {
 
 // ── Grid tile ───────────────────────────────────────────────────
 
+// A generation that hasn't landed yet, shaped as the history row it is about to
+// become — the anchor the editor opens on when an in-flight tile is clicked.
+// `finishGen` writes the real row under this same id, so the editor re-resolves
+// to it on arrival with nothing to re-target and no remount. `imageRef` is
+// deliberately empty: that's the flag the editor reads to know it has no base
+// image yet, and it keeps Generate disabled until one exists.
+function pendingItemFromGen(gen: InFlightCharacterGen): CharacterHistoryItem {
+  return {
+    id: gen.id,
+    imageRef: '',
+    profile: (gen.profile as CharacterProfile | undefined) ?? createEmptyProfile(),
+    modelId: gen.modelId,
+    aspectRatio: gen.aspectRatio,
+    resolution: gen.resolution,
+    kind: gen.kind ?? 'portrait',
+    lineageId: gen.lineageId,
+    styleName: gen.styleName,
+    createdAt: gen.startedAt,
+  }
+}
+
 function HistoryTile({
   item,
   onClick,
   onDelete,
   onMakeSheet,
   onCopyPrompt,
+  onShowInSingle,
 }: {
   item: CharacterHistoryItem
   onClick: () => void
   onDelete: () => void | Promise<unknown>
   onMakeSheet: () => void
   onCopyPrompt: () => void
+  onShowInSingle: () => void
 }) {
   const a = useHistoryTileActions(item, onDelete)
 
@@ -846,6 +940,9 @@ function HistoryTile({
           </TileActionButton>
           <TileActionButton title="Copy prompt" onClick={() => onCopyPrompt()}>
             <Copy className="h-4 w-4" />
+          </TileActionButton>
+          <TileActionButton title="Show this one in Single view" onClick={() => onShowInSingle()}>
+            <Frame className="h-4 w-4" />
           </TileActionButton>
           {!a.isSheet && (
             <TileActionButton
@@ -921,6 +1018,7 @@ function HistoryListRow({
   onDelete,
   onMakeSheet,
   onCopyPrompt,
+  onShowInSingle,
 }: {
   item: CharacterHistoryItem
   mediaAspect: number
@@ -928,6 +1026,7 @@ function HistoryListRow({
   onDelete: () => void | Promise<unknown>
   onMakeSheet: () => void
   onCopyPrompt: () => void
+  onShowInSingle: () => void
 }) {
   const a = useHistoryTileActions(item, onDelete)
   const prompt = buildImagePrompt(item.profile).trim()
@@ -1012,6 +1111,9 @@ function HistoryListRow({
             <ListRowButton title="Copy prompt" onClick={onCopyPrompt}>
               <Copy className="h-3.5 w-3.5" />
             </ListRowButton>
+            <ListRowButton title="Show this one in Single view" onClick={onShowInSingle}>
+              <Frame className="h-3.5 w-3.5" />
+            </ListRowButton>
             {!a.isSheet && (
               <ListRowButton title="Make a character sheet from this portrait" onClick={onMakeSheet}>
                 <LayoutGrid className="h-3.5 w-3.5" />
@@ -1028,14 +1130,14 @@ function HistoryListRow({
 
 // In-flight generation as a list row — placeholder + progress, matching the
 // finished-row layout (2/3 media · 1/3 info) so the feed doesn't jump.
-function InFlightRow({ gen, mediaAspect, onCancel }: { gen: InFlightCharacterGen; mediaAspect: number; onCancel: () => void }) {
+function InFlightRow({ gen, mediaAspect, onCancel, onClick }: { gen: InFlightCharacterGen; mediaAspect: number; onCancel: () => void; onClick: () => void }) {
   // Match HistoryListRow: landscape gens keep a 16:9 frame; portraits follow the
   // slider so the in-flight placeholder doesn't jump when the result lands.
   const frameAspect = gen.aspectRatio.includes('16:9') ? 16 / 9 : mediaAspect
   return (
     <div className="flex w-full items-stretch gap-3 overflow-hidden rounded-2xl border border-influencers-500/20 bg-influencers-500/[0.04] card-soft-shadow">
       <div className="relative min-w-0 flex-[5]" style={{ aspectRatio: frameAspect }}>
-        <GeneratingTile modelId={gen.modelId} kind={gen.kind} aspectRatio={gen.aspectRatio} onCancel={onCancel} fill />
+        <GeneratingTile modelId={gen.modelId} kind={gen.kind} aspectRatio={gen.aspectRatio} onCancel={onCancel} onClick={onClick} fill />
       </div>
       <div className="flex min-w-0 flex-[2] flex-col justify-center gap-2 py-3 pr-3">
         <span className="text-[12px] font-semibold tracking-wide text-influencers-200">
@@ -1077,6 +1179,6 @@ function ListRowButton({
   )
 }
 
-function InFlightTile({ gen, onCancel }: { gen: InFlightCharacterGen; onCancel: () => void }) {
-  return <GeneratingTile modelId={gen.modelId} kind={gen.kind} aspectRatio={gen.aspectRatio} onCancel={onCancel} />
+function InFlightTile({ gen, onCancel, onClick }: { gen: InFlightCharacterGen; onCancel: () => void; onClick: () => void }) {
+  return <GeneratingTile modelId={gen.modelId} kind={gen.kind} aspectRatio={gen.aspectRatio} onCancel={onCancel} onClick={onClick} />
 }

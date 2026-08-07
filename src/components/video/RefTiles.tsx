@@ -18,7 +18,11 @@ interface RefTilesProps {
 
 // Reference-image slot rendered as a labelled grid of thumbnail tiles plus a
 // dashed add tile — so the attached images are visible at a glance instead of
-// hidden behind a "0/9" pill.
+// hidden behind a "0/9" pill. A half-width media card with a 28px thumbnail was
+// tried here and reverted: on a reference image the PICTURE is the point, and
+// shrinking it to a chip beside a filename made the one thing you check ("did I
+// attach the right photo?") the smallest thing on the row. Omni's characters
+// keep the card shape, because there the name is what identifies the row.
 export default function RefTiles({ label, values, onChange, max, bankType, tabs }: RefTilesProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)

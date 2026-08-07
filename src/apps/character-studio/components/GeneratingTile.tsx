@@ -33,12 +33,17 @@ export default function GeneratingTile({
   kind,
   aspectRatio,
   onCancel,
+  onClick,
   fill = false,
 }: {
   modelId: string
   kind?: 'portrait' | 'sheet'
   aspectRatio: string
   onCancel?: () => void
+  // Opens the editor on the generation that is still running. The tile used to
+  // be inert until the image landed, which meant waiting on a render just to
+  // reach the controls you were going to use on it.
+  onClick?: () => void
   // Stretch to fill the parent (list view's fixed-height media frame) instead
   // of sizing to the output's aspect ratio (grid view).
   fill?: boolean
@@ -47,7 +52,8 @@ export default function GeneratingTile({
   const isSheet = kind === 'sheet'
   return (
     <div
-      className={`group relative overflow-hidden border-influencers-500/20 ${fill ? 'h-full w-full border-0' : 'rounded-lg border'}`}
+      onClick={onClick}
+      className={`group relative overflow-hidden border-influencers-500/20 ${fill ? 'h-full w-full border-0' : 'rounded-lg border'} ${onClick ? 'cursor-pointer' : ''}`}
       style={fill ? undefined : aspectStyle(aspectRatio)}
     >
       <GeneratingBackdrop family="influencers" />
@@ -58,7 +64,7 @@ export default function GeneratingTile({
         <button
           type="button"
           title="Cancel"
-          onClick={onCancel}
+          onClick={(e) => { e.stopPropagation(); onCancel() }}
           className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white opacity-0 backdrop-blur transition-opacity hover:border-red-400/40 hover:bg-red-500/30 hover:text-red-100 group-hover:opacity-100"
         >
           <X className="h-3 w-3" />

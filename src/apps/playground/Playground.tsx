@@ -149,9 +149,10 @@ export default function Playground() {
   //   silent video clip. Easier to mute occasionally than miss audio always.
   // - Instrumental = on. UGC ad scoring is overwhelmingly instrumental;
   //   lyrics are the rare case worth opting into per-track.
-  // - Video resolution = the picked model's preferred default (e.g. 720p for
-  //   Seedance). Persisted state predating this default would otherwise
-  //   keep the old `resolutions[0]` value forever.
+  // - Video resolution = clamped to a tier the picked model actually offers.
+  //   Deliberately NOT re-stamped to the model's preferred default: that ran on
+  //   every hydrate, so a member who chose a different tier lost it on the next
+  //   refresh. The default belongs to picking a model, not to reloading a draft.
   const [state, setState] = usePersistedState<PromptPanelState>(`${baseKey}:state`, initialState(), {
     sanitize: (v) => {
       const next = { ...v, audio: true, instrumental: true }
@@ -164,8 +165,9 @@ export default function Playground() {
         next.modelId = getDefaultModel('playground', task)?.id ?? next.modelId
         m = getModel(next.modelId)
       }
-      if (v.mode === 'video' && m?.videoConstraints?.default) {
-        next.resolution = m.videoConstraints.default
+      const videoConstraints = m?.videoConstraints
+      if (v.mode === 'video' && videoConstraints && !videoConstraints.resolutions.includes(v.resolution)) {
+        next.resolution = videoConstraints.default ?? videoConstraints.resolutions[0] ?? next.resolution
       }
       return next
     },

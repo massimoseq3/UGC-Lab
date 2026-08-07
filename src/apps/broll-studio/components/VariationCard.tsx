@@ -991,8 +991,12 @@ export default function VariationCard(props: VariationCardProps) {
           {/* Hover-reveal action stack (components/tileActions) — app-wide
               standard order: download · save (stills only) · copy · send-to-
               Playground (videos only) · delete. The card body stays clickable
-              to open the detail modal. */}
-          <TileActionStack forceVisible={confirmingDelete} hidden={cardVideo.watching}>
+              to open the detail modal. It does NOT step aside while the clip
+              plays with sound: watching a take is exactly when you decide to
+              keep it, and having Download / Save / Copy vanish under the
+              pointer meant pausing first to reach them. It's top-right, clear
+              of the play/mute buttons on the left, and still hover-only. */}
+          <TileActionStack forceVisible={confirmingDelete}>
             {coverKind && (
               <>
                 <TileActionButton
@@ -1055,12 +1059,13 @@ export default function VariationCard(props: VariationCardProps) {
               rather than covering it, since hover is exactly when that needs to
               stay readable. Video play/mute used to force the same dodge; they
               live top-left now, so a video cover keeps the row at its usual
-              height. Suppressed while the clip plays with sound — watching it
-              is the task then, and only play/pause + mute stay on the face. */}
+              height. Stays put while the clip plays with sound, for the same
+              reason as the action stack above — deciding what to do with a take
+              is what you're doing while you watch it. */}
           <div
-            className={`absolute inset-x-2 z-10 items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 ${
-              cardVideo.watching ? 'hidden' : 'flex'
-            } ${showImageError ? 'bottom-14' : 'bottom-2'}`}
+            className={`absolute inset-x-2 z-10 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 ${
+              showImageError ? 'bottom-14' : 'bottom-2'
+            }`}
           >
             <button
               type="button"

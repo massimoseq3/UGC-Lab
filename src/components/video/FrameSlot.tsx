@@ -20,11 +20,14 @@ interface FrameSlotProps {
   disabledNote?: string
 }
 
-// A 16:9 drop-zone for a single frame (start / end). Empty it's a labelled
+// A 2:1 drop-zone for a single frame (start / end). Empty it's a labelled
 // dashed tile with an "Optional" tag; filled it shows the frame with a remove
 // button. Upload or pick from a bank; whole-panel drag-and-drop is wired by the
 // parent straight into the value. Kept deliberately short — the two slots sit
-// directly above the prompt box and every pixel here is a pixel it loses.
+// directly above the prompt box and every pixel here is a pixel it loses, which
+// is why the box is 2:1 rather than the 16:9 it started as. The frame inside is
+// `object-contain`, so the box's ratio only sets how tall the slot is; a 9:16
+// UGC still letterboxes either way.
 export default function FrameSlot({
   label,
   value,
@@ -51,7 +54,7 @@ export default function FrameSlot({
 
   if (value) {
     return (
-      <div className="group relative aspect-[16/9] w-full overflow-hidden rounded-2xl border border-ink/10 bg-black/30">
+      <div className="group relative aspect-[2/1] w-full overflow-hidden rounded-2xl border border-ink/10 bg-black/30">
         <img src={value.dataUri} alt="" className="h-full w-full object-contain" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 pb-1 pt-5">
           <span className="text-[11px] font-medium text-white">{label}</span>
@@ -75,7 +78,7 @@ export default function FrameSlot({
         type="button"
         disabled={disabled}
         onClick={() => setActionMenu((v) => !v)}
-        className={`group relative flex aspect-[16/9] w-full flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-ink/15 bg-ink/[0.02] transition-colors ${
+        className={`group relative flex aspect-[2/1] w-full flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-ink/15 bg-ink/[0.02] transition-colors ${
           disabled
             ? 'cursor-not-allowed opacity-40'
             : 'hover:border-ink/30 hover:bg-ink/[0.04]'

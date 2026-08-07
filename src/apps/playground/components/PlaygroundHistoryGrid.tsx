@@ -2,7 +2,7 @@ import { memo, useMemo, useState, useEffect } from 'react'
 import {
   Loader2, Download, Bookmark, Check, Film, Image as ImageIcon,
   Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy,
-  LayoutGrid, List, Maximize2,
+  LayoutGrid, List, Maximize2, FolderDown,
 } from 'lucide-react'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState, useAssetUrl } from '../../../hooks/useAssetUrl'
@@ -12,7 +12,8 @@ import { getUrl } from '../../../utils/assetStore'
 import { VideoFrameActions } from '../../../components/VideoLightbox'
 import { getModel } from '../../../utils/models'
 import { usePersistedState } from '../../../hooks/usePersistedState'
-import { sectionLabel, groupByDay } from '../../../utils/history'
+import { sectionLabel, groupByDay, formatRelative } from '../../../utils/history'
+import ClipDownloadModal, { type ClipDownloadEntry } from '../../../components/ClipDownloadModal'
 import { downloadImage } from '../../../utils/downloadImage'
 import type { ImageHistoryItem, VideoHistoryItem, MusicHistoryItem } from '../../../stores/types'
 import AudioTile from './AudioTile'
@@ -104,6 +105,30 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
 
   const visibleInFlight = filterMode ? inFlight.filter((g) => g.mode === filterMode) : inFlight
 
+  // Every finished clip on screen, as the zip picker's entries. Nothing is
+  // preselected: unlike B-Roll's storyboard (one cover take per card), this list
+  // is every video the member has ever generated here, so opening with all of it
+  // ticked would mean unticking dozens to get the two they came for.
+  //
+  // There's no title field on a video row, so the prompt is the label and the
+  // zip name is positional. The index is over the whole newest-first list, so a
+  // file name stays stable while the picker is open and can't collide.
+  const clipEntries = useMemo<ClipDownloadEntry[]>(
+    () => entries.flatMap((e, i) => e.kind !== 'video' ? [] : [{
+      id: e.data.id,
+      ref: e.data.videoUrl,
+      name: `playground-clip-${String(i + 1).padStart(2, '0')}`,
+      label: e.data.prompt || 'Untitled clip',
+      // When it was made, and nothing else. The model name was on this line and
+      // came off: it's the same for a whole run, so it repeated down the row
+      // without telling the clips apart — which is the only job this line has.
+      meta: formatRelative(e.data.createdAt),
+      aspectRatio: e.data.aspectRatio,
+    }]),
+    [entries],
+  )
+  const [downloadOpen, setDownloadOpen] = useState(false)
+
   // Save an image-history entry to the B-Rolls bank. Tracks in-flight ids so
   // the user can't double-tap into duplicate BRolls.
   async function handleSaveImage(item: ImageHistoryItem) {
@@ -152,6 +177,19 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
           Matches the prompt panel's h-[57px] mode-toggle bar so the left/right
           tabs sit on the same line. */}
       <div className="flex h-[57px] shrink-0 items-center justify-end gap-3 border-b border-ink/5 px-4">
+        {/* Zip picker — the Video tab only, since it's the one kind the picker
+            can preview. Same neutral pill B-Roll's storyboard toolbar uses. */}
+        {clipEntries.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setDownloadOpen(true)}
+            title="Pick which clips to download as a zip"
+            className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/25 hover:bg-ink/[0.07] hover:text-ink-100"
+          >
+            <FolderDown className="h-3.5 w-3.5" />
+            {`Download clips (${clipEntries.length})`}
+          </button>
+        )}
         {viewMode === 'list' && (
           <div className="flex items-center gap-2.5" title="Card size">
             <Maximize2 className="h-3.5 w-3.5 text-ink-500" />
@@ -290,6 +328,16 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
               ? () => onAnimateImage(previewItem.data)
               : undefined
           }
+        />
+      )}
+
+      {downloadOpen && (
+        <ClipDownloadModal
+          entries={clipEntries}
+          zipBasename="playground-clips"
+          subtitle="Select the clips you want, and they download as one zip."
+          accent="playground"
+          onClose={() => setDownloadOpen(false)}
         />
       )}
     </div>
@@ -655,9 +703,14 @@ function VideoTile({
         )}
 
         {/* Hover action stack — top-right vertical column, app-wide standard
-            order: download · copy · delete (video has no save-to-bank). Steps
-            aside while the clip plays with sound. */}
-        <TileActionStack hidden={inline.watching}>
+            order: download · copy · delete (video has no save-to-bank). It
+            deliberately does NOT step aside while the clip plays with sound:
+            watching a take is exactly when you decide to keep it, and having
+            Download / Copy prompt / Delete vanish under the pointer meant
+            pausing first to reach them. It sits top-right, clear of the
+            play/pause and mute buttons on the left, and only fades in on
+            hover — so it never covers a clip you're just watching. */}
+        <TileActionStack>
           <TileActionButton
             title="Download"
             onClick={async (e) => {
