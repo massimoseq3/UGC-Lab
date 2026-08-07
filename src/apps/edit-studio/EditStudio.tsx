@@ -73,7 +73,7 @@ export default function EditStudio() {
               <Download className="h-4 w-4" strokeWidth={2} />
               Download Skill
             </button>
-            <p className="text-[11px] text-ink-600">video-editor.skill · 25 KB</p>
+            <p className="text-[11px] text-ink-600">video-editor.skill · 35 KB</p>
           </div>
         </div>
 
