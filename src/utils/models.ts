@@ -130,6 +130,10 @@ export interface ModelEntry {
   // Video-only: model accepts reference video clips (Seedance 2 family's
   // `reference_video_urls`, ≤15s total).
   supportsReferenceVideos?: boolean
+  // Video-only: combined length cap, in seconds, for the reference audio strip
+  // and (separately) the reference video strip. Undeclared models fall back to
+  // UNDECLARED_REFERENCE_CLIP_SECONDS. Only set from a documented provider cap.
+  maxReferenceClipSeconds?: number
   // Gemini Omni only: model accepts persistent character ids, designed voice
   // ids, and a trimmed source video clip, under a shared 7-slot input quota.
   omniInputs?: boolean
@@ -581,6 +585,70 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 
   // ── Video generation ──────────────────────────────────────────
 
+  // Seedance 2.5 — ByteDance's next-gen video model. Two things separate it
+  // from the 2.0 family:
+  //
+  //   1. Length. It generates up to 30s in one call, where the rest of the
+  //      catalog tops out at 15. Hence the extended duration ladder below.
+  //   2. Input shape. It has NO first_frame_url / last_frame_url — every image
+  //      arrives via `reference_image_urls` as a generic reference, not as
+  //      frame one. Same situation as Gemini Omni: no 'image-to-video' and no
+  //      'frames-to-video' mode, so B-Roll's Animate tab and Continuous grey it
+  //      out rather than silently animating from a still it can't honour. A
+  //      frame that reaches the body builder anyway rides along as a reference
+  //      image (see buildVideoInput) rather than being dropped.
+  //
+  // Pricing (kie, beta — user-supplied 2026-08-07). kie publishes two tiers per
+  // resolution and the cheaper one is NOT cheaper in practice:
+  //   no video input:   480p 28/s · 720p 63/s, billed on OUTPUT seconds
+  //   with video input: 480p 17/s · 720p 38/s, billed on (INPUT + OUTPUT)
+  // A 5s reference clip on a 5s render is 17×10 = 170 credits at 480p, versus
+  // 28×5 = 140 with no clip — so the "discount" tier costs more the moment the
+  // reference is longer than ~⅔ of the output. We quote the no-video rate
+  // across the board: it's exact for the common case, and we can't know a
+  // reference clip's length at estimate time. Same floor caveat as MiniMax H3.
+  // kie also notes prices are beta and the +10% top-up bonus makes the
+  // effective rate ~10% lower — neither is modelled, since both move the real
+  // figure DOWN and an estimate that over-quotes is the safe direction.
+  //
+  // No `official` / `market` entry, for the same reason as the whole Seedance
+  // family: kie undercuts Fal but not BytePlus direct, so we claim no savings
+  // rather than pick a flattering baseline.
+  // Docs: bytedance/seedance-2-5 on docs.kie.ai.
+  {
+    id: 'bytedance/seedance-2-5',
+    displayName: 'Seedance 2.5',
+    provider: 'ByteDance',
+    task: 'video',
+    modes: ['text-to-video', 'reference-to-video'],
+    tags: ['recommended', 'new'],
+    supportsReferenceImages: true,
+    supportsReferenceAudio: true,
+    supportsReferenceVideos: true,
+    // Reference audio/video are capped at 30s TOTAL each here, double the 2.0
+    // family's 15s. No published cap on reference_image_urls, so
+    // maxReferenceImages stays undeclared and falls back to the conservative
+    // default — an over-long ref array is a 400, not a graceful drop.
+    maxReferenceClipSeconds: 30,
+    pricing: {
+      unit: 'per-second',
+      credits: 63,
+      priceFor: ({ durationSeconds = 5, resolution = '720p' }) => {
+        const perSec = resolution === '480p' ? 28 : 63
+        return perSec * durationSeconds
+      },
+    },
+    videoEndpoint: 'createTask',
+    videoConstraints: {
+      // The API takes any integer up to 30. This ladder is the app's usual
+      // rungs plus the long tail that's the whole point of the model.
+      durations: [4, 5, 6, 8, 10, 12, 15, 20, 25, 30],
+      resolutions: ['480p', '720p'],
+      default: '720p',
+      aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4', '21:9'],
+      supportsAudio: true,
+    },
+  },
   {
     id: 'bytedance/seedance-2',
     displayName: 'Seedance 2.0',
@@ -1130,6 +1198,16 @@ export function referenceImageCapacity(modelId?: string): number {
   return model?.maxReferenceImages ?? UNDECLARED_REFERENCE_IMAGE_CAP
 }
 
+// Combined seconds allowed across a reference audio (or video) strip when the
+// model declares no cap of its own. 15s is the Seedance 2.0 family's documented
+// limit and was hardcoded in Playground until Seedance 2.5 doubled it.
+export const UNDECLARED_REFERENCE_CLIP_SECONDS = 15
+
+export function referenceClipCapacitySeconds(modelId?: string): number {
+  const model = modelId ? getModel(modelId) : undefined
+  return model?.maxReferenceClipSeconds ?? UNDECLARED_REFERENCE_CLIP_SECONDS
+}
+
 // Display label for a video resolution tier. Some providers name their tiers
 // by quality ('std' / 'pro' / '4K' for Kling 3.0) rather than the pixel
 // resolution they actually output. This maps those aliases to the real
@@ -1674,6 +1752,32 @@ export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<
       }
     }
     return { prompt: opts.prompt, aspect_ratio: ar, duration: h3Duration }
+  }
+
+  // ── Seedance 2.5 ──
+  // No first_frame_url / last_frame_url on this model at all — every image is a
+  // generic reference. Sending one anyway is a 422, so a frame that arrives
+  // here (a card persisted under a frame-native model, a Playground draft
+  // carried across a model flip) is folded into reference_image_urls in shot
+  // order rather than dropped: an ignored input is cheaper to explain than a
+  // failed generation. Duration is a plain integer 1–30, clamped for the same
+  // cross-model reason.
+  if (modelId === 'bytedance/seedance-2-5') {
+    const referenceImages: string[] = []
+    if (opts.firstFrameUrl) referenceImages.push(opts.firstFrameUrl)
+    else if (opts.imageUrl && opts.mode === 'image-to-video') referenceImages.push(opts.imageUrl)
+    if (opts.lastFrameUrl) referenceImages.push(opts.lastFrameUrl)
+    if (opts.referenceImageUrls?.length) referenceImages.push(...opts.referenceImageUrls)
+    return {
+      prompt: opts.prompt,
+      ...(referenceImages.length ? { reference_image_urls: referenceImages } : {}),
+      ...(opts.referenceAudioUrls?.length ? { reference_audio_urls: opts.referenceAudioUrls } : {}),
+      ...(opts.referenceVideoUrls?.length ? { reference_video_urls: opts.referenceVideoUrls } : {}),
+      aspect_ratio: ar,
+      duration: Math.min(30, Math.max(1, Math.round(duration))),
+      resolution: resolution === '480p' ? '480p' : '720p',
+      generate_audio: opts.audio ?? true,
+    }
   }
 
   // ── Seedance 1.5 Pro ──
