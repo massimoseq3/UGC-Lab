@@ -3,7 +3,7 @@
 // We never talk to R2 directly with credentials — `/api/r2-sign` mints a
 // presigned URL scoped to the current user, then we PUT/GET against R2 with it.
 
-import { getSupabase, isCloudEnabled, ensureFreshSession } from './supabase'
+import { getSupabase, isCloudEnabled, ensureFreshSession, forceRefreshSession } from './supabase'
 import { useAuthStore } from '../stores/authStore'
 
 interface SignedUrlResponse {
@@ -25,11 +25,23 @@ async function presign(op: 'put' | 'get', assetId: string, mimeType?: string, by
   const token = await getAccessToken()
   if (!token) throw new Error('Not signed in')
 
-  const res = await withTimeout(fetch('/api/r2-sign', {
+  const attempt = (bearer: string) => withTimeout(fetch('/api/r2-sign', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ op, assetId, mimeType, byteSize }),
   }), ATTEMPT_TIMEOUT_MS)
+
+  let res = await attempt(token)
+
+  // 401 means the server asked Supabase about this exact token and Supabase said
+  // no. Practically always a token that aged out while the tab was hidden — see
+  // the ensureFreshSession comment. Buy a genuinely new one and retry once,
+  // rather than reporting a sync failure the member can neither read nor act on.
+  if (res.status === 401) {
+    const refreshed = await forceRefreshSession()
+    if (refreshed && refreshed !== token) res = await attempt(refreshed)
+  }
+
   if (!res.ok) {
     // Parse JSON error body so the toast shows the friendly server message
     // (e.g. "Storage cap reached — you're using 5.23 GB of 10 GB.") rather

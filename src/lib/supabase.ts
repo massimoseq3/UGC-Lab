@@ -73,6 +73,75 @@ export function getSupabase(): SupabaseClient {
 const SESSION_TIMEOUT_MS = 3_000
 const TIMED_OUT = Symbol('session-timeout')
 
+// Headroom an access token must still have before we're willing to send it.
+// Matches supabase-js's own EXPIRY_MARGIN (3 × its 30s auto-refresh tick): a
+// token inside that window may well be dead by the time it reaches the server.
+const TOKEN_MIN_LIFETIME_MS = 90_000
+
+// A JWT's `exp`, in ms, read WITHOUT verifying the signature. This is never an
+// authorization decision — the Edge functions still verify every token against
+// Supabase. It only decides whether OUR OWN token is worth spending a round trip
+// on, so a forged one would fool nobody but its forger.
+function tokenExpiresAt(token: string | null): number | null {
+  if (!token) return null
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return null
+    const exp = (JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: unknown }).exp
+    return typeof exp === 'number' ? exp * 1000 : null
+  } catch {
+    return null
+  }
+}
+
+// A token with no readable `exp` counts as usable — we can't judge it, and the
+// server can.
+function isTokenUsable(token: string | null): boolean {
+  if (!token) return false
+  const expiresAt = tokenExpiresAt(token)
+  return expiresAt === null || expiresAt - Date.now() > TOKEN_MIN_LIFETIME_MS
+}
+
+// Generous: this runs on background upload paths, never in front of a click,
+// and it's the last thing standing between us and a 401 the member has to read.
+const FORCED_REFRESH_TIMEOUT_MS = 10_000
+let forcedRefresh: Promise<string | null> | null = null
+
+// Trade the refresh token for a new access token, explicitly. Single-flight, so
+// a batch of generations finishing together mints ONE new token rather than one
+// each (supabase-js dedupes its own concurrent refreshes the same way).
+//
+// Falls back to the cached token when the refresh itself fails: a broken refresh
+// is the caller's status quo, and failing louder here would turn a recoverable
+// blip into "Not signed in".
+export async function forceRefreshSession(): Promise<string | null> {
+  if (!isCloudEnabled()) return null
+  if (forcedRefresh) return forcedRefresh
+  forcedRefresh = (async () => {
+    try {
+      const token = await Promise.race([
+        getSupabase().auth.refreshSession().then(({ data, error }) => {
+          if (error) throw error
+          return data.session?.access_token ?? null
+        }),
+        new Promise<typeof TIMED_OUT>((resolve) => setTimeout(() => resolve(TIMED_OUT), FORCED_REFRESH_TIMEOUT_MS)),
+      ])
+      if (token === TIMED_OUT) {
+        console.warn('[supabase] refreshSession() stalled — using cached access token')
+        return cachedAccessToken
+      }
+      if (token) cachedAccessToken = token
+      return token ?? cachedAccessToken
+    } catch (e) {
+      console.warn('[supabase] refreshSession() failed — using cached access token', e)
+      return cachedAccessToken
+    } finally {
+      forcedRefresh = null
+    }
+  })()
+  return forcedRefresh
+}
+
 // Returns the current access token, refreshing if the SDK deems it necessary.
 //
 // Why the timeout fallback exists: the SDK's `autoRefreshToken` timer gets
@@ -83,23 +152,48 @@ const TIMED_OUT = Symbol('session-timeout')
 // until a page refresh cleared the lock). Racing it against a short timeout and
 // falling back to the last-seen token keeps writes moving: they either succeed,
 // or fail fast on a stale token (recoverable) instead of hanging.
+//
+// The fallback is expiry-CHECKED, and that check is the whole point. supabase-js
+// stops auto-refreshing a hidden tab (`_onVisibilityChanged` → `_stopAutoRefresh`),
+// so a tab left in the background is exactly where the access token dies — and
+// it's also where getSession() is slowest, because on return the SDK's own
+// `_recoverAndRefresh` holds the lock through a network refresh while our
+// nonBlockingLock gives up on it after 2s. The old code handed the timeout path
+// straight to `cachedAccessToken`, i.e. handed the server the very token that had
+// just expired: /api/r2-sign asked Supabase who it belonged to, got a rejection,
+// and answered "Invalid session" — which surfaced on every video that finished
+// while the member was in another tab.
 export async function ensureFreshSession(): Promise<string | null> {
   if (!isCloudEnabled()) return null
+
+  let token: string | null = null
+  let resolved = false
   try {
-    const token = await Promise.race([
+    const raced = await Promise.race([
       getSupabase().auth.getSession().then((r) => r.data.session?.access_token ?? null),
       new Promise<typeof TIMED_OUT>((resolve) => setTimeout(() => resolve(TIMED_OUT), SESSION_TIMEOUT_MS)),
     ])
-    if (token !== TIMED_OUT) {
-      cachedAccessToken = token
-      return token
+    if (raced === TIMED_OUT) {
+      console.warn('[supabase] getSession() stalled — falling back to the cached access token')
+    } else {
+      resolved = true
+      token = raced
+      if (token) cachedAccessToken = token
     }
-    console.warn('[supabase] getSession() stalled — using cached access token')
-    return cachedAccessToken
   } catch (e) {
-    console.warn('[supabase] getSession() failed — using cached access token', e)
-    return cachedAccessToken
+    console.warn('[supabase] getSession() failed — falling back to the cached access token', e)
   }
+
+  if (isTokenUsable(token)) return token
+  if (isTokenUsable(cachedAccessToken)) return cachedAccessToken
+
+  // A clean getSession() that resolved to nothing, with nothing cached, means
+  // signed out — there's no refresh token to spend a round trip on.
+  if (resolved && !token && !cachedAccessToken) return null
+
+  // Everything we hold is expired or about to be. Sending it buys a 401 the
+  // caller can only report as a failure, so pay for a real token here instead.
+  return await forceRefreshSession()
 }
 
 // One-time install: proactively recover the session when the user brings the

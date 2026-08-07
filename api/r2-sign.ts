@@ -45,6 +45,19 @@ function json(status: number, body: unknown): Response {
   })
 }
 
+// How a non-OK reply from Supabase's /auth/v1/user is reported.
+//
+// Only a 401/403 means "this token is no good" — and only that answer earns the
+// 401 the client retries after a forced token refresh. Everything else (429 rate
+// limit, a 5xx, a maintenance window) is the auth service being unable to
+// answer, which is nothing to do with the member's session. Reporting all of it
+// as "Invalid session" told members their login had broken when it hadn't, and
+// gave the client no way to tell a dead session from a retryable blip.
+function authFailure(status: number): { error: string; status: number } {
+  if (status === 401 || status === 403) return { error: 'Invalid session', status: 401 }
+  return { error: `Auth check unavailable (${status}) — try again in a moment.`, status: 503 }
+}
+
 // The `sub` claim of a JWT, read WITHOUT verifying the signature.
 //
 // This is never an authorization decision — `verifyUser` still asks Supabase
@@ -135,7 +148,7 @@ async function verifyUser(
     guessedId && needUsage ? fetchUsedBytes(supabaseUrl, supabaseAnon, token, guessedId) : Promise.resolve(null),
   ])
 
-  if (!res.ok) return { error: 'Invalid session' }
+  if (!res.ok) return authFailure(res.status)
   const user = await res.json() as { id?: string }
   if (!user.id) return { error: 'No user id in session' }
 
