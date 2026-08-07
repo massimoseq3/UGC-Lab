@@ -135,8 +135,11 @@ export async function saveAsset(blob: Blob, mimeType?: string, opts: SaveAssetOp
     void uploadAssetToR2(id, blob).catch((err) => {
       const msg = err instanceof Error ? err.message : String(err)
       console.warn('[assetStore] R2 mirror failed', err)
+      // Says "will upload" rather than "is saved locally" because that's what
+      // happens: cloudSync's reconcileAssets re-uploads any bank-referenced blob
+      // R2 doesn't have yet, on the next load. The old wording read as data loss.
       useAppStore.getState().addToast(
-        `Cloud sync failed: ${msg}. Asset is saved locally on this device.`,
+        `Cloud sync failed: ${msg}. Saved on this device — it'll upload on your next reload.`,
         'error',
       )
     })

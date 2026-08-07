@@ -50,7 +50,14 @@ async function verifyAdmin(authHeader: string | null): Promise<{ userId: string 
   const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
     headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnon },
   })
-  if (!res.ok) return { error: 'Invalid session' }
+  // Only a 401/403 means the token itself was rejected. A 429 or 5xx is the auth
+  // service failing to answer, which isn't the caller's session — reporting both
+  // as "Invalid session" blamed a working login for an upstream blip.
+  if (!res.ok) {
+    return res.status === 401 || res.status === 403
+      ? { error: 'Invalid session', status: 401 }
+      : { error: `Auth check unavailable (${res.status}) — try again in a moment.`, status: 503 }
+  }
   const user = await res.json() as { id?: string }
   if (!user.id) return { error: 'No user id in session' }
 
