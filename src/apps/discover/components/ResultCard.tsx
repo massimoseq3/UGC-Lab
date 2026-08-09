@@ -226,8 +226,13 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
               ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
               : <Eye className="h-3.5 w-3.5" />}
           </TileActionButton>
+          {/* The one-click shortcut past the modal: this pulls the transcript
+              AND opens Scripts, so it does spend a credit. That's fine here —
+              it's a deliberate press on a labelled button, unlike opening a
+              card — but the title has to say so, since the modal's route now
+              charges on its own separate "Get transcript" step. */}
           <TileActionButton
-            title="Remix Transcript — opens in Scripts"
+            title="Remix Transcript — 1 credit, opens in Scripts"
             onClick={() => onRemix(result)}
             disabled={busy === 'remix'}
           >

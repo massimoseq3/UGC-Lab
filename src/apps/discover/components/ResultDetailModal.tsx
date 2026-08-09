@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowUpRight, Bookmark, BookmarkCheck, Download, Eye, ExternalLink, Loader2, PenLine, Sparkles, X } from 'lucide-react'
+import { ArrowUpRight, Bookmark, BookmarkCheck, Download, Eye, ExternalLink, FileText, Loader2, PenLine, RotateCw, Sparkles, X } from 'lucide-react'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
@@ -10,13 +10,17 @@ import type { DiscoverResult } from '../types'
 
 interface ResultDetailModalProps {
   result: DiscoverResult
-  /** Fetched by the parent when the card opens, so it's on screen by the time
-      you've read the caption — and already paid for when Remix fires. */
+  /** Starts 'idle' — a transcript costs a credit, so opening a card never
+      fetches one. The Transcript block below is where it's asked for. */
   transcript: TranscriptState
   onClose: () => void
   onAnalyze: (result: DiscoverResult) => void
-  /** `useAi` spends 10 extra credits, so it's only ever passed from the
-      explicit retry below — never from the first attempt. */
+  /** Pulls the transcript and nothing else — it stays in this panel rather
+      than bouncing to Scripts, which is Remix's job. `useAi` is the 10-credit
+      fallback, only ever passed from the explicit retry below. */
+  onFetchTranscript: (result: DiscoverResult, useAi?: boolean) => void
+  /** Sends the words to Scripts. Never fetches — by the time this is clickable
+      the transcript is already in hand and already paid for. */
   onRemix: (result: DiscoverResult, useAi?: boolean) => Promise<void>
   onSave: (result: DiscoverResult) => void
   /** Saves the ad's video to the member's own disk. */
@@ -30,6 +34,7 @@ export default function ResultDetailModal({
   transcript,
   onClose,
   onAnalyze,
+  onFetchTranscript,
   onRemix,
   onSave,
   onDownload,
@@ -152,6 +157,21 @@ export default function ResultDetailModal({
                 Analyze Ad, which reads the video itself. */}
             {result.platform === 'tiktok' && (
             <Section label="Transcript">
+              {/* Asked for, never assumed. Opening a card used to fetch this on
+                  its own, which billed a ScrapeCreators credit for the act of
+                  looking — the one thing here you do idly, thirty cards to a
+                  page. The cost is on the button because it is the whole
+                  reason the button exists. */}
+              {transcript.phase === 'idle' && (
+                <button
+                  type="button"
+                  onClick={() => onFetchTranscript(result)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  Get transcript — 1 credit
+                </button>
+              )}
               {transcript.phase === 'loading' && (
                 <p className="flex items-center gap-2 text-[12px] text-ink-500">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -168,11 +188,14 @@ export default function ResultDetailModal({
                   <p className="text-[12px] leading-relaxed text-ink-500">
                     This video has no captions to pull.
                   </p>
+                  {/* Fetches through the AI path and stays here. It used to
+                      call onRemix, which pulled the words AND threw you into
+                      Scripts — so a button labelled "Transcribe" quietly left
+                      the app. */}
                   <button
                     type="button"
-                    onClick={() => void onRemix(result, true)}
-                    disabled={busy === 'remix'}
-                    className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:opacity-50"
+                    onClick={() => onFetchTranscript(result, true)}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5"
                   >
                     <Sparkles className="h-3.5 w-3.5" />
                     Transcribe with AI — 10 credits
@@ -180,9 +203,19 @@ export default function ResultDetailModal({
                 </div>
               )}
               {transcript.phase === 'error' && (
-                <p className="text-[12px] leading-relaxed text-red-300 light:text-red-700">
-                  {transcript.message}
-                </p>
+                <div>
+                  <p className="text-[12px] leading-relaxed text-red-300 light:text-red-700">
+                    {transcript.message}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onFetchTranscript(result)}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5"
+                  >
+                    <RotateCw className="h-3.5 w-3.5" />
+                    Try again
+                  </button>
+                </div>
               )}
             </Section>
             )}
@@ -221,11 +254,14 @@ export default function ResultDetailModal({
                 <button
                   type="button"
                   onClick={() => void onRemix(result)}
-                  // Held back until there are words to send: the whole point of
-                  // this button is the transcript, and firing it on an empty
-                  // one would bounce you to Scripts with nothing in the box.
+                  // Held back until Get transcript has actually returned words.
+                  // Two reasons, and both matter: firing it on an empty
+                  // transcript bounces you to Scripts with nothing in the box,
+                  // and gating it here is what keeps the credit on a button the
+                  // member pressed rather than on opening a card. By the time
+                  // this is live the words are cached, so Remix costs nothing.
                   disabled={busy === 'remix' || !hasTranscript}
-                  title={hasTranscript ? 'Opens in Scripts' : 'No transcript to remix yet'}
+                  title={hasTranscript ? 'Opens in Scripts' : 'Get the transcript first'}
                   className="flex flex-1 items-center justify-center gap-2 rounded-full border border-ink/10 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {busy === 'remix' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}

@@ -50,6 +50,11 @@ const SORT_OPTIONS: Record<DiscoverPlatform, Array<{ value: DiscoverSort; label:
 
 const MIN_VIEW_OPTIONS = [0, 10_000, 100_000, 1_000_000]
 
+/** 10_000 → "10K". Shared by the filter's own options and the hidden-count line. */
+function minViewsLabel(v: number): string {
+  return v >= 1_000_000 ? `${v / 1_000_000}M` : `${v / 1000}K`
+}
+
 /** The per-card actions that can be mid-flight, so the right button spins. */
 export type DiscoverAction = 'analyze' | 'remix' | 'save' | 'download'
 
@@ -68,8 +73,15 @@ const EMPTY_SEARCHES: Record<DiscoverPlatform, PlatformSearch> = {
   meta: BLANK_SEARCH,
 }
 
-/** Where a card's transcript has got to. 'empty' is a normal outcome, not a failure. */
+/**
+ * Where a card's transcript has got to.
+ *
+ * 'idle' is the state every card opens in — a transcript costs a ScrapeCreators
+ * credit, so it is never fetched by the act of looking at a card. 'empty' is a
+ * normal outcome (the video genuinely has no captions), not a failure.
+ */
 export type TranscriptState =
+  | { phase: 'idle' }
   | { phase: 'loading' }
   | { phase: 'ready'; text: string }
   | { phase: 'empty' }
@@ -123,9 +135,10 @@ export default function Discover() {
   const [busyId, setBusyId] = useState<string | null>(null)
   const [busyKind, setBusyKind] = useState<DiscoverAction | null>(null)
 
-  // Transcripts, keyed by card. Fetched once when a card is opened and reused
-  // by Remix, so reading the words and then sending them is ONE credit rather
-  // than two. Lives here (not in the modal) so it survives closing the modal.
+  // Transcripts, keyed by card. Fetched at most once per card and reused by
+  // Remix, so pulling the words and then sending them is ONE credit rather than
+  // two. Lives here (not in the modal) so it survives closing the modal — a
+  // card you paid for once stays paid for.
   const [transcripts, setTranscripts] = useState<Record<string, TranscriptState>>({})
 
   const apiKey = useSettingsStore((s) => s.scrapeCreatorsKey)
@@ -320,19 +333,24 @@ export default function Discover() {
     }
   }, [addToast])
 
-  // Opening a card pulls its transcript straight away, so the words are on
-  // screen rather than one click and one credit away. On Meta this is free
-  // when the ad has no video — that endpoint only charges when it returns
-  // something. Errors surface inside the modal, so nothing is toasted here.
+  /**
+   * Pulls a card's transcript on an explicit click, and nothing else.
+   *
+   * Errors land in the modal's own Transcript block (that's what the 'error'
+   * phase is for), so the rejection is swallowed rather than toasted twice.
+   */
+  const handleFetchTranscript = useCallback((result: DiscoverResult, useAi = false) => {
+    void ensureTranscript(result, useAi).catch(() => {})
+  }, [ensureTranscript])
+
+  // Opening a card costs NOTHING. It used to pull the transcript straight away
+  // so the words were on screen by the time you'd read the caption — but that
+  // spent a ScrapeCreators credit for the act of looking at a card, which is
+  // the one thing in this app you can do idly. The modal now offers an explicit
+  // "Get transcript" and Remix stays disabled until it has been pressed.
   const openCard = useCallback((result: DiscoverResult) => {
     setOpenResult(result)
-    // TikTok only. Meta's ad-transcript endpoint reads Facebook's exposed
-    // captions, which Ad Library video ads don't carry, so it came back empty
-    // every time — the modal drops the Transcript block there and routes the
-    // words through Analyze Ad instead. `fetchResultTranscript` keeps its Meta
-    // branch so re-enabling this is a one-line change if that ever improves.
-    if (result.platform === 'tiktok') void ensureTranscript(result).catch(() => {})
-  }, [ensureTranscript])
+  }, [])
 
   const isTikTok = platform === 'tiktok'
   // A member who picked "Most viewed" on TikTok and switched to Meta has a
@@ -344,7 +362,13 @@ export default function Discover() {
     : 'outlier'
   // Both derived on every render: moving Min views or Sort re-ranks what's on
   // screen without spending another credit.
-  const sorted = sortResults(applyMinViews(results, filters.minViews), activeSort)
+  const visible = applyMinViews(results, filters.minViews)
+  const sorted = sortResults(visible, activeSort)
+  // A page is 30 rows, and the Min views floor (10K by default) removes every
+  // card under it CLIENT-SIDE — so a niche keyword can pay for 30 results and
+  // render four. That used to happen in total silence, which reads as a broken
+  // search rather than as a filter doing its job. Say so.
+  const hiddenByMinViews = results.length - visible.length
 
   return (
     <div className="flex h-full flex-col">
@@ -429,7 +453,7 @@ export default function Discover() {
                 value={String(filters.minViews)}
                 options={MIN_VIEW_OPTIONS.map((v) => ({
                   value: String(v),
-                  label: v === 0 ? 'Any' : v >= 1_000_000 ? `${v / 1_000_000}M+` : `${v / 1000}K+`,
+                  label: v === 0 ? 'Any' : `${minViewsLabel(v)}+`,
                 }))}
                 onChange={(v) => setFilters((f) => ({ ...f, minViews: Number(v) }))}
               />
@@ -500,7 +524,12 @@ export default function Discover() {
             title={searched ? 'No results' : 'Awaiting search'}
             hint={
               searched
-                ? 'Nothing came back for that phrase. Try a broader keyword, or widen the date range.'
+                ? hiddenByMinViews > 0
+                  // The search DID return — the floor ate all of it. Telling
+                  // this member to try a broader keyword would send them to
+                  // spend another credit on the same outcome.
+                  ? `All ${hiddenByMinViews} results are under ${minViewsLabel(filters.minViews)} views. Lower Min views to see them.`
+                  : 'Nothing came back for that phrase. Try a broader keyword, or widen the date range.'
                 : isTikTok
                   ? 'Search a phrase and Outliers ranks what comes back by views against each creator’s own following.'
                   : 'Search a phrase to see the ads running against it, ranked by how long they’ve been live.'
@@ -509,7 +538,13 @@ export default function Discover() {
         </GridCanvas>
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          {hiddenByMinViews > 0 && (
+            <p className="mb-3 text-[11px] text-ink-600">
+              {hiddenByMinViews} more hidden under {minViewsLabel(filters.minViews)} views.
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+
             {sorted.map((result) => (
               <ResultCard
                 key={`${result.platform}:${result.id}`}
@@ -546,9 +581,10 @@ export default function Discover() {
       {openResult && (
         <ResultDetailModal
           result={openResult}
-          transcript={transcripts[`${openResult.platform}:${openResult.id}`] ?? { phase: 'loading' }}
+          transcript={transcripts[`${openResult.platform}:${openResult.id}`] ?? { phase: 'idle' }}
           onClose={() => setOpenResult(null)}
           onAnalyze={handleAnalyze}
+          onFetchTranscript={handleFetchTranscript}
           onRemix={handleRemix}
           onSave={handleSave}
           onDownload={handleDownload}
