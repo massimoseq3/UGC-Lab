@@ -181,10 +181,31 @@ const GENERIC_FALLBACK =
  * operation in the `fallback` instead and toast the result verbatim:
  * `addToast(humanizeError(err, 'Video generation failed.'), 'error')`.
  */
+// Where a message stops explaining and starts dumping debug context. Several
+// generation errors append the raw evidence an operator needs — `taskId=…`,
+// `url=…`, `record={…}`, `body=…`, `size=…B` — and those payloads are full of
+// arbitrary digits, while the status-code rules above are plain substring
+// matches. So `kie.ai returned an undecodable video (size=402B, …)` matched the
+// 402 rule and told a member with a full balance to go and buy credits, and any
+// blob size or CDN URL containing 401 told them to replace a working API key.
+//
+// Matching against the human half only fixes that without weakening anything:
+// kie's own status codes and messages always land BEFORE this boundary
+// (`friendlyHttpError` builds `kie.ai 402 (insufficient credits) at POST /x: …`),
+// and so does every phrase the non-numeric rules look for.
+// The leading boundary is "any non-identifier char", not whitespace: these keys
+// appear bracketed as often as spaced (`blob (size=1401234B, …)`). `type` is
+// deliberately NOT in the list — it only ever follows a `size=`/`url=` that
+// already cuts, and including it would truncate at `content-type=` and throw
+// away the sentence that names the failure.
+const DEBUG_TAIL = /(?:^|[^a-z0-9])(?:taskid|url|record|body|size|endpoint|response shape|first \d+ chars)\s*[=:]/i
+
 export function humanizeError(err: unknown, fallback: string = GENERIC_FALLBACK): string {
   const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : ''
   if (!raw) return fallback
-  const lower = raw.toLowerCase()
+  const cut = raw.search(DEBUG_TAIL)
+  const lower = (cut === -1 ? raw : raw.slice(0, cut)).toLowerCase()
+  if (!lower.trim()) return fallback
   for (const rule of RULES) {
     if (rule.test(lower)) return rule.message
   }

@@ -21,7 +21,7 @@ import { useAuthStore } from '../stores/authStore'
 import { useAppStore } from '../stores/appStore'
 import { useBankStore, backfillUsageLedger, persistBanksNow, localBanksReady, markCloudHydrated } from '../stores/bankStore'
 import { useSettingsStore } from '../stores/settingsStore'
-import { getSupabase, isCloudEnabled, ensureFreshSession } from './supabase'
+import { getSupabase, isCloudEnabled, ensureFreshSession, selectAllRows } from './supabase'
 import { existingRemoteAssetIds, uploadAssetToR2 } from './r2'
 import { isAssetRef, assetIdFromRef, getBlob } from '../utils/assetStore'
 import { findOrphanAssets, purgeOrphans } from '../utils/orphanCleanup'
@@ -425,7 +425,13 @@ async function hydrateFromCloud(userId: string): Promise<boolean> {
   const tablesPromise = Promise.all(
     BANK_KEYS.map(async (key) => {
       const table = BANK_TO_TABLE[key]
-      const { data, error } = await sb.from(table).select('id, data').eq('user_id', userId)
+      // Paged: the history banks are uncapped by design, so a working member
+      // crosses PostgREST's row ceiling and an unpaged read would hand back
+      // only the first page — silently dropping the rest of their work here
+      // AND from the local cache persistBanksNow writes below.
+      const { data, error } = await selectAllRows<{ id: string; data: unknown }>((from, to) =>
+        sb.from(table).select('id, data', { count: 'exact' }).eq('user_id', userId).range(from, to),
+      )
       // On a fetch error, keep whatever loadFromStorage already gave us for this
       // bank — never replace good local rows with an empty array just because
       // the cloud was momentarily unreachable.

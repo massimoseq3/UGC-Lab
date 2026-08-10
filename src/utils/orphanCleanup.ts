@@ -6,7 +6,7 @@
 // Sound for the signed-in user only — relies on the local bank state being
 // fully hydrated from cloud (which startCloudSync guarantees on sign-in).
 
-import { getSupabase, isCloudEnabled } from '../lib/supabase'
+import { getSupabase, isCloudEnabled, selectAllRows } from '../lib/supabase'
 import type { BankKey } from '../lib/cloudSync'
 import { deleteAssetFromR2 } from '../lib/r2'
 import { useAuthStore } from '../stores/authStore'
@@ -64,13 +64,19 @@ export async function findOrphanAssets(): Promise<{
   if (!userId) return { orphans: [], totalBytes: 0, total: 0, totalAssetBytes: 0 }
 
   const sb = getSupabase()
-  const { data, error } = await sb
-    .from('assets')
-    .select('id, byte_size, mime_type, created_at')
-    .eq('user_id', userId)
+  // Paged — this list is the DELETE candidate set, so a truncated read is the
+  // most dangerous kind here: it would pair a partial asset list against a
+  // partial ref set and purge live blobs that only the unread rows referenced.
+  const { data, error } = await selectAllRows<OrphanAsset>((from, to) =>
+    sb
+      .from('assets')
+      .select('id, byte_size, mime_type, created_at', { count: 'exact' })
+      .eq('user_id', userId)
+      .range(from, to),
+  )
   if (error) throw new Error(`assets read: ${error.message}`)
 
-  const all = (data ?? []) as OrphanAsset[]
+  const all = data
   const totalAssetBytes = all.reduce((s, a) => s + Number(a.byte_size ?? 0), 0)
 
   const refs = new Set<string>()
@@ -141,12 +147,12 @@ export async function getStorageUsage(): Promise<{ totalBytes: number; assetCoun
   if (!userId) return { totalBytes: 0, assetCount: 0 }
 
   const sb = getSupabase()
-  const { data, error } = await sb
-    .from('assets')
-    .select('byte_size')
-    .eq('user_id', userId)
+  // Paged, or the Settings storage bar plateaus at the row cap and a member
+  // near the 10 GB ceiling is told they've used a fraction of what they have.
+  const { data: rows, error } = await selectAllRows<{ byte_size: number }>((from, to) =>
+    sb.from('assets').select('byte_size', { count: 'exact' }).eq('user_id', userId).range(from, to),
+  )
   if (error) throw new Error(`storage usage: ${error.message}`)
-  const rows = (data ?? []) as Array<{ byte_size: number }>
   return {
     totalBytes: rows.reduce((s, r) => s + Number(r.byte_size ?? 0), 0),
     assetCount: rows.length,

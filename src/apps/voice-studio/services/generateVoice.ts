@@ -1,26 +1,37 @@
 import type { VoiceSettings, HistoryItem } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
-import { createTask, pollTask, parseResult } from '../../../utils/kie'
+import { createTask, pollTask, parseResult, fetchGeneratedAsset } from '../../../utils/kie'
 import { saveAsset } from '../../../utils/assetStore'
 import { TTS_MODEL_ID } from '../../../utils/models'
 
 // Re-exported so voice-studio components can keep importing it from here.
 export { TTS_MODEL_ID }
 
+// The duration is a label on the history card, never a gate — so every failure
+// path resolves 0 rather than rejecting, and a clip that simply never reports
+// metadata resolves too. This is awaited in the middle of finishVoiceTask,
+// AFTER kie has generated and billed for the audio: hanging here would lose a
+// paid voiceover to a decode that never settles, for the sake of a timestamp.
+const AUDIO_PROBE_TIMEOUT_MS = 10_000
+
 async function probeAudioDuration(blob: Blob): Promise<number> {
   return new Promise((resolve) => {
     const url = URL.createObjectURL(blob)
     const audio = new Audio()
-    audio.preload = 'metadata'
-    audio.addEventListener('loadedmetadata', () => {
-      const dur = isFinite(audio.duration) ? Math.round(audio.duration) : 0
+    let settled = false
+    const done = (dur: number) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
       URL.revokeObjectURL(url)
       resolve(dur)
+    }
+    const timer = setTimeout(() => done(0), AUDIO_PROBE_TIMEOUT_MS)
+    audio.preload = 'metadata'
+    audio.addEventListener('loadedmetadata', () => {
+      done(isFinite(audio.duration) ? Math.round(audio.duration) : 0)
     })
-    audio.addEventListener('error', () => {
-      URL.revokeObjectURL(url)
-      resolve(0)
-    })
+    audio.addEventListener('error', () => done(0))
     audio.src = url
   })
 }
@@ -79,7 +90,7 @@ export async function finishVoiceTask(
     )
   }
 
-  const res = await fetch(urls[0])
+  const res = await fetchGeneratedAsset(urls[0])
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     throw new Error(

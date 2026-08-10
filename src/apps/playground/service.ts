@@ -33,7 +33,7 @@ import {
   type VideoMode,
 } from '../../utils/models'
 import { saveAsset, isAssetRef, getAsBase64 } from '../../utils/assetStore'
-import { kieChatCompletions, type ChatMessage } from '../../utils/kie'
+import { kieChatCompletions, fetchGeneratedAsset, type ChatMessage } from '../../utils/kie'
 import { getChatTarget } from '../../utils/models'
 import type { ImageHistoryItem, MusicHistoryItem, VideoHistoryItem } from '../../stores/types'
 import type { PlaygroundMode } from './types'
@@ -433,7 +433,7 @@ export async function finishPlaygroundMusicTask(
   }
 
   const dlUrl = track.audioUrl
-  const res = await fetch(dlUrl)
+  const res = await fetchGeneratedAsset(dlUrl)
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     throw new Error(
@@ -446,7 +446,7 @@ export async function finishPlaygroundMusicTask(
   let coverImageRef: string | undefined
   if (track.imageUrl) {
     try {
-      const coverRes = await fetch(track.imageUrl)
+      const coverRes = await fetchGeneratedAsset(track.imageUrl)
       if (coverRes.ok) {
         const coverBlob = await coverRes.blob()
         coverImageRef = await saveAsset(coverBlob, coverBlob.type || 'image/jpeg')

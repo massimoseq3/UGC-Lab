@@ -9,7 +9,7 @@
 // or a content-filtered MP4 with no decodable frames — all of which render as
 // a silent black tile. We reject those here so no caller can save one.
 
-import { pollTask, parseResult, kieVeoPoll, VIDEO_POLL_ATTEMPTS } from './kie'
+import { pollTask, parseResult, kieVeoPoll, fetchGeneratedAsset, VIDEO_POLL_ATTEMPTS } from './kie'
 import { saveAsset } from './assetStore'
 import { useSettingsStore } from '../stores/settingsStore'
 
@@ -32,7 +32,10 @@ export async function finishVideoAssetTask(
     )
   }
 
-  const res = await fetch(urls[0])
+  // Deadline-bounded, and cancellable: this is the biggest download in the app
+  // (a 30s clip is tens of MB) and a stalled body read here used to park the
+  // tile on "generating" forever with nothing to cancel.
+  const res = await fetchGeneratedAsset(urls[0], { signal })
   if (!res.ok) {
     const body = await res.text().catch(() => '')
     throw new Error(
