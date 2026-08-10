@@ -24,7 +24,7 @@ const BANK_BARS: Array<{ key: keyof MemberRow; label: string; color: string }> =
 ]
 
 export default function Insights() {
-  const { rows, fetchedAt, loading, slowHint, profilesError, reload } = useMembers()
+  const { rows, fetchedAt, loading, refreshing, slowHint, profilesError, reload } = useMembers()
 
   const stats = useMemo(() => {
     let active = 0, inactive = 0, disabled = 0, bytes = 0, gens7d = 0
@@ -101,7 +101,9 @@ export default function Insights() {
     )
   }
 
-  if (profilesError) {
+  // Same rule as MembersTable: only take over the pane when there's nothing to
+  // show. A failed refresh over loaded rows reports in a banner.
+  if (profilesError && rows.length === 0) {
     return (
       <div className="space-y-3">
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-[12px] text-red-300 light:text-red-700">{profilesError}</div>
@@ -114,9 +116,14 @@ export default function Insights() {
 
   return (
     <div className="space-y-5">
+      {profilesError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-[12px] text-red-300 light:text-red-700">
+          Refresh failed — showing the last loaded numbers. {profilesError}
+        </div>
+      )}
       <div className="flex items-center justify-end">
         <button onClick={reload} className="flex items-center gap-1.5 rounded-md border border-ink/10 px-2.5 py-1 text-[11px] text-ink-300 transition-colors hover:bg-ink/[0.05]">
-          <RefreshCw className="h-3 w-3" /> Refresh
+          <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
         </button>
       </div>
 

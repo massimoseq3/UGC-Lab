@@ -3,23 +3,12 @@ import { Loader2, RefreshCw, Ban, CheckCircle2, AlertTriangle, ChevronUp, Chevro
 import { getSupabase } from '../../lib/supabase'
 import useCloseOnEscape from '../../hooks/useCloseOnEscape'
 import { deleteMember } from './deleteMember'
+import { QUERY_TIMEOUT_MS, readyAdminSession, withTimeout } from './adminQuery'
 import {
   useMembers, memberName, formatBytes, formatDate, formatRelative,
   daysSinceActive, isInactive, isActivated, INACTIVE_DAYS,
   type MemberRow,
 } from './useMembers'
-
-const QUERY_TIMEOUT_MS = 15_000
-
-function withTimeout<T>(p: PromiseLike<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)), ms)
-    Promise.resolve(p).then(
-      (v) => { clearTimeout(t); resolve(v) },
-      (e) => { clearTimeout(t); reject(e) },
-    )
-  })
-}
 
 type SortKey = 'name' | 'email' | 'created_at' | 'last_active_at' | 'total_bytes' | 'assets_last_7d'
 type SortDir = 'asc' | 'desc'
@@ -62,7 +51,7 @@ function downloadMembersCsv(rows: MemberRow[]) {
 }
 
 export default function MembersTable() {
-  const { rows, loading, slowHint, profilesError, storageWarning, activityWarning, reload } = useMembers()
+  const { rows, loading, refreshing, slowHint, profilesError, storageWarning, activityWarning, reload } = useMembers()
   const [busyId, setBusyId] = useState<string | null>(null)
 
   const [sortKey, setSortKey] = useState<SortKey>('created_at')
@@ -75,10 +64,11 @@ export default function MembersTable() {
   async function toggleDisabled(row: MemberRow) {
     setBusyId(row.id)
     try {
+      await readyAdminSession()
       const sb = getSupabase()
       const next = row.disabled_at ? null : new Date().toISOString()
       const { error } = await withTimeout(
-        sb.from('profiles').update({ disabled_at: next }).eq('id', row.id),
+        (signal) => sb.from('profiles').update({ disabled_at: next }).eq('id', row.id).abortSignal(signal),
         QUERY_TIMEOUT_MS,
         'profile update',
       ) as { error: { message: string } | null }
@@ -206,7 +196,9 @@ export default function MembersTable() {
     )
   }
 
-  if (profilesError) {
+  // Only take over the pane when there's nothing to show. A refresh that fails
+  // over rows we already loaded reports in a banner and leaves them on screen.
+  if (profilesError && rows.length === 0) {
     return (
       <div className="space-y-3">
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-[12px] text-red-300 light:text-red-700">
@@ -221,6 +213,11 @@ export default function MembersTable() {
 
   return (
     <div className="space-y-3">
+      {profilesError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-[12px] text-red-300 light:text-red-700">
+          Refresh failed — showing the last loaded list. {profilesError}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div className="text-[13px] text-ink-400">
           <span className="text-ink-200">{rows.length}</span> {rows.length === 1 ? 'member' : 'members'}
@@ -236,7 +233,7 @@ export default function MembersTable() {
             <Download className="h-3 w-3" /> Export CSV
           </button>
           <button onClick={reload} className="flex items-center gap-1.5 rounded-md border border-ink/10 px-2.5 py-1 text-[11px] text-ink-300 transition-colors hover:bg-ink/[0.05]">
-            <RefreshCw className="h-3 w-3" /> Refresh
+            <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
           </button>
         </div>
       </div>

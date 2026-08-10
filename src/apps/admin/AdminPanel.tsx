@@ -7,9 +7,25 @@ import { useAuthStore } from '../../stores/authStore'
 
 type Tab = 'members' | 'insights' | 'allowlist'
 
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'members', label: 'Members' },
+  { id: 'insights', label: 'Insights' },
+  { id: 'allowlist', label: 'Allowlist' },
+]
+
 export default function AdminPanel() {
   const isAdmin = useAuthStore((s) => s.profile?.is_admin === true)
   const [tab, setTab] = useState<Tab>('members')
+  // A tab is mounted on first visit and then STAYS mounted, hidden behind the
+  // active one. Unmounting used to throw away each pane's fetched data, sort,
+  // filters and scroll position, so every click on the tab strip dropped the
+  // panel back to a spinner and refired its queries.
+  const [visited, setVisited] = useState<Tab[]>(['members'])
+
+  function open(next: Tab) {
+    setTab(next)
+    setVisited((prev) => (prev.includes(next) ? prev : [...prev, next]))
+  }
 
   if (!isAdmin) {
     return (
@@ -28,14 +44,23 @@ export default function AdminPanel() {
           <h1 className="text-lg font-semibold tracking-tight text-ink-100">Admin</h1>
         </div>
         <div className="flex gap-1 rounded-lg border border-ink/10 bg-ink/[0.03] p-0.5">
-          <TabButton active={tab === 'members'} onClick={() => setTab('members')}>Members</TabButton>
-          <TabButton active={tab === 'insights'} onClick={() => setTab('insights')}>Insights</TabButton>
-          <TabButton active={tab === 'allowlist'} onClick={() => setTab('allowlist')}>Allowlist</TabButton>
+          {TABS.map((t) => (
+            <TabButton key={t.id} active={tab === t.id} onClick={() => open(t.id)}>{t.label}</TabButton>
+          ))}
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-6 py-5">
-        {tab === 'members' ? <MembersTable /> : tab === 'insights' ? <Insights /> : <AllowlistEditor />}
+      {/* Each pane owns its own scroll container so a hidden tab keeps its
+          scroll position instead of inheriting the last one's. */}
+      <div className="relative flex-1">
+        {TABS.filter((t) => visited.includes(t.id)).map((t) => (
+          <div
+            key={t.id}
+            className={`absolute inset-0 overflow-y-auto px-6 py-5 ${tab === t.id ? '' : 'hidden'}`}
+          >
+            {t.id === 'members' ? <MembersTable /> : t.id === 'insights' ? <Insights /> : <AllowlistEditor />}
+          </div>
+        ))}
       </div>
     </div>
   )
