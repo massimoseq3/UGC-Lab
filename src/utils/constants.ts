@@ -18,11 +18,11 @@ import type { ElementType } from 'react'
 
 // The community this workspace gates access to. Shown to disabled/non-member
 // accounts as a link back to join.
-export const SKOOL_COMMUNITY_URL = 'https://www.skool.com/ai-ugc-lab-6995'
+export const SKOOL_COMMUNITY_URL = 'https://www.skool.com/ugcos'
 
 // The paid training classroom inside the community — surfaced from the
 // Dashboard as the "AI UGC Academy" shortcut.
-export const AI_UGC_ACADEMY_URL = 'https://www.skool.com/ai-ugc-lab-6995/classroom/bd64d8bd?md=e629eb69abaf42f5b8d545538f7da046'
+export const AI_UGC_ACADEMY_URL = 'https://www.skool.com/ugcos/classroom/bd64d8bd?md=667c539f37fb4b11a832c3ad705cd4c8'
 
 // 'system' is the Dashboard's own leading dock group (its divider separates it
 // from Bank); admin never renders in the dock.
