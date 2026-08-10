@@ -7,7 +7,7 @@ import InputPanel from './components/InputPanel'
 import RightPanel from './components/RightPanel'
 import { generateScript } from './services/generateScript'
 import { humanizeError } from '../../utils/friendlyError'
-import { WRITE_STYLE_META, HOOK_CATEGORY_META, detectSceneBlueprint, isWriteStyle, isWriteFormat, isWriteLength, isRemixLength, isHookCategoryChoice, isVariationCount, parseHooks, DEFAULT_VARIATION_COUNT, DEFAULT_REMIX_LENGTH, type ScriptMode, type ScriptUiMode, type EditableProductContext, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type VariationCount, type RemixAngle } from './types'
+import { WRITE_STYLE_META, HOOK_CATEGORY_META, detectSceneBlueprint, isWriteStyle, isWriteFormat, isWriteLength, isRemixLength, isHookCategoryChoice, isHookCount, isVariationCount, parseHooks, DEFAULT_VARIATION_COUNT, DEFAULT_HOOK_COUNT, DEFAULT_REMIX_LENGTH, type ScriptMode, type ScriptUiMode, type EditableProductContext, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type HookCount, type VariationCount, type RemixAngle } from './types'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 
 interface ReverseEngineerPayload {
@@ -66,6 +66,11 @@ export default function ScriptArchitect() {
   // Hooks format: which formula family the pack draws from ('auto' = mixed).
   const [hookCategory, setHookCategory] = usePersistedState<HookCategoryChoice>(`${baseKey}:hookCategory`, 'auto', {
     sanitize: (v) => (isHookCategoryChoice(v) ? v : 'auto'),
+  })
+  // How many hooks a Hooks generate returns. Its own slot, not variationCount:
+  // that one counts whole scripts, and the two lists don't overlap.
+  const [hookCount, setHookCount] = usePersistedState<HookCount>(`${baseKey}:hookCount`, DEFAULT_HOOK_COUNT, {
+    sanitize: (v) => (isHookCount(v) ? v : DEFAULT_HOOK_COUNT),
   })
   const [selectedProductId, setSelectedProductId] = usePersistedState<string | null>(`${baseKey}:productId`, null)
   const [additionalContext, setAdditionalContext] = usePersistedState(`${baseKey}:context`, '')
@@ -198,6 +203,7 @@ export default function ScriptArchitect() {
         // source ad's own length.
         remixLength: remixLength === 'default' ? undefined : remixLength,
         hookCategory,
+        hookCount,
         variationCount,
         productId: selectedProduct.id,
         productName: selectedProduct.productName,
@@ -224,6 +230,7 @@ export default function ScriptArchitect() {
         writeLength,
         remixLength,
         hookCategory,
+        hookCount,
         variationCount,
         remixAngles: result.angles,
         createdAt: Date.now(),
@@ -231,13 +238,13 @@ export default function ScriptArchitect() {
       addScriptHistory(item)
       setActiveHistoryId(item.id)
 
-      const hookCount = writeFormat === 'hooks' ? parseHooks(result.variations[0] ?? '').length : 0
+      const hooksReturned = writeFormat === 'hooks' ? parseHooks(result.variations[0] ?? '').length : 0
       // Count what actually came back rather than the configured batch size, so
       // the toast stays honest if a take fails or the count changes again.
       const n = result.variations.length
       useAppStore.getState().addToast(
         resolvedMode === 'write'
-          ? (writeFormat === 'hooks' ? `${hookCount || 'Your'} hooks generated` : writeFormat === 'scenes' ? `${n} scene drafts generated` : `${n} scripts generated`)
+          ? (writeFormat === 'hooks' ? `${hooksReturned || 'Your'} hooks generated` : writeFormat === 'scenes' ? `${n} scene drafts generated` : `${n} scripts generated`)
           : resolvedMode === 'remix' ? `${n} script variations generated` : 'Script rewritten',
         'success',
       )
@@ -287,8 +294,11 @@ export default function ScriptArchitect() {
       if (item.writeStyle && item.writeStyle in WRITE_STYLE_META) setWriteStyle(item.writeStyle as WriteStyle)
       if (isWriteFormat(item.writeFormat)) setWriteFormat(item.writeFormat)
       if (isWriteLength(item.writeLength)) setWriteLength(item.writeLength)
-      if (item.writeFormat === 'hooks' && isHookCategoryChoice(item.hookCategory)) {
-        setHookCategory(item.hookCategory)
+      if (item.writeFormat === 'hooks') {
+        if (isHookCategoryChoice(item.hookCategory)) setHookCategory(item.hookCategory)
+        // Absent on rows saved before the count was pickable — those kept the
+        // fixed ten, so restoring the default is faithful to what ran.
+        if (isHookCount(item.hookCount)) setHookCount(item.hookCount)
       }
     }
   }
@@ -328,6 +338,8 @@ export default function ScriptArchitect() {
           onVariationCountChange={setVariationCount}
           hookCategory={hookCategory}
           onHookCategoryChange={setHookCategory}
+          hookCount={hookCount}
+          onHookCountChange={setHookCount}
           selectedProduct={selectedProduct}
           onProductSelect={handleProductSelect}
           additionalContext={additionalContext}
@@ -347,6 +359,7 @@ export default function ScriptArchitect() {
           writeFormat={outputFormat}
           writeStyleLabel={WRITE_STYLE_META[outputStyle].label}
           hookCategoryLabel={HOOK_CATEGORY_META[outputHookCategory].label}
+          hookCount={hookCount}
           linkedProductId={selectedProduct?.id ?? null}
           isGenerating={isGenerating}
           error={error}

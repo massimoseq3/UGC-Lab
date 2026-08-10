@@ -36,34 +36,40 @@ import { providersOf, groupByProvider } from '../utils/providerGroups'
 // is the grouping made clickable; the groups are still all there when it's on
 // "All", so the rail filters a long list rather than being the only way in.
 
-const ACCENTS: Record<ScriptModelApp, { text: string; bg: string; border: string; star: string; railOn: string }> = {
+const ACCENTS: Record<ScriptModelApp, { text: string; bg: string; star: string; railOn: string }> = {
   'script-architect': {
     text: 'text-scripts-text',
     bg: 'bg-scripts-500/10',
-    border: 'border-scripts-500/20 bg-scripts-500/[0.06] hover:border-scripts-500/30 hover:bg-scripts-500/10',
     star: 'text-scripts-text',
     railOn: 'bg-scripts-500/15 text-scripts-text',
   },
   'broll-studio': {
     text: 'text-broll-300',
     bg: 'bg-broll-500/10',
-    border: 'border-broll-500/20 bg-broll-500/[0.06] hover:border-broll-500/30 hover:bg-broll-500/10',
     star: 'text-broll-300',
     railOn: 'bg-broll-500/15 text-broll-300',
   },
 }
+
+// The trigger row is NEUTRAL chrome in both apps. It used to wear the host
+// app's accent — a navy fill in Scripts, purple in B-Roll — which read as a
+// selected state next to the plain rows it's stacked with, when in fact this
+// row is never unselected: there is always a resolved model. The accent still
+// belongs inside the panel it opens (the rail, the tick, the stars), where it
+// marks the one row out of many that IS picked.
+const TRIGGER_CHROME = 'border-ink/10 bg-ink/[0.02] hover:border-ink/20 hover:bg-ink/[0.04]'
 
 // What the picked model is actually for, per app. Scripts writes takes;
 // B-Roll writes the shot prompts behind every card.
 const COPY: Record<ScriptModelApp, { label: string; hint: string; title: string }> = {
   'script-architect': {
     label: 'Script Model',
-    hint: 'The script writer',
+    hint: 'The Scriptwriter',
     title: 'Script Model',
   },
   'broll-studio': {
     label: 'Prompt Model',
-    hint: 'The prompt writer',
+    hint: 'The Prompt Writer',
     title: 'Prompt Model',
   },
 }
@@ -74,15 +80,9 @@ interface ScriptModelRowProps {
   // with margins (mb-3, the default here), B-Roll's settings band spaces its
   // rows with a flex gap and wants none (pass "").
   className?: string
-  // One line instead of two — logo, name, cost, chevron, no hint underneath.
-  // Sized to match Playground's model trigger. Scripts uses it because the row
-  // sits in a pinned footer above Generate, where every pixel is one the brief
-  // doesn't get; B-Roll keeps the two-line form so it matches the Visual Style
-  // and Ad Format rows it's stacked with.
-  compact?: boolean
 }
 
-export default function ScriptModelRow({ appId, className = 'mb-3', compact = false }: ScriptModelRowProps) {
+export default function ScriptModelRow({ appId, className = 'mb-3' }: ScriptModelRowProps) {
   const [open, setOpen] = useState(false)
   // Subscribe to this app's own slot — that's what re-renders the row the
   // moment a pick lands in the panel. resolveScriptModel still owns the
@@ -106,27 +106,29 @@ export default function ScriptModelRow({ appId, className = 'mb-3', compact = fa
               setOpen(true)
             }
           }}
-          // h-11 compact: B-Roll stacks this with a SegmentedToggle and the
-          // Visual Style row, and the three only read as one band at a shared
-          // height. Scripts gets the same row a few px taller than its
-          // Variations/Length dropdowns, which is the right way round — this is
-          // the control that decides what the click costs.
-          className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-full border text-left transition-colors ${accent.border} ${
-            compact ? 'h-11 px-3' : 'gap-3 px-4 py-2.5'
-          }`}
+          // Geometry copied exactly from the picker rows this sits in a column
+          // with — Scripts' Style/Product rows, B-Roll's References cards:
+          // h-[58px], px-4, gap-3, 36px icon disc. Anything else and the icons
+          // don't line up down the column, which is the thing the eye reads.
+          className={`group flex h-[58px] w-full cursor-pointer items-center gap-3 rounded-full border px-4 text-left transition-colors ${TRIGGER_CHROME}`}
         >
-          {compact ? (
-            <ProviderLogo provider={model?.provider ?? ''} size="sm" />
-          ) : (
-            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${accent.bg}`}>
-              {model ? <ProviderLogo provider={model.provider} size="sm" /> : <Sparkles className={`h-[18px] w-[18px] ${accent.text}`} strokeWidth={1.75} />}
-            </div>
-          )}
+          {/* The same 36px accent disc every sibling picker row wears — Product,
+              Character, Script Style, Visual Style. `compact` used to drop it
+              for the bare 24px provider mark, which left this row's icon
+              visibly smaller than the rows above it. */}
+          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${accent.bg}`}>
+            {model ? <ProviderLogo provider={model.provider} size="sm" /> : <Sparkles className={`h-[18px] w-[18px] ${accent.text}`} strokeWidth={1.75} />}
+          </div>
           <div className="min-w-0 flex-1">
-            <div className={`truncate text-[13px] font-medium tracking-tight ${accent.text}`}>
+            {/* Neutral text too — on a neutral row an accent-coloured name is
+                the same false "selected" cue the accent fill was. */}
+            <div className="truncate text-[13px] font-medium tracking-tight text-ink-200">
               {model?.displayName ?? copy.label}
             </div>
-            {!compact && <div className="truncate text-[11px] leading-snug text-ink-500">{copy.hint}</div>}
+            {/* The hint runs in both variants: a model name alone says which
+                model, never what it's for, and at 58px the second line is room
+                the row already has. */}
+            <div className="truncate text-[11px] leading-snug text-ink-500">{copy.hint}</div>
           </div>
           <CostGlyphs tier={chatCostTier(resolvedId)} />
           <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />

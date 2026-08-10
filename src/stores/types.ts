@@ -263,6 +263,9 @@ export interface ScriptHistoryItem {
   remixLength?: number | 'default'
   // Hooks format only: the formula-family choice ('auto' or a category slug).
   hookCategory?: string
+  // Hooks format only: how many hooks this run asked for. Absent on rows saved
+  // before the count became pickable (those always produced ten).
+  hookCount?: number
   // How many takes this run asked for. Absent on rows saved before the count
   // became pickable (those always produced five).
   variationCount?: number

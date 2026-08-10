@@ -159,13 +159,23 @@ export type HookCategory =
 
 export type HookCategoryChoice = 'auto' | HookCategory
 
-export const HOOK_COUNT = 10
+// How many hooks a Hooks generate returns. User-picked like the take count,
+// but its own list and its own slot: hooks are one-liners off a single call, so
+// 50 of them cost what 50 scripts never could, and 10 stays the default the
+// prompt was written around.
+export const HOOK_COUNTS = [10, 20, 50] as const
+export type HookCount = (typeof HOOK_COUNTS)[number]
+export const DEFAULT_HOOK_COUNT: HookCount = 10
+
+export function isHookCount(v: unknown): v is HookCount {
+  return HOOK_COUNTS.includes(v as HookCount)
+}
 
 // How many takes a Script / Scenes / Remix generate returns.
 // User-picked, defaulting to 3: five parallel takes off one brief crowded each
 // other, and three long scripts is what most people actually read before
 // picking. 10 is there for when you want a wide net and don't mind the credits.
-// Hooks are exempt (HOOK_COUNT) — those are one-liners, not scripts.
+// Hooks are exempt (HOOK_COUNTS) — those are one-liners, not scripts.
 //
 // Every angle list below is ordered BEST-FIRST and sliced to the chosen count,
 // so picking 3 gives the three strongest angles rather than an arbitrary three.
@@ -223,6 +233,16 @@ export function hooksPlainText(text: string): string {
   return parseHooks(text).map((h) => h.text).join('\n')
 }
 
+// The inverse of parseHooks — rebuilds the tagged text a pack is stored as, so
+// editing ONE line in place can be written back without disturbing the others.
+// The tag round-trips through parseHooks' own slug rule ('myth-busting' →
+// <MYTH BUSTING>), and a hook that arrived untagged stays untagged.
+export function hooksToText(hooks: ParsedHook[]): string {
+  return hooks
+    .map((h) => (h.category ? `<${h.category.replace(/-/g, ' ').toUpperCase()}> ${h.text}` : h.text))
+    .join('\n')
+}
+
 export interface EditableProductContext {
   productName: string
   productDescription: string
@@ -265,8 +285,10 @@ export interface GenerateScriptInput {
   // Remix mode: the target duration to re-cut the source ad to. Omitted → the
   // remix keeps the source's own length and beat count (the 'default' pick).
   remixLength?: WriteLength
-  // Hooks format only: which formula family the 10 hooks draw from.
+  // Hooks format only: which formula family the hooks draw from.
   hookCategory?: HookCategoryChoice
+  // Hooks format only: how many hooks to return. Omitted → DEFAULT_HOOK_COUNT.
+  hookCount?: HookCount
   // How many takes to return. Omitted → DEFAULT_VARIATION_COUNT.
   variationCount?: VariationCount
   productId: string | null

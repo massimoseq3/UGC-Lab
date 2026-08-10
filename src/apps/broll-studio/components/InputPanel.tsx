@@ -298,7 +298,34 @@ export default function InputPanel({
       </div>
 
       {/* Bank selections */}
-      <div className="flex flex-1 flex-col px-5 pb-4 pt-3 md:overflow-y-auto">
+      {/* pb-2, not pb-4: the settings band below is part of this column, and
+          16px of column padding plus the band's own top padding opened a gap
+          twice the 8px the reference cards sit apart. */}
+      <div className="flex flex-1 flex-col px-5 pb-2 pt-3 md:overflow-y-auto">
+        {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
+            card silent, for a voiceover laid over in the edit; "With Dialogue"
+            makes all three the character speaking that line, staged three
+            different ways. It leads the column, above the References heading:
+            it decides what KIND of storyboard the references are gathered for,
+            so it reads as a second mode switch under the mode toggle rather
+            than a setting at the far end of the panel. (It sat last, directly
+            above Generate, until August 2026.) Continuous has no deliveries —
+            it's narration over footage — so it isn't rendered there at all. */}
+        {isLineMode(mode) && (
+          <div className="mb-2">
+            <SegmentedToggle<BrollDelivery>
+              className="h-12 !p-1"
+              value={lineDelivery}
+              onChange={onLineDeliveryChange}
+              accent="broll"
+              options={[
+                { value: 'silent', label: 'B-Roll Clips' },
+                { value: 'dialogue', label: 'With Dialogue' },
+              ]}
+            />
+          </div>
+        )}
+
         {/* "References" label + the panel-level New reset. It sits here rather
             than in the header band because the three-way mode toggle already
             fills that row in this narrow (25%) pane. */}
@@ -350,6 +377,70 @@ export default function InputPanel({
             {selectedModel && <ModelCard model={selectedModel} />}
           </BankCard>
 
+          {/* Visual Style — third reference, under Character: the look is
+              something the storyboard is built FROM, so it reads as one of the
+              inputs rather than a switch on the way to Generate. Required, so
+              it's dashed and asking to be filled until picked, then
+              accent-filled with an X to clear. */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={onOpenStyle}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenStyle() } }}
+            title={styleChosen ? styleHint : 'How every clip looks'}
+            className={`group flex h-[58px] w-full cursor-pointer items-center gap-3 rounded-full border px-4 text-left transition-colors ${
+              styleChosen
+                ? 'border-broll-500/25 bg-broll-500/[0.07] hover:border-broll-500/35 hover:bg-broll-500/10'
+                : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-broll-500/30 hover:bg-broll-500/5'
+            }`}
+          >
+            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${styleIsCustom ? 'bg-broll-500/20 text-broll-300' : 'bg-broll-500/10 text-broll-400 light:text-broll-600'}`}>
+              {styleIsCustom ? <Sparkles className="h-[18px] w-[18px]" strokeWidth={1.75} /> : <Palette className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+            </div>
+            {/* Name over a one-line subtext, the shape of the References
+                cards above and the model row below — at 58px the second line
+                is room the row already has, and "Visual Style" alone says
+                nothing about what picking one does. Picked, the subtext is the
+                style's own brief, clipped to the line. */}
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex min-w-0 items-center gap-1.5">
+                {styleChosen ? (
+                  <>
+                    <span className="truncate text-[13px] font-medium tracking-tight text-broll-200 light:text-broll-700">{styleLabel}</span>
+                    {styleIsCustom && (
+                      <span className="shrink-0 rounded-full bg-broll-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-broll-300 light:text-broll-700">
+                        Custom
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span className="truncate text-[13px] font-medium text-ink-300">Visual Style</span>
+                )}
+              </div>
+              <div className="truncate text-[11px] leading-snug text-ink-500">
+                {styleChosen ? styleHint : 'How every clip looks'}
+              </div>
+            </div>
+            {styleChosen ? (
+              <div className="flex shrink-0 items-center gap-1">
+                <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
+                  <RefreshCw className="h-2.5 w-2.5" />
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onClearStyle() }}
+                  title="Clear style"
+                  aria-label="Clear style"
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
+            )}
+          </div>
+
           {/* Script — optional, and labelled as such. Bring your own words from
               the bank or a paste. It and the Instructions box below share the
               column's leftover height (`flex-1`, no `basis-0`): each one's base
@@ -399,9 +490,10 @@ export default function InputPanel({
             <div className="flex items-center justify-between gap-2 px-4 pt-2.5">
               <div className="flex min-w-0 items-center gap-1.5">
                 <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
-                <span className="truncate text-[13px] font-medium text-ink-200">
-                  {hasScript ? 'Instructions' : 'Brief'}
-                </span>
+                {/* One name whether or not a script is loaded — it's the same
+                    box doing the same job, and it matches what Scripts calls
+                    its own free-text steer. */}
+                <span className="truncate text-[13px] font-medium text-ink-200">Additional Instructions</span>
               </div>
               <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
                 optional
@@ -427,79 +519,14 @@ export default function InputPanel({
           panel, so it's gone and the rows sit straight on the column. Sticky on
           mobile (where it floats over scrolling content, hence the opaque fill
           — see the note under bg-surface-0), plain and static on desktop. */}
-      <div className="sticky bottom-0 z-30 bg-surface-0 px-5 py-2.5 md:static md:z-auto md:bg-transparent">
+      <div className="sticky bottom-0 z-30 bg-surface-0 px-5 pb-2.5 pt-0 md:static md:z-auto md:bg-transparent">
         <div className="mb-2 flex flex-col gap-2">
 
-          {/* The two decisions that shape the output, docked together above
-              Generate — and the two things Generate is gated on. The
-              References column above says what the ad is ABOUT (product,
-              character, words); this pair says what it IS: how it looks
-              (Visual Style) and how it's shot (Ad Format). One bordered block
-              rather than two stacked ones: that cost a border, a padding pair
-              and a gap the column couldn't spare, and they read as a single
-              decision anyway. They sit as plain rows in the band, the same
-              size and width as the reference cards above, rather than boxed
-              inside their own bordered card — and with no uppercase eyebrow
-              labels, which only repeated what the rows already say.
-
-              Each row opens its own picker — StyleModal for the look (presets,
-              your saved styles, and the analyse-from-references flow), the
-              Formats/Structures slide-over for the format. Both are dashed and
-              asking to be filled until picked, accent-filled with a clear X
-              after; a custom style shows its name with a Custom tag. */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={onOpenStyle}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenStyle() } }}
-            title={styleChosen ? styleHint : 'How every clip looks'}
-            className={`group flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-full border px-3 text-left transition-colors ${
-              styleChosen
-                ? 'border-broll-500/25 bg-broll-500/[0.07] hover:border-broll-500/35 hover:bg-broll-500/10'
-                : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-broll-500/30 hover:bg-broll-500/5'
-            }`}
-          >
-            <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${styleIsCustom ? 'bg-broll-500/20 text-broll-300' : 'bg-broll-500/10 text-broll-400 light:text-broll-600'}`}>
-              {styleIsCustom ? <Sparkles className="h-4 w-4" strokeWidth={1.75} /> : <Palette className="h-4 w-4" strokeWidth={1.5} />}
-            </div>
-            {/* One line, at the delivery toggle's height — the band's three
-                controls are a matched set, and the second line was a hint the
-                picker gives better (unpicked) or a truncated brief every card's
-                StyleNote already carries (picked). It survives as the row's
-                tooltip. */}
-            <div className="flex min-w-0 flex-1 items-center gap-1.5">
-              {styleChosen ? (
-                <>
-                  <span className="truncate text-[13px] font-medium tracking-tight text-broll-200 light:text-broll-700">{styleLabel}</span>
-                  {styleIsCustom && (
-                    <span className="shrink-0 rounded-full bg-broll-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-broll-300 light:text-broll-700">
-                      Custom
-                    </span>
-                  )}
-                </>
-              ) : (
-                <span className="truncate text-[13px] font-medium text-ink-300">Visual Style</span>
-              )}
-            </div>
-            {styleChosen ? (
-              <div className="flex shrink-0 items-center gap-1">
-                <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
-                  <RefreshCw className="h-2.5 w-2.5" />
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onClearStyle() }}
-                  title="Clear style"
-                  aria-label="Clear style"
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ) : (
-              <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
-            )}
-          </div>
+          {/* Who writes the shot prompts, then how the cards are delivered.
+              Visual Style used to lead this band and now sits with the
+              References above — it's an input the storyboard is built FROM,
+              like the product and the character, not a setting on the way to
+              Generate. */}
 
           {/* The Ad Format row (Formats + Structures, shared out of Scripts)
               stood here and is REMOVED (July 2026), a week after B-Roll stopped
@@ -516,37 +543,17 @@ export default function InputPanel({
               less often changed of the two: the look is a creative decision made
               per ad, the model is a standing one about intelligence vs. spend.
               className="" because the band spaces its rows with a flex gap, not
-              margins; `compact` so it matches the Visual Style row above it and
-              the delivery toggle below. */}
-          <ScriptModelRow appId="broll-studio" className="" compact />
+              margins; `compact` so it matches the References cards up the
+              column, Visual Style now among them. */}
+          <ScriptModelRow appId="broll-studio" className="" />
 
-          {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
-              card silent, for a voiceover laid over in the edit; "With
-              Dialogue" makes all three the character speaking that line, staged
-              three different ways. It sits LAST, directly above Generate: it's
-              the switch you'd flip on your way to firing, and it changes what
-              comes back more than either row above it. Continuous has no
-              deliveries — it's narration over footage — so the toggle isn't
-              rendered there at all. */}
-          {isLineMode(mode) && (
-            <SegmentedToggle<BrollDelivery>
-              className="h-11 !p-1"
-              value={lineDelivery}
-              onChange={onLineDeliveryChange}
-              accent="broll"
-              options={[
-                { value: 'silent', label: 'B-Roll Clips' },
-                { value: 'dialogue', label: 'With Dialogue' },
-              ]}
-            />
-          )}
 
         </div>
 
         <button
           onClick={onGenerate}
           disabled={!canGenerate || isGenerating}
-          className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-3.5 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-broll-400 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-broll-400 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isGenerating ? (
             <>

@@ -1,14 +1,14 @@
 import { useState, type ComponentType } from 'react'
-import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkles, Shuffle, FishingHook, Video } from 'lucide-react'
+import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkles, Shuffle, FishingHook, Video, Clock } from 'lucide-react'
 import type { Product, Script } from '../../../stores/types'
-import { WRITE_LENGTHS, REMIX_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNT, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type VariationCount } from '../types'
+import { WRITE_LENGTHS, REMIX_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNTS, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type HookCount, type VariationCount } from '../types'
 import { useBankStore } from '../../../stores/bankStore'
 import BankPicker from '../../../components/BankPicker'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import ClearAllButton from '../../../components/ClearAllButton'
 import SlideOver from '../../../components/SlideOver'
 import ScriptModelRow from '../../../components/ScriptModelRow'
-import Dropdown from '../../../components/Dropdown'
+import ConstraintChip from '../../../components/ConstraintChip'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import PromptToolbar from '../../../components/PromptToolbar'
 import { useAppStore } from '../../../stores/appStore'
@@ -45,6 +45,8 @@ interface InputPanelProps {
   onVariationCountChange: (value: VariationCount) => void
   hookCategory: HookCategoryChoice
   onHookCategoryChange: (value: HookCategoryChoice) => void
+  hookCount: HookCount
+  onHookCountChange: (value: HookCount) => void
   selectedProduct: Product | null
   onProductSelect: (product: Product | null) => void
   additionalContext: string
@@ -77,6 +79,8 @@ export default function InputPanel({
   onVariationCountChange,
   hookCategory,
   onHookCategoryChange,
+  hookCount,
+  onHookCountChange,
   selectedProduct,
   onProductSelect,
   additionalContext,
@@ -144,12 +148,14 @@ export default function InputPanel({
   // The scene-rewrite pipeline will run (blueprint detected, no override) —
   // drives the source box chrome, the chip copy, and the button labels.
   const blueprintActive = isBlueprint && !forceTranscript
-  // The two footer dropdowns. Hooks is a fixed batch of one-liners (HOOK_COUNT,
-  // no duration), and the blueprint rewrite returns ONE script, so it has no
-  // count. It does get a length: it defaults to keeping the source's own scene
-  // timings (the 'default' pick), but re-cutting a 60s blueprint to 30 is a
-  // real thing to want, and `runReverseEngineer` re-times the scenes for it.
-  const showTakes = !isHooksFormat && !blueprintActive
+  // The two footer dropdowns. Every output picks its batch size — takes for
+  // Script / Scenes / Remix, hooks for Hooks (one-liners off a single call, so
+  // their own list) — except the blueprint rewrite, which returns ONE script.
+  // Hooks have no duration; the blueprint rewrite does get a length, defaulting
+  // to keeping the source's own scene timings (the 'default' pick), because
+  // re-cutting a 60s blueprint to 30 is a real thing to want and
+  // `runReverseEngineer` re-times the scenes for it.
+  const showCount = !blueprintActive
   const showLength = !isHooksFormat
 
   // Slide-over footer actions. The edits already live in `editableContext`
@@ -316,15 +322,44 @@ export default function InputPanel({
     setSourceScript(item)
   }
 
+  // Hooks has no Length chip to pair with, so its count rides beside the model
+  // row instead of taking a full-width row on its own.
+  const inlineCount = showCount && isHooksFormat
+  // The count keeps its noun ("3 Variations" / "10 Hooks") instead of an icon:
+  // a bare "3" beside a duration reads as another measurement, and the word is
+  // what makes the chip self-evident. Standalone it's `lg`, the size of the
+  // Characters generate bar's 1K / 9:16 pills; inline it takes the model row's
+  // 58px instead — two controls sharing a row that don't share a height read
+  // as a mistake — and anchors its menu right, the menu being wider than it.
+  const countChip = (
+    <ConstraintChip
+      grow
+      size={inlineCount ? 'xl' : 'lg'}
+      align={inlineCount ? 'right' : 'left'}
+      openDirection="up"
+      value={isHooksFormat ? `${hookCount} Hooks` : `${variationCount} Variations`}
+      options={
+        isHooksFormat
+          ? HOOK_COUNTS.map((n) => `${n} Hooks`)
+          : VARIATION_COUNTS.map((n) => `${n} Variations`)
+      }
+      onChange={(v) => {
+        const n = parseInt(v, 10)
+        if (isHooksFormat) onHookCountChange(n as HookCount)
+        else onVariationCountChange(n as VariationCount)
+      }}
+    />
+  )
+
   const generateLabel = mode === 'write'
-    ? (writeFormat === 'scenes' ? `Generate ${variationCount} Scene Drafts` : writeFormat === 'hooks' ? `Generate ${HOOK_COUNT} Hooks` : `Generate ${variationCount} Scripts`)
+    ? (writeFormat === 'scenes' ? `Generate ${variationCount} Scene Drafts` : writeFormat === 'hooks' ? `Generate ${hookCount} Hooks` : `Generate ${variationCount} Scripts`)
     : blueprintActive ? 'Rewrite Scene Prompts' : `Generate ${variationCount} Script Variations`
 
   // Product picker — step 2 in every mode, but rendered in a different spot
   // for Write New (before the brief) than for the remix modes (after the
   // source text).
   const productSection = (
-    <div className="mb-3">
+    <div className="mb-2">
       {selectedProduct ? (
         <div>
           {/* Whole-card-clickable — hitting any part of the populated
@@ -435,7 +470,7 @@ export default function InputPanel({
             { value: 'remix', label: 'Remix', icon: Shuffle },
           ]}
         />
-        <ClearAllButton onClear={onClearInputs} label="New" className="shrink-0" />
+        <ClearAllButton onClear={onClearInputs} label="New" className="shrink-0" iconOnly />
       </div>
 
       {/* Scrollable inputs — a flex column so step 1's textarea can absorb
@@ -444,14 +479,19 @@ export default function InputPanel({
       {/* pb-1, not pb-5: the brief grows to the bottom of this column and the
           footer starts right under it, so anything more reads as a gap between
           the box and the controls that belong to it. */}
-      <div className="flex flex-1 flex-col overflow-y-auto px-5 pb-1 pt-4">
+      {/* 8px between every row, and 8px from the last one to the footer band
+          (pb-2 + the band's pt-0) — B-Roll's rhythm. This column ran on 12s
+          and 16s, which read as loose beside it. */}
+      <div className="flex flex-1 flex-col overflow-y-auto px-5 pb-2 pt-3">
         {mode === 'write' ? (
           <>
             {/* Output sub-mode toggle — governs the form below (which style
                 picker, the length options, the artifact), so it leads, right
-                under the mode toggle. Sized to match the Influencers
-                Portrait/Character Sheet toggle (h-12, p-1). */}
-            <div className="mb-3">
+                under the mode toggle. h-12, matching the Influencers
+                Portrait/Character Sheet toggle: a three-way switch of one-word
+                labels doesn't need a picker row's height, and at 58 it read as
+                the heaviest thing in a column it only introduces. */}
+            <div className="mb-2">
               <SegmentedToggle<WriteFormat>
                 className="h-12 !p-1"
                 accent="scripts"
@@ -470,7 +510,7 @@ export default function InputPanel({
                 dashed unset affordance; picking a family flips it solid, and
                 the X resets back to auto. */}
             {isHooksFormat && (
-            <div className="mb-3">
+            <div className="mb-2">
               <div
                 role="button"
                 tabIndex={0}
@@ -524,7 +564,7 @@ export default function InputPanel({
                 opens the style picker slide-over. Hidden in the hooks format,
                 which has its own family picker above. */}
             {!isHooksFormat && (
-            <div className="mb-3">
+            <div className="mb-2">
               <div
                 role="button"
                 tabIndex={0}
@@ -579,35 +619,35 @@ export default function InputPanel({
             {/* Product — sits below the style picker. */}
             {productSection}
 
-            {/* The brief — its section grows to absorb leftover column height so
-                the box fills the blank space below the pickers (same
-                expand-don't-scroll pattern as Playground's prompt). The length
-                toggle is pinned to the footer above Generate, so the brief owns
-                all the leftover space here. */}
-            {/* basis-0 + an explicit floor, so the brief takes the height that's
-                left rather than demanding a slab of it — see the Additional
-                Context note below for why the floor sits on the SECTION. */}
-            <div className="mt-3 flex min-h-[160px] flex-1 basis-0 flex-col">
-              <div className="mb-3 flex items-center gap-2">
-                {/* Same name as the box the remix modes get, because it's the
-                    same job — the free-text steer on top of the product. Only
-                    one of the two ever renders. */}
-                <StepLabel
-                  label="Additional Instructions"
-                  optional
-                  tooltip="What should this video say or focus on? Vibe, angle, key points — anything goes. Leave it blank and the model will come up with the angle for you."
-                />
-              </div>
-              {/* Single rounded box (Playground prompt pattern): the textarea
-                  grows to fill the box, with the shared PromptToolbar attached
-                  along the bottom inside the same border. */}
+            {/* The brief — the SAME box the remix modes get, header and all:
+                it's the same field doing the same job, and the two modes only
+                differ in what's above it. Its name sits INSIDE the box rather
+                than on a StepLabel row above, which is what closed the gap
+                under the product row — that row plus its margins was ~40px of
+                nothing between the pickers and the field.
+                `flex-1 basis-0` with the floor on the SECTION: the box takes
+                whatever height is left, so it opens tall on a fresh panel and
+                gives ground as the pickers above it fill up. */}
+            {/* No top margin: the product row above already carries mb-2, and
+                the pair of them stacked a 16px gap where every other row in the
+                column sits 8 apart. */}
+            <div className="flex min-h-[160px] flex-1 basis-0 flex-col">
               <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
+                <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-2.5">
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <PenLine className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
+                    <span className="truncate text-[13px] font-medium text-ink-200">Additional Instructions</span>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
+                    optional
+                  </span>
+                </div>
                 <textarea
                   value={brief}
                   onChange={(e) => handleBriefType(e.target.value)}
                   onBlur={commitBriefDraft}
                   placeholder={"Leave blank and I'll come up with the angle — or steer it: e.g. A girl in her 20s talking about this serum like she's telling her best friend, focus on how fast it cleared her skin. Casual, a little funny, end with the discount code."}
-                  className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 py-3 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
+                  className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 pb-3 pt-1.5 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                 />
                 <PromptToolbar
                   accent="scripts"
@@ -627,7 +667,7 @@ export default function InputPanel({
             </div>
           </>
         ) : (
-          <div className="mb-4 flex min-h-[140px] flex-1 basis-0 flex-col">
+          <div className="mb-2 flex min-h-[140px] flex-1 basis-0 flex-col">
             {/* Select from bank (header) + paste manually (textarea) merged into
                 one rounded box so the two sources read as a single input. One
                 box serves both remix pipelines: the pasted source's format is
@@ -697,7 +737,7 @@ export default function InputPanel({
           // the box's overflow-hidden sliced the footer toolbar in half. A
           // min-height on the section overrides its auto min-size, so it shrinks
           // to a real, known floor and everything inside shrinks with it.
-          <div className="mt-2 flex min-h-[120px] flex-1 basis-0 flex-col">
+          <div className="flex min-h-[120px] flex-1 basis-0 flex-col">
             {/* Single rounded box (matches the Write New brief): a header row
                 naming the field, the textarea taking whatever height is left,
                 then Enhance / Clear / Undo / Redo + Expand in a footer. The
@@ -748,68 +788,70 @@ export default function InputPanel({
           window frame, so any alpha lets content underneath ghost through. No
           rule above it: the brief box ends where its own toolbar ends, so a
           hairline there just fenced off controls that belong to the same column. */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 shrink-0 bg-surface-0 px-5 pb-3 pt-2 md:static md:left-auto md:right-auto md:z-auto md:bg-transparent">
-        {/* Variations and length, side by side. Both were full-width segmented
-            toggles — two 48px slabs stacked above Generate, in a column that
-            has to fit a brief as well. As dropdowns they're one 36px row, and
-            neither is a control you sweep through: you pick 3 or 30s and move
-            on. Each hides on its own, so the row can carry either alone.
-            Hooks are ten one-liners with no duration, so both go.
-            Both open UPWARD: they sit directly above the model row and
-            Generate, and a downward menu covers the button you're heading for.
-            'above' rather than AnchoredPopover's default 'auto', which measures
-            room against the viewport and finds plenty on a tall screen. */}
-        {(showTakes || showLength) && (
-          <div className="mb-2 flex items-center gap-2">
-            {showTakes && (
-              <div className="min-w-0 flex-1">
-                {/* The options carry the noun ("3 variations"), so there's no
-                    dim `label` on the trigger — with one it read "Variations 3
-                    variations". Length keeps its label, since "15s" alone
-                    doesn't say what it measures. */}
-                <Dropdown
-                  compact
-                  className="h-11"
-                  accent="scripts"
-                  placement="above"
-                  value={`${variationCount} variations`}
-                  options={VARIATION_COUNTS.map((n) => `${n} variations`)}
-                  onChange={(v) => onVariationCountChange(parseInt(v, 10) as VariationCount)}
-                />
-              </div>
-            )}
+      <div className="fixed bottom-0 left-0 right-0 z-30 shrink-0 bg-surface-0 px-5 pb-3 pt-0 md:static md:left-auto md:right-auto md:z-auto md:bg-transparent">
+        {/* Length and batch size — the same `ConstraintChip` pearls every other
+            generate bar in the app uses for aspect / duration / resolution, and
+            for the same reason: these are two small settings on the way to
+            Generate, not fields. They were full-width `SegmentedToggle` slabs,
+            then full-width `Dropdown`s. `grow` + the centred label is exactly
+            Playground's 1K / 9:16 row — the pair splits the width and each
+            reads as a pearl rather than a bar with a value pushed to one end.
+            `size='xl'` puts them at the column's shared 58px, so the settings
+            stack (toggle → style row → chips → model row) is one ladder.
+            Each hides on its own, so the row can carry either alone — Hooks
+            have no duration, the blueprint rewrite has no count. Both open
+            UPWARD (`openDirection='up'`): they sit directly above the model row
+            and Generate, and a downward menu would cover the button you're
+            heading for. */}
+        {(showLength || (showCount && !inlineCount)) && (
+          <div className="mb-2 flex flex-wrap items-center justify-center gap-1.5">
             {showLength && (
-              <div className="min-w-0 flex-1">
-                {/* Remix's list carries a "Default" — the source ad already has
-                    a length, and keeping it is usually the point of remixing a
-                    winner. Write New has no source to inherit from. */}
-                <Dropdown
-                  compact
-                  className="h-11"
-                  accent="scripts"
-                  placement="above"
-                  label="Length"
-                  value={mode === 'write' ? `${writeLength}s` : remixLength === 'default' ? 'Default' : `${remixLength}s`}
-                  options={
-                    mode === 'write'
-                      ? WRITE_LENGTHS.map((len) => `${len}s`)
-                      : REMIX_LENGTHS.map((len) => (len === 'default' ? 'Default' : `${len}s`))
-                  }
-                  onChange={(v) => {
-                    if (mode === 'write') onWriteLengthChange(Number(v.replace('s', '')) as WriteLength)
-                    else onRemixLengthChange((v === 'Default' ? 'default' : Number(v.replace('s', ''))) as RemixLength)
-                  }}
-                />
-              </div>
+              // The clock carries the meaning the old dim "Length" label did —
+              // "15s" alone doesn't say what it measures, and a chip has no
+              // room for a second word. Remix's list leads with "Default": the
+              // source ad already has a length, and keeping it is usually the
+              // point of remixing a winner. Write New has no source to inherit.
+              <ConstraintChip
+                grow
+                size="lg"
+                openDirection="up"
+                value={mode === 'write' ? `${writeLength}s` : remixLength === 'default' ? 'Default' : `${remixLength}s`}
+                options={
+                  mode === 'write'
+                    ? WRITE_LENGTHS.map((len) => `${len}s`)
+                    : REMIX_LENGTHS.map((len) => (len === 'default' ? 'Default' : `${len}s`))
+                }
+                onChange={(v) => {
+                  if (mode === 'write') onWriteLengthChange(Number(v.replace('s', '')) as WriteLength)
+                  else onRemixLengthChange((v === 'Default' ? 'default' : Number(v.replace('s', ''))) as RemixLength)
+                }}
+                render={(v) => (
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>{v}</span>
+                  </span>
+                )}
+              />
             )}
+            {showCount && !inlineCount && countChip}
           </div>
         )}
         {/* Who writes the takes — directly above Generate, because it's the
             last thing you'd change before firing and the one that decides what
-            the click costs. Compact: in a pinned footer every pixel is one the
-            brief above doesn't get, and the panel it opens is titled "Script
-            Model" anyway, so the hint line under the name said it twice. */}
-        <ScriptModelRow appId="script-architect" className="mb-2" compact />
+            the click costs. In Hooks the count rides on this row's right: with
+            no Length to pair with it was a lone pearl on a full-width row of
+            its own, and the two sit better as one line. */}
+        {inlineCount ? (
+          <div className="mb-2 flex items-stretch gap-1.5">
+            <ScriptModelRow appId="script-architect" className="min-w-0 flex-1" />
+            {/* A fixed 132px rather than shrink-to-fit: "10 Hooks" sized to its
+                own text left a chip narrower than the words felt like they
+                needed, and every option in the list is the same length anyway. */}
+            <div className="flex w-[132px] shrink-0">{countChip}</div>
+          </div>
+        ) : (
+          <ScriptModelRow appId="script-architect" className="mb-2" />
+        )}
         <button
           onClick={() => onGenerate(editableContext)}
           disabled={!canGenerate || isGenerating}
@@ -818,7 +860,7 @@ export default function InputPanel({
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{mode === 'write' ? (writeFormat === 'hooks' ? `Writing ${HOOK_COUNT} Hooks...` : `Writing ${variationCount} Takes...`) : blueprintActive ? 'Rewriting Scene Prompts...' : `Generating ${variationCount} Script Variations...`}</span>
+              <span>{mode === 'write' ? (writeFormat === 'hooks' ? `Writing ${hookCount} Hooks...` : `Writing ${variationCount} Takes...`) : blueprintActive ? 'Rewriting Scene Prompts...' : `Generating ${variationCount} Script Variations...`}</span>
             </>
           ) : blocker ? (
             <>
@@ -914,7 +956,7 @@ export default function InputPanel({
         open={hookSlideOpen}
         onClose={() => setHookSlideOpen(false)}
         title="Choose a hook style"
-        subtitle={`Which formula family the ${HOOK_COUNT} hooks draw from`}
+        subtitle={`Which formula family the ${hookCount} hooks draw from`}
         size="wide"
       >
         <div className="flex flex-col gap-2 p-4">
@@ -975,38 +1017,6 @@ export default function InputPanel({
         placeholder="Extra instructions for this generation…"
       />
     </div>
-  )
-}
-
-// Section heading for every field in the form — 13px, no leading number, the
-// same size as the Voiceovers settings subheadings (SETTING_LABEL). An optional
-// `tooltip` turns the label into a dotted-underline hint that reveals guidance
-// on hover (same pattern as the Voiceovers sliders), keeping the form clean of
-// always-on helper text.
-function StepLabel({ label, tooltip, optional }: { label: string; tooltip?: string; optional?: boolean }) {
-  const [hover, setHover] = useState(false)
-  return (
-    <span
-      className={`relative inline-block text-[13px] font-medium text-ink-200 ${tooltip ? 'cursor-help' : ''}`}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      onFocus={() => setHover(true)}
-      onBlur={() => setHover(false)}
-      tabIndex={tooltip ? 0 : -1}
-    >
-      <span className={tooltip ? 'underline decoration-dotted decoration-ink-600 underline-offset-4' : ''}>
-        {label}
-      </span>
-      {optional && <span className="ml-2 inline-block rounded-full bg-ink/5 px-2 py-0.5 align-middle text-[10px] font-medium uppercase tracking-wide text-ink-500">optional</span>}
-      {tooltip && hover && (
-        <span
-          role="tooltip"
-          className="pointer-events-none absolute left-0 top-full z-20 mt-2 w-72 rounded-xl bg-surface-2 px-3.5 py-2.5 text-[12px] font-normal leading-snug text-ink-100 shadow-xl ring-1 ring-ink/10"
-        >
-          {tooltip}
-        </span>
-      )}
-    </span>
   )
 }
 

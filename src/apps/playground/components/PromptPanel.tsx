@@ -621,7 +621,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               stretched to its own content and the box overflowed the port —
               its toolbar was pushed out of sight and clipped by the box's own
               overflow-hidden. */}
-          <div className="flex h-full min-h-0 flex-col gap-3 px-5 pb-1 pt-3">
+          <div className="flex h-full min-h-0 flex-col gap-2 px-5 pb-2 pt-3">
             {/* Model picker now lives in the footer, above the output-settings
                 pills (see below) — the scrollable body opens straight into the
                 reference inputs. */}
@@ -664,7 +664,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                     )}
                     {refsAllowed && (
                       <RefTiles
-                        label="Reference images"
+                        label="Reference Images"
                         values={refStripValues()}
                         onChange={setRefStrip}
                         max={maxRefs}
@@ -672,27 +672,36 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                         tabs={PLAYGROUND_REF_TABS}
                       />
                     )}
-                    {supportsRefAudio && (
-                      <MediaRefStrip
-                        label="Reference audio"
-                        kind="audio"
-                        values={mediaStripValues('audio')}
-                        onChange={(v) => setMediaStrip('audio', v)}
-                        max={3}
-                        maxTotalSeconds={refClipSeconds}
-                        onLimitError={(m) => addToast(m, 'error')}
-                      />
-                    )}
-                    {supportsRefVideos && (
-                      <MediaRefStrip
-                        label="Reference videos"
-                        kind="video"
-                        values={mediaStripValues('video')}
-                        onChange={(v) => setMediaStrip('video', v)}
-                        max={3}
-                        maxTotalSeconds={refClipSeconds}
-                        onLimitError={(m) => addToast(m, 'error')}
-                      />
+                    {/* Audio and video references share a row when a model
+                        takes both (the Seedance 2 family) — two stacked
+                        full-width upload cards cost the prompt box its height
+                        in a column that also has to fit frames, ref images and
+                        the settings stack. Alone, either one spans the width. */}
+                    {(supportsRefAudio || supportsRefVideos) && (
+                      <div className={supportsRefAudio && supportsRefVideos ? 'grid grid-cols-2 gap-2' : ''}>
+                        {supportsRefAudio && (
+                          <MediaRefStrip
+                            label="Reference Audio"
+                            kind="audio"
+                            values={mediaStripValues('audio')}
+                            onChange={(v) => setMediaStrip('audio', v)}
+                            max={3}
+                            maxTotalSeconds={refClipSeconds}
+                            onLimitError={(m) => addToast(m, 'error')}
+                          />
+                        )}
+                        {supportsRefVideos && (
+                          <MediaRefStrip
+                            label="Reference Videos"
+                            kind="video"
+                            values={mediaStripValues('video')}
+                            onChange={(v) => setMediaStrip('video', v)}
+                            max={3}
+                            maxTotalSeconds={refClipSeconds}
+                            onLimitError={(m) => addToast(m, 'error')}
+                          />
+                        )}
+                      </div>
                     )}
                     {isOmni && (
                       <OmniInputsSection refs={state.refs} onChangeRefs={(refs) => onChange({ ...state, refs })} />
@@ -701,7 +710,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 )}
                 {state.mode === 'image' && (
                   <RefTiles
-                    label="Reference images"
+                    label="Reference Images"
                     values={refStripValues()}
                     onChange={setRefStrip}
                     max={4}
@@ -864,10 +873,12 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
           it configures. */}
       {/* No hairline above this: the prompt box now ends where its text ends, so
           the gap between it and the model row already reads as the seam. */}
-      <div className="shrink-0 px-5 pb-4 pt-2">
+      {/* 8px between the model row, the settings pills and Generate — the
+          rhythm Scripts and B-Roll run on. */}
+      <div className="shrink-0 px-5 pb-3 pt-0">
         {/* Model — video mode uses the slide-in side panel (matching B-Roll);
             image / music keep the inline dropdown (which auto-opens upward here). */}
-        <div className="mb-3">
+        <div className="mb-2">
           {state.mode === 'video' ? (
             <>
               {/* Trigger — provider logo + name + star + "% off", an arrow
@@ -875,7 +886,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               <button
                 type="button"
                 onClick={() => setModelPanelOpen(true)}
-                className="flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]"
+                className="flex h-[58px] w-full items-center gap-3 rounded-full border border-ink/10 bg-ink/[0.02] px-4 text-left transition-colors hover:bg-ink/[0.05]"
               >
                 {model ? (
                   <>
@@ -914,6 +925,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             </>
           ) : (
             <ModelPicker
+              row
               appId="playground"
               task={taskForMode}
               mode={pickerMode}
@@ -924,11 +936,12 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
         </div>
         {/* Output settings — resolution / aspect (+ duration, audio, lyrics
             per mode). Sits just above Generate; dropdowns open upward. */}
-        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
         {state.mode === 'video' && model?.videoConstraints && (
           <>
             <ConstraintChip
               grow
+              size="lg"
               openDirection="up"
               options={model.videoConstraints.resolutions}
               value={state.resolution}
@@ -944,6 +957,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             {!isMotionControl && model.videoConstraints.aspectRatios.length > 0 && (
             <ConstraintChip
               grow
+              size="lg"
               openDirection="up"
               options={model.videoConstraints.aspectRatios}
               value={state.aspectRatio}
@@ -959,6 +973,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             {!isMotionControl && model.videoConstraints.durations.length > 0 && (
               <ConstraintChip
                 grow
+                size="lg"
                 openDirection="up"
                 options={model.videoConstraints.durations.map(String)}
                 value={String(state.durationSeconds)}
@@ -969,6 +984,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             {!isMotionControl && model.videoConstraints.supportsAudio && (
               <ConstraintChip
                 grow
+                size="lg"
                 openDirection="up"
                 options={['Audio', 'Mute']}
                 value={state.audio ? 'Audio' : 'Mute'}
@@ -991,6 +1007,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
           <>
             <ConstraintChip
               grow
+              size="lg"
               openDirection="up"
               options={model.imageConstraints.resolutions}
               value={state.resolution}
@@ -1008,6 +1025,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             {model.imageConstraints.aspectRatios && (
               <ConstraintChip
                 grow
+                size="lg"
                 openDirection="up"
                 options={model.imageConstraints.aspectRatios}
                 value={state.aspectRatio}

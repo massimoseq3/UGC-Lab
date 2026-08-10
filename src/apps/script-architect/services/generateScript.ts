@@ -1,5 +1,5 @@
 import type { GenerateScriptInput, GeneratedScript, RemixAngle, EditableProductContext, WriteStyle, WriteLength, HookCategory } from '../types'
-import { HOOK_COUNT, REMIX_ANGLES, DEFAULT_VARIATION_COUNT, isVariationCount, WRITE_STYLE_META } from '../types'
+import { REMIX_ANGLES, DEFAULT_VARIATION_COUNT, isVariationCount, DEFAULT_HOOK_COUNT, isHookCount, WRITE_STYLE_META } from '../types'
 import { useSettingsStore, resolveScriptModel } from '../../../stores/settingsStore'
 import { kieChatCompletions, LONG_CHAT_TIMEOUT_MS, type ChatMessage } from '../../../utils/kie'
 import { getChatTarget, type ChatTarget } from '../../../utils/models'
@@ -352,7 +352,9 @@ OUTPUT FORMAT — CRITICAL:
 - Below each header, the scene's single paragraph.
 - Blank line between scenes. No introduction, conclusion, commentary, or markdown code fences. Plain text only.`
 
-const HOOKS_SYSTEM = `You are a top 1% short-form hook writer. Your instincts were built by studying 1,000 hooks that actually went viral on TikTok and Reels — you know the first line IS the video: it either stops the thumb in under 1.5 seconds or nothing else you wrote matters. Brands pay you for opening lines that stop the scroll WITHOUT sounding like an ad.
+// The batch size is user-picked, so the contract that names it ("return EXACTLY
+// N lines") has to be built per call rather than sit at module scope.
+const hooksSystem = (count: number) => `You are a top 1% short-form hook writer. Your instincts were built by studying 1,000 hooks that actually went viral on TikTok and Reels — you know the first line IS the video: it either stops the thumb in under 1.5 seconds or nothing else you wrote matters. Brands pay you for opening lines that stop the scroll WITHOUT sounding like an ad.
 
 ${HOOK_LIBRARY}
 
@@ -362,7 +364,7 @@ HOW TO USE THE FORMULAS:
 - Each hook must stand alone as the first spoken line of its own video. No warm-up, no context-setting — the most interesting beat goes first.
 - USE THE FORMULA'S COMPLETE STRUCTURE. If a formula has a setup and a payoff clause ("(Big brand) didn't want to sponsor this video, let me show you what they're missing out on"), the hook keeps BOTH — a line that stops where the payoff should be ("(Big brand) didn't want to sponsor this video.") is a failed hook. The win happens in the first 3-4 words, but you never shorten a formula to get there.
 - Sound like a person talking to their phone camera: contractions always (I'm, don't, it's), 6th-grade vocabulary, no emojis, no hashtags.
-- Mention the brand name in at most 2 of the ${HOOK_COUNT} hooks — "this thing" or the product category is how real people talk.
+- Mention the brand name in at most 2 of the ${count} hooks — "this thing" or the product category is how real people talk.
 - Banned hook openers (they scream "ad"): "So I've been...", "Have you ever...", "Let me tell you about...", "Introducing...", "If you struggle with...".
 
 ${BANNED_AI_PATTERNS}
@@ -370,12 +372,20 @@ ${BANNED_AI_PATTERNS}
 SELF-AUDIT BEFORE YOU ANSWER (silently): read each hook and ask "would this stop MY thumb in 1.5 seconds?" — rewrite the weak ones. Then check every hook against its formula: does it carry the COMPLETE thought, setup and payoff both? Rewrite any line that ends mid-thought. Kill any banned sentence shape, any em-dash, any leftover blank. Make one vague hook specific.
 
 OUTPUT FORMAT — CRITICAL:
-- Return EXACTLY ${HOOK_COUNT} lines. One hook per line. Nothing else.
+- Return EXACTLY ${count} lines. One hook per line. Nothing else.
 - Every line starts with its family tag in angle brackets, then the hook, e.g.: <MYTH BUSTING> Let me de-influence you from $80 serums.
 - Valid tags: <EDUCATIONAL> <COMPARISON> <MYTH BUSTING> <STORYTELLING> <AUTHORITY> <DAY IN THE LIFE> <PATTERN INTERRUPT>
 - No numbering, no blank lines, no quotation marks, no commentary, no markdown.`
 
 async function runHooks(input: GenerateScriptInput, apiKey: string, endpoint: ChatTarget): Promise<string> {
+  // Sanitised like the take count — it round-trips through a persisted draft
+  // and a history row.
+  const count = isHookCount(input.hookCount) ? input.hookCount : DEFAULT_HOOK_COUNT
+  // The spread rules scale with the pack. "At least 4 families, never more than
+  // 3 from one" was written for ten hooks; on a pack of five it demands almost
+  // one family per line, and on twenty it lets the pack blur.
+  const minFamilies = Math.min(7, Math.max(3, Math.ceil(count / 3)))
+  const maxPerFamily = Math.max(2, Math.round(count * 0.3))
   let prompt = `The creator's brief for these hooks:\n\n${input.brief.trim()}\n\n`
 
   const ctxLines = productContextLines(input.productContext)
@@ -389,13 +399,13 @@ async function runHooks(input: GenerateScriptInput, apiKey: string, endpoint: Ch
 
   const category = input.hookCategory ?? 'auto'
   prompt += category === 'auto'
-    ? `CATEGORY MIX: you pick the families. Choose the ones that genuinely fit this product and audience — cover at least 4 different families across the ${HOOK_COUNT} hooks, never more than 3 hooks from any one family, and order the ${HOOK_COUNT} strongest-first.\n\n`
-    : `CATEGORY LOCK: every one of the ${HOOK_COUNT} hooks must be <${HOOK_TAG[category]}>. Use a different formula from that family for each hook so the ${HOOK_COUNT} don't blur together, and order them strongest-first.\n\n`
+    ? `CATEGORY MIX: you pick the families. Choose the ones that genuinely fit this product and audience — cover at least ${minFamilies} different families across the ${count} hooks, never more than ${maxPerFamily} hooks from any one family, and order the ${count} strongest-first.\n\n`
+    : `CATEGORY LOCK: every one of the ${count} hooks must be <${HOOK_TAG[category]}>. Use a different formula from that family for each hook so the ${count} don't blur together, and order them strongest-first.\n\n`
 
-  prompt += `Write the ${HOOK_COUNT} hooks now.`
+  prompt += `Write the ${count} hooks now.`
 
   const messages: ChatMessage[] = [
-    { role: 'system', content: [{ type: 'text', text: HOOKS_SYSTEM }] },
+    { role: 'system', content: [{ type: 'text', text: hooksSystem(count) }] },
     { role: 'user', content: [{ type: 'text', text: prompt }] },
   ]
 
