@@ -279,33 +279,91 @@ function loadFromStorage(): BankData {
 let pendingSave: BankData | null = null
 let saveScheduled = false
 
+function isQuotaError(e: unknown): boolean {
+  // Safari reports the legacy code 22 with a different name, Firefox uses its
+  // own name — match all three rather than the Chrome spelling alone.
+  return (
+    e instanceof DOMException &&
+    (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22)
+  )
+}
+
+// How many rows of each history bank the LOCAL copy keeps when the full blob
+// won't fit. localStorage is a boot cache, not the source of truth — the cloud
+// holds every row and hydrate refills memory from it — so shedding the oldest
+// rows from the WRITE costs a cloud member nothing but a slower first paint on
+// the deep end of their history. Full fidelity is always tried first; these
+// only come into play once the browser refuses the write.
+const PERSIST_TRIM_STEPS = [Infinity, 400, 150, 40]
+
+const HISTORY_KEYS = [
+  'voiceHistory', 'videoHistory', 'imageHistory', 'musicHistory',
+  'scriptHistory', 'brollHistory', 'characterHistory', 'adAnatomyHistory',
+] as const satisfies readonly (keyof BankData)[]
+
+let quotaReported = false
+
+function persistPayload(state: BankData, keep: number): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
+    products: state.products,
+    models: state.models,
+    scripts: state.scripts,
+    voices: state.voices,
+    brolls: state.brolls,
+    styles: state.styles,
+    swipes: state.swipes,
+    usageDays: state.usageDays,
+  }
+  for (const key of HISTORY_KEYS) {
+    const rows = state[key] as Array<{ createdAt?: number }>
+    payload[key] = keep >= rows.length
+      ? rows
+      : [...rows].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)).slice(0, keep)
+  }
+  return payload
+}
+
 function flushSaveToStorage() {
   saveScheduled = false
   if (!pendingSave) return
   const state = pendingSave
   pendingSave = null
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      products: state.products,
-      models: state.models,
-      scripts: state.scripts,
-      voices: state.voices,
-      brolls: state.brolls,
-      styles: state.styles,
-      swipes: state.swipes,
-      voiceHistory: state.voiceHistory,
-      videoHistory: state.videoHistory,
-      imageHistory: state.imageHistory,
-      musicHistory: state.musicHistory,
-      scriptHistory: state.scriptHistory,
-      brollHistory: state.brollHistory,
-      characterHistory: state.characterHistory,
-      adAnatomyHistory: state.adAnatomyHistory,
-      usageDays: state.usageDays,
-    }))
-  } catch (error) {
-    console.error('Failed to save to storage', error)
+
+  let lastError: unknown = null
+  for (const keep of PERSIST_TRIM_STEPS) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(persistPayload(state, keep)))
+      return
+    } catch (error) {
+      lastError = error
+      // Only a full disk is worth retrying smaller; anything else (a serialise
+      // error, a browser blocking storage outright) repeats identically.
+      if (!isQuotaError(error)) break
+    }
   }
+
+  console.error('Failed to save to storage', lastError)
+  // Once per session: the row IS in memory and, for a cloud member, already on
+  // its way to Postgres — so this is a warning about this browser's copy, not a
+  // report of lost work. Saying it on every flush would make it noise, and the
+  // condition doesn't clear on its own.
+  if (!quotaReported) {
+    quotaReported = true
+    const msg = isQuotaError(lastError)
+      ? "This browser's storage is full, so your work can't be saved here. Clear some history from the Bank, or sign in on this browser to keep everything in the cloud."
+      : "This browser refused to save your work locally. Check that storage isn't blocked for this site."
+    try { useAppStore.getState().addToast(msg, 'error') } catch { /* ignore */ }
+  }
+}
+
+// Write the given state to localStorage right now, through the same trim
+// ladder, instead of waiting on the idle queue. For cloudSync's post-hydrate
+// write: that one lands the whole cloud-side history at once — the largest
+// write a member ever makes, and the first thing a heavy account does after
+// signing in — so it is exactly the one that must degrade rather than vanish.
+export function persistBanksNow(state: BankData) {
+  pendingSave = state
+  flushSaveToStorage()
 }
 
 function saveToStorage(state: BankData) {
@@ -488,16 +546,22 @@ export const useBankStore = create<BankState>((set, get) => ({
     const old = get().products.find((p) => p.id === id)
     if (!old) return
     const updated: Product = { ...old, ...updates }
-    if (updates.productImage && old.productImage && old.productImage !== updates.productImage) {
-      cleanupAssets(old.productImage)
-    }
     // Extra angles are this product's own assets (nothing else links them), so
-    // one dropped from the form is purged outright.
-    if (updates.extraImages && old.extraImages?.length) {
-      const kept = new Set([updated.productImage, ...updates.extraImages])
-      const dropped = old.extraImages.filter((ref) => !kept.has(ref))
-      if (dropped.length) cleanupAssets(...dropped)
-    }
+    // one dropped from the form is purged outright. Work out what the row still
+    // shows FIRST, across both fields at once, and only then purge what fell
+    // out: promoting an angle to primary demotes the old primary INTO
+    // extraImages, so purging a replaced primary on its own destroyed a blob the
+    // row was still showing. cleanupAssets drops the Supabase `assets` record
+    // too, which is what made that unrecoverable rather than merely wrong —
+    // downloadAssetFromR2 bails on a missing row, so the cloud copy went with
+    // it and the card fell back to the placeholder for good. This is the same
+    // shape as updateModel's `stillReferenced` guard below.
+    const kept = new Set(
+      [updated.productImage, ...(updated.extraImages ?? [])].filter((r): r is string => !!r),
+    )
+    const dropped = [old.productImage, ...(old.extraImages ?? [])]
+      .filter((r): r is string => !!r && !kept.has(r))
+    if (dropped.length) cleanupAssets(...dropped)
     set((state) => {
       const next = { products: state.products.map((p) => p.id === id ? updated : p) }
       saveToStorage({ ...state, ...next })

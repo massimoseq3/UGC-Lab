@@ -19,7 +19,7 @@
 
 import { useAuthStore } from '../stores/authStore'
 import { useAppStore } from '../stores/appStore'
-import { useBankStore, backfillUsageLedger } from '../stores/bankStore'
+import { useBankStore, backfillUsageLedger, persistBanksNow } from '../stores/bankStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { getSupabase, isCloudEnabled, ensureFreshSession } from './supabase'
 import { existingRemoteAssetIds, uploadAssetToR2 } from './r2'
@@ -102,10 +102,26 @@ function readOutbox(): Outbox {
   return { upserts: {}, deletes: {} }
 }
 
+let outboxWriteFailed = false
+
 function writeOutbox(ob: Outbox) {
   const key = outboxKey()
   if (!key) return
-  try { localStorage.setItem(key, JSON.stringify(ob)) } catch { /* quota — ignore */ }
+  try {
+    localStorage.setItem(key, JSON.stringify(ob))
+    outboxWriteFailed = false
+  } catch (e) {
+    // The outbox IS the durability guarantee behind a fire-and-forget push: a
+    // failed write here means a failed push has nothing to replay it from. It
+    // used to be swallowed as "quota — ignore", which under a full disk took
+    // out both copies of a new row at once — local blob and replay entry — and
+    // the member still saw a green "Saved". Warn once per run of failures so
+    // it's visible in a console the operator can ask for.
+    if (!outboxWriteFailed) {
+      outboxWriteFailed = true
+      console.error('[cloudSync] outbox write failed — a failed push cannot be replayed', e)
+    }
+  }
 }
 
 // Per-row marker tokens. Every record* call mints a fresh token, and
@@ -464,19 +480,10 @@ async function hydrateFromCloud(userId: string): Promise<boolean> {
     usageDays: (next.usageDays as UsageDay[]) ?? [],
   })
 
-  try {
-    const s = useBankStore.getState()
-    localStorage.setItem('ai-ugc-lab-banks', JSON.stringify({
-      products: s.products, models: s.models,
-      scripts: s.scripts, voices: s.voices, brolls: s.brolls, styles: s.styles, swipes: s.swipes,
-      voiceHistory: s.voiceHistory, videoHistory: s.videoHistory,
-      imageHistory: s.imageHistory, musicHistory: s.musicHistory,
-      scriptHistory: s.scriptHistory, brollHistory: s.brollHistory,
-      characterHistory: s.characterHistory,
-      adAnatomyHistory: s.adAnatomyHistory,
-      usageDays: s.usageDays,
-    }))
-  } catch { /* ignore */ }
+  // Through bankStore's own persist, not a second hand-rolled copy of the
+  // payload: that duplicate silently drifted out of the store's field list, and
+  // it skipped the quota trim on the one write most likely to hit it.
+  persistBanksNow(useBankStore.getState())
 
   return !anyError
 }

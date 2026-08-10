@@ -160,10 +160,21 @@ export async function downloadAssetFromR2(assetId: string): Promise<Blob | null>
   const { data, error } = await sb.from('assets').select('id, mime_type').eq('id', assetId).maybeSingle()
   if (error || !data) return null
 
+  // Bounded like every other network hop here. Unguarded, a stalled CDN read
+  // hung getBlob() — and getBlob is awaited by useAssetUrl on first paint of a
+  // bank card and by the product-photo step that runs BEFORE B-Roll's prompt
+  // call, so one stuck download could hold up a whole generation rather than
+  // just leaving a tile on its placeholder. Returning null is the established
+  // contract for "couldn't fetch"; the caller shows the placeholder.
   const { url } = await presign('get', assetId)
-  const res = await fetch(url)
-  if (!res.ok) return null
-  return await res.blob()
+  try {
+    const res = await withTimeout(fetch(url), ATTEMPT_TIMEOUT_MS)
+    if (!res.ok) return null
+    return await withTimeout(res.blob(), ATTEMPT_TIMEOUT_MS)
+  } catch (e) {
+    console.warn('[r2] asset download failed', assetId, e)
+    return null
+  }
 }
 
 // Awaited delete of both the `assets` metadata row AND the R2 binary itself.
