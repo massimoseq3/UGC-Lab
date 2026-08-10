@@ -19,7 +19,7 @@
 
 import { useAuthStore } from '../stores/authStore'
 import { useAppStore } from '../stores/appStore'
-import { useBankStore, backfillUsageLedger, persistBanksNow } from '../stores/bankStore'
+import { useBankStore, backfillUsageLedger, persistBanksNow, localBanksReady, markCloudHydrated } from '../stores/bankStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { getSupabase, isCloudEnabled, ensureFreshSession } from './supabase'
 import { existingRemoteAssetIds, uploadAssetToR2 } from './r2'
@@ -414,6 +414,12 @@ async function hydrateFromCloud(userId: string): Promise<boolean> {
     .eq('id', userId)
     .maybeSingle()
 
+  // The local cache read is async now (IndexedDB, not localStorage), so wait
+  // for it before snapshotting local state — otherwise the fallback used when
+  // a table's fetch errors would be the empty pre-load state, and a transient
+  // Postgres error would blank that bank instead of keeping what we had.
+  await localBanksReady
+  markCloudHydrated()
   const localState = useBankStore.getState()
   let anyError = false
   const tablesPromise = Promise.all(

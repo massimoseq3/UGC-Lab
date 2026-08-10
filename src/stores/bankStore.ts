@@ -7,8 +7,8 @@ import { saveRow, deleteRow, recordPendingUpsert, recordPendingDelete, clearPend
 import { useAppStore } from './appStore'
 import { estimateCredits, estimateOfficialUsd, estimateMarketUsd, creditsToUsd, TTS_MODEL_ID, type CostEstimateParams } from '../utils/models'
 import { usageDayId } from '../utils/usage'
+import { readBanks, writeBanks, clearBanks, readLegacySync, dropLegacy } from '../utils/bankPersist'
 
-const STORAGE_KEY = 'ai-ugc-lab-banks'
 const MIGRATION_FLAG = 'ai-ugc-lab-migrated-v2'
 
 const BROLL_HISTORY_CAP = 50
@@ -191,7 +191,7 @@ function generateId(): string {
   return crypto.randomUUID()
 }
 
-type BankData = Pick<BankState, 'products' | 'models' | 'scripts' | 'voices' | 'brolls' | 'styles' | 'swipes' | 'voiceHistory' | 'videoHistory' | 'imageHistory' | 'musicHistory' | 'scriptHistory' | 'brollHistory' | 'characterHistory' | 'adAnatomyHistory' | 'usageDays'>
+export type BankData = Pick<BankState, 'products' | 'models' | 'scripts' | 'voices' | 'brolls' | 'styles' | 'swipes' | 'voiceHistory' | 'videoHistory' | 'imageHistory' | 'musicHistory' | 'scriptHistory' | 'brollHistory' | 'characterHistory' | 'adAnatomyHistory' | 'usageDays'>
 
 function migrateVoiceShape<T>(arr: unknown): T[] {
   if (!Array.isArray(arr)) return []
@@ -242,15 +242,18 @@ const EMPTY_BANKS: BankData = {
 export function resetBankStore(): void {
   pendingSave = null
   saveScheduled = false
-  try { localStorage.removeItem(STORAGE_KEY) } catch { /* ignore */ }
+  void clearBanks()
+  dropLegacy()
   useBankStore.setState(EMPTY_BANKS)
 }
 
-function loadFromStorage(): BankData {
+// Normalise whatever came back from the cache — the IndexedDB record, or the
+// legacy localStorage blob on the one load that migrates it. Both are untrusted
+// shapes (an older app version wrote them), so every field is defaulted.
+function normalizeBanks(source: unknown): BankData {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw)
+    if (source && typeof source === 'object') {
+      const parsed = source as Record<string, never>
       return {
         products: parsed.products ?? [],
         models: parsed.models ?? [],
@@ -276,91 +279,70 @@ function loadFromStorage(): BankData {
   return { ...EMPTY_BANKS }
 }
 
+// Resolves once the IndexedDB copy has been read (or failed). cloudSync awaits
+// it before hydrating, so the slower local read can never land on top of fresher
+// cloud data — the one ordering hazard in having two async sources.
+let markLocalReady: () => void
+export const localBanksReady: Promise<void> = new Promise((resolve) => { markLocalReady = resolve })
+
+// The cloud is authoritative the moment it lands. If hydrate somehow beat the
+// local read, the local copy is stale by definition and must not be applied.
+let cloudHasHydrated = false
+export function markCloudHydrated(): void {
+  cloudHasHydrated = true
+}
+
+async function loadLocalBanks(): Promise<void> {
+  try {
+    const stored = await readBanks()
+    if (stored) {
+      if (!cloudHasHydrated) useBankStore.setState(normalizeBanks(stored))
+      // The legacy key has served its purpose — drop it so it can't go stale
+      // and so this browser stops paying for the biggest write it was making.
+      dropLegacy()
+    } else {
+      // First load since the move: promote the legacy blob into IndexedDB. It
+      // was already applied synchronously below, so this only persists it.
+      const legacy = readLegacySync()
+      if (legacy) {
+        await writeBanks(normalizeBanks(legacy)).then(dropLegacy).catch(() => { /* retried on next save */ })
+      }
+    }
+  } catch (e) {
+    console.warn('[bankStore] local cache read failed', e)
+  } finally {
+    localLoadDone = true
+    markLocalReady()
+    // A mutation during the read (migrateToAssetStore, or a fast first click)
+    // left its snapshot queued and suppressed. Flush it now, or it would sit
+    // there until the next unrelated write happened to come along.
+    if (pendingSave) flushSaveToStorage()
+  }
+}
+
 let pendingSave: BankData | null = null
 let saveScheduled = false
 
-function isQuotaError(e: unknown): boolean {
-  // Safari reports the legacy code 22 with a different name, Firefox uses its
-  // own name — match all three rather than the Chrome spelling alone.
-  return (
-    e instanceof DOMException &&
-    (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED' || e.code === 22)
-  )
-}
-
-// How many rows of each history bank the LOCAL copy keeps when the full blob
-// won't fit. localStorage is a boot cache, not the source of truth — the cloud
-// holds every row and hydrate refills memory from it — so shedding the oldest
-// rows from the WRITE costs a cloud member nothing but a slower first paint on
-// the deep end of their history. Full fidelity is always tried first; these
-// only come into play once the browser refuses the write.
-const PERSIST_TRIM_STEPS = [Infinity, 400, 150, 40]
-
-const HISTORY_KEYS = [
-  'voiceHistory', 'videoHistory', 'imageHistory', 'musicHistory',
-  'scriptHistory', 'brollHistory', 'characterHistory', 'adAnatomyHistory',
-] as const satisfies readonly (keyof BankData)[]
-
-let quotaReported = false
-
-function persistPayload(state: BankData, keep: number): Record<string, unknown> {
-  const payload: Record<string, unknown> = {
-    products: state.products,
-    models: state.models,
-    scripts: state.scripts,
-    voices: state.voices,
-    brolls: state.brolls,
-    styles: state.styles,
-    swipes: state.swipes,
-    usageDays: state.usageDays,
-  }
-  for (const key of HISTORY_KEYS) {
-    const rows = state[key] as Array<{ createdAt?: number }>
-    payload[key] = keep >= rows.length
-      ? rows
-      : [...rows].sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0)).slice(0, keep)
-  }
-  return payload
-}
+// Suppressed until the IndexedDB read below has resolved, so the empty initial
+// state (or a partial legacy one) can't be written over a good cached copy in
+// the window before it lands.
+let localLoadDone = false
 
 function flushSaveToStorage() {
   saveScheduled = false
-  if (!pendingSave) return
+  if (!pendingSave || !localLoadDone) return
   const state = pendingSave
   pendingSave = null
-
-  let lastError: unknown = null
-  for (const keep of PERSIST_TRIM_STEPS) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(persistPayload(state, keep)))
-      return
-    } catch (error) {
-      lastError = error
-      // Only a full disk is worth retrying smaller; anything else (a serialise
-      // error, a browser blocking storage outright) repeats identically.
-      if (!isQuotaError(error)) break
-    }
-  }
-
-  console.error('Failed to save to storage', lastError)
-  // Once per session: the row IS in memory and, for a cloud member, already on
-  // its way to Postgres — so this is a warning about this browser's copy, not a
-  // report of lost work. Saying it on every flush would make it noise, and the
-  // condition doesn't clear on its own.
-  if (!quotaReported) {
-    quotaReported = true
-    const msg = isQuotaError(lastError)
-      ? "This browser's storage is full, so your work can't be saved here. Clear some history from the Bank, or sign in on this browser to keep everything in the cloud."
-      : "This browser refused to save your work locally. Check that storage isn't blocked for this site."
-    try { useAppStore.getState().addToast(msg, 'error') } catch { /* ignore */ }
-  }
+  // Failures are logged, never toasted: this is the boot cache, and the cloud
+  // already has the row. Telling a member their work is at risk because a
+  // SPEED optimisation missed would be false — and was, when it did.
+  void writeBanks(state).catch((e) => console.warn('[bankStore] local cache write failed', e))
 }
 
-// Write the given state to localStorage right now, through the same trim
-// ladder, instead of waiting on the idle queue. For cloudSync's post-hydrate
-// write: that one lands the whole cloud-side history at once — the largest
-// write a member ever makes, and the first thing a heavy account does after
-// signing in — so it is exactly the one that must degrade rather than vanish.
+// Cache the given state now rather than on the idle queue — for cloudSync's
+// post-hydrate write, which lands the whole cloud-side history at once. It is
+// the largest write a member ever makes, and under the old localStorage home it
+// was the one that failed.
 export function persistBanksNow(state: BankData) {
   pendingSave = state
   flushSaveToStorage()
@@ -481,7 +463,11 @@ function brollAssetStillInHistory(
 }
 
 export const useBankStore = create<BankState>((set, get) => ({
-  ...loadFromStorage(),
+  // Synchronous first paint from the legacy localStorage blob, so an existing
+  // member's Bank is populated on frame one. Empty for everyone after the
+  // migration below drops that key; loadLocalBanks() then fills it from
+  // IndexedDB a tick later, and the cloud overwrites both when it lands.
+  ...normalizeBanks(readLegacySync()),
 
   // ── Usage ledger ──────────────────────────────────────────────────
   // Same local-first + background-push contract as every bank action. No
@@ -1454,3 +1440,8 @@ async function migrateToAssetStore() {
 }
 
 migrateToAssetStore()
+
+// Fill the Bank from the IndexedDB cache (and migrate the legacy localStorage
+// blob on the first load after the move). Kicked off at module load so it races
+// nothing: cloudSync awaits `localBanksReady` before hydrating.
+void loadLocalBanks()
