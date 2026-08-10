@@ -73,11 +73,12 @@ const STILL_CAPABLE_MODES: Mode[] = ['image-to-video', 'reference-to-video']
 
 // ─── Option columns ──────────────────────────────────────────────────────
 // The storyboard is a grid: one row per script line, one column per option.
-// An IMAGE batch walks that grid a COLUMN at a time by default — every line's
-// Option 1, then Option 2 — so the member sees a one-per-line storyboard and
-// can stop there; a still is cheap enough that the saved credits are worth the
-// extra press. A VIDEO batch opens on all options instead: "Generate all
-// videos" that silently means Option 1 is a promise the dialog doesn't keep.
+// Both header batches open on ALL options. They used to open on the leftmost
+// column with work left, so that a second press picked up where the first left
+// off — cheaper per press, but a button labelled "Generate all images" that
+// quietly does a third of them is a button that doesn't do what it says, and
+// members read the short run as a bug rather than a saving. The Options chips
+// still scope a run; scoping is the deliberate act now, not the default.
 type BatchColumn = number | 'all'
 
 interface BatchRequest {
@@ -101,16 +102,6 @@ const columnOf = (key: string) => Number(key.split('-')[1])
 
 const columnsIn = (keys: string[]) =>
   [...new Set(keys.map(columnOf))].filter((n) => Number.isFinite(n)).sort((a, b) => a - b)
-
-// Which column the dialog opens on: the leftmost that still has work. That's
-// what makes a second press pick up where the first left off, without a
-// stateful counter that a refresh (or a regenerated card) would get wrong.
-function firstOpenColumn(keys: string[], isFresh: (key: string) => boolean): BatchColumn {
-  for (const col of columnsIn(keys)) {
-    if (keys.some((k) => columnOf(k) === col && isFresh(k))) return col
-  }
-  return 'all'
-}
 
 // The still a card is currently showing — the user's pick if they made one,
 // otherwise the one on the card face. Used to resolve what the next dialogue
@@ -294,7 +285,10 @@ export default function ScenesView({
     // dialog still opens — with the toggle as the only way forward — so
     // "regenerate the lot" stays possible but never accidental.
     setIncludeExisting(false)
-    setBatchColumn(columnar ? firstOpenColumn(targets, (k) => !hasImage(k)) : 'all')
+    // All options — see the note on BatchColumn. Cards that already hold an
+    // image are still held back by the toggle above, so this is "every option
+    // that has no still yet", not a re-render of the storyboard.
+    setBatchColumn('all')
     setBatchConfirm({ keys, scope, columnar })
   }
 
@@ -416,11 +410,9 @@ export default function ScenesView({
     // Cards that already have a clip are held back by default — a video is the
     // expensive half of this app, so re-billing one takes an explicit tick.
     setIncludeExistingVideos(false)
-    // A video batch opens on ALL options, not the leftmost open column. The
-    // button says "Generate all videos" and a dialog that quietly scoped it to
-    // Option 1 read as a bug — the member ticked Generate expecting the
-    // storyboard and got a third of it. The column chips are still there to
-    // narrow it; narrowing is now the deliberate act, not the default.
+    // All options — see the note on BatchColumn. Cards that already hold a clip
+    // are still held back, so this is "every option that has no video yet",
+    // not a re-bill of the storyboard.
     setVideoColumn('all')
     setVideoConfirm({ keys, scope, columnar, stillsOnly })
   }
