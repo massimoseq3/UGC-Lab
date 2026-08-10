@@ -82,14 +82,17 @@ export function SectionLabel({
   className = '',
 }: {
   label: string
-  filled: boolean
+  // Undefined = NO dot, the same convention `RefGroup` uses: for a row whose
+  // filled state is already obvious from the control itself (a thumbnail versus
+  // a dashed box), or one in a group where a dot could only ever be green.
+  filled?: boolean
   required?: boolean
   right?: ReactNode
   className?: string
 }) {
   return (
     <div className={`flex items-center gap-1.5 ${className}`}>
-      <StatusDot filled={filled} required={required} />
+      {filled != null && <StatusDot filled={filled} required={required} />}
       <span className="text-[11px] font-medium uppercase tracking-widest text-ink-300">{label}</span>
       {right && <div className="ml-auto">{right}</div>}
     </div>

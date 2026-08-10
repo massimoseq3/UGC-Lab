@@ -14,7 +14,9 @@ import {
   ChevronRight,
   Star,
   Link2,
+  Layers,
 } from 'lucide-react'
+import SectionCard, { SectionLabel } from '../../../components/SectionCard'
 import ModelPicker from '../../../components/ModelPicker'
 import ModelSidePanel from '../../../components/ModelSidePanel'
 import ProviderLogo from '../../../components/ProviderLogo'
@@ -256,6 +258,11 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     (characterRef && cardState.refsCharacter !== false ? 1 : 0) +
     (productActive ? 1 : 0) +
     extraRefs.length
+  // What the References card header reports. The product's extra angles are
+  // deliberately not counted here — they ride behind the product reference and
+  // the Product slot already says "+2 angles" on its own line.
+  const chainActive = isDialogue && !!chainImageRef && cardState.chainLink !== false && tab === 'image'
+  const attachedRefCount = manualRefCount + (chainActive ? 1 : 0)
   const attachedAngleCount = productActive
     ? productAngleSlots({
         manualCount: manualRefCount,
@@ -491,9 +498,12 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                 {/* Animate tab → Start frame preview. Image/Video tabs →
                     the Influencer / Product reference slot cards + extra refs. */}
                 {tab === 'animate' ? (
-                  <div>
-                    <span className="text-sm font-medium text-ink-200">Start frame</span>
-                    <div className="mt-2">
+                  <div className="flex flex-col gap-1.5">
+                    {/* Required, and the dot is honest: no still means Animate is
+                        disabled, which is exactly what red is reserved for. Not
+                        carded — a border around one control says nothing. */}
+                    <SectionLabel label="Start frame" filled={!!effectiveAnimateFrame} required />
+                    <div>
                       {effectiveAnimateFrame && animateFrameUrl ? (
                         <div
                           className="relative max-w-[72px] overflow-hidden rounded-xl border border-ink/10 bg-ink/[0.02]"
@@ -512,11 +522,26 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                     </div>
                   </div>
                 ) : (
-                  <div>
+                  /* Everything this render is built FROM, in the same References
+                     card the input panel behind the modal wears — same icon,
+                     same centred title. The slot cards, the product-photo strip
+                     and the extra refs were four sibling blocks with nothing
+                     saying they were one group. */
+                  <SectionCard
+                    icon={Layers}
+                    title="References"
+                    contentClassName="flex flex-col gap-3"
+                    right={attachedRefCount > 0 ? (
+                      <span className="rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] tabular-nums text-ink-500">
+                        {attachedRefCount} attached
+                      </span>
+                    ) : undefined}
+                  >
                     {/* Reference images — bank-keyed Influencer / Product slot
-                        cards (no heading, Playground style). Click the body to
-                        pick from the bank; the tick-circle toggles whether the
-                        ref is sent. */}
+                        cards. Click the body to pick from the bank; the
+                        tick-circle toggles whether the ref is sent. No status
+                        dots: a thumbnail versus a placeholder disc already
+                        outshouts a 6px dot, and none of these gates the run. */}
                     <div className="grid grid-cols-2 gap-2">
                       {/* Previous cut — a DIALOGUE card chains off the last
                           talking-head still so the ad reads as one continuous
@@ -584,11 +609,11 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                       />
                     )}
                     {hasActiveRef && refsUnsupportedForVideo && (
-                      <p className="mt-2 text-[11px] leading-relaxed text-gold-400/80 light:text-gold-600/80">
+                      <p className="text-[11px] leading-relaxed text-gold-400/80 light:text-gold-600/80">
                         {videoModelName} doesn't support reference images — this will generate text-to-video only. Pick Seedance 2.0 or Gemini Omni to use your character/product.
                       </p>
                     )}
-                  </div>
+                  </SectionCard>
                 )}
 
                 {/* Prompt — grows to absorb leftover height. Textarea + footer
@@ -637,12 +662,19 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                     prompt. Only on the Video / Animate tabs of a DIALOGUE card;
                     edits update the value shared by all dialogue clips. */}
                 {isDialogue && onUpdateVoiceProfile && tab !== 'image' && (
-                  <div className="rounded-2xl border border-broll-500/20 bg-broll-500/[0.06] px-3 py-2.5">
-                    <div className="mb-1.5 flex items-center gap-1.5">
-                      <Volume2 className="h-3.5 w-3.5 text-broll-300 light:text-broll-600" />
-                      <span className="text-[12px] font-medium text-ink-100">Voice</span>
-                      <span className="text-[10px] text-ink-500">shared by every dialogue clip</span>
-                    </div>
+                  /* A real SectionCard rather than a look-alike: this was a
+                     hand-rolled tinted block with a left-aligned heading, which
+                     made it a fourth heading register in one column. Same shape
+                     as Voiceovers' own Voice card now. */
+                  <SectionCard
+                    icon={Volume2}
+                    title="Voice"
+                    right={(
+                      <span className="rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500">
+                        every clip
+                      </span>
+                    )}
+                  >
                     <textarea
                       value={voiceDraft}
                       onChange={(e) => setVoiceDraft(e.target.value)}
@@ -651,7 +683,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                       placeholder="How the character sounds — age, accent, pitch, pace, texture, energy. Written once, applied to every talking clip."
                       className="w-full resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-[12px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
                     />
-                  </div>
+                  </SectionCard>
                 )}
               </div>
             </div>

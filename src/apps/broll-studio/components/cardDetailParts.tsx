@@ -13,6 +13,7 @@ import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import DayPill from '../../../components/DayPill'
 import BankPicker from '../../../components/BankPicker'
 import SlotActionMenu from '../../../components/video/SlotActionMenu'
+import { SectionLabel } from '../../../components/SectionCard'
 import type { CardState, ReferenceImage } from '../types'
 import type { BRoll, AnyBankItem } from '../../../stores/types'
 import { useAssetUrlState, useAssetUrl } from '../../../hooks/useAssetUrl'
@@ -777,12 +778,18 @@ export function ProductPhotoRow({
   }
   return (
     <div className={`flex flex-col gap-1.5 ${dimmed ? 'opacity-50' : ''}`}>
-      <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[11px] font-medium tracking-tight text-ink-400">Product photo</span>
-        <span className="text-[10px] tracking-tight text-ink-600">
-          {selection.length === 1 ? 'One state per shot' : `${selection.length} attached`}
-        </span>
-      </div>
+      {/* Small-caps, because this row lives inside the References card now and a
+          13px sentence-case label under a 13px card title reads as a second
+          title. No dot: the picked photo is lit and the others are dimmed, which
+          says "filled" far louder than 6px could. */}
+      <SectionLabel
+        label="Product photo"
+        right={(
+          <span className="text-[10px] tracking-tight text-ink-600">
+            {selection.length === 1 ? 'One state per shot' : `${selection.length} attached`}
+          </span>
+        )}
+      />
       <div className="flex flex-wrap gap-2">
         {photos.map((ref, i) => (
           <ProductPhotoTile
@@ -880,40 +887,49 @@ export function ExtraRefsRow({
   }
 
   return (
-    <div className={`mt-2 ${dimmed ? 'opacity-50' : ''}`}>
+    <div className={`flex flex-col gap-1.5 ${dimmed ? 'opacity-50' : ''}`}>
+      {/* The group's name and its count now live on a SectionLabel rather than
+          being pinned into the add card's own corners — inside the References
+          card there's a header row to carry them, which is the whole point of
+          the card. No dot: extra refs never gate a generation. */}
+      <SectionLabel
+        label="Extra references"
+        right={(
+          <span className="text-[10px] tabular-nums tracking-tight text-ink-600">
+            {refs.length}/{max}
+          </span>
+        )}
+      />
+
       {/* Picked references render as a four-up thumbnail strip above the add
           card — same layout as the Playground reference strip. */}
       {refs.length > 0 && (
-        <div className="mb-2 grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           {refs.map((r, i) => (
             <RefThumb key={i} refStr={r.dataUrl} onRemove={() => onRemove(i)} />
           ))}
         </div>
       )}
 
-      {/* Full-width dashed add card — mirrors the Playground "Reference Images"
-          box (Optional badge left, count right, centered icon + label). Click
-          opens Upload / Pick-from-Bank. */}
+      {/* Dashed add card — click opens Upload / Pick-from-Bank. Shorter than it
+          was (h-14, not h-20): the label above now says what it is, so the card
+          only has to be a target. */}
       <div className="relative">
         <button
           ref={triggerRef}
           type="button"
           disabled={remaining <= 0}
           onClick={() => { if (remaining > 0) setMenuOpen((v) => !v) }}
-          className={`group relative flex h-20 w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-ink/15 bg-ink/[0.02] transition-colors ${
+          className={`group relative flex h-14 w-full flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-ink/15 bg-ink/[0.02] transition-colors ${
             remaining <= 0 ? 'cursor-not-allowed opacity-50' : 'hover:border-ink/25 hover:bg-ink/[0.04]'
           }`}
         >
-          <span className="absolute left-2 top-2 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[9px] font-medium capitalize tracking-tight text-ink-500">
-            Optional
-          </span>
-          <span className="absolute right-2 top-2 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[9px] font-medium tabular-nums tracking-tight text-ink-500">
-            {refs.length}/{max}
-          </span>
-          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-ink/15 bg-ink/[0.03] text-ink-400 transition-colors group-hover:text-ink-200">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-ink/15 bg-ink/[0.03] text-ink-400 transition-colors group-hover:text-ink-200">
             <ImagePlus className="h-3.5 w-3.5" />
           </span>
-          <span className="text-[12px] font-normal text-ink-500">Reference Images</span>
+          <span className="text-[12px] font-normal text-ink-500">
+            {remaining <= 0 ? 'All slots used' : 'Upload or pick from a bank'}
+          </span>
         </button>
         {remaining > 0 && (
           <SlotActionMenu
