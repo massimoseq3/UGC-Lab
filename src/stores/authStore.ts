@@ -80,7 +80,7 @@ interface AuthState {
 
   bootstrap: () => Promise<void>
   signIn: (email: string, password: string) => Promise<{ ok: true } | { ok: false; error: string; revoked?: boolean }>
-  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ ok: true; needsConfirm: boolean } | { ok: false; error: string }>
+  signUp: (email: string, password: string, firstName: string, lastName: string, signupCode: string) => Promise<{ ok: true; needsConfirm: boolean } | { ok: false; error: string }>
   signOut: () => Promise<void>
   clearAccessRevoked: () => void
   refreshProfile: () => Promise<void>
@@ -198,16 +198,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   clearAccessRevoked: () => set({ accessRevoked: false }),
 
-  signUp: async (email, password, firstName, lastName) => {
+  signUp: async (email, password, firstName, lastName, signupCode) => {
     if (!isCloudEnabled()) return { ok: false, error: 'Cloud not configured.' }
     const sb = getSupabase()
     // Names ride along as user metadata; the on_auth_user_created trigger reads
     // them into the profile when the allowlist has no name for this email (e.g.
     // they signed up with a different email than their Skool one).
+    //
+    // The access code rides the same way and is checked by enforce_allowlist
+    // (migration 0021), which strips it back off the row. It is deliberately
+    // NOT validated here: the expected value lives in app_config, never in the
+    // bundle, so nobody can read it out of the shipped JS.
     const { data, error } = await sb.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { first_name: firstName.trim(), last_name: lastName.trim() } },
+      options: {
+        data: {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          signup_code: signupCode.trim(),
+        },
+      },
     })
     if (error) {
       // Surface our allowlist-trigger message verbatim — that's the friendly
@@ -282,10 +293,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
 function prettifyAuthError(message: string): string {
   // Postgres trigger errors come back with the `P0001` prefix stripped; we
-  // recognise our specific phrase and clean it up. Everything else passes
+  // recognise our specific phrases and clean them up. Everything else passes
   // through so kie/Supabase errors stay debuggable.
   if (/not on the access list/i.test(message)) {
     return "This email isn't on the access list. Join the Skool community first, then try again."
+  }
+  if (/access code/i.test(message)) {
+    return 'That access code is incorrect. You can find it in the Skool community.'
+  }
+  // Some GoTrue versions swallow a signup trigger's own message and return this
+  // generic one instead, so name both things it can be rather than leaving the
+  // member staring at "Database error".
+  if (/database error saving new user/i.test(message)) {
+    return "Couldn't create your account. Check your access code, and that you're signing up with the email you use on Skool."
   }
   return message
 }
