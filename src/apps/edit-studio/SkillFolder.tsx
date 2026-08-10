@@ -1,4 +1,5 @@
 import CrabSprite from '../../components/CrabSprite'
+import { SKILL_VERSION } from '../../stores/skillUpdateStore'
 
 // The downloadable video editor skill, drawn as a glowing macOS-style folder
 // (recreates Massimo's "edit video" folder art in live DOM so it can animate).
@@ -60,13 +61,31 @@ export function downloadSkill() {
   link.remove()
 }
 
-export default function SkillFolder() {
+// The version sticker on the folder's corner. The skill is installed by hand
+// and never auto-updates, so the folder has to say which cut is inside it —
+// and shout when that's a newer one than the member last took.
+function VersionBadge({ fresh }: { fresh: boolean }) {
+  return (
+    <span
+      className={`absolute right-[1%] top-[16%] z-30 rotate-[4deg] rounded-full px-2.5 py-1 text-[11px] font-bold leading-none tracking-tight shadow-md shadow-black/25 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:rotate-[7deg] ${
+        fresh
+          ? 'text-white ring-1 ring-inset ring-white/30'
+          : 'bg-[#F7F5F0] text-zinc-500 ring-1 ring-inset ring-black/10'
+      }`}
+      style={fresh ? { backgroundColor: ACCENT } : undefined}
+    >
+      {fresh ? `New update · v${SKILL_VERSION}` : `v${SKILL_VERSION}`}
+    </span>
+  )
+}
+
+export default function SkillFolder({ fresh = false }: { fresh?: boolean }) {
   return (
     <button
       type="button"
       onClick={downloadSkill}
       className="group relative mx-auto block w-[300px] cursor-pointer select-none outline-none sm:w-[340px]"
-      aria-label="Download the video editor Claude skill"
+      aria-label={`Download the video editor Claude skill, version ${SKILL_VERSION}`}
     >
       {/* Orange halo, brightens and widens on hover */}
       <div
@@ -134,6 +153,8 @@ export default function SkillFolder() {
             /video-editor
           </span>
         </div>
+
+        <VersionBadge fresh={fresh} />
       </div>
     </button>
   )

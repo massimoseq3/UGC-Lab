@@ -2,6 +2,7 @@ import { Fragment, useState, type ReactNode } from 'react'
 import { Settings } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useActivityStore } from '../stores/activityStore'
+import { useSkillUpdateUnseen } from '../stores/skillUpdateStore'
 import { APP_REGISTRY, type AppCategory, type AppConfig } from '../utils/constants'
 import { getTeamMember } from '../utils/team'
 import CrabSprite from './CrabSprite'
@@ -21,6 +22,9 @@ export default function Dock() {
   const runningApps = useAppStore((s) => s.runningApps)
   const openApp = useAppStore((s) => s.openApp)
   const activityCounts = useActivityStore((s) => s.counts)
+  // Edit hands out a file that never auto-updates, so a new cut of the skill
+  // has to announce itself from the dock — nobody reopens a download page.
+  const skillUpdate = useSkillUpdateUnseen()
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   const groups = SECTION_ORDER.map((category) =>
@@ -43,6 +47,7 @@ export default function Dock() {
                   active={activeApp === app.id}
                   running={runningApps.includes(app.id)}
                   busy={(activityCounts[app.id] ?? 0) > 0}
+                  badge={app.id === 'edit-studio' && skillUpdate}
                   onClick={() => openApp(app.id)}
                 />
               ))}
@@ -126,12 +131,16 @@ function DockAppTile({
   active,
   running,
   busy,
+  badge,
   onClick,
 }: {
   app: AppConfig
   active: boolean
   running: boolean
   busy: boolean
+  // Something new is waiting inside — a notification dot on the tile itself,
+  // not the running dot under the label (that one means "this app is open").
+  badge: boolean
   onClick: () => void
 }) {
   const Icon = app.icon
@@ -174,6 +183,14 @@ function DockAppTile({
             strokeWidth={1.9}
           />
         </span>
+        {/* Top-LEFT, because the crab peeks out of the top-right on hover.
+            Ringed in the dock's own fill so it reads as a badge on the tile. */}
+        {badge && (
+          <span
+            className="absolute -left-0.5 -top-0.5 z-20 h-3 w-3 rounded-full border-2 border-surface-1 bg-red-500"
+            aria-hidden
+          />
+        )}
       </span>
     </DockItem>
   )
