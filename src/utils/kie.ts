@@ -412,25 +412,59 @@ export function parseResult(record: TaskRecord): ParsedResult {
 // 3 days, so failing loudly here is what lets the caller retry.
 const ASSET_DOWNLOAD_TIMEOUT_MS = 180_000
 
-// Download a generated URL and return base64 + mimeType for local persistence.
-export async function downloadAsBase64(url: string): Promise<{ base64: string; mimeType: string }> {
-  // One controller for the fetch AND the body read — aborting it tears down the
-  // response stream too, so a mid-download stall can't outlive the deadline.
+// Fetch a finished result off kie's CDN on a deadline.
+//
+// This is the tail of a generation kie has ALREADY finished and billed for, and
+// it is reached by a bare `fetch` from several services. A bare fetch here is
+// the same hang `armBodyTimeout` exists to stop, one step further down: fetch()
+// settles at the headers, so a CDN that answers and then stalls mid-body leaves
+// the read pending forever — the tile sits on "generating" with no error, no
+// cancel and no way out but a reload, and the download is exactly what can't be
+// skipped, since kie's URLs expire in 3 days.
+//
+// One controller covers the request AND the body read (aborting it tears down
+// the response stream), and the returned Response has its readers re-armed with
+// a fresh budget, so `.blob()`/`.text()` are bounded too. Callers keep their own
+// status checks and error wording.
+export async function fetchGeneratedAsset(
+  url: string,
+  opts: { signal?: AbortSignal; timeoutMs?: number } = {},
+): Promise<Response> {
+  const { signal, timeoutMs = ASSET_DOWNLOAD_TIMEOUT_MS } = opts
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), ASSET_DOWNLOAD_TIMEOUT_MS)
-  let blob: Blob
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const onAbort = () => controller.abort()
+  signal?.addEventListener('abort', onAbort, { once: true })
+
   try {
     const res = await fetch(url, { signal: controller.signal })
-    if (!res.ok) throw new Error(`Failed to download generated asset (${res.status}).`)
-    blob = await res.blob()
+    // Deliberately leaves `onAbort` attached: the body is still unread at this
+    // point, so a caller that cancels afterwards should still tear the download
+    // down. It is a `once` listener on a signal the caller owns, so it costs one
+    // closure and cannot fire twice.
+    return armBodyTimeout(res, controller, timeoutMs)
   } catch (e) {
+    signal?.removeEventListener('abort', onAbort)
     if (e instanceof DOMException && e.name === 'AbortError') {
+      // The caller's own cancel is not a failure to report as one.
+      if (signal?.aborted) throw e
       throw new Error('Timed out downloading the finished result. Try again.')
     }
     throw e
   } finally {
+    // Headers landed (or we failed) — the body read carries its own fresh
+    // budget via armBodyTimeout, so this deadline has done its job.
     clearTimeout(timer)
   }
+}
+
+// Download a generated URL and return base64 + mimeType for local persistence.
+export async function downloadAsBase64(url: string): Promise<{ base64: string; mimeType: string }> {
+  const res = await fetchGeneratedAsset(url)
+  if (!res.ok) throw new Error(`Failed to download generated asset (${res.status}).`)
+  const blob = await res.blob()
   const mimeType = blob.type || 'image/png'
   const buffer = await blob.arrayBuffer()
   // Avoid `String.fromCharCode(...new Uint8Array(...))` which blows the call

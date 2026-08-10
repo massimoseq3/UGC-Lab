@@ -196,6 +196,51 @@ export async function ensureFreshSession(): Promise<string | null> {
   return await forceRefreshSession()
 }
 
+// ── Paged reads ─────────────────────────────────────────────────────
+//
+// PostgREST caps every response at a server-configured maximum (Supabase's
+// default is 1000 rows) and says nothing about it in the body: a query matching
+// more rows just returns the first N, with no error and no flag. Any read that
+// means "the whole table" therefore HAS to page, or it silently truncates.
+//
+// That truncation is not cosmetic here. The history banks grow unbounded by
+// design ("a member's outputs are never evicted behind their back"), so a heavy
+// member crosses the cap — and then hydrate replaces their local state with the
+// first page only, and `persistBanksNow` writes that truncated set to the local
+// cache. Worse, the orphan sweep that runs after a clean hydrate builds its
+// in-use ref set from those same truncated banks and deletes every asset it
+// can't find a reference for, from IndexedDB AND R2. A truncated read is what
+// turns "your older history is missing" into "your older media is gone".
+//
+// Paging by the batch size actually RETURNED (not the size requested) keeps
+// this correct whatever the server cap is set to — asking for 1000 against a
+// server capped at 500 must not read a 500-row answer as "that's the last of
+// them". `count` from the first page says when to stop without paying for a
+// trailing empty request; callers that don't ask for one fall back to the
+// short-batch heuristic.
+const PAGE_SIZE = 1000
+
+export async function selectAllRows<T>(
+  page: (from: number, to: number) => PromiseLike<{
+    data: T[] | null
+    error: { message: string } | null
+    count?: number | null
+  }>,
+): Promise<{ data: T[]; error: { message: string } | null }> {
+  const rows: T[] = []
+  let total: number | null = null
+  for (;;) {
+    const { data, error, count } = await page(rows.length, rows.length + PAGE_SIZE - 1)
+    if (error) return { data: [], error }
+    if (total === null && typeof count === 'number') total = count
+    const batch = data ?? []
+    rows.push(...batch)
+    if (batch.length === 0) break
+    if (total !== null ? rows.length >= total : batch.length < PAGE_SIZE) break
+  }
+  return { data: rows, error: null }
+}
+
 // One-time install: proactively recover the session when the user brings the
 // tab back. ensureFreshSession() is timeout-guarded, so this can't hang.
 // Module-level so it runs once on first import. Guarded so it's inert in
