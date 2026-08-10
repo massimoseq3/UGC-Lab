@@ -94,6 +94,11 @@ function withTimeout<T>(p: PromiseLike<T>, ms: number, label: string): Promise<T
 
 export interface UseMembersResult {
   rows: MemberRow[]
+  // When `rows` was loaded (epoch ms; 0 before the first successful fetch).
+  // Age-of-row maths reads this instead of calling Date.now() during render,
+  // which would be an impure render call and make the React Compiler skip the
+  // whole component.
+  fetchedAt: number
   loading: boolean
   slowHint: boolean
   profilesError: string | null
@@ -108,6 +113,7 @@ export interface UseMembersResult {
 // Shared by MembersTable and the Insights tab so both read one fetch.
 export function useMembers(): UseMembersResult {
   const [rows, setRows] = useState<MemberRow[]>([])
+  const [fetchedAt, setFetchedAt] = useState(0)
   const [loading, setLoading] = useState(true)
   const [slowHint, setSlowHint] = useState(false)
   const [profilesError, setProfilesError] = useState<string | null>(null)
@@ -205,6 +211,7 @@ export function useMembers(): UseMembersResult {
         }
       })
       setRows(merged)
+      setFetchedAt(Date.now())
     } catch (e) {
       setProfilesError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -215,5 +222,5 @@ export function useMembers(): UseMembersResult {
 
   useEffect(() => { reload() }, [reload])
 
-  return { rows, loading, slowHint, profilesError, storageWarning, activityWarning, reload }
+  return { rows, fetchedAt, loading, slowHint, profilesError, storageWarning, activityWarning, reload }
 }

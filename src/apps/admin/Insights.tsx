@@ -4,6 +4,15 @@ import { useMembers, formatBytes, formatRelative, memberName, isInactive, isActi
 
 const DAY = 24 * 60 * 60_000
 
+// Is the timestamp `s` between `lo` and `hi` days old, measured from `now`?
+// Module scope on purpose: `now` is passed in rather than read from the clock,
+// so nothing here calls an impure function during render.
+function withinDays(s: string | null, lo: number, hi: number, now: number): boolean {
+  if (!s) return false
+  const age = now - new Date(s).getTime()
+  return age >= lo * DAY && age < hi * DAY
+}
+
 // Per-bank accent hexes (mirror of BANK_CONFIG, plus a videos tint).
 const BANK_BARS: Array<{ key: keyof MemberRow; label: string; color: string }> = [
   { key: 'products', label: 'Products', color: '#f59e0b' },
@@ -15,7 +24,7 @@ const BANK_BARS: Array<{ key: keyof MemberRow; label: string; color: string }> =
 ]
 
 export default function Insights() {
-  const { rows, loading, slowHint, profilesError, reload } = useMembers()
+  const { rows, fetchedAt, loading, slowHint, profilesError, reload } = useMembers()
 
   const stats = useMemo(() => {
     let active = 0, inactive = 0, disabled = 0, bytes = 0, gens7d = 0
@@ -38,11 +47,16 @@ export default function Insights() {
       byMonth.set(key, (byMonth.get(key) ?? 0) + 1)
     }
     const months = [...byMonth.keys()].sort()
+    // Plain loop rather than a mutating .map callback: a closure that reassigns
+    // an outer variable is flagged as escaping render (react-hooks/immutability).
+    const out: Array<{ month: string; added: number; total: number }> = []
     let running = 0
-    return months.map((m) => {
-      running += byMonth.get(m) ?? 0
-      return { month: m, added: byMonth.get(m) ?? 0, total: running }
-    })
+    for (const m of months) {
+      const added = byMonth.get(m) ?? 0
+      running += added
+      out.push({ month: m, added, total: running })
+    }
+    return out
   }, [rows])
 
   const bankTotals = useMemo(
@@ -72,16 +86,11 @@ export default function Insights() {
 
   // Signup/churn momentum: this 7-day window vs the previous one.
   const growth = useMemo(() => {
-    const within = (s: string | null, lo: number, hi: number) => {
-      if (!s) return false
-      const age = Date.now() - new Date(s).getTime()
-      return age >= lo * DAY && age < hi * DAY
-    }
-    const newThisWeek = rows.filter((r) => within(r.created_at, 0, 7)).length
-    const newLastWeek = rows.filter((r) => within(r.created_at, 7, 14)).length
-    const disabledThisWeek = rows.filter((r) => within(r.disabled_at, 0, 7)).length
+    const newThisWeek = rows.filter((r) => withinDays(r.created_at, 0, 7, fetchedAt)).length
+    const newLastWeek = rows.filter((r) => withinDays(r.created_at, 7, 14, fetchedAt)).length
+    const disabledThisWeek = rows.filter((r) => withinDays(r.disabled_at, 0, 7, fetchedAt)).length
     return { newThisWeek, newLastWeek, disabledThisWeek, net: newThisWeek - disabledThisWeek }
-  }, [rows])
+  }, [rows, fetchedAt])
 
   if (loading) {
     return (
