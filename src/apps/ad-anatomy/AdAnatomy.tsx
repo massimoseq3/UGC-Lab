@@ -231,9 +231,11 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
         </h2>
       </div>
 
+      {/* The frame grows into whatever height the pane has left (aspect-ratio
+          derives the width from it), capped so it can't balloon on a tall display. */}
       {(sourceUrl || thumbUrl) && (
         <div
-          className="group relative max-h-80 max-w-72 overflow-hidden rounded-2xl border border-ink/10 shadow-[0_0_90px_-28px_rgba(255,82,87,0.45)]"
+          className="group relative min-h-0 w-auto max-w-full flex-1 overflow-hidden rounded-2xl border border-ink/10 shadow-[0_0_90px_-28px_rgba(255,82,87,0.45)] max-h-[34rem]"
           style={{ aspectRatio: '9 / 16' }}
         >
           {sourceUrl ? (
