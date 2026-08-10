@@ -45,6 +45,11 @@ interface ModelPickerProps {
   // Roomier trigger (more padding, larger type) for footer rows where the
   // picker is the primary control. Ignored when `compact` is set.
   large?: boolean
+  // The 58px PICKER-ROW height — the same geometry as ScriptModelRow and the
+  // bank/style rows in Scripts and B-Roll (h-[58px], px-4, gap-3). For a
+  // trigger that owns its own row in a settings stack rather than sharing one
+  // with chips (which `large` does, at their 48px). Ignored when `compact`.
+  row?: boolean
   // Cost params for the per-row credit estimate (e.g. current resolution),
   // mirroring ModelSidePanel. Defaults to a single image at base resolution.
   costParams?: CostEstimateParams
@@ -57,7 +62,7 @@ interface ModelPickerProps {
   persistKey?: string
 }
 
-export default function ModelPicker({ appId, task, mode, value, onChange, requireMode, requireAnyModes, requireModeNote, compact, large, costParams, allowedModelIds, persistKey }: ModelPickerProps) {
+export default function ModelPicker({ appId, task, mode, value, onChange, requireMode, requireAnyModes, requireModeNote, compact, large, row, costParams, allowedModelIds, persistKey }: ModelPickerProps) {
   const setAppModel = useSettingsStore((s) => s.setAppModel)
   const getAppModel = useSettingsStore((s) => s.getAppModel)
   const persistedKey = persistKey ?? `${appId}:${task}${mode ? `:${mode}` : ''}`
@@ -138,6 +143,8 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
         className={
           compact
             ? 'flex h-9 w-full items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.02] px-2 text-left transition-colors hover:bg-ink/[0.05]'
+            : row
+            ? 'flex h-[58px] w-full items-center gap-3 rounded-full border border-ink/10 bg-ink/[0.02] px-4 text-left transition-colors hover:bg-ink/[0.05]'
             : large
             ? 'flex h-12 w-full items-center gap-3 rounded-full border border-ink/10 bg-ink/[0.02] px-4 text-left transition-colors hover:bg-ink/[0.05]'
             : 'flex h-12 w-full items-center gap-2.5 rounded-full border border-ink/10 bg-ink/[0.02] px-3 text-left transition-colors hover:bg-ink/[0.05]'

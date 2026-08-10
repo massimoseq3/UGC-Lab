@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Copy, Check, Bookmark, ArrowUpRight, Mic, Film, PenLine, AlertCircle, ImagePlay, Pencil, X, Undo2, Redo2, Quote } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import GridCanvas from '../../../components/GridCanvas'
+import AutoGrowTextarea from '../../../components/AutoGrowTextarea'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
-import { REMIX_ANGLE_LABEL, remixAnglesForCount, HOOK_CATEGORY_META, HOOK_COUNT, parseHooks, hooksPlainText, type ParsedHook, type RemixAngle, type ScriptMode, type WriteFormat } from '../types'
+import { REMIX_ANGLE_LABEL, remixAnglesForCount, HOOK_CATEGORY_META, DEFAULT_HOOK_COUNT, parseHooks, hooksPlainText, hooksToText, type ParsedHook, type RemixAngle, type ScriptMode, type WriteFormat } from '../types'
 
 interface OutputPanelProps {
   variations: string[]
@@ -19,6 +20,8 @@ interface OutputPanelProps {
   writeStyleLabel?: string
   // Hooks format only — the family choice that produced the shown pack.
   hookCategoryLabel?: string
+  // Hooks format only — the live count, for the empty + loading copy.
+  hookCount?: number
   linkedProductId: string | null
   isGenerating?: boolean
   error?: string | null
@@ -355,6 +358,21 @@ function VariationCard({
     setEditing(false)
   }
 
+  // A hook is edited ON its own row — click the line and type, no Edit mode to
+  // enter first. Rewrites that one line and pushes the rebuilt pack through the
+  // same commit path (and the same undo stack) the raw editor uses, so the two
+  // ways in stay interchangeable. The raw editor is still the only way to ADD
+  // or DELETE a line, which is why its button survives here.
+  const editHookLine = (index: number, next: string) => {
+    if (!hooks) return
+    const rebuilt = hooksToText(hooks.map((h, i) => (i === index ? { ...h, text: next } : h)))
+    if (rebuilt === text) return
+    const nextHistory = [...history.slice(0, histIndex + 1), rebuilt]
+    setHistory(nextHistory)
+    setHistIndex(nextHistory.length - 1)
+    applyText(rebuilt)
+  }
+
   const handleUndo = () => {
     if (!canUndo) return
     const i = histIndex - 1
@@ -504,7 +522,14 @@ function VariationCard({
         ) : hooks ? (
           // One row per hook — family chip + the line + its own copy button.
           <>
-            {hooks.map((hook, i) => <HookLineCard key={i} hook={hook} index={i} />)}
+            {hooks.map((hook, i) => (
+              <HookLineCard
+                key={i}
+                hook={hook}
+                index={i}
+                onChange={onEdit ? (line) => editHookLine(i, line) : undefined}
+              />
+            ))}
           </>
         ) : scenes ? (
           <>
@@ -667,11 +692,40 @@ function VoiceProfileCard({ body }: { body: string }) {
 
 // One hook in the pack — its family chip, the spoken line, and a copy button.
 // The copy target is the clean line only (the chip is UI metadata).
-function HookLineCard({ hook, index }: { hook: ParsedHook; index: number }) {
+//
+// The line IS the editor when `onChange` is given: it's a textarea styled as
+// the paragraph it replaces, so clicking a hook puts the caret in it. There's
+// no edit mode to enter, which is the whole point — the alternative was
+// swapping the ten rendered rows for one raw box of <FAMILY> tags to fix a
+// typo in line 3.
+function HookLineCard({ hook, index, onChange }: { hook: ParsedHook; index: number; onChange?: (text: string) => void }) {
   const [copied, setCopied] = useState(false)
+  // Local draft so a keystroke doesn't re-serialise and re-parse the whole
+  // pack; committed on blur. `sync` tells our own commit from an external
+  // change (an undo, a new generation) and re-seeds the draft for the latter.
+  const [draft, setDraft] = useState(hook.text)
+  const [sync, setSync] = useState(hook.text)
+  if (hook.text !== sync) {
+    setSync(hook.text)
+    setDraft(hook.text)
+  }
   const addToast = useAppStore((s) => s.addToast)
+
+  // One hook is one line, so anything pasted in gets flattened. An emptied line
+  // reverts instead of committing: a hook that vanishes as you clear it reads
+  // as the row deleting itself.
+  const commit = () => {
+    const next = draft.replace(/\s+/g, ' ').trim()
+    if (!next) {
+      setDraft(hook.text)
+      return
+    }
+    if (next !== draft) setDraft(next)
+    if (next !== hook.text) onChange?.(next)
+  }
+
   const handleCopy = async () => {
-    const ok = await copyToClipboard(hook.text)
+    const ok = await copyToClipboard(draft.replace(/\s+/g, ' ').trim())
     if (ok) {
       setCopied(true)
       addToast('Hook copied to clipboard')
@@ -681,7 +735,7 @@ function HookLineCard({ hook, index }: { hook: ParsedHook; index: number }) {
     }
   }
   return (
-    <div className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 card-soft-shadow">
+    <div className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 transition-colors focus-within:border-scripts-500/30 card-soft-shadow">
       <div className="mb-1.5 flex select-none items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="shrink-0 text-[10px] font-semibold tabular-nums text-ink-600">{index + 1}</span>
@@ -699,7 +753,32 @@ function HookLineCard({ hook, index }: { hook: ParsedHook; index: number }) {
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <p className="text-sm font-light leading-normal tracking-tight text-ink-100">{hook.text}</p>
+      {onChange ? (
+        // Same type as the <p> below it, on a field with no chrome until you're
+        // in it — a hover tint says "this is editable" without printing a box
+        // around every line. Enter commits rather than breaking the hook in two;
+        // Escape puts it back.
+        <AutoGrowTextarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              e.currentTarget.blur()
+            } else if (e.key === 'Escape') {
+              setDraft(hook.text)
+              e.currentTarget.blur()
+            }
+          }}
+          rows={1}
+          spellCheck={false}
+          aria-label={`Hook ${index + 1}`}
+          className="-mx-1.5 -my-1 w-[calc(100%+0.75rem)] cursor-text resize-none rounded-lg bg-transparent px-1.5 py-1 text-sm font-light leading-normal tracking-tight text-ink-100 outline-none transition-colors hover:bg-ink/[0.05] focus:bg-surface-0"
+        />
+      ) : (
+        <p className="text-sm font-light leading-normal tracking-tight text-ink-100">{hook.text}</p>
+      )}
     </div>
   )
 }
@@ -775,7 +854,7 @@ function SceneChunkCard({ chunk }: { chunk: SceneChunk }) {
   )
 }
 
-export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, linkedProductId, isGenerating, error, onEditVariation }: OutputPanelProps) {
+export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, hookCount = DEFAULT_HOOK_COUNT, linkedProductId, isGenerating, error, onEditVariation }: OutputPanelProps) {
   // Resolve the linked product so saved scripts get a meaningful default title
   // ("<Product> — Hook-Led Script").
   const products = useBankStore((s) => s.products)
@@ -841,7 +920,7 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
   if (isGenerating) {
     const message = copyMode === 'write'
       ? (writeFormat === 'hooks'
-          ? ['Reading your brief...', 'Digging through the hook library...', `Writing ${HOOK_COUNT} hooks...`, 'Cutting the weak ones...']
+          ? ['Reading your brief...', 'Digging through the hook library...', `Writing ${hookCount} hooks...`, 'Cutting the weak ones...']
           : ['Reading your brief...', 'Writing the takes...', 'Making it sound human...', 'Tightening the hooks...'])
       : copyMode === 'remix'
         ? ['Building the angles...', 'Sending parallel requests...', 'Writing variations...', 'Polishing final drafts...']
@@ -873,7 +952,7 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
           <PenLine className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
           <p className="text-sm text-ink-700">
             {copyMode === 'write'
-              ? (writeFormat === 'hooks' ? `Your ${HOOK_COUNT} hooks will appear here` : 'Your takes will appear here')
+              ? (writeFormat === 'hooks' ? `Your ${hookCount} hooks will appear here` : 'Your takes will appear here')
               : copyMode === 'remix' ? 'Your script variations will appear here' : 'Your scene prompts will appear here'}
           </p>
           {error && (

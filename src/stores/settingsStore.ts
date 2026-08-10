@@ -391,9 +391,9 @@ export function scriptModelSlot(appId: ScriptModelApp): string {
   return `${appId}:chat`
 }
 
-// Which chat model writes this app's scripts and prompts. Falls back to the
-// registry default (Gemini 3 Flash), so a member who never opens the picker
-// pays exactly what they paid before it existed.
+// Which chat model writes this app's scripts and prompts. Falls back to these
+// two apps' own registry default (GPT 5.6 Luna), which is both cheaper and a
+// better writer than the app-wide default the rest of the surfaces run on.
 export function resolveScriptModel(appId: ScriptModelApp): string {
   return (
     useSettingsStore.getState().getAppModel(scriptModelSlot(appId)) ??

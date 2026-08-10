@@ -19,6 +19,9 @@ interface RightPanelProps {
   writeStyleLabel: string
   // Hooks format only — labels the pack's card ("Best Mix" / a family name).
   hookCategoryLabel: string
+  // Hooks format only — the live pick, so the empty/loading copy names the
+  // number of hooks the next Generate will actually write.
+  hookCount: number
   linkedProductId: string | null
   isGenerating: boolean
   error: string | null
@@ -39,6 +42,7 @@ export default function RightPanel({
   writeFormat,
   writeStyleLabel,
   hookCategoryLabel,
+  hookCount,
   linkedProductId,
   isGenerating,
   error,
@@ -99,6 +103,7 @@ export default function RightPanel({
             writeFormat={writeFormat}
             writeStyleLabel={writeStyleLabel}
             hookCategoryLabel={hookCategoryLabel}
+            hookCount={hookCount}
             linkedProductId={linkedProductId}
             isGenerating={isGenerating}
             error={error}
