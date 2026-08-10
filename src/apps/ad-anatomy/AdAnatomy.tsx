@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, RotateCcw, Volume2, VolumeX } from 'lucide-react'
+import { AlertCircle, Loader2, RotateCcw, Upload, Volume2, VolumeX } from 'lucide-react'
 import UploadView from './components/UploadView'
 import ResultsView from './components/ResultsView'
 import HistoryRail from './components/HistoryRail'
@@ -8,7 +8,7 @@ import type { AdAnatomyHistoryItem, DiscoverVideoPayload } from '../../stores/ty
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
 import { saveAsset, deleteAsset } from '../../utils/assetStore'
-import { enqueueAnalysis, resumeAnalysis } from './services/analysisQueue'
+import { enqueueAnalysis, resumeAnalysis, retryAnalysis } from './services/analysisQueue'
 import { useBankStore } from '../../stores/bankStore'
 import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
@@ -47,21 +47,26 @@ export default function AdAnatomy() {
       if (item.taskId) {
         resumeAnalysis(item)
       } else {
+        // No taskId means the refresh landed before kie accepted the job, so
+        // there is nothing to re-attach to — that request died with the page.
+        // The SOURCE stays, though: dropping it made a refresh cost the member
+        // their upload as well as their place in the queue, and re-dragging a
+        // 50MB clip is the part that actually hurts. ErrorPane offers Retry.
         void updateAdAnatomyHistory(item.id, {
           status: 'error',
-          errorMessage: 'Analysis was interrupted. Re-upload to retry.',
-          uploadedRef: undefined,
+          errorMessage: 'Analysis was interrupted by a page refresh. Your ad is still here — retry to run it again.',
         })
       }
     }
 
-    // Pass 1.5: TTL sweep for retained source videos. Idempotent — only
-    // fires for `complete` rows still carrying an uploadedRef older than the
-    // window. The thumbnail + saved analysis stay; the playback source goes.
+    // Pass 1.5: TTL sweep for retained source videos. Idempotent — only fires
+    // for settled rows (complete or error) still carrying an uploadedRef older
+    // than the window. The thumbnail + saved analysis stay; the playback source
+    // (and, on an error row, the ability to retry without re-uploading) goes.
     const SOURCE_TTL_MS = 14 * 86_400_000
     let purgedSources = 0
     for (const item of items) {
-      if (item.status !== 'complete') continue
+      if (item.status !== 'complete' && item.status !== 'error') continue
       if (!item.uploadedRef) continue
       if (Date.now() - item.createdAt < SOURCE_TTL_MS) continue
       const refToDrop = item.uploadedRef
@@ -107,7 +112,16 @@ export default function AdAnatomy() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Storing a 50MB clip in IndexedDB takes real time, and until the row lands
+  // there is no `selected` to render — which dropped the screen back to a bare
+  // upload zone with the member's click apparently ignored. This flag holds a
+  // "getting your ad ready" face over that gap. No try/finally: the per-file
+  // catch below swallows everything, so the reset after the loop always runs
+  // (and a try/finally here would make the React Compiler skip this component).
+  const [preparing, setPreparing] = useState(false)
+
   const handleAnalyze = async (files: File[]) => {
+    setPreparing(true)
     let firstId: string | null = null
     for (const file of files) {
       try {
@@ -132,6 +146,7 @@ export default function AdAnatomy() {
       }
     }
     if (firstId) setSelectedId(firstId)
+    setPreparing(false)
   }
 
   // Outliers hands over a found ad as a live File (targetField 'adVideo') and
@@ -172,7 +187,7 @@ export default function AdAnatomy() {
       />
       <div className="min-h-0 flex-1 md:min-w-0">
         {!selected ? (
-          <UploadView onAnalyze={handleAnalyze} />
+          preparing ? <PreparingPane /> : <UploadView onAnalyze={handleAnalyze} />
         ) : selected.status === 'analyzing' ? (
           <AnalyzingPane item={selected} />
         ) : selected.status === 'error' ? (
@@ -208,6 +223,22 @@ function CompletePane({ item, onReset }: { item: AdAnatomyHistoryItem; onReset: 
       restoredThumbUrl={thumbUrl}
       fileName={item.fileName}
     />
+  )
+}
+
+// ── Pane: storing the upload, before the first row exists ───────────
+// Covers the gap between the Analyze click and the history row landing (an
+// IndexedDB write of the whole clip). Deliberately the same two-line shape as
+// AnalyzingPane, so the wait reads as one continuous step.
+function PreparingPane() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
+      <Loader2 className="h-7 w-7 animate-spin text-[#FF5257]/70" strokeWidth={1.5} />
+      <div className="flex flex-col items-center gap-1">
+        <h2 className="text-lg font-semibold tracking-tight text-ink-100">Getting your ad ready</h2>
+        <p className="text-xs text-ink-500">Storing the clip before the analysis starts.</p>
+      </div>
+    </div>
   )
 }
 
@@ -270,7 +301,17 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
         </div>
       )}
 
-      <p className="text-[11px] text-ink-600">This keeps running if you switch tools.</p>
+      {/* The one thing this screen has to say. A full-video read is a single
+          long chat call with no progress to report, so without a stated
+          expectation the sweep animation reads as a hung page — which is what
+          sent members reloading and losing their place in the queue. */}
+      <div className="flex flex-col items-center gap-1 text-center">
+        <p className="text-xs text-ink-400">Please wait — this can take a couple of minutes.</p>
+        {/* Deliberately not "survives a refresh": it usually does, but a reload
+            in the window before kie accepts the job can't be resumed, and a
+            promise the app breaks once is worse than one it never made. */}
+        <p className="text-[11px] text-ink-600">No need to reload — it keeps running if you switch tools.</p>
+      </div>
 
       <style>{`
         @keyframes ad-scan {
@@ -283,7 +324,30 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
 }
 
 // ── Pane: error ─────────────────────────────────────────────────────
+// A failed or interrupted row keeps its source ad, so the primary action is
+// "run it again" — no re-upload, no re-drag. It falls back to the old
+// re-upload route when the source is gone (TTL-swept, or a pre-fix row).
 function ErrorPane({ item, onRetry }: { item: AdAnatomyHistoryItem; onRetry: () => void }) {
+  const [retrying, setRetrying] = useState(false)
+  const addToast = useAppStore((s) => s.addToast)
+  const canRerun = !!item.uploadedRef && !retrying
+
+  const handleRerun = () => {
+    setRetrying(true)
+    retryAnalysis(item)
+      .then((ok) => {
+        if (!ok) {
+          addToast('That ad is no longer stored — upload it again to retry.', 'error')
+          setRetrying(false)
+        }
+        // On success the row flips to 'analyzing' and this pane unmounts.
+      })
+      .catch(() => {
+        addToast('Could not restart the analysis. Upload the ad again.', 'error')
+        setRetrying(false)
+      })
+  }
+
   return (
     <div className="flex h-full flex-col items-center justify-center gap-5 px-6">
       <AlertCircle className="h-10 w-10 text-[#FF5257]/70" strokeWidth={1.5} />
@@ -294,13 +358,25 @@ function ErrorPane({ item, onRetry }: { item: AdAnatomyHistoryItem; onRetry: () 
       <div className="max-w-md rounded-xl border border-[#FF5257]/20 bg-[#FF5257]/[0.06] px-4 py-3 text-center">
         <p className="text-sm text-ink-300">{item.errorMessage || 'Something went wrong.'}</p>
       </div>
-      <button
-        onClick={onRetry}
-        className="flex items-center gap-2 rounded-full border border-[#FF5257]/20 bg-[#FF5257]/10 px-4 py-2 text-sm font-medium text-[#FF5257] transition-colors hover:bg-[#FF5257]/20"
-      >
-        <RotateCcw className="h-3.5 w-3.5" />
-        Re-upload to retry
-      </button>
+      <div className="flex items-center gap-2">
+        {item.uploadedRef && (
+          <button
+            onClick={handleRerun}
+            disabled={!canRerun}
+            className="flex items-center gap-2 rounded-full border border-white/15 bg-[#FF5257] px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-[#FF5257]/90 disabled:opacity-60"
+          >
+            <RotateCcw className={`h-3.5 w-3.5 ${retrying ? 'animate-spin' : ''}`} />
+            {retrying ? 'Restarting…' : 'Retry analysis'}
+          </button>
+        )}
+        <button
+          onClick={onRetry}
+          className="flex items-center gap-2 rounded-full border border-[#FF5257]/20 bg-[#FF5257]/10 px-4 py-2 text-sm font-medium text-[#FF5257] transition-colors hover:bg-[#FF5257]/20"
+        >
+          <Upload className="h-3.5 w-3.5" />
+          Upload another
+        </button>
+      </div>
     </div>
   )
 }

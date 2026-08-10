@@ -54,8 +54,13 @@ export default function ReferenceLibrarySlideOver({
     return groupByDay(filtered, (it) => it.createdAt)
   }, [items, query])
 
+  // stopPropagation matters even though this panel is portaled to the body:
+  // React synthetic events travel the REACT tree, not the DOM one, and the
+  // slide-over is a child of CharacterStudio's full-area drop zone. Without it
+  // every drop here ran addFiles twice — a 5-photo drop became 10 vision calls.
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     setDragOver(false)
     const files = Array.from(e.dataTransfer.files)
     if (files.length > 0) onAdd(files)

@@ -224,6 +224,14 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
               </span>
             )}
           </button>
+
+          {/* Said before they commit, and again on the analysing screen. A
+              whole-video read is one long call with no progress to stream, so
+              the wait has to be stated or it reads as a hung page. */}
+          <p className="text-center text-[11px] text-ink-600">
+            Please wait after starting — this can take a couple of minutes
+            {staged.length > 1 ? ' per ad' : ''}.
+          </p>
         </div>
       )}
 
