@@ -1,6 +1,7 @@
 import { CheckCircle2, Download } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import DesktopWallpaper from '../../components/DesktopWallpaper'
+import { SKILL_VERSION, useSkillUpdateStore } from '../../stores/skillUpdateStore'
 import SkillFolder, { downloadSkill } from './SkillFolder'
 
 // Edit is the last stop in the create row. Unlike the other apps it doesn't
@@ -52,7 +53,19 @@ const BENEFITS = [
   'Puts captions on the screen that match every word',
 ]
 
+// Kept next to SKILL_VERSION so the two are edited together.
+const SKILL_FILE_SIZE = '45 KB'
+
 export default function EditStudio() {
+  const markSeen = useSkillUpdateStore((s) => s.markSeen)
+  // Read once on mount: marking it seen must not pull the badge out from under
+  // the member while they're looking at the page it's on.
+  const [fresh] = useState(() => useSkillUpdateStore.getState().seenVersion < SKILL_VERSION)
+
+  useEffect(() => {
+    markSeen()
+  }, [markSeen])
+
   return (
     // Same deep-space wallpaper as the Dashboard. Edit is the other page with no
     // panels of its own — a folder and a card floating on the bare canvas — so it
@@ -63,7 +76,7 @@ export default function EditStudio() {
       <div className="relative mx-auto grid w-full max-w-5xl flex-1 content-center gap-10 px-5 py-10 md:grid-cols-2 md:items-center md:gap-8 md:px-8">
         {/* Left: the folder is the download */}
         <div className="flex flex-col items-center gap-7">
-          <SkillFolder />
+          <SkillFolder fresh={fresh} />
           <div className="flex flex-col items-center gap-2">
             <button
               type="button"
@@ -73,7 +86,9 @@ export default function EditStudio() {
               <Download className="h-4 w-4" strokeWidth={2} />
               Download Skill
             </button>
-            <p className="text-[11px] text-ink-600">video-editor.skill · 35 KB</p>
+            <p className="text-[11px] text-ink-600">
+              video-editor.skill · v{SKILL_VERSION} · {SKILL_FILE_SIZE}
+            </p>
           </div>
         </div>
 
