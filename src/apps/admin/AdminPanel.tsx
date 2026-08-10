@@ -3,13 +3,15 @@ import { Shield } from 'lucide-react'
 import MembersTable from './MembersTable'
 import AllowlistEditor from './AllowlistEditor'
 import Insights from './Insights'
+import Announcements from './Announcements'
 import { useAuthStore } from '../../stores/authStore'
 
-type Tab = 'members' | 'insights' | 'allowlist'
+type Tab = 'members' | 'insights' | 'announcements' | 'allowlist'
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'members', label: 'Members' },
   { id: 'insights', label: 'Insights' },
+  { id: 'announcements', label: 'Announcements' },
   { id: 'allowlist', label: 'Allowlist' },
 ]
 
@@ -58,7 +60,15 @@ export default function AdminPanel() {
             key={t.id}
             className={`absolute inset-0 overflow-y-auto px-6 py-5 ${tab === t.id ? '' : 'hidden'}`}
           >
-            {t.id === 'members' ? <MembersTable /> : t.id === 'insights' ? <Insights /> : <AllowlistEditor />}
+            {t.id === 'members' ? (
+              <MembersTable />
+            ) : t.id === 'insights' ? (
+              <Insights />
+            ) : t.id === 'announcements' ? (
+              <Announcements />
+            ) : (
+              <AllowlistEditor />
+            )}
           </div>
         ))}
       </div>

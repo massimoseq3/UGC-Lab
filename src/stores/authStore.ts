@@ -3,6 +3,7 @@ import type { Session, User } from '@supabase/supabase-js'
 import { getSupabase, isCloudEnabled } from '../lib/supabase'
 import { resetBankStore } from './bankStore'
 import { resetSettingsStore, adoptUserKeys } from './settingsStore'
+import { resetAnnouncementStore } from './announcementStore'
 import { resetAssetStore } from '../utils/assetStore'
 
 // Remove every localStorage key whose name starts with any of these prefixes.
@@ -39,6 +40,9 @@ function clearLocalResidue(): void {
 async function wipeLocalUserData(): Promise<void> {
   resetBankStore()
   resetSettingsStore()
+  // Announcements are global, but WHICH ones this account had read is not —
+  // leaving the receipts behind would hide the dot for the next person.
+  resetAnnouncementStore()
   clearLocalResidue()
   await resetAssetStore()
 }

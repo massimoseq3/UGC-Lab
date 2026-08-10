@@ -7,6 +7,7 @@ import AppBackground from './components/AppBackground'
 import Dock from './components/Dock'
 import MenuBar from './components/MenuBar'
 import MeetTheTeam from './components/MeetTheTeam'
+import AnnouncementsHost from './components/announcements/AnnouncementsHost'
 import ToastContainer from './components/Toast'
 import AuthGate from './components/auth/AuthGate'
 import RouterSync from './components/RouterSync'
@@ -169,6 +170,7 @@ function Workspace() {
 
         <ToastContainer />
         <MeetTheTeam />
+        <AnnouncementsHost />
       </div>
     </div>
   )

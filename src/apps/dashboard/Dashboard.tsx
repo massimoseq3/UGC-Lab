@@ -8,6 +8,7 @@ import { creditsToUsd } from '../../utils/models'
 import { computeUsageMetrics, dailyMinutesSaved, usageDayStart } from '../../utils/usage'
 import { AI_UGC_ACADEMY_URL } from '../../utils/constants'
 import ActivityHeatmap, { HeatmapLegend } from './ActivityHeatmap'
+import AnnouncementsTile from './AnnouncementsTile'
 import ConnectKeyCard from './ConnectKeyCard'
 import DesktopWallpaper from '../../components/DesktopWallpaper'
 import DesktopIcons from './DesktopIcons'
@@ -194,28 +195,47 @@ export default function Dashboard() {
                 </div>
               </Widget>
 
-              {/* Academy */}
-              <a
-                href={AI_UGC_ACADEMY_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={riseStyle(slot(4))}
-                className={`widget-rise group relative col-span-12 flex flex-col p-4 lg:col-span-3 ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
-              >
-                <ArrowUpRight
-                  className="absolute right-3.5 top-3.5 h-4 w-4 text-ink-600 transition-colors group-hover:text-dashboard-400"
-                  strokeWidth={2}
-                />
-                <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-dashboard-500/15">
-                  <GraduationCap className="h-[22px] w-[22px] text-dashboard-400" strokeWidth={1.75} />
-                </span>
-                <div className="mt-auto pt-3">
-                  <p className="text-[19px] italic font-normal leading-tight tracking-tight text-ink-50" style={DISPLAY_FONT}>
-                    AI UGC Academy
-                  </p>
-                  <p className="mt-1 text-[11px] leading-snug text-ink-500">Trainings for every tool.</p>
-                </div>
-              </a>
+              {/* The row's last three columns hold two shortcuts, stacked.
+                  They can't sit side by side: the slot is ~177px, which halves
+                  into squares too narrow for either title — and they can't take
+                  a column each either, because the 26-week heatmap needs ~364px
+                  and Activity dropping below nine columns puts a scrollbar
+                  inside it. Stacked, both get the full width at half the height,
+                  and the wall stays two rows. */}
+              <div className="col-span-12 grid gap-3.5 sm:grid-cols-2 lg:col-span-3 lg:grid-cols-1">
+                <AnnouncementsTile index={slot(4)} />
+
+                {/* Academy */}
+                <a
+                  href={AI_UGC_ACADEMY_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={riseStyle(slot(5))}
+                  className={`widget-rise group relative flex items-center gap-2.5 p-3.5 ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
+                >
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-dashboard-500/15">
+                    <GraduationCap className="h-[18px] w-[18px] text-dashboard-400" strokeWidth={1.75} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    {/* Truncating rather than wrapping: the card is half a row
+                        tall, so a second title line pushes the sub-line out of
+                        the box entirely. */}
+                    <span
+                      className="block truncate text-[15px] italic font-normal leading-tight tracking-tight text-ink-50"
+                      style={DISPLAY_FONT}
+                    >
+                      AI UGC Academy
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11px] leading-snug text-ink-500">Trainings</span>
+                  </span>
+                  {/* Out of flow — in it, the arrow costs the title 28px it
+                      doesn't have. */}
+                  <ArrowUpRight
+                    className="absolute right-3 top-3 h-3.5 w-3.5 text-ink-600 transition-colors group-hover:text-dashboard-400"
+                    strokeWidth={2}
+                  />
+                </a>
+              </div>
             </div>
 
             {/* Below lg the icons can't sit in a right-hand column, so they run
