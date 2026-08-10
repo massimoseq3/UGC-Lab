@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, Loader2, RotateCcw, Upload, Volume2, VolumeX } from 'lucide-react'
+import { AlertCircle, Eye, History, Loader2, RotateCcw, Upload, Volume2, VolumeX } from 'lucide-react'
+import MobilePaneTabs, { paneClass } from '../../components/MobilePaneTabs'
 import UploadView from './components/UploadView'
 import ResultsView from './components/ResultsView'
 import HistoryRail from './components/HistoryRail'
@@ -17,6 +18,8 @@ import { useReportActivity } from '../../stores/activityStore'
 export default function AdAnatomy() {
   const baseKey = useProjectScopedKey('ad-anatomy')
   const [selectedId, setSelectedId] = usePersistedState<string | null>(`${baseKey}:selectedId`, null)
+  // Phone-only: which of the two panes is on screen (ignored from md up).
+  const [pane, setPane] = useState<'history' | 'result'>('result')
 
   const adAnatomyHistory = useBankStore((s) => s.adAnatomyHistory)
 
@@ -121,6 +124,8 @@ export default function AdAnatomy() {
   const [preparing, setPreparing] = useState(false)
 
   const handleAnalyze = async (files: File[]) => {
+    // On a phone only one pane is on screen — follow the run to the analysis.
+    setPane('result')
     setPreparing(true)
     let firstId: string | null = null
     for (const file of files) {
@@ -175,17 +180,28 @@ export default function AdAnatomy() {
     : null
 
   return (
-    // Phones stack: compact history strip on top, analysis below. md+ keeps
-    // the desktop split with the 280px rail on the left.
-    <div className="flex h-full flex-col overflow-hidden md:flex-row">
-      <HistoryRail
-        items={adAnatomyHistory}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
-        onNew={() => setSelectedId(null)}
-        onDelete={handleDelete}
+    <div className="flex h-full flex-col overflow-hidden">
+      <MobilePaneTabs
+        options={[
+          { value: 'history', label: 'Analyses', icon: History },
+          { value: 'result', label: 'Analysis', icon: Eye },
+        ]}
+        value={pane}
+        onChange={setPane}
       />
-      <div className="min-h-0 flex-1 md:min-w-0">
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      <div className={paneClass(pane === 'history', 'md:w-[280px] md:shrink-0 md:border-r md:border-ink/5')}>
+        <HistoryRail
+          items={adAnatomyHistory}
+          selectedId={selectedId}
+          // Picking an analysis on a phone means "show me it" — the list and
+          // the reading surface are two tabs, not two columns.
+          onSelect={(id) => { setSelectedId(id); setPane('result') }}
+          onNew={() => { setSelectedId(null); setPane('result') }}
+          onDelete={handleDelete}
+        />
+      </div>
+      <div className={paneClass(pane === 'result', 'md:min-w-0 md:flex-1')}>
         {!selected ? (
           preparing ? <PreparingPane /> : <UploadView onAnalyze={handleAnalyze} />
         ) : selected.status === 'analyzing' ? (
@@ -195,6 +211,7 @@ export default function AdAnatomy() {
         ) : (
           <CompletePane item={selected} onReset={() => setSelectedId(null)} />
         )}
+      </div>
       </div>
     </div>
   )

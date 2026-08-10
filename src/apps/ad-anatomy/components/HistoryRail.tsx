@@ -33,9 +33,11 @@ export default function HistoryRail({ items, selectedId, onSelect, onDelete, onN
   }, [items, query])
 
   return (
-    // Phones: full-width strip on top of the app (New + search in one row,
-    // history capped to a short scrollable list). md+: the 280px left rail.
-    <div className="flex w-full shrink-0 flex-col border-b border-ink/5 md:h-full md:w-[280px] md:border-b-0 md:border-r">
+    // The rail is a full pane on a phone (the Analyses tab), the 280px left
+    // column from md up. It used to be a strip stacked on top of the analysis
+    // with its list capped at max-h-44, which cost the reading surface ~250px
+    // and still only showed two rows.
+    <div className="flex h-full min-h-0 w-full flex-col">
       {/* New analysis leads the rail, above the search field.
           On md+ the button sits in its own h-[57px] band so the rail's first
           hairline lines up with the results column's sticky header (the
@@ -69,11 +71,9 @@ export default function HistoryRail({ items, selectedId, onSelect, onDelete, onN
         />
       </div>
 
-      <div className="max-h-44 overflow-y-auto md:max-h-none md:flex-1">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {items.length === 0 ? (
-          // The tall empty placeholder is desktop-only — on phones an empty
-          // strip should take no space at all.
-          <div className="hidden h-full flex-col items-center justify-center gap-2 p-6 text-center md:flex">
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
             <Eye className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
             <p className="text-xs text-ink-500">No analyses yet</p>
           </div>

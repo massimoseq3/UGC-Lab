@@ -23,11 +23,12 @@ interface LegalLayoutProps {
 export default function LegalLayout({ title, children }: LegalLayoutProps) {
   const { pathname } = useLocation()
 
-  // h-screen + overflow-y-auto on the root because index.css pins
+  // h-dvh + overflow-y-auto on the root because index.css pins
   // html/body/#root to overflow: hidden; without this the legal pages
-  // can't scroll.
+  // can't scroll. dvh, not screen: 100vh overflows behind a mobile browser's
+  // URL bar, which is the same reason the workspace shell uses it.
   return (
-    <div className="relative h-screen w-full overflow-y-auto bg-surface-0 text-ink-200 antialiased">
+    <div className="relative h-dvh w-full overflow-y-auto bg-surface-0 text-ink-200 antialiased">
       <AppBackground />
 
       <div className="relative z-10 mx-auto max-w-5xl px-6 py-10">

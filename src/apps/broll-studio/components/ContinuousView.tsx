@@ -1810,7 +1810,8 @@ function SceneRow({
 }) {
   return (
     <div className="-m-4 p-4" style={{ contentVisibility: 'auto', containIntrinsicSize: '620px' }}>
-      <div className="mb-5 flex items-center justify-between gap-4">
+      {/* Stacks on a phone — see the note on ScenesView's matching header. */}
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
         <div className="flex min-w-0 items-center gap-4">
           <span
             className="text-5xl font-normal italic tabular-nums text-ink-800"
@@ -1842,7 +1843,7 @@ function SceneRow({
             </button>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <ChainToggle frameIndex={frame.index} chainOn={chainOn} onToggle={onToggleChain} />
           <button
             type="button"
@@ -1933,7 +1934,8 @@ function FinalFrameRow({
   const framePicked = !!selection
   return (
     <div className="-m-4 p-4" style={{ contentVisibility: 'auto', containIntrinsicSize: '620px' }}>
-      <div className="mb-5 flex items-center justify-between gap-4">
+      {/* Stacks on a phone — see the note on ScenesView's matching header. */}
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
         <div className="flex min-w-0 items-center gap-4">
           <span
             className="text-5xl font-normal italic tabular-nums text-ink-800"
@@ -1954,7 +1956,7 @@ function FinalFrameRow({
             </p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <ChainToggle frameIndex={frame.index} chainOn={chainOn} onToggle={onToggleChain} />
           <button
             type="button"

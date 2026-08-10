@@ -125,7 +125,7 @@ export default function ClipDownloadModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink-950/95 shadow-2xl"
+        className="flex max-h-[85dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink-950/95 shadow-2xl"
       >
         <div className="flex items-center justify-between gap-3 border-b border-ink/5 px-5 py-3.5">
           <div className="min-w-0">

@@ -602,7 +602,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
           />
 
           {displayImage ? (
-            <div className="group/img relative aspect-square w-full shrink-0 overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02]">
+            <div className="group/img relative aspect-[3/2] w-full shrink-0 overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] md:aspect-square">
               <img src={displayImage} alt="" className="h-full w-full object-cover" />
               {isExtracting && (
                 <div className="absolute left-2 top-2 z-10 flex items-center gap-1.5 rounded-lg bg-black/70 px-2.5 py-1 text-[10px] font-medium text-emerald-200 backdrop-blur-sm">
@@ -629,7 +629,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              className="group flex aspect-square w-full shrink-0 flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] px-3 text-center transition-colors hover:border-ink/20"
+              className="group flex aspect-[3/2] w-full shrink-0 flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] px-3 text-center transition-colors hover:border-ink/20 md:aspect-square"
             >
               <ImagePlus className="h-6 w-6 text-ink-600 transition-colors group-hover:text-ink-400" />
               <span className="text-[10px] font-medium uppercase tracking-widest text-ink-600 transition-colors group-hover:text-ink-500">

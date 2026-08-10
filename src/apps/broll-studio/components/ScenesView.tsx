@@ -1461,7 +1461,9 @@ function SceneSection({
     <div className="-m-4 p-4" style={{ contentVisibility: 'auto', containIntrinsicSize: '700px' }}>
       {/* Scene header — number + tiny line chip + the line itself. The
           spoken-duration chip was removed (its estimate was unreliable). */}
-      <div className="mb-5 flex items-center justify-between gap-4">
+      {/* Stacks on a phone: the two batch buttons are ~330px of shrink-0, which
+          left the line itself a column two characters wide. */}
+      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
         <div className="flex min-w-0 items-center gap-4">
           <span
             className="text-5xl font-normal italic tabular-nums text-ink-800"
@@ -1506,7 +1508,7 @@ function SceneSection({
         {/* Per-scene batches — one row's worth of images or clips, so a member
             can work scene by scene instead of committing the whole storyboard's
             credits in one press. */}
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={onGenerateScene}

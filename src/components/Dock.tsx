@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Settings } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useActivityStore } from '../stores/activityStore'
@@ -27,6 +27,23 @@ export default function Dock() {
   const skillUpdate = useSkillUpdateUnseen()
   const [settingsOpen, setSettingsOpen] = useState(false)
 
+  // On a phone the dock is wider than the screen and scrolls, so the running
+  // app's tile is often off to one side — including right after a handoff moved
+  // you to an app you never tapped. Bring it into view whenever it changes.
+  // `inline: 'nearest'` so a tile already on screen doesn't jump, and `block:
+  // 'nearest'` so this can never scroll the page itself.
+  const navRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (!activeApp) return
+    const nav = navRef.current
+    if (!nav || nav.scrollWidth <= nav.clientWidth) return
+    nav.querySelector(`[data-dock-app="${activeApp}"]`)?.scrollIntoView({
+      behavior: 'smooth',
+      inline: 'nearest',
+      block: 'nearest',
+    })
+  }, [activeApp])
+
   const groups = SECTION_ORDER.map((category) =>
     APP_REGISTRY.filter((app) => app.category === category)
   ).filter((apps) => apps.length > 0)
@@ -36,7 +53,7 @@ export default function Dock() {
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-2 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
         {/* overflow-x-auto keeps the dock usable on narrow screens; md+ fits
             everything so overflow stays visible. */}
-        <nav className="pointer-events-auto flex max-w-full items-start gap-0.5 overflow-x-auto overscroll-x-contain scrollbar-hide rounded-[26px] border border-ink/10 bg-surface-1/75 px-2 pb-1.5 pt-2 shadow-2xl shadow-black/25 backdrop-blur-2xl md:overflow-visible md:px-2.5 md:pt-2.5 light:bg-white/75">
+        <nav ref={navRef} className="pointer-events-auto flex max-w-full items-start gap-0.5 overflow-x-auto overscroll-x-contain scrollbar-hide rounded-[26px] border border-ink/10 bg-surface-1/75 px-2 pb-1.5 pt-2 shadow-2xl shadow-black/25 backdrop-blur-2xl md:overflow-visible md:px-2.5 md:pt-2.5 light:bg-white/75">
           {groups.map((apps, i) => (
             <Fragment key={apps[0].category}>
               {i > 0 && <DockDivider />}
@@ -76,6 +93,8 @@ function DockDivider() {
 interface DockItemProps {
   label: string
   title?: string
+  // Marks the tile so the dock can scroll the running app into view.
+  appId?: string
   active?: boolean
   running?: boolean
   // A generation is in flight in this app — the dot pulses in the app accent
@@ -89,11 +108,12 @@ interface DockItemProps {
 // Shared item chrome: tile on top, always-visible label under it, and a
 // macOS-style running/active dot below the label. Hover gives a slow eased
 // lift (no scale — that's what felt clunky); no click press, it felt slow.
-function DockItem({ label, title, active, running, busy, accent, onClick, children }: DockItemProps) {
+function DockItem({ label, title, appId, active, running, busy, accent, onClick, children }: DockItemProps) {
   return (
     <button
       onClick={onClick}
       title={title}
+      data-dock-app={appId}
       className="group flex w-[3.4rem] shrink-0 select-none flex-col items-center gap-1 pt-0.5 md:w-16"
     >
       <span className="flex h-12 w-12 items-center justify-center will-change-transform transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-px">
@@ -153,6 +173,7 @@ function DockAppTile({
     // distracting — the persona introduction lives in Meet your team.
     <DockItem
       label={app.name}
+      appId={app.id}
       active={active}
       running={running}
       busy={busy}

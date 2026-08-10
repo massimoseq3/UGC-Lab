@@ -134,9 +134,12 @@ function Crew({ onVisit }: { onVisit: (appId: string) => void }) {
       {/* Five cards with the pipeline running through them. The arrows carry
           real information — this order is the order you work in — so they only
           appear between the Create apps, never around Bank or the tools. */}
-      <div className="mt-2 flex flex-wrap items-stretch justify-center gap-1 sm:flex-nowrap">
+      {/* A 3-across grid on a phone (two rows of three), a single chain from sm
+          up. Six cards sharing one 390px line left every name truncated to
+          "Ch…" / "Scr…" / "Voi…", which introduces nobody. */}
+      <div className="mt-2 grid grid-cols-3 gap-1 sm:flex sm:flex-nowrap sm:items-stretch sm:justify-center">
         {WORKFLOW.map((member, i) => (
-          <div key={member.appId} className="flex min-w-0 flex-1 items-center">
+          <div key={member.appId} className="flex min-w-0 items-center sm:flex-1">
             {i > 0 && (
               <ChevronRight
                 aria-hidden

@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
+import { Film, SlidersHorizontal } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
+import MobilePaneTabs, { paneClass } from '../../components/MobilePaneTabs'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
 import type { AdBlueprintPayload, Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
@@ -313,6 +315,8 @@ export default function BrollStudio() {
     useSettingsStore((s) => s.perAppModel['broll-studio:continuous:video']) ?? CONTINUOUS_DEFAULT_MODEL_ID
 
   const [isGenerating, setIsGenerating] = useState(false)
+  // Phone-only: which of the two panes is on screen (ignored from md up).
+  const [pane, setPane] = useState<'input' | 'output'>('input')
   const [error, setError] = useState<string | null>(null)
   const [pickerMode, setPickerMode] = useState<PickerMode>(null)
   const [highlightField, setHighlightField] = useState<string | null>(null)
@@ -996,6 +1000,8 @@ export default function BrollStudio() {
     if (isGenerating) return
     const script = scriptText.trim()
     if (!script) return
+    // On a phone only one pane is on screen — follow the run to the storyboard.
+    setPane('output')
     setIsGenerating(true)
     try {
       if (mode === 'continuous') await handleGenerateContinuous(script)
@@ -1098,9 +1104,19 @@ export default function BrollStudio() {
   }
 
   return (
-    <div className="flex flex-col pb-28 md:flex-row md:h-full md:pb-0">
+    <div className="flex h-full flex-col md:flex-row">
+      <MobilePaneTabs
+        options={[
+          { value: 'input', label: 'Setup', icon: SlidersHorizontal },
+          { value: 'output', label: 'Storyboard', icon: Film },
+        ]}
+        value={pane}
+        onChange={setPane}
+        accent="broll"
+      />
+
       {/* Left panel — inputs */}
-      <div className="flex w-full md:w-[30%] shrink-0 flex-col border-b md:border-b-0 md:border-r border-ink/5">
+      <div className={paneClass(pane === 'input', 'md:w-[30%] md:shrink-0 md:border-r md:border-ink/5')}>
         <InputPanel
           selectedProduct={selectedProduct}
           selectedModel={selectedModel}
@@ -1134,7 +1150,7 @@ export default function BrollStudio() {
       </div>
 
       {/* Right panel — output */}
-      <div className="flex w-full md:w-[70%] flex-col overflow-hidden">
+      <div className={paneClass(pane === 'output', 'md:w-[70%] md:overflow-hidden')}>
         <RightPanel
           mode={mode}
           result={result}

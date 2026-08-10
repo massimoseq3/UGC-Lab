@@ -112,7 +112,7 @@ export default function ImportPromptsModal({
       {...backdrop}
     >
       <div
-        className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-surface-1 shadow-2xl"
+        className="flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-surface-1 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

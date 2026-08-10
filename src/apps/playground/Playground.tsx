@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Images, Wand2 } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
+import MobilePaneTabs, { paneClass } from '../../components/MobilePaneTabs'
 import { useReportActivity } from '../../stores/activityStore'
 import type { VideoSourceClipPayload, ImageHistoryItem } from '../../stores/types'
 import { isAssetRef, getAsBase64 } from '../../utils/assetStore'
@@ -143,6 +145,8 @@ function initialState(): PromptPanelState {
 
 export default function Playground() {
   const baseKey = useProjectScopedKey('playground')
+  // Phone-only: which of the two panes is on screen (ignored from md up).
+  const [pane, setPane] = useState<'prompt' | 'history'>('prompt')
   // Sanitize hydrated state so a few "users always want this" defaults
   // re-assert themselves on every load:
   // - Audio = on. Users routinely forget to flip the chip and end up with a
@@ -337,6 +341,9 @@ export default function Playground() {
   async function handleSubmit() {
     const promptText = state.prompt.trim()
     if (!state.modelId) return
+
+    // On a phone only one pane is on screen — follow the run to the grid.
+    setPane('history')
 
     const id = crypto.randomUUID()
     const mode = state.mode
@@ -624,11 +631,18 @@ export default function Playground() {
   useReportActivity('playground', isGenerating)
 
   return (
-    <div className="relative flex flex-col md:h-full">
-      <div className="flex flex-1 flex-col md:min-h-0 md:flex-row">
-        {/* Left — prompt panel. On mobile we still want controls above the
-            grid, so the panel comes first in source order regardless. */}
-        <div className="flex w-full md:w-1/3 md:min-w-[380px] shrink-0 flex-col border-b md:border-b-0 md:border-r border-ink/5">
+    <div className="relative flex h-full flex-col">
+      <MobilePaneTabs
+        options={[
+          { value: 'prompt', label: 'Prompt', icon: Wand2 },
+          { value: 'history', label: 'History', icon: Images },
+        ]}
+        value={pane}
+        onChange={setPane}
+      />
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        {/* Left — prompt panel. */}
+        <div className={paneClass(pane === 'prompt', 'md:w-1/3 md:min-w-[380px] md:shrink-0 md:border-r md:border-ink/5')}>
           <PromptPanel
             state={state}
             onChange={setState}
@@ -639,7 +653,7 @@ export default function Playground() {
         </div>
 
         {/* Right — history grid */}
-        <div className="flex flex-1 flex-col md:min-h-0 md:overflow-hidden">
+        <div className={paneClass(pane === 'history', 'md:flex-1 md:overflow-hidden')}>
           <PlaygroundHistoryGrid
             inFlight={inFlight}
             filterMode={filterMode}

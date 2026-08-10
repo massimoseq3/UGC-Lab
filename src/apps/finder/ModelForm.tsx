@@ -263,9 +263,9 @@ export default function ModelForm({ item, onSave, onCancel }: ModelFormProps) {
               {displayImage ? (
                 // Natural aspect — supports portrait (9:16) AND landscape (16:9)
                 // influencers (e.g. character-sheet entries) without cropping.
-                <img src={displayImage} alt="" className="block w-full object-contain" />
+                <img src={displayImage} alt="" className="block max-h-[42dvh] w-full object-contain md:max-h-none" />
               ) : (
-                <div className="flex aspect-[9/16] w-full items-center justify-center">
+                <div className="flex aspect-[9/16] max-h-[42dvh] w-full items-center justify-center md:max-h-none">
                   <ImagePlus className="h-8 w-8 text-ink-600 transition-colors group-hover/img:text-ink-400" />
                 </div>
               )}

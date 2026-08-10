@@ -331,8 +331,13 @@ export default function Finder() {
           the right, with the separator footing flush under the toggle. Mirrors
           the Influencers gallery header so the toggle reads the same height as
           the other main toggles across the app. */}
-      <div className="flex h-[57px] shrink-0 items-center justify-between gap-2 border-b border-ink/5 px-3 md:gap-3 md:px-5">
-        <div className="min-w-0 flex-1 overflow-x-auto scrollbar-hide scroll-fade-r">
+      {/* Two rows on a phone: the six bank tabs plus Sort plus Add can't share
+          390px, and squeezing them left the bank switcher — the one control
+          this screen is for — as a sliver reading "P…". The toggle takes its own
+          full-width row and the actions sit under it. md+ is the single 57px
+          band, unchanged. */}
+      <div className="flex shrink-0 flex-col gap-2 border-b border-ink/5 px-3 py-2 md:h-[57px] md:flex-row md:items-center md:justify-between md:gap-3 md:px-5 md:py-0">
+        <div className="min-w-0 overflow-x-auto scrollbar-hide scroll-fade-r md:flex-1">
           <SegmentedToggle<BankType>
             fitContent
             className="h-10 !p-1"
