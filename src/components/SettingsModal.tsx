@@ -93,13 +93,12 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
 
   // Demo-data tool — populates every bank + the generation histories with
   // placeholder content to review the UI without spending credits, then wipes
-  // it again. Visible to me only: in local-only mode, on any localhost dev
-  // build (cloud env set or not), or to an admin on the live domain. Regular
-  // members on the production domain never see it.
-  const isLocalhost =
-    typeof window !== 'undefined' &&
-    /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(window.location.hostname)
-  const showDemoTool = !isCloudEnabled() || isLocalhost || !!profile?.is_admin
+  // it again. Visible to me only: whenever there are accounts at all it takes
+  // `is_admin`, so a member never sees it wherever they run the app (a
+  // localhost exception was here and is gone — it let a signed-in member
+  // running a dev build against the live cloud seed their own banks). A
+  // local-only build has no accounts and no members, so the tool stays.
+  const showDemoTool = !isCloudEnabled() || !!profile?.is_admin
   const [demoLoaded, setDemoLoaded] = useState(false)
   const [demoBusy, setDemoBusy] = useState(false)
 
@@ -337,7 +336,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
               <Section>
                 <Card>
                   <div className="flex items-center justify-between">
-                    <label className="text-[12px] font-medium text-ink-300">API key</label>
+                    <label className="text-[12px] font-medium text-ink-300">kie.ai API key</label>
                     <a
                       href="https://kie.ai/api-key"
                       target="_blank"
@@ -362,7 +361,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                     <button
                       type="button"
                       onClick={() => setShowKie(!showKie)}
-                      aria-label={showKie ? 'Hide API key' : 'Show API key'}
+                      aria-label={showKie ? 'Hide kie.ai API key' : 'Show kie.ai API key'}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-500 transition-colors hover:text-ink-300"
                     >
                       {showKie ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -520,11 +519,6 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                       {scTestResult.message}
                     </Banner>
                   )}
-
-                  <p className="mt-3 text-[11px] leading-relaxed text-ink-500">
-                    Testing spends 1 credit — there's no free balance endpoint, so the
-                    check runs a real search and reads the balance off it.
-                  </p>
                 </Card>
 
                 <p className="text-[11px] leading-relaxed text-ink-500">
