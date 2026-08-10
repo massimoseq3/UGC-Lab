@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { X, ImagePlus, Download, Loader2, AlertCircle, Sparkles, Check, Package, Users, Star, Tag } from 'lucide-react'
+import { X, ImagePlus, Download, Loader2, AlertCircle, Sparkles, Check, Package, Users, Star, Tag, Image as ImageIcon } from 'lucide-react'
 import type { Product } from '../../stores/types'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
 import { useAppStore } from '../../stores/appStore'
@@ -10,6 +10,7 @@ import { humanizeError } from '../../utils/friendlyError'
 import SegmentedToggle from '../../components/SegmentedToggle'
 import ExpandTextModal, { ExpandButton } from '../../components/ExpandableText'
 import AutoGrowTextarea from '../../components/AutoGrowTextarea'
+import { usePersistedState } from '../../hooks/usePersistedState'
 
 interface ProductFormProps {
   item?: Product | null
@@ -26,7 +27,7 @@ interface ProductFormProps {
 
 const FIELD_META: Record<string, { label: string; type: 'text' | 'textarea'; required?: boolean; hint?: string }> = {
   productName: { label: 'Product name', type: 'text', required: true },
-  productDescription: { label: 'Description', type: 'textarea', required: true },
+  productDescription: { label: 'Description', type: 'textarea' },
   targetMarket: { label: 'Target market', type: 'textarea' },
   painPoints: { label: 'Pain points', type: 'textarea' },
   objections: { label: 'Objections', type: 'textarea', hint: 'What stops them buying' },
@@ -51,7 +52,19 @@ const SECTIONS: { key: SectionKey; label: string; icon: React.ElementType; field
   { key: 'offer', label: 'Offer', icon: Tag, fields: ['offer', 'cta'] },
 ]
 
-const REQUIRED_KEYS = ['productName', 'productDescription'] as const
+// A name is what makes the row pickable in a BankPicker, so it stays required.
+// The description deliberately doesn't: a member who only wants this product's
+// photos as reference images (Photo only, below) has no copy to put in it, and
+// gating Add on a write-up they didn't ask for was the whole complaint.
+const REQUIRED_KEYS = ['productName'] as const
+
+// What a dropped photo does. Auto-fill is the default and the advertised flow;
+// Photo only attaches the shot and spends nothing, for a product whose copy is
+// already written — or one that exists purely to hand its photos to B-Roll and
+// Playground as references. The on-demand "Auto-fill from image" button under
+// the photo is the way back, so nothing is lost by switching.
+type DropMode = 'autofill' | 'photo'
+const DROP_MODE_KEY = 'ai-ugc-lab:products:drop-mode'
 
 // Extra angles beyond the hero shot. Four is enough to cover closed/open/label/
 // contents without turning the auto-fill call into a photo album.
@@ -149,6 +162,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
   const [expandedField, setExpandedField] = useState<string | null>(null)
   const [activeSection, setActiveSection] = useState<SectionKey>('identity')
   const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [dropMode, setDropMode] = usePersistedState<DropMode>(DROP_MODE_KEY, 'autofill')
   const resolvedAssetUrl = useAssetUrl(form.productImage)
   const displayImage = localPreview ?? resolvedAssetUrl
   const addToast = useAppStore((s) => s.addToast)
@@ -264,16 +278,15 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
     }
   }
 
+  // Picking a file through the tile follows the same mode a drop does. It used
+  // to attach silently whatever the tile's own "Drop to auto-fill" label said,
+  // so the two ways of adding the same photo behaved differently.
   const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = reader.result as string
-      set('productImage', dataUrl)
-      setLocalPreview(dataUrl)
-    }
-    reader.readAsDataURL(file)
+    if (dropMode === 'photo') attachImage(file)
+    else void runExtraction(file)
   }
 
   // Extra angles are read straight to data URIs and held on the form; the save
@@ -302,6 +315,19 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
 
   const removeExtraImage = (index: number) => {
     setForm((f) => ({ ...f, extraImages: f.extraImages.filter((_, i) => i !== index) }))
+  }
+
+  // Attach a photo as the hero shot and stop there — no vision call, no credits.
+  // The same half of `runExtraction` that shows the picture, without the read.
+  const attachImage = (file: File) => {
+    setExtractError(null)
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') return
+      setForm((f) => ({ ...f, productImage: reader.result as string }))
+      setLocalPreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
   }
 
   const runExtraction = async (file: File) => {
@@ -393,7 +419,8 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
       setExtractError('File too large. Maximum size is 10 MB.')
       return
     }
-    runExtraction(file)
+    if (dropMode === 'photo') attachImage(file)
+    else void runExtraction(file)
   }
 
   const handleDownload = () => {
@@ -499,11 +526,13 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
       onDrop={handleDrop}
       className="relative flex flex-col gap-4 lg:min-h-0 lg:flex-1"
     >
+      {/* The overlay says what THIS drop will do, so the choice is visible
+          before the file lands rather than discovered from the credit spend. */}
       {overlayActive && (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-xl border-2 border-dashed border-emerald-400/60 bg-emerald-500/10 backdrop-blur-sm">
           <div className="flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-emerald-200">
-            <Sparkles className="h-4 w-4" />
-            Drop image to auto-fill product info
+            {dropMode === 'photo' ? <ImageIcon className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+            {dropMode === 'photo' ? 'Drop image to add the photo only' : 'Drop image to auto-fill product info'}
           </div>
         </div>
       )}
@@ -550,6 +579,21 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
           ref={sideRef}
           className={`flex w-full shrink-0 flex-col gap-4 md:w-[300px] lg:min-h-0 lg:overflow-y-auto lg:pr-1 ${sideHasMore ? 'scroll-fade-b' : ''}`}
         >
+          {/* What a dropped photo does. Sits above the photo because it has to
+              be readable BEFORE the drop — the Auto-fill button below only
+              appears once there's already an image. */}
+          <SegmentedToggle<DropMode>
+            dense
+            accent="products"
+            value={dropMode}
+            onChange={setDropMode}
+            options={[
+              { value: 'autofill', label: 'Auto-fill', icon: Sparkles },
+              { value: 'photo', label: 'Photo only', icon: ImageIcon },
+            ]}
+            className="shrink-0"
+          />
+
           {displayImage ? (
             <div className="group/img relative aspect-square w-full shrink-0 overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02]">
               <img src={displayImage} alt="" className="h-full w-full object-cover" />
@@ -582,7 +626,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
             >
               <ImagePlus className="h-6 w-6 text-ink-600 transition-colors group-hover:text-ink-400" />
               <span className="text-[10px] font-medium uppercase tracking-widest text-ink-600 transition-colors group-hover:text-ink-500">
-                Drop to auto-fill
+                {dropMode === 'photo' ? 'Drop to add photo' : 'Drop to auto-fill'}
               </span>
             </button>
           )}
@@ -706,7 +750,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
               {showError && (
                 <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] text-red-300 light:text-red-700">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  <span>Fill in the product name and description to add this product.</span>
+                  <span>Give this product a name to add it.</span>
                 </div>
               )}
 
