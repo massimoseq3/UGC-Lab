@@ -293,7 +293,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
         aria-labelledby="settings-title"
         /* A fixed height keeps the rail steady — a modal that resized per
            section would jump under the cursor on every switch. */
-        className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-ink/10 bg-surface-1 shadow-2xl sm:h-[520px] sm:flex-row"
+        className="flex max-h-[88dvh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-ink/10 bg-surface-1 shadow-2xl sm:h-[520px] sm:flex-row"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Nav rail — a recessed column on desktop, a scrolling pill row on phones */}

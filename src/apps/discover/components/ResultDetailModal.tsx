@@ -68,10 +68,10 @@ export default function ResultDetailModal({
               poster={result.coverUrl}
               controls
               autoPlay
-              className="max-h-[80vh] w-full object-contain"
+              className="max-h-[80dvh] w-full object-contain"
             />
           ) : result.coverUrl ? (
-            <img src={result.coverUrl} alt="" className="max-h-[80vh] w-full object-contain" />
+            <img src={result.coverUrl} alt="" className="max-h-[80dvh] w-full object-contain" />
           ) : (
             <div className="flex h-64 items-center justify-center text-sm text-ink-600">No preview</div>
           )}
