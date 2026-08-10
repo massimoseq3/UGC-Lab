@@ -149,6 +149,44 @@ function backoffMs(attempt: number): number {
   return Math.min(2 ** attempt * 1000 + Math.random() * 500, 10_000)
 }
 
+// fetch() settles as soon as the response HEADERS land, so the timeout below is
+// disarmed while the body is still in flight — and a chat call asks for
+// `stream: true`, which guarantees headers arrive early. A gateway that answered
+// and then stalled mid-body left the body read pending FOREVER: the surface sat
+// on "generating" with no error and no cancel, and only a page reload cleared
+// it. That is one bug reachable from every transport in this file, so it is
+// fixed here rather than at nine call sites.
+//
+// The body readers are re-armed with a fresh budget and abort the request when
+// they blow it, so a stalled read fails loudly instead of hanging. Timers are
+// created lazily per read, so a response whose body is never read costs nothing.
+function armBodyTimeout(res: Response, controller: AbortController, timeoutMs: number): Response {
+  const guard = <T>(read: () => Promise<T>) => async (): Promise<T> => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      return await Promise.race([
+        read(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            controller.abort()
+            reject(new Error('Request timed out — kie.ai started responding but never finished. Try again.'))
+          }, timeoutMs)
+        }),
+      ])
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+  // Own properties shadowing Response.prototype — every caller here reads the
+  // body through exactly these three, so guarding them covers the file.
+  Object.defineProperties(res, {
+    json: { value: guard(() => Response.prototype.json.call(res)) },
+    text: { value: guard(() => Response.prototype.text.call(res)) },
+    blob: { value: guard(() => Response.prototype.blob.call(res)) },
+  })
+  return res
+}
+
 async function fetchWithRetry(
   url: string,
   init: RequestInit,
@@ -166,7 +204,11 @@ async function fetchWithRetry(
     signal?.addEventListener('abort', onAbort, { once: true })
 
     try {
-      const res = await fetch(url, { ...init, signal: controller.signal })
+      const res = armBodyTimeout(
+        await fetch(url, { ...init, signal: controller.signal }),
+        controller,
+        timeoutMs,
+      )
       clearTimeout(timer)
       signal?.removeEventListener('abort', onAbort)
 
@@ -362,11 +404,33 @@ export function parseResult(record: TaskRecord): ParsedResult {
   }
 }
 
+// Generous, because a 30s video is tens of MB on a slow line — but NOT
+// unbounded, which is what this was. This runs at the TAIL of a generation kie
+// has already finished and billed for, so a stalled CDN read meant the result
+// never landed: the tile sat on "generating" with no error and no way back
+// except a reload. The whole point of the download is that kie's URLs expire in
+// 3 days, so failing loudly here is what lets the caller retry.
+const ASSET_DOWNLOAD_TIMEOUT_MS = 180_000
+
 // Download a generated URL and return base64 + mimeType for local persistence.
 export async function downloadAsBase64(url: string): Promise<{ base64: string; mimeType: string }> {
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`Failed to download generated asset (${res.status}).`)
-  const blob = await res.blob()
+  // One controller for the fetch AND the body read — aborting it tears down the
+  // response stream too, so a mid-download stall can't outlive the deadline.
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ASSET_DOWNLOAD_TIMEOUT_MS)
+  let blob: Blob
+  try {
+    const res = await fetch(url, { signal: controller.signal })
+    if (!res.ok) throw new Error(`Failed to download generated asset (${res.status}).`)
+    blob = await res.blob()
+  } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw new Error('Timed out downloading the finished result. Try again.')
+    }
+    throw e
+  } finally {
+    clearTimeout(timer)
+  }
   const mimeType = blob.type || 'image/png'
   const buffer = await blob.arrayBuffer()
   // Avoid `String.fromCharCode(...new Uint8Array(...))` which blows the call
@@ -415,11 +479,17 @@ export interface ChatMessage {
 }
 
 // The ceiling for chat calls that write something long: a storyboard, a batch
-// of takes, a whole-video read. kie's gateway BUFFERS the SSE stream rather
-// than streaming it, so the timeout below bounds the entire generation, not
-// just time-to-headers — a big call blows through the 120s default while kie
-// finishes the job anyway and bills for it. Consuming the stream incrementally
-// is the real fix; this raises the ceiling until then.
+// of takes, a whole-video read. kie's gateway usually BUFFERS the SSE stream
+// rather than streaming it, so a big call blows through the 120s default while
+// kie finishes the job anyway and bills for it.
+//
+// Applied TWICE per call — once to time-to-headers and again to the body read
+// (see armBodyTimeout) — because "kie buffers" is a habit, not a guarantee:
+// when headers did arrive early the ceiling used to be silently void, and a
+// stall past that point hung the call with nothing to cancel it. The worst case
+// is now two ceilings rather than one; that is the deliberate trade for never
+// hanging forever. Consuming the stream incrementally, with a per-chunk idle
+// timer instead of a total one, is still the real fix.
 export const LONG_CHAT_TIMEOUT_MS = 300_000
 
 export interface ChatCompletionsOptions {
@@ -485,6 +555,7 @@ export async function kieChatCompletions(
   )
 
   // Read the body once as text; dispatch based on content-type / shape.
+  // Bounded by armBodyTimeout in fetchWithRetry — see the note there.
   const raw = await res.text()
   const contentType = res.headers.get('content-type') ?? ''
   const looksLikeSSE = contentType.includes('text/event-stream') || raw.startsWith('data:') || raw.includes('\ndata:')

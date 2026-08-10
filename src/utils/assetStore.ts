@@ -25,9 +25,27 @@ const urlCache = new Map<string, Promise<string>>()
 let fallbackStore: Map<string, StoredAsset> | null = null
 let dbPromise: Promise<IDBDatabase> | null = null
 
+// indexedDB.open() can do more than succeed or fail: `onblocked` fires — and
+// nothing else does — while another tab holds an older version open, and a
+// browser busy reclaiming storage can leave the request pending indefinitely.
+// Either way the promise never settles, and saveAsset AWAITS this, so a save to
+// the bank simply never completes: the member clicks Save, nothing lands, no
+// error appears, and only a reload clears it.
+const DB_OPEN_TIMEOUT_MS = 10_000
+
 function openDB(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise
-  dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
+
+  const attempt = new Promise<IDBDatabase>((resolve, reject) => {
+    let settled = false
+    const fail = (reason: string, err?: unknown) => {
+      if (settled) return
+      settled = true
+      console.warn(`[assetStore] IndexedDB ${reason} — using in-memory fallback for now`, err)
+      if (!fallbackStore) fallbackStore = new Map()
+      reject(err instanceof Error ? err : new Error(`IndexedDB ${reason}`))
+    }
+    const timer = setTimeout(() => fail('open timed out'), DB_OPEN_TIMEOUT_MS)
     try {
       const request = indexedDB.open(DB_NAME, DB_VERSION)
       request.onupgradeneeded = () => {
@@ -36,19 +54,38 @@ function openDB(): Promise<IDBDatabase> {
           db.createObjectStore(STORE_NAME, { keyPath: 'id' })
         }
       }
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => {
-        console.warn('IndexedDB unavailable, using in-memory fallback')
-        fallbackStore = new Map()
-        reject(request.error)
+      request.onsuccess = () => {
+        clearTimeout(timer)
+        // Lost the race against the timeout — don't leak the connection.
+        if (settled) { try { request.result.close() } catch { /* ignore */ } return }
+        settled = true
+        resolve(request.result)
       }
-    } catch {
-      console.warn('IndexedDB unavailable, using in-memory fallback')
-      fallbackStore = new Map()
-      reject(new Error('IndexedDB not available'))
+      request.onerror = () => { clearTimeout(timer); fail('unavailable', request.error) }
+      request.onblocked = () => { clearTimeout(timer); fail('blocked by another tab') }
+    } catch (e) {
+      clearTimeout(timer)
+      fail('not available', e)
     }
   })
-  return dbPromise
+
+  // A FAILED open must not be cached. It used to be — `if (dbPromise) return
+  // dbPromise` handed the same rejected promise back forever — so one transient
+  // failure (an eviction, a blocked upgrade, a stalled open) poisoned every
+  // later read and write for the life of the tab. That is precisely why
+  // reloading the page "fixed" saving: it was the only way to clear this.
+  dbPromise = attempt
+  attempt.catch(() => { if (dbPromise === attempt) dbPromise = null })
+  return attempt
+}
+
+// The in-memory tier is a stopgap for a single failed write, not a mode the
+// session is stuck in — so say it once and let IndexedDB be retried after.
+let degradedReported = false
+function reportDegradedStorage() {
+  if (degradedReported) return
+  degradedReported = true
+  console.warn('[assetStore] a blob was held in memory only — this browser refused to store it')
 }
 
 function generateAssetId(): string {
@@ -72,7 +109,9 @@ export function assetIdFromRef(value: string): string {
 }
 
 async function idbPut(asset: StoredAsset): Promise<void> {
-  if (fallbackStore) { fallbackStore.set(asset.id, asset); return }
+  // Always ATTEMPT the durable store, even once a memory fallback exists. The
+  // old short-circuit meant the first failure made every later blob in the
+  // session memory-only — saved to all appearances, gone on the next reload.
   try {
     const db = await openDB()
     await new Promise<void>((resolve, reject) => {
@@ -80,15 +119,24 @@ async function idbPut(asset: StoredAsset): Promise<void> {
       tx.objectStore(STORE_NAME).put(asset)
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
+      // A quota-exceeded write aborts rather than erroring; without this the
+      // promise never settles and the awaiting save hangs.
+      tx.onabort = () => reject(tx.error)
     })
+    // Landed on disk — drop any stale memory copy so the tiers can't disagree.
+    fallbackStore?.delete(asset.id)
   } catch {
     if (!fallbackStore) fallbackStore = new Map()
     fallbackStore.set(asset.id, asset)
+    reportDegradedStorage()
   }
 }
 
 async function idbDelete(id: string): Promise<void> {
-  if (fallbackStore) { fallbackStore.delete(id); return }
+  // Both tiers, unconditionally: now that a blob can exist in either, deleting
+  // only the one we happen to look at first would leave the other behind — and
+  // for a delete, a survivor is the bug.
+  fallbackStore?.delete(id)
   try {
     const db = await openDB()
     await new Promise<void>((resolve, reject) => {
@@ -96,6 +144,7 @@ async function idbDelete(id: string): Promise<void> {
       tx.objectStore(STORE_NAME).delete(id)
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
+      tx.onabort = () => reject(tx.error)
     })
   } catch {
     /* best effort */
@@ -171,10 +220,14 @@ export async function getBlob(refOrId: string): Promise<Blob | null> {
   // Callers pass either a bare id or an asset:// URI — IDB only knows the
   // bare key, so normalise up front.
   const assetId = assetIdFromRef(refOrId)
-  let local: Blob | null = null
-  if (fallbackStore) {
-    local = fallbackStore.get(assetId)?.blob ?? null
-  } else {
+  // Memory tier first (it only ever holds blobs IndexedDB refused), then the
+  // durable store. This used to be an either/or on `fallbackStore` being set,
+  // which meant one failed write sent every subsequent READ past IndexedDB for
+  // the rest of the session — so a member with a perfectly good local cache
+  // went to the network for every image, and showed placeholders whenever that
+  // network hop failed too.
+  let local: Blob | null = fallbackStore?.get(assetId)?.blob ?? null
+  if (!local) {
     try {
       const db = await openDB()
       local = await new Promise<Blob | null>((resolve, reject) => {
@@ -185,6 +238,7 @@ export async function getBlob(refOrId: string): Promise<Blob | null> {
           resolve(asset?.blob ?? null)
         }
         request.onerror = () => reject(request.error)
+        tx.onabort = () => reject(tx.error)
       })
     } catch {
       local = null
