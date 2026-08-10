@@ -12,10 +12,11 @@
 // back weeks; pre-ticking all of it would mean unticking dozens of clips to get
 // the two you came for, so it opens with nothing picked.
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Download, Loader2, Check, Star } from 'lucide-react'
+import { X, Download, Loader2, Check, Star, Film } from 'lucide-react'
 import { useAssetUrl } from '../hooks/useAssetUrl'
+import useNearViewport from '../hooks/useNearViewport'
 import { useAppStore } from '../stores/appStore'
 import { downloadAssetsZip } from '../utils/downloadZip'
 import { humanizeError } from '../utils/friendlyError'
@@ -88,6 +89,7 @@ export default function ClipDownloadModal({
 
   const backdrop = useBackdropClose(onClose)
   const tint = ACCENT[accent]
+  const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const toggle = (id: string) =>
     setPicked((prev) => {
@@ -140,7 +142,7 @@ export default function ClipDownloadModal({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {entries.map((entry) => (
               <ClipTile
@@ -148,6 +150,7 @@ export default function ClipDownloadModal({
                 entry={entry}
                 picked={picked.has(entry.id)}
                 tint={tint}
+                scrollRoot={scrollRef}
                 onToggle={() => toggle(entry.id)}
               />
             ))}
@@ -186,17 +189,24 @@ function ClipTile({
   entry,
   picked,
   tint,
+  scrollRoot,
   onToggle,
 }: {
   entry: ClipDownloadEntry
   picked: boolean
   tint: { frame: string; check: string }
+  scrollRoot: React.RefObject<HTMLElement | null>
   onToggle: () => void
 }) {
-  const url = useAssetUrl(entry.ref)
+  // Only tiles near the scroll window hold a clip — this list runs to every
+  // video the member has ever made, and mounting all of them at once left the
+  // grid black while the tab stalled. See hooks/useNearViewport.
+  const { ref: tileRef, near } = useNearViewport<HTMLButtonElement>(scrollRoot)
+  const url = useAssetUrl(near ? entry.ref : null)
   return (
     <div className="flex flex-col gap-1.5">
       <button
+        ref={tileRef}
         type="button"
         onClick={onToggle}
         title={picked ? 'Leave out of the zip' : 'Add to the zip'}
@@ -217,8 +227,13 @@ function ClipTile({
             onMouseLeave={(e) => { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
           />
         ) : (
+          // A tile that hasn't reached the window yet gets a still glyph, not a
+          // spinner: forty spinning icons off screen is forty animations the
+          // browser keeps ticking, and nothing is actually loading down there.
           <div className="flex h-full w-full items-center justify-center">
-            <Loader2 className="h-4 w-4 animate-spin text-white/40" />
+            {near
+              ? <Loader2 className="h-4 w-4 animate-spin text-white/40" />
+              : <Film className="h-4 w-4 text-white/20" />}
           </div>
         )}
         <span

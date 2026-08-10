@@ -1,4 +1,4 @@
-import { memo, useMemo, useState, useEffect } from 'react'
+import { memo, useMemo, useRef, useState, useEffect } from 'react'
 import {
   Loader2, Download, Bookmark, Check, Film, Image as ImageIcon,
   Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy,
@@ -25,6 +25,7 @@ import SegmentedToggle from '../../../components/SegmentedToggle'
 import type { PlaygroundMode, InFlightGen } from '../types'
 import { humanizeError } from '../../../utils/friendlyError'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
+import useNearViewport from '../../../hooks/useNearViewport'
 export type { InFlightGen }
 
 // List-view size-slider bounds. The raw value drives the slider fill % and the
@@ -128,6 +129,10 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
     [entries],
   )
   const [downloadOpen, setDownloadOpen] = useState(false)
+  // The scroller every tile observes itself against — see hooks/useNearViewport.
+  // This list is uncapped, so without it a member with a few dozen clips paid
+  // for every one of them (a blob read each, a decoder each) on mount.
+  const scrollRef = useRef<HTMLDivElement | null>(null)
 
   // Save an image-history entry to the B-Rolls bank. Tracks in-flight ids so
   // the user can't double-tap into duplicate BRolls.
@@ -212,7 +217,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
         <ViewToggle value={viewMode} onChange={setViewMode} />
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-3">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
         {visibleInFlight.length > 0 && (
           <>
             <DayPill label="In progress" className="my-5" />
@@ -248,6 +253,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                       <ImageTile
                         item={entry.data}
                         isSaving={savingIds.has(entry.data.id)}
+                        scrollRoot={scrollRef}
                         onClick={() => setPreviewItem(entry)}
                         onSave={() => handleSaveImage(entry.data)}
                         onDelete={() => deleteImageHistory(entry.data.id)}
@@ -258,6 +264,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                     {entry.kind === 'video' && (
                       <VideoTile
                         item={entry.data}
+                        scrollRoot={scrollRef}
                         onClick={() => setPreviewItem(entry)}
                         onDelete={() => deleteVideoHistory(entry.data.id)}
                         onCopyPrompt={() => handleCopyPrompt(entry.data.prompt)}
@@ -286,6 +293,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                     entry={entry}
                     mediaAspect={mediaAspect}
                     isSaving={savingIds.has(entry.data.id)}
+                    scrollRoot={scrollRef}
                     onClickImage={entry.kind === 'image' ? () => setPreviewItem(entry) : undefined}
                     onCopyPrompt={() => handleCopyPrompt(entry.data.prompt)}
                     onSave={entry.kind === 'image' ? () => handleSaveImage(entry.data) : undefined}
@@ -375,6 +383,7 @@ function HistoryListRow({
   entry,
   mediaAspect,
   isSaving,
+  scrollRoot,
   onClickImage,
   onCopyPrompt,
   onSave,
@@ -385,6 +394,7 @@ function HistoryListRow({
   entry: HistoryEntry
   mediaAspect: number
   isSaving: boolean
+  scrollRoot: React.RefObject<HTMLElement | null>
   onClickImage?: () => void
   onCopyPrompt: () => void
   onSave?: () => void
@@ -392,9 +402,11 @@ function HistoryListRow({
   onDelete: () => void
   onAnimate?: () => void
 }) {
-  const { url, status } = useAssetUrlState(
-    entry.kind === 'image' ? entry.data.imageUrl : entry.kind === 'video' ? entry.data.videoUrl : null,
-  )
+  // The row's media loads once the row is near the window — see the note on
+  // `scrollRef` above. Everything else about the row renders regardless.
+  const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
+  const mediaRef = entry.kind === 'image' ? entry.data.imageUrl : entry.kind === 'video' ? entry.data.videoUrl : null
+  const { url, status } = useAssetUrlState(near ? mediaRef : null)
   const audioUrl = useAssetUrl(entry.kind === 'music' ? entry.data.audioRef : null)
   // Native controls here, but the same one-clip-at-a-time rule as the tiles.
   const rowVideo = useExclusiveVideo()
@@ -418,7 +430,7 @@ function HistoryListRow({
   }
 
   return (
-    <div className="flex w-full items-stretch gap-3 overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.02] card-soft-shadow">
+    <div ref={rowRef} className="flex w-full items-stretch gap-3 overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.02] card-soft-shadow">
       {/* Media — fixed-width column (the larger share of the row). Landscape
           outputs keep their own 16:9-style frame (no letterbox bars) at any slider
           position; portraits follow the slider-driven aspect, growing taller as it
@@ -569,6 +581,7 @@ function ListRowButton({
 function ImageTile({
   item,
   isSaving,
+  scrollRoot,
   onClick,
   onSave,
   onDelete,
@@ -577,24 +590,32 @@ function ImageTile({
 }: {
   item: ImageHistoryItem
   isSaving: boolean
+  scrollRoot: React.RefObject<HTMLElement | null>
   onClick: () => void
   onSave: () => void
   onDelete: () => void
   onCopyPrompt: () => void
   onAnimate?: () => void
 }) {
-  const { url, status } = useAssetUrlState(item.imageUrl)
+  // `loading="lazy"` only defers the <img> — the blob behind it still came out
+  // of IndexedDB for every tile in the list. This defers the read itself.
+  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
+  const { url, status } = useAssetUrlState(near ? item.imageUrl : null)
   const isSaved = !!item.linkedBRollId
 
   return (
       <div
+        ref={tileRef}
         onClick={onClick}
         className="group relative cursor-pointer overflow-hidden rounded-lg border border-ink/10 light:border-ink/5 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 light:hover:border-ink/10 hover:-translate-y-px card-soft-shadow"
       >
         {status === 'ready' && url ? (
           <img src={url} alt="" loading="lazy" decoding="async" className="block h-auto w-full" />
         ) : (
-          <div className="flex aspect-square w-full items-center justify-center">
+          // Shaped like the picture that's coming, not square: a tile whose
+          // media loads on scroll would otherwise resize under the pointer and
+          // shove the rest of the column around as it goes.
+          <div className="flex w-full items-center justify-center" style={aspectStyle(item.aspectRatio)}>
             {status === 'loading'
               ? <Loader2 className="h-5 w-5 animate-spin text-ink-500" />
               : <ImageIcon className="h-6 w-6 text-ink-700" />}
@@ -643,16 +664,21 @@ function ImageTile({
 
 function VideoTile({
   item,
+  scrollRoot,
   onClick,
   onDelete,
   onCopyPrompt,
 }: {
   item: VideoHistoryItem
+  scrollRoot: React.RefObject<HTMLElement | null>
   onClick: () => void
   onDelete: () => void
   onCopyPrompt: () => void
 }) {
-  const { url, status } = useAssetUrlState(item.videoUrl)
+  // Off-window tiles hold no clip: a <video> each is a blob in memory and a
+  // decoder, and the browser runs out of the second long before this list does.
+  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
+  const { url, status } = useAssetUrlState(near ? item.videoUrl : null)
   // Hover-autoplay must stay muted (browsers block unmuted autoplay), but an
   // explicit Play click is a user gesture and plays in place with sound — and
   // stops whatever clip was playing elsewhere in the app.
@@ -662,6 +688,7 @@ function VideoTile({
 
   return (
       <div
+        ref={tileRef}
         {...inline.hoverProps}
         onClick={onClick}
         className="group relative cursor-pointer overflow-hidden rounded-lg border border-ink/10 light:border-ink/5 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 light:hover:border-ink/10 hover:-translate-y-px card-soft-shadow"
