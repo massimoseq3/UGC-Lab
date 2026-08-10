@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from 'react'
 import { X, Plus, type LucideIcon } from 'lucide-react'
+import { StatusDot } from '../SectionCard'
 
 // Shared building blocks for the Playground reference inputs. The design goal:
 // every input the active model accepts reads as a labelled, droppable slot you
@@ -12,17 +13,26 @@ export function RefGroup({
   label,
   count,
   max,
+  filled,
   children,
 }: {
   label: string
   count?: number
   max?: number
+  // Drives the Influencers status dot. Undefined = no dot, for a group whose
+  // filled state is already obvious from the slots themselves (the frame
+  // squares: a picture versus a dashed box outshouts a 6px dot).
+  filled?: boolean
   children: ReactNode
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5 px-0.5">
-        <span className="text-[11px] font-medium tracking-tight text-ink-500">{label}</span>
+        {/* Never `required`: every reference slot in Playground is optional —
+            the prompt alone is a valid generation — so an empty group is
+            neutral, never red. */}
+        {filled != null && <StatusDot filled={filled} />}
+        <span className="text-[11px] font-medium uppercase tracking-widest text-ink-300">{label}</span>
         {count != null && max != null && (
           <span className="text-[10px] tabular-nums text-ink-600">
             {count}/{max}

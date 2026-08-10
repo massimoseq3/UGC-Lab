@@ -1,5 +1,5 @@
 import { useState, type ComponentType } from 'react'
-import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkles, Shuffle, FishingHook, Video, Clock } from 'lucide-react'
+import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkles, Shuffle, FishingHook, Video, Clock, Layers } from 'lucide-react'
 import type { Product, Script } from '../../../stores/types'
 import { WRITE_LENGTHS, REMIX_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNTS, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type HookCount, type VariationCount } from '../types'
 import { useBankStore } from '../../../stores/bankStore'
@@ -8,6 +8,7 @@ import SegmentedToggle from '../../../components/SegmentedToggle'
 import ClearAllButton from '../../../components/ClearAllButton'
 import SlideOver from '../../../components/SlideOver'
 import ScriptModelRow from '../../../components/ScriptModelRow'
+import SectionCard, { StatusDot } from '../../../components/SectionCard'
 import ConstraintChip from '../../../components/ConstraintChip'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import PromptToolbar from '../../../components/PromptToolbar'
@@ -358,8 +359,13 @@ export default function InputPanel({
   // Product picker — step 2 in every mode, but rendered in a different spot
   // for Write New (before the brief) than for the remix modes (after the
   // source text).
+  // Product — required in every mode (it's what the script is ABOUT), so it
+  // leads the References card and its dot is the one that can go red. Script
+  // Style sits under it: it's optional flavour, and the Generate button is
+  // already down the column saying "Pick a product to generate", which used to
+  // point at the second row rather than the first.
   const productSection = (
-    <div className="mb-2">
+    <div>
       {selectedProduct ? (
         <div>
           {/* Whole-card-clickable — hitting any part of the populated
@@ -370,8 +376,9 @@ export default function InputPanel({
             tabIndex={0}
             onClick={() => setProductPickerOpen(true)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProductPickerOpen(true) } }}
-            className="group flex w-full cursor-pointer items-center gap-3 rounded-full border border-gold-500/25 bg-gold-500/[0.06] px-4 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-inset ring-gold-500/10 transition-colors hover:bg-gold-500/10"
+            className="group flex w-full cursor-pointer items-center gap-2.5 rounded-full border border-gold-500/25 bg-gold-500/[0.06] px-4 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-inset ring-gold-500/10 transition-colors hover:bg-gold-500/10"
           >
+            <StatusDot filled required />
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gold-500/15">
               {resolvedProductImage ? (
                 <img src={resolvedProductImage} alt="" className="h-full w-full object-cover" />
@@ -420,8 +427,9 @@ export default function InputPanel({
           {products.length > 0 ? (
             <button
               onClick={() => setProductPickerOpen(true)}
-              className="flex w-full items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-left transition-colors hover:border-scripts-500/30 hover:bg-scripts-500/5"
+              className="flex w-full items-center gap-2.5 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-left transition-colors hover:border-scripts-500/30 hover:bg-scripts-500/5"
             >
+              <StatusDot filled={false} required />
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-500/10">
                 <Package className="h-[18px] w-[18px] text-gold-400 light:text-gold-600" />
               </div>
@@ -432,7 +440,8 @@ export default function InputPanel({
               <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
             </button>
           ) : (
-            <div className="flex items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 py-2.5">
+            <div className="flex items-center gap-2.5 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 py-2.5">
+              <StatusDot filled={false} required />
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-ink/5">
                 <Package className="h-[18px] w-[18px] text-ink-700" />
               </div>
@@ -505,23 +514,36 @@ export default function InputPanel({
               />
             </div>
 
+            {/* References — what this script is built from, grouped in the
+                Influencers section card so the two picker rows read as one
+                thing rather than as two more rungs on a ladder. The card also
+                hosts the status dots: every row's dot sits at its left edge, so
+                they stack into one column you can scan without reading a word.
+                Product first — it's required, and it's what the script is
+                about. */}
+            <SectionCard icon={Layers} title="References" className="mb-2">
+            {productSection}
+
             {/* Hook Style — the hooks format's replacement for the Script Style
                 picker. 'auto' (Best Mix) is the default and renders as the
                 dashed unset affordance; picking a family flips it solid, and
                 the X resets back to auto. */}
             {isHooksFormat && (
-            <div className="mb-2">
+            <div>
               <div
                 role="button"
                 tabIndex={0}
                 onClick={() => setHookSlideOpen(true)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHookSlideOpen(true) } }}
-                className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
+                className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-full border px-4 py-2.5 text-left transition-colors ${
                   hookCategory !== 'auto'
                     ? 'border-scripts-500/20 bg-scripts-500/[0.06] hover:border-scripts-500/30 hover:bg-scripts-500/10'
                     : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
                 }`}
               >
+                {/* Not `required`: Best Mix is a real answer, so an unpicked
+                    family is neutral rather than something blocking the run. */}
+                <StatusDot filled={hookCategory !== 'auto'} />
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-text">
                   <FishingHook className="h-[18px] w-[18px]" strokeWidth={1.75} />
                 </div>
@@ -534,7 +556,10 @@ export default function InputPanel({
                   ) : (
                     <>
                       <div className="text-[13px] font-medium text-ink-300">Hook Style</div>
-                      <div className="text-[11px] text-ink-600">Auto picks the best mix — or lock one category</div>
+                      {/* "family", not "category" — the picker itself calls
+                          them families, and one control shouldn't use two
+                          names for the same thing. */}
+                      <div className="text-[11px] text-ink-600">Auto picks the best mix — or lock one family</div>
                     </>
                   )}
                 </div>
@@ -560,22 +585,25 @@ export default function InputPanel({
             </div>
             )}
 
-            {/* Script Style — sits above the product picker. Tapping the button
+            {/* Script Style — sits under the product row. Tapping the button
                 opens the style picker slide-over. Hidden in the hooks format,
                 which has its own family picker above. */}
             {!isHooksFormat && (
-            <div className="mb-2">
+            <div>
               <div
                 role="button"
                 tabIndex={0}
                 onClick={() => setStyleSlideOpen(true)}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
-                className={`group flex w-full cursor-pointer items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
+                className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-full border px-4 py-2.5 text-left transition-colors ${
                   styleChosen
                     ? 'border-scripts-500/20 bg-scripts-500/[0.06] hover:border-scripts-500/30 hover:bg-scripts-500/10'
                     : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
                 }`}
               >
+                {/* Optional — nothing is waiting on a style, so an unpicked one
+                    is neutral, never red. */}
+                <StatusDot filled={styleChosen} />
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-text">
                   {styleChosen && WRITE_STYLE_META[writeStyle].group === 'format'
                     ? <Video className="h-[18px] w-[18px]" strokeWidth={1.75} />
@@ -615,9 +643,7 @@ export default function InputPanel({
               </div>
             </div>
             )}
-
-            {/* Product — sits below the style picker. */}
-            {productSection}
+            </SectionCard>
 
             {/* The brief — the SAME box the remix modes get, header and all:
                 it's the same field doing the same job, and the two modes only
@@ -667,7 +693,18 @@ export default function InputPanel({
             </div>
           </>
         ) : (
-          <div className="mb-2 flex min-h-[140px] flex-1 basis-0 flex-col">
+          // Same References card as Write New, holding the same product row
+          // plus the source the remix is built from. The source box goes LAST
+          // because it's the one thing here that grows as you paste — above the
+          // product row it would shove it down the column on every keystroke.
+          <SectionCard
+            icon={Layers}
+            title="References"
+            className="mb-2 flex flex-1 flex-col"
+            contentClassName="flex flex-1 flex-col gap-2"
+          >
+          {productSection}
+          <div className="flex min-h-[140px] flex-1 flex-col">
             {/* Select from bank (header) + paste manually (textarea) merged into
                 one rounded box so the two sources read as a single input. One
                 box serves both remix pipelines: the pasted source's format is
@@ -680,6 +717,9 @@ export default function InputPanel({
             <div className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30 ${sourceScript ? (blueprintActive ? 'border-fuchsia-500/40' : 'border-scripts-500/40') : 'border-dashed border-ink/10'} ${highlightField === 'source' ? 'animate-field-flash' : ''}`}>
               <ScriptBankCard
                 selected={sourceScript}
+                // Filled is about the TEXT, not the bank pick — a pasted
+                // transcript is a filled source with no bank row behind it.
+                filled={sourceFilled}
                 label={blueprintActive ? 'Scene' : 'Script'}
                 icon={blueprintActive ? Clapperboard : FileText}
                 accentClass={blueprintActive ? 'bg-fuchsia-500/10 text-fuchsia-300/80 light:text-fuchsia-700/80' : 'bg-scripts-500/10 text-scripts-300/80'}
@@ -721,11 +761,8 @@ export default function InputPanel({
               )}
             </div>
           </div>
+          </SectionCard>
         )}
-
-        {/* Step 02 — Product Context (Write New renders it inside its own
-            block above, between Output and the brief) */}
-        {mode !== 'write' && productSection}
 
         {/* Final step — the free-text steer. Write New has its own copy of this
             box higher up (it doubles as the brief there), so this one is only
@@ -737,7 +774,7 @@ export default function InputPanel({
           // the box's overflow-hidden sliced the footer toolbar in half. A
           // min-height on the section overrides its auto min-size, so it shrinks
           // to a real, known floor and everything inside shrinks with it.
-          <div className="flex min-h-[120px] flex-1 basis-0 flex-col">
+          <div className="flex min-h-[120px] flex-1 flex-col">
             {/* Single rounded box (matches the Write New brief): a header row
                 naming the field, the textarea taking whatever height is left,
                 then Enhance / Clear / Undo / Redo + Expand in a footer. The
@@ -1025,6 +1062,7 @@ export default function InputPanel({
 // bank item is selected — mirrors the B-Roll reference cards.
 function ScriptBankCard({
   selected,
+  filled,
   label,
   icon: Icon,
   accentClass,
@@ -1034,6 +1072,9 @@ function ScriptBankCard({
   flat,
 }: {
   selected: Script | null
+  // Whether the source actually holds text — a paste fills it with no bank row
+  // selected, so this is NOT `!!selected`.
+  filled: boolean
   label: string
   icon: ComponentType<{ className?: string; strokeWidth?: number }>
   accentClass: string
@@ -1049,12 +1090,13 @@ function ScriptBankCard({
       <button
         type="button"
         onClick={onSelect}
-        className={`group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+        className={`group flex w-full items-center gap-2.5 px-4 py-3 text-left transition-colors ${
           flat
             ? 'border-b border-dashed border-ink/10 hover:bg-ink/[0.04]'
             : 'rounded-full border border-dashed border-ink/10 bg-ink/[0.015] hover:border-ink/20 hover:bg-ink/[0.03]'
         } ${className ?? ''}`}
       >
+        <StatusDot filled={filled} required />
         <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${accentClass}`}>
           <Icon className="h-4 w-4" />
         </div>
@@ -1072,12 +1114,13 @@ function ScriptBankCard({
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
-      className={`group flex w-full cursor-pointer items-center gap-3 px-4 py-3 transition-colors ${
+      className={`group flex w-full cursor-pointer items-center gap-2.5 px-4 py-3 transition-colors ${
         flat
           ? 'border-b border-ink/10 hover:bg-ink/[0.04]'
           : 'rounded-full border border-ink/10 bg-ink/[0.02] hover:border-ink/20 hover:bg-ink/[0.04]'
       } ${className ?? ''}`}
     >
+      <StatusDot filled={filled} required />
       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${accentClass}`}>
         <Icon className="h-4 w-4" />
       </div>

@@ -45,8 +45,10 @@ export default function Slider({
       <div className="flex items-baseline justify-between">
         <span
           // Matches SETTING_LABEL in SettingsView — the one size every setting
-          // subheading in this panel reads at.
-          className="relative cursor-help text-[13px] font-medium text-ink-200"
+          // subheading in this panel reads at. Small-caps since the settings
+          // moved inside titled cards: a 13px sentence-case label under a 13px
+          // card title reads as two competing headings.
+          className="relative cursor-help text-[11px] font-medium uppercase tracking-widest text-ink-300"
           onMouseEnter={() => setLabelHover(true)}
           onMouseLeave={() => setLabelHover(false)}
           onFocus={() => setLabelHover(true)}
