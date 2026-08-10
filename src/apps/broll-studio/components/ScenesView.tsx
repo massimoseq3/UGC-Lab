@@ -73,10 +73,11 @@ const STILL_CAPABLE_MODES: Mode[] = ['image-to-video', 'reference-to-video']
 
 // ─── Option columns ──────────────────────────────────────────────────────
 // The storyboard is a grid: one row per script line, one column per option.
-// A whole-storyboard batch walks that grid a COLUMN at a time by default —
-// every line's Option 1, then Option 2 — so the member sees a one-per-line
-// storyboard and can stop there. Committing all three options up front is
-// three times the credits for alternatives they may never cut with.
+// An IMAGE batch walks that grid a COLUMN at a time by default — every line's
+// Option 1, then Option 2 — so the member sees a one-per-line storyboard and
+// can stop there; a still is cheap enough that the saved credits are worth the
+// extra press. A VIDEO batch opens on all options instead: "Generate all
+// videos" that silently means Option 1 is a promise the dialog doesn't keep.
 type BatchColumn = number | 'all'
 
 interface BatchRequest {
@@ -415,7 +416,12 @@ export default function ScenesView({
     // Cards that already have a clip are held back by default — a video is the
     // expensive half of this app, so re-billing one takes an explicit tick.
     setIncludeExistingVideos(false)
-    setVideoColumn(columnar ? firstOpenColumn(targets, (k) => !hasVideo(k)) : 'all')
+    // A video batch opens on ALL options, not the leftmost open column. The
+    // button says "Generate all videos" and a dialog that quietly scoped it to
+    // Option 1 read as a bug — the member ticked Generate expecting the
+    // storyboard and got a third of it. The column chips are still there to
+    // narrow it; narrowing is now the deliberate act, not the default.
+    setVideoColumn('all')
     setVideoConfirm({ keys, scope, columnar, stillsOnly })
   }
 

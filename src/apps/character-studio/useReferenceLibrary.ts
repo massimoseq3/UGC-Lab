@@ -17,6 +17,16 @@ const ANALYZE_CONCURRENCY = 3
 // end so a heavy user can't walk the localStorage quota into a wall.
 const LIBRARY_CAP = 60
 
+// How long the same file is ignored after being accepted. This is a guard
+// against one gesture reaching addFiles twice — a nested drop zone whose event
+// bubbles to the app-wide one, which is exactly the bug that billed members for
+// two vision calls per dropped photo. The zones now stopPropagation, but this
+// is the entry every path shares and a vision call costs real credits, so the
+// cheap check lives here too. Re-dropping a photo on purpose a second later
+// still works.
+const DOUBLE_FIRE_WINDOW_MS = 1500
+const fileSignature = (f: File) => `${f.name}:${f.size}:${f.lastModified}`
+
 /** Run `fn` over `items` with at most `limit` in flight. */
 async function runPool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
   let cursor = 0
@@ -52,6 +62,9 @@ export function useReferenceLibrary(
   // retried without asking for the file again. Not persisted — after a refresh
   // a failed row can only be removed.
   const filesRef = useRef(new Map<string, File>())
+
+  // file signature → when it was last accepted. See DOUBLE_FIRE_WINDOW_MS.
+  const recentDropsRef = useRef(new Map<string, number>())
 
   const onApplyRef = useRef(onApply)
   useEffect(() => { onApplyRef.current = onApply }, [onApply])
@@ -89,11 +102,26 @@ export function useReferenceLibrary(
     }
     if (accepted.length === 0) return
 
+    // Drop anything that arrived moments ago — the same gesture reaching this
+    // function twice. Stale entries are swept on the way through so the map
+    // can't grow across a session.
+    const now = Date.now()
+    for (const [sig, at] of recentDropsRef.current) {
+      if (now - at >= DOUBLE_FIRE_WINDOW_MS) recentDropsRef.current.delete(sig)
+    }
+    const fresh = accepted.filter((file) => {
+      const sig = fileSignature(file)
+      if (recentDropsRef.current.has(sig)) return false
+      recentDropsRef.current.set(sig, now)
+      return true
+    })
+    if (fresh.length === 0) return
+
     // A lone photo keeps the original gesture: it fills the form the moment its
     // DNA lands. Several at once do not — see the note on onApply above.
-    const autoApply = accepted.length === 1
+    const autoApply = fresh.length === 1
 
-    const queued = await Promise.all(accepted.map(async (file) => {
+    const queued = await Promise.all(fresh.map(async (file) => {
       const id = crypto.randomUUID()
       filesRef.current.set(id, file)
       return {
