@@ -14,6 +14,8 @@ export function RefGroup({
   count,
   max,
   filled,
+  required = false,
+  note,
   children,
 }: {
   label: string
@@ -23,21 +25,28 @@ export function RefGroup({
   // filled state is already obvious from the slots themselves (the frame
   // squares: a picture versus a dashed box outshouts a 6px dot).
   filled?: boolean
+  // Red when empty instead of neutral. Almost never set: a reference slot in
+  // Playground is normally optional — the prompt alone is a valid generation —
+  // so an empty group is neutral. Motion Control is the exception, and the only
+  // one: it refuses to run without BOTH a character image and a driving video,
+  // so those two empty slots really are why nothing generates.
+  required?: boolean
+  // Trailing hint on the label row, for a limit the member would otherwise only
+  // meet as an error after the upload (Motion Control's clip ceiling).
+  note?: string
   children: ReactNode
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5 px-0.5">
-        {/* Never `required`: every reference slot in Playground is optional —
-            the prompt alone is a valid generation — so an empty group is
-            neutral, never red. */}
-        {filled != null && <StatusDot filled={filled} />}
+        {filled != null && <StatusDot filled={filled} required={required} />}
         <span className="text-[11px] font-medium uppercase tracking-widest text-ink-300">{label}</span>
         {count != null && max != null && (
           <span className="text-[10px] tabular-nums text-ink-600">
             {count}/{max}
           </span>
         )}
+        {note && <span className="ml-auto text-[10px] tabular-nums text-ink-600">{note}</span>}
       </div>
       {children}
     </div>

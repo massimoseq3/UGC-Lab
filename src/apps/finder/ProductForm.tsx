@@ -10,6 +10,7 @@ import { humanizeError } from '../../utils/friendlyError'
 import SegmentedToggle from '../../components/SegmentedToggle'
 import ExpandTextModal, { ExpandButton } from '../../components/ExpandableText'
 import AutoGrowTextarea from '../../components/AutoGrowTextarea'
+import SectionCard, { SectionLabel } from '../../components/SectionCard'
 import { usePersistedState } from '../../hooks/usePersistedState'
 
 interface ProductFormProps {
@@ -467,14 +468,20 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
     const borderCls = isMissing ? 'border-red-500/60 focus:border-red-400' : 'border-ink/10 focus:border-ink/20'
     return (
       <label key={key} className="flex flex-col gap-1.5">
-        {/* Sentence case, quiet: uppercase belongs to the section headings now,
-            so a label reads as a label and a heading reads as a heading. */}
-        <span className="flex items-baseline gap-2">
-          <span className={`text-[12px] font-medium ${isMissing ? 'text-red-400 light:text-red-600' : 'text-ink-300'}`}>
-            {label}{required && <span className="text-ink-600"> *</span>}
-          </span>
-          {hint && <span className="truncate text-[11px] text-ink-600">{hint}</span>}
-        </span>
+        {/* The in-card small-caps register. It was quiet 12px sentence case
+            under a quiet 9px uppercase section eyebrow, where only the
+            letter-spacing told a heading from a label; the section is a titled
+            card now, so the label can step down to this without competing.
+            A dot only where it can ever be red — `productName` is the one
+            required field, and nine neutral dots on nine optional ones would be
+            decoration (the card header's filled count answers "what's left" at
+            the right scale). */}
+        <SectionLabel
+          label={label}
+          filled={required ? !!value.toString().trim() : undefined}
+          required={required}
+          right={hint ? <span className="truncate text-[11px] text-ink-600">{hint}</span> : undefined}
+        />
         {type === 'textarea' ? (
           <div className="relative">
             {/* Grows to fit — an auto-filled product fills every one of these,
@@ -729,21 +736,34 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
             ref={fieldsRef}
             className={`min-h-0 flex-1 lg:overflow-y-auto lg:pr-1 ${fieldsHaveMore ? 'scroll-fade-b' : ''}`}
           >
-            <div className="flex flex-col gap-7 pb-2">
+            <div className="flex flex-col gap-3 pb-2">
+              {/* One SectionCard per section. This was a left-aligned small-caps
+                  eyebrow with a hairline running off to the right — the exact
+                  shape SectionCard was written to replace, and one that reads as
+                  a divider BETWEEN blocks rather than a container around one.
+                  The four glyphs have been declared in SECTIONS all along and
+                  nothing rendered them; the card header is where they go, and
+                  it's also where the filled count belongs — beside the fields
+                  it's counting, not only up in the jump strip. */}
               {SECTIONS.map((section) => (
                 <div
                   key={section.key}
                   ref={(el) => { sectionRefs.current[section.key] = el }}
                   data-section={section.key}
-                  className="flex scroll-mt-2 flex-col gap-4"
+                  className="scroll-mt-2"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-500">
-                      {section.label}
-                    </span>
-                    <span className="h-px flex-1 bg-ink/[0.07]" />
-                  </div>
-                  {section.fields.map(renderField)}
+                  <SectionCard
+                    icon={section.icon}
+                    title={section.label}
+                    contentClassName="flex flex-col gap-4"
+                    right={(
+                      <span className="rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] tabular-nums text-ink-500">
+                        {filledIn(section.fields)}/{section.fields.length}
+                      </span>
+                    )}
+                  >
+                    {section.fields.map(renderField)}
+                  </SectionCard>
                 </div>
               ))}
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { X, Loader2, Palette } from 'lucide-react'
 import type { StylePreset } from '../../stores/types'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
+import SectionCard, { SectionLabel } from '../../components/SectionCard'
 
 interface StyleFormProps {
   item?: StylePreset | null
@@ -62,9 +63,9 @@ export default function StyleForm({ item, onSave, onCancel }: StyleFormProps) {
       </div>
 
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-        {/* Left — the style paragraph itself */}
+        {/* Left — the style paragraph itself. A lone control, so no card. */}
         <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <span className="text-[11px] font-medium uppercase tracking-widest text-ink-500">Style Brief *</span>
+          <SectionLabel label="Style brief" filled={!!brief.trim()} required />
           <textarea
             value={brief}
             onChange={(e) => setBrief(e.target.value)}
@@ -77,28 +78,34 @@ export default function StyleForm({ item, onSave, onCancel }: StyleFormProps) {
           </span>
         </label>
 
-        {/* Right — name, reference frames, save */}
-        <div className="flex w-full shrink-0 flex-col gap-4 lg:sticky lg:top-1 lg:w-72">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-medium uppercase tracking-widest text-ink-500">Name *</span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder='e.g. "Warm 90s Camcorder"'
-              className="rounded-full border border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
-            />
-          </label>
+        {/* Right — name, reference frames, save. The name and the frames it was
+            read from are one group (what this style IS and where it came from);
+            Save stays outside the card, like every panel's Generate. */}
+        <div className="flex w-full shrink-0 flex-col gap-3 lg:sticky lg:top-1 lg:w-72">
+          <SectionCard icon={Palette} title="Style" contentClassName="flex flex-col gap-4">
+            <label className="flex flex-col gap-1.5">
+              <SectionLabel label="Name" filled={!!name.trim()} required />
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder='e.g. "Warm 90s Camcorder"'
+                className="rounded-full border border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
+              />
+            </label>
 
-          {item?.thumbRefs && item.thumbRefs.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-medium uppercase tracking-widest text-ink-500">Read from</span>
-              <div className="flex flex-wrap gap-2">
-                {item.thumbRefs.map((ref) => (
-                  <ReferenceThumb key={ref} refId={ref} />
-                ))}
+            {item?.thumbRefs && item.thumbRefs.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                {/* No dot: these are read-only thumbnails of what the brief was
+                    distilled from, not an input anything waits on. */}
+                <SectionLabel label="Read from" />
+                <div className="flex flex-wrap gap-2">
+                  {item.thumbRefs.map((ref) => (
+                    <ReferenceThumb key={ref} refId={ref} />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </SectionCard>
 
           {!item && (
             <p className="flex items-start gap-2 rounded-2xl border border-ink/5 bg-ink/[0.03] px-3.5 py-3 text-[11px] leading-relaxed text-ink-500">

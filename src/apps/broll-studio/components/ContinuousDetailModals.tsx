@@ -22,7 +22,10 @@ import {
   ArrowDown,
   ChevronRight,
   Star,
+  Layers,
+  Images,
 } from 'lucide-react'
+import SectionCard, { SectionLabel, StatusDot } from '../../../components/SectionCard'
 import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
 import ModelPicker from '../../../components/ModelPicker'
@@ -218,6 +221,14 @@ export function ContinuousFrameModal({
         modelId: resolveImageModelId(true),
       })
     : 0
+  // What the References card header reports. The product's extra angles aren't
+  // counted — they ride behind the product reference, whose own line says
+  // "+2 angles".
+  const attachedRefCount =
+    (chainImageRef && cardState.chainLink ? 1 : 0) +
+    (characterRef && cardState.refsCharacter ? 1 : 0) +
+    (productRef && cardState.refsProduct ? 1 : 0) +
+    extraRefs.length
   const resolutions = (imageConstraints?.resolutions ?? imageResolutionsFor(imageModelId ?? '')) as ImageResolution[]
   const aspects = imageConstraints?.aspectRatios ?? ['9:16', '1:1', '16:9', '4:3', '3:4']
   const credits = imageModelId
@@ -291,8 +302,20 @@ export function ContinuousFrameModal({
               {frameTab === 'image' && (<>
               <StyleNote style={style} onChange={onChangeStyle} />
 
-              {/* Reference toggles — the chain ref (previous keyframe) is the
-                  continuity lock; character/product fix identity. */}
+              {/* Everything this keyframe is built FROM, in the References card
+                  the input panel wears — the chain ref (previous keyframe) is
+                  the continuity lock, character/product fix identity, and the
+                  photo strip and extra refs belong to the same group. */}
+              <SectionCard
+                icon={Layers}
+                title="References"
+                contentClassName="flex flex-col gap-3"
+                right={attachedRefCount > 0 ? (
+                  <span className="rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] tabular-nums text-ink-500">
+                    {attachedRefCount} attached
+                  </span>
+                ) : undefined}
+              >
               {(chainImageRef || characterRef || productRef) && (
                 <div className="grid grid-cols-2 gap-2">
                   {chainImageRef && (
@@ -347,9 +370,11 @@ export function ContinuousFrameModal({
 
               {/* Extra references — attach more (a prop, a location, a pose). */}
               <ExtraRefsRow refs={extraRefs} onAdd={onAddExtraRef} onRemove={onRemoveExtraRef} />
+              </SectionCard>
 
               {/* Prompt — the keyframe description, with the same toolbar the
-                  Line-by-Line card carries. */}
+                  Line-by-Line card carries. Deliberately OUTSIDE the card: it's
+                  where you write, not what you attach. */}
               <div className="flex grow flex-col">
                 <div className="relative flex grow flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
                   <textarea
@@ -380,10 +405,11 @@ export function ContinuousFrameModal({
 
               {frameTab === 'animate' && (
                 <>
-                  {/* Start frame — the chosen still this animation begins on. */}
-                  <div>
-                    <span className="text-sm font-medium text-ink-200">Start frame</span>
-                    <div className="mt-2">
+                  {/* Start frame — the chosen still this animation begins on.
+                      The dot is honest: no still means Animate is disabled. */}
+                  <div className="flex flex-col gap-1.5">
+                    <SectionLabel label="Start frame" filled={!!startImageUrl} required />
+                    <div>
                       {startImageUrl ? (
                         <div className="relative max-w-[120px] overflow-hidden rounded-xl border border-ink/10 bg-ink/[0.02]" style={{ aspectRatio: '9 / 16' }}>
                           <img src={startImageUrl} alt="" className="h-full w-full object-cover" />
@@ -398,8 +424,13 @@ export function ContinuousFrameModal({
                   </div>
 
                   {/* Motion — how the still animates (seeded from this frame's
-                      departure motion; edit freely). */}
-                  <div className="flex grow flex-col">
+                      departure motion; edit freely). Named, where it used to be
+                      an unlabelled box you identified from its placeholder. */}
+                  <div className="flex grow flex-col gap-1.5">
+                    {/* Neutral when empty, never red: Animate is gated on the
+                        still and the model's capability, not on this text. Red
+                        means "this is why Generate is grey" and nothing else. */}
+                    <SectionLabel label="Motion" filled={cardState.animateMotion.trim().length > 0} />
                     <div className="relative flex grow flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
                       <textarea
                         value={cardState.animateMotion}
@@ -931,19 +962,34 @@ export function ContinuousClipModal({
               </div>
               <div className="-mx-5 -mt-1 border-b border-ink/5" />
 
-              {/* Start → end keyframes this clip interpolates between. */}
-              <div className="flex items-center gap-3">
-                <EndpointThumb label="Start frame" imageRef={startImageRef} />
-                <ArrowDown className="h-4 w-4 shrink-0 -rotate-90 text-ink-500" />
-                <EndpointThumb label="End frame" imageRef={endImageRef} />
-              </div>
-              {!framesReady && (
-                <p className="text-[11px] leading-relaxed text-amber-300 light:text-amber-700">
-                  Pick a keyframe for both ends of this clip first — click an image on each frame card.
-                </p>
-              )}
-
+              {/* The style note LEADS, as it does in the other two modals — this
+                  one opened on its keyframes, so all three B-Roll workspaces
+                  started with a different thing. */}
               <StyleNote style={style} onChange={onChangeStyle} />
+
+              {/* Start → end keyframes this clip interpolates between, and the
+                  line explaining what's missing, in one card: the two ends ARE a
+                  group, and they ARE the gate on Generate. */}
+              <SectionCard
+                icon={Images}
+                title="Keyframes"
+                right={(
+                  <span className="rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] tabular-nums text-ink-500">
+                    {(startImageRef ? 1 : 0) + (endImageRef ? 1 : 0)} of 2 picked
+                  </span>
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <EndpointThumb label="Start" imageRef={startImageRef} />
+                  <ArrowDown className="h-4 w-4 shrink-0 -rotate-90 text-ink-500" />
+                  <EndpointThumb label="End" imageRef={endImageRef} />
+                </div>
+                {!framesReady && (
+                  <p className="text-[11px] leading-relaxed text-amber-300 light:text-amber-700">
+                    Pick a keyframe for both ends of this clip first — click an image on each frame card.
+                  </p>
+                )}
+              </SectionCard>
 
               {/* Motion prompt — how the shot animates from the first frame to
                   the last. Auto-filled from the picked keyframe's own motion.
@@ -1178,6 +1224,10 @@ function EndpointThumb({ label, imageRef }: { label: string; imageRef?: string }
   const url = useAssetUrl(imageRef ?? '')
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl border border-ink/10 bg-ink/[0.02] p-2">
+      {/* The dot rides at the row's own left edge, before the thumbnail, so the
+          two endpoints stack into one column you can read without the words.
+          Required: an unpicked end is exactly why Generate is grey. */}
+      <StatusDot filled={!!imageRef} required />
       {imageRef && url ? (
         <img src={url} alt={label} className="h-14 w-9 shrink-0 rounded-lg object-cover" />
       ) : (
