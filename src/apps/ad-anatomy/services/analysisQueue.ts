@@ -7,8 +7,8 @@
 
 import { startAnalysisTask, pollAnalysisTask, streamAnalysisFallback } from './analyzeAd'
 import { captureFirstFrame } from '../utils/captureFirstFrame'
-import { saveAsset, deleteAsset } from '../../../utils/assetStore'
-// `deleteAsset` is still used by applyFailure below.
+import { saveAsset, deleteAsset, getBlob } from '../../../utils/assetStore'
+// `deleteAsset` is still used for the thumbnail cleanup below.
 import { useBankStore } from '../../../stores/bankStore'
 import type { AnalysisResult } from '../types'
 import type { AdAnatomyHistoryItem } from '../../../stores/types'
@@ -61,16 +61,17 @@ async function applyFailure(historyId: string, err: unknown) {
   // message — the one that says WHICH rejection this was — is gone for good.
   console.error('[ad-anatomy] analysis failed', err)
   const errorMessage = humanizeError(err, 'Analysis failed.')
+  // `uploadedRef` SURVIVES a failure. It used to be dropped and the asset
+  // deleted, which turned every transient rejection into "find that 50MB file
+  // and drag it in again" — so Retry now re-runs from the stored source with
+  // one click. The mount-time TTL sweep evicts it on the same 14-day rule as a
+  // completed row, and deleting the row purges it outright.
   await updateAdAnatomyHistory(historyId, {
     status: 'error',
     errorMessage,
-    uploadedRef: undefined,
     taskId: undefined,
     perception: undefined,
   })
-  if (current.uploadedRef) {
-    deleteAsset(current.uploadedRef).catch(() => {})
-  }
 }
 
 function rowExists(historyId: string): boolean {
@@ -117,6 +118,31 @@ export function enqueueAnalysis(historyId: string, file: File): void {
     }
   })
   pump()
+}
+
+// Re-run an errored row from its retained source. This is the answer to the
+// two ways an analysis dies without a result the member can use: a refresh
+// landing in the window BEFORE kie handed back a taskId (nothing to re-attach
+// to — the request went down with the page), and an outright failure. Both keep
+// `uploadedRef`, so retrying costs a click rather than another upload.
+//
+// Returns false when the source is gone (TTL-swept, or a pre-fix row that had
+// its ref dropped) — the caller falls back to asking for the file again.
+export async function retryAnalysis(item: AdAnatomyHistoryItem): Promise<boolean> {
+  const { updateAdAnatomyHistory } = useBankStore.getState()
+  if (!item.uploadedRef) return false
+
+  const blob = await getBlob(item.uploadedRef).catch(() => null)
+  if (!blob) return false
+
+  const file = new File([blob], item.fileName, { type: blob.type || 'video/mp4' })
+  await updateAdAnatomyHistory(item.id, {
+    status: 'analyzing',
+    errorMessage: undefined,
+    taskId: undefined,
+  })
+  enqueueAnalysis(item.id, file)
+  return true
 }
 
 // Re-attach an in-flight row after a refresh — only rows that got a taskId

@@ -49,8 +49,14 @@ export default function PhotoExtractZone({
 
   // Format/size validation lives in the library (it has to report per file on a
   // bulk drop) — this row just hands the files over.
+  //
+  // stopPropagation is load-bearing: CharacterStudio's root div carries a
+  // full-area drop handler that also calls addFiles, so a drop landing here
+  // bubbled up and analysed the same photo TWICE — two library rows, two vision
+  // calls, two charges on the member's key, and the form auto-filled twice.
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     setDragOver(false)
     const files = Array.from(e.dataTransfer.files)
     if (files.length > 0) onPhotoDrop(files)
