@@ -785,8 +785,10 @@ function SingleCard({
 
       <PromptData profile={item.profile} />
 
+      {/* Model · when. The stage holds one character, so its caption is the one
+          place the model name costs nothing to state outright. */}
       <p className="truncate text-center text-[10px] font-medium tracking-wider text-ink-500">
-        {formatRelative(item.createdAt)}
+        {getModel(item.modelId)?.displayName ?? item.modelId} · {formatRelative(item.createdAt)}
       </p>
     </>
   )
@@ -922,6 +924,18 @@ function HistoryTile({
 
       <SourceBadge isSheet={a.isSheet} savedAsModel={a.savedAsModel} />
 
+      {/* Which model drew this. Hover-only and bottom-left, clear of the action
+          stack — the grid is scanned for faces, not for model names, but "what
+          made this one?" is the question you ask about the tile under the
+          pointer. Steps aside for the inline name input like the stack does. */}
+      {a.nameDraft === null && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end bg-gradient-to-t from-black/70 to-transparent p-2 pt-6 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <span className="truncate text-[10px] font-medium text-white/80">
+            {getModel(item.modelId)?.displayName ?? item.modelId}
+          </span>
+        </div>
+      )}
+
       {/* Hover actions — the shared tile stack (components/tileActions). Order
           is the app-wide standard: Download · Save · Copy · extras · Delete.
           The inline name input takes over the bottom edge while a save is
@@ -1036,6 +1050,8 @@ function HistoryListRow({
   // follow the slider-driven aspect (taller as it moves right).
   const frameAspect = item.aspectRatio.includes('16:9') ? 16 / 9 : mediaAspect
 
+  const modelLabel = getModel(item.modelId)?.displayName ?? item.modelId
+
   const meta: string[] = []
   if (item.resolution) meta.push(item.resolution)
   if (item.aspectRatio) meta.push(item.aspectRatio)
@@ -1073,6 +1089,9 @@ function HistoryListRow({
           scrolls within the stretched panel. */}
       <div className="relative min-w-0 flex-[2]">
         <div className="absolute inset-0 flex flex-col gap-2 py-3 pr-3">
+        {/* Model name over the meta pills, the same shape InFlightRow uses, so a
+            row reads identically whether it's still rendering or finished. */}
+        <p className="truncate text-[11px] font-medium text-ink-200">{modelLabel}</p>
         {meta.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             {meta.map((m) => (
