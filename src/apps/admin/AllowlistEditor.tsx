@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2, Trash2, Plus, RefreshCw, Upload, X, AlertTriangle } from 'lucide-react'
 import { getSupabase } from '../../lib/supabase'
+import { QUERY_TIMEOUT_MS, readyAdminSession, withTimeout } from './adminQuery'
 
 interface AllowlistRow {
   email: string
@@ -15,18 +16,6 @@ interface CsvEntry {
   email: string
   firstName: string | null
   lastName: string | null
-}
-
-const QUERY_TIMEOUT_MS = 15_000
-
-function withTimeout<T>(p: PromiseLike<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)), ms)
-    Promise.resolve(p).then(
-      (v) => { clearTimeout(t); resolve(v) },
-      (e) => { clearTimeout(t); reject(e) },
-    )
-  })
 }
 
 // Parse one CSV line, respecting double-quoted fields with embedded commas/quotes.
@@ -119,9 +108,10 @@ export default function AllowlistEditor() {
 
   async function loadConfig() {
     try {
+      await readyAdminSession()
       const sb = getSupabase()
       const { data, error } = await withTimeout(
-        sb.from('app_config').select('enforce_allowlist').eq('id', true).maybeSingle(),
+        (signal) => sb.from('app_config').select('enforce_allowlist').eq('id', true).abortSignal(signal).maybeSingle(),
         QUERY_TIMEOUT_MS,
         'app_config query',
       ) as { data: { enforce_allowlist: boolean } | null; error: { message: string } | null }
@@ -140,9 +130,13 @@ export default function AllowlistEditor() {
     if (!next && !confirm('Turn the allowlist OFF? Anyone with the link will be able to create an account until you turn it back on.')) return
     setEnforceBusy(true)
     try {
+      await readyAdminSession()
       const sb = getSupabase()
       const { error } = await withTimeout(
-        sb.from('app_config').update({ enforce_allowlist: next, updated_at: new Date().toISOString() }).eq('id', true),
+        (signal) => sb.from('app_config')
+          .update({ enforce_allowlist: next, updated_at: new Date().toISOString() })
+          .eq('id', true)
+          .abortSignal(signal),
         QUERY_TIMEOUT_MS,
         'app_config update',
       ) as { error: { message: string } | null }
@@ -161,9 +155,13 @@ export default function AllowlistEditor() {
     setSlowHint(false)
     const slowTimer = setTimeout(() => setSlowHint(true), 3000)
     try {
+      await readyAdminSession()
       const sb = getSupabase()
       const { data, error } = await withTimeout(
-        sb.from('allowlist').select('email, source, added_at, notes, first_name, last_name').order('added_at', { ascending: false }),
+        (signal) => sb.from('allowlist')
+          .select('email, source, added_at, notes, first_name, last_name')
+          .order('added_at', { ascending: false })
+          .abortSignal(signal),
         QUERY_TIMEOUT_MS,
         'allowlist query',
       ) as { data: AllowlistRow[] | null; error: { message: string } | null }
@@ -184,9 +182,10 @@ export default function AllowlistEditor() {
     if (!email) return
     setAdding(true)
     try {
+      await readyAdminSession()
       const sb = getSupabase()
       const { error } = await withTimeout(
-        sb.from('allowlist').insert({ email, source: 'manual' }),
+        (signal) => sb.from('allowlist').insert({ email, source: 'manual' }).abortSignal(signal),
         QUERY_TIMEOUT_MS,
         'allowlist insert',
       ) as { error: { message: string } | null }
@@ -203,9 +202,10 @@ export default function AllowlistEditor() {
   async function handleDelete(email: string) {
     if (!confirm(`Remove ${email} from the allowlist? They will be signed out and disabled.`)) return
     try {
+      await readyAdminSession()
       const sb = getSupabase()
       const { error } = await withTimeout(
-        sb.from('allowlist').delete().eq('email', email),
+        (signal) => sb.from('allowlist').delete().eq('email', email).abortSignal(signal),
         QUERY_TIMEOUT_MS,
         'allowlist delete',
       ) as { error: { message: string } | null }
@@ -326,6 +326,7 @@ export default function AllowlistEditor() {
     if (willAdd === 0 && willUpdate === 0 && willRemove === 0) { setPreview(null); return }
     setImporting(true)
     try {
+      await readyAdminSession()
       const sb = getSupabase()
       // Adds first, then name-only updates, then optional removes. RLS on
       // `allowlist` is admin-only, so each batch is a single round trip. The
@@ -333,7 +334,7 @@ export default function AllowlistEditor() {
       // names into the matching profile rows.
       if (willAdd > 0) {
         const { error } = await withTimeout(
-          sb.from('allowlist').upsert(
+          (signal) => sb.from('allowlist').upsert(
             preview.newEntries.map((e) => ({
               email: e.email,
               source: 'csv-import',
@@ -341,7 +342,7 @@ export default function AllowlistEditor() {
               last_name: e.lastName,
             })),
             { onConflict: 'email', ignoreDuplicates: true },
-          ),
+          ).abortSignal(signal),
           30_000,
           'bulk import (add)',
         ) as { error: { message: string } | null }
@@ -352,10 +353,10 @@ export default function AllowlistEditor() {
         // Batched in parallel for speed.
         const results = await Promise.allSettled(preview.nameUpdates.map((e) =>
           withTimeout(
-            sb.from('allowlist').update({
+            (signal) => sb.from('allowlist').update({
               first_name: e.firstName,
               last_name: e.lastName,
-            }).eq('email', e.email),
+            }).eq('email', e.email).abortSignal(signal),
             30_000,
             `name update ${e.email}`,
           ) as Promise<{ error: { message: string } | null }>,
@@ -372,7 +373,7 @@ export default function AllowlistEditor() {
       }
       if (willRemove > 0) {
         const { error } = await withTimeout(
-          sb.from('allowlist').delete().in('email', preview.removable),
+          (signal) => sb.from('allowlist').delete().in('email', preview.removable).abortSignal(signal),
           30_000,
           'bulk import (remove)',
         ) as { error: { message: string } | null }
