@@ -17,6 +17,8 @@ export interface MediaRefValue {
 
 interface MediaRefStripProps {
   label: string
+  // Forwarded to RefGroup's status dot. Omit for no dot.
+  filled?: boolean
   kind: 'audio' | 'video'
   values: MediaRefValue[]
   onChange: (next: MediaRefValue[]) => void
@@ -29,6 +31,7 @@ interface MediaRefStripProps {
 
 export default function MediaRefStrip({
   label,
+  filled,
   kind,
   values,
   onChange,
@@ -62,7 +65,7 @@ export default function MediaRefStrip({
   }
 
   return (
-    <RefGroup label={label} count={values.length} max={max}>
+    <RefGroup label={label} filled={filled} count={values.length} max={max}>
       <div className="flex flex-col gap-2">
         {values.map((v, i) => (
           <MediaCard

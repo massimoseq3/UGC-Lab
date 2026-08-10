@@ -214,17 +214,23 @@ export default function BrollStudio() {
   const [mode, setMode] = usePersistedState<BrollMode>(`${baseKey}:mode`, 'line', {
     sanitize: sanitizeBrollMode,
   })
-  // Line-by-Line delivery: 'silent' (every card silent b-roll — the default) or
-  // 'dialogue' (every card the character speaking that line, staged three
-  // different ways). Not a mode: both produce the same per-line storyboard.
+  // Line-by-Line delivery: 'dialogue' (every card the character speaking that
+  // line, staged three different ways — THE DEFAULT since August 2026) or
+  // 'silent' (every card silent b-roll, for a voiceover laid over in the edit).
+  // Not a mode: both produce the same per-line storyboard.
   const [lineDelivery, setLineDelivery] = usePersistedState<BrollDelivery>(
     `${baseKey}:lineDelivery`,
-    'silent',
-    // A member sitting in the short-lived Dialogue *mode* has that in the mode
-    // slot and a stale delivery in this one, so the mode wins when it says
-    // dialogue. Runs on the default too, which is exactly what's wanted — their
-    // `:lineDelivery` may never have been written.
-    { sanitize: (raw) => (raw === 'dialogue' || readPersistedMode(baseKey) === 'dialogue' ? 'dialogue' : 'silent') },
+    'dialogue',
+    // `sanitize` runs on the fallback too when the slot is empty, so flipping
+    // the default means flipping this — it decides what an ABSENT value means.
+    // Only an explicit stored 'silent' stays silent (a member who picked B-Roll
+    // Clips keeps it); anything missing or unrecognised lands on dialogue. The
+    // mode check still wins: a member sitting in the short-lived Dialogue *mode*
+    // has that in the mode slot and a stale delivery in this one.
+    {
+      sanitize: (raw) =>
+        readPersistedMode(baseKey) === 'dialogue' ? 'dialogue' : raw === 'silent' ? 'silent' : 'dialogue',
+    },
   )
 
   // ── Scene staging ──────────────────────────────────────────────

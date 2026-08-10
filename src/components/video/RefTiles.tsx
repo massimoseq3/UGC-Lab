@@ -9,6 +9,8 @@ import type { VideoInputValue } from './VideoInputSlot'
 
 interface RefTilesProps {
   label: string
+  // Forwarded to RefGroup's status dot. Omit for no dot.
+  filled?: boolean
   values: VideoInputValue[]
   onChange: (next: VideoInputValue[]) => void
   max: number
@@ -23,7 +25,7 @@ interface RefTilesProps {
 // shrinking it to a chip beside a filename made the one thing you check ("did I
 // attach the right photo?") the smallest thing on the row. Omni's characters
 // keep the card shape, because there the name is what identifies the row.
-export default function RefTiles({ label, values, onChange, max, bankType, tabs }: RefTilesProps) {
+export default function RefTiles({ label, filled, values, onChange, max, bankType, tabs }: RefTilesProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -51,7 +53,7 @@ export default function RefTiles({ label, values, onChange, max, bankType, tabs 
   }
 
   return (
-    <RefGroup label={label} count={values.length} max={max}>
+    <RefGroup label={label} filled={filled} count={values.length} max={max}>
       <div className="flex flex-wrap gap-1.5">
         {values.map((v, i) => (
           <ImageTile key={i} src={v.dataUri} onRemove={() => onChange(values.filter((_, idx) => idx !== i))} />

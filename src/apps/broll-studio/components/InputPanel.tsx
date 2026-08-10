@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote } from 'lucide-react'
+import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote, Layers } from 'lucide-react'
 import type { Product, Model, Script } from '../../../stores/types'
 import { isLineMode, type BrollDelivery, type BrollMode } from '../types'
 import ScriptModelRow from '../../../components/ScriptModelRow'
+import SectionCard, { StatusDot } from '../../../components/SectionCard'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -64,7 +65,8 @@ function BankCard({
   selectedClass,
   isEmpty,
   emptyHint,
-  optional,
+  required,
+  filled,
   children,
   onSelect,
   onClear,
@@ -80,11 +82,17 @@ function BankCard({
   selectedClass: string
   isEmpty: boolean
   // Sub-label shown in the empty state, replacing the default bank prompt. Use
-  // when the slot's job needs saying — the Script slot is optional here, and a
-  // card that only says "click to select" reads as required.
+  // when the slot's job needs saying — the Script slot takes a paste as well as
+  // a bank pick, and a card that only says "click to select" hides that.
   emptyHint?: string
-  // Shows an OPTIONAL tag in the empty state, same shape as the Brief pill's.
-  optional?: boolean
+  // Gates the run — an empty one gets the red dot instead of the neutral one.
+  // (This replaced an `optional` flag that painted an OPTIONAL tag on the
+  // Script slot, which has been REQUIRED since B-Roll stopped writing scripts.)
+  required?: boolean
+  // Overrides what the dot reports. The Script slot needs it: pasting into the
+  // textarea below fills the input while the header row is still "empty", so
+  // `!isEmpty` would leave a red dot over a filled script.
+  filled?: boolean
   children?: React.ReactNode
   onSelect: () => void
   onClear?: () => void
@@ -99,12 +107,13 @@ function BankCard({
     return (
       <button
         onClick={onSelect}
-        className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+        className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors ${
           flat
             ? 'border-b border-dashed border-ink/10 hover:bg-ink/[0.04]'
             : 'rounded-full border border-dashed border-ink/10 hover:border-ink/20 hover:bg-ink/[0.02]'
         } ${className ?? ''}`}
       >
+        <StatusDot filled={filled ?? false} required={required} />
         <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${accentClass}`}>
           <Icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
         </div>
@@ -115,16 +124,7 @@ function BankCard({
           <p className="truncate text-[13px] font-medium text-ink-300">{label}</p>
           <p className="truncate text-[11px] text-ink-600">{emptyHint ?? 'Click to select from bank'}</p>
         </div>
-        {/* The OPTIONAL tag takes the chevron's slot rather than sitting beside
-            it — this column is 25% wide and three trailing elements wrapped the
-            label onto two lines and the hint onto five. */}
-        {optional ? (
-          <span className="shrink-0 rounded-full border border-ink/10 bg-ink/[0.03] px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-ink-500">
-            Optional
-          </span>
-        ) : (
-          <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
-        )}
+        <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
       </button>
     )
   }
@@ -139,12 +139,13 @@ function BankCard({
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
-      className={`group flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors ${
+      className={`group flex cursor-pointer items-center gap-2.5 px-4 py-2.5 transition-colors ${
         flat
           ? 'border-b border-ink/10 hover:bg-ink/[0.04]'
           : `rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ${selectedClass}`
       } ${className ?? ''}`}
     >
+      <StatusDot filled={filled ?? true} required={required} />
       <div className="min-w-0 flex-1">{children}</div>
       <div className="flex shrink-0 items-center gap-1">
         <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
@@ -302,18 +303,24 @@ export default function InputPanel({
           16px of column padding plus the band's own top padding opened a gap
           twice the 8px the reference cards sit apart. */}
       <div className="flex flex-1 flex-col px-5 pb-2 pt-3 md:overflow-y-auto">
-        {/* "References" label + the panel-level New reset. It sits here rather
-            than in the header band because the three-way mode toggle already
-            fills that row in this narrow (25%) pane. */}
-        <div className="mb-2.5 flex items-center justify-between gap-2">
-          {/* Sentence-case 13px label — the Voiceovers side panel's subheading
-              size, so a section label reads the same in both apps. */}
-          <span className="text-[13px] font-medium text-ink-200">References</span>
-          <div className="flex shrink-0 items-center gap-1.5">
-            {/* Bring your own prompts — write them in Claude (or anywhere) and
-                paste them in, instead of paying for the prompt-writing call.
-                Sized and styled as ClearAllButton's twin so the two read as one
-                pair of panel-level utilities. */}
+        {/* The References card — the Influencers section card, holding
+            everything the storyboard is built FROM. Its centred header carries
+            the panel's two utilities on its edges (Influencers' TabDivider
+            shape), which is what the old left-aligned label row did with an
+            extra row of its own: Import prompts on the left, New on the right.
+            Every row inside puts its status dot at its own left edge, so they
+            stack into one column that answers "what's still missing" without
+            reading a word. */}
+        <SectionCard
+          icon={Layers}
+          title="References"
+          className="mb-2 flex flex-[5] flex-col"
+          contentClassName="flex flex-1 flex-col gap-2"
+          left={
+            /* Bring your own prompts — write them in Claude (or anywhere) and
+               paste them in, instead of paying for the prompt-writing call.
+               Sized and styled as ClearAllButton's twin so the two read as one
+               pair of panel-level utilities. */
             <button
               type="button"
               onClick={onImportPrompts}
@@ -323,11 +330,11 @@ export default function InputPanel({
               <FileInput className="h-2.5 w-2.5" strokeWidth={2.5} />
               Import prompts
             </button>
-            <ClearAllButton onClear={onClearInputs} label="New" />
-          </div>
-        </div>
-        <div className="flex grow flex-col gap-2">
-          {/* Product */}
+          }
+          right={<ClearAllButton onClear={onClearInputs} label="New" />}
+        >
+          {/* Product — optional, so an empty one is a neutral dot. Red is
+              reserved for the two inputs that actually hold Generate shut. */}
           <BankCard
             icon={Package}
             label="Product"
@@ -364,12 +371,14 @@ export default function InputPanel({
             onClick={onOpenStyle}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenStyle() } }}
             title={styleChosen ? styleHint : 'How every clip looks'}
-            className={`group flex h-[58px] w-full cursor-pointer items-center gap-3 rounded-full border px-4 text-left transition-colors ${
+            className={`group flex h-[58px] w-full cursor-pointer items-center gap-2.5 rounded-full border px-4 text-left transition-colors ${
               styleChosen
                 ? 'border-broll-500/25 bg-broll-500/[0.07] hover:border-broll-500/35 hover:bg-broll-500/10'
                 : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-broll-500/30 hover:bg-broll-500/5'
             }`}
           >
+            {/* Required — half of `canGenerate`, so an unpicked style is red. */}
+            <StatusDot filled={styleChosen} required />
             <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${styleIsCustom ? 'bg-broll-500/20 text-broll-300' : 'bg-broll-500/10 text-broll-400 light:text-broll-600'}`}>
               {styleIsCustom ? <Sparkles className="h-[18px] w-[18px]" strokeWidth={1.75} /> : <Palette className="h-[18px] w-[18px]" strokeWidth={1.5} />}
             </div>
@@ -417,23 +426,32 @@ export default function InputPanel({
             )}
           </div>
 
-          {/* Script — optional, and labelled as such. Bring your own words from
-              the bank or a paste. It and the Instructions box below share the
+          {/* Script — REQUIRED (half of `canGenerate`), and last in the card:
+              it's the only reference here that grows as you paste, so above the
+              three pills it would shove them down the column on every keystroke.
+              Bring your own words from the bank or a paste. It and the
+              Instructions box below share the
               column's leftover height (`flex-1`, no `basis-0`): each one's base
               size is its own content, so a pasted script grows its box while an
               empty brief stays a strip, and whatever is still spare is split
               between them. With basis-0 they were always an even split whatever
               was in them — a matched pair on an empty panel, and a script fighting
               for room the moment one was pasted in. */}
-          <div className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border transition-colors ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
+          <div className={`flex min-h-[140px] flex-1 flex-col overflow-hidden rounded-3xl border transition-colors ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
             <BankCard
               icon={FileText}
               label="Script / Hooks"
               accentClass="bg-scripts-500/15 text-scripts-text"
               selectedClass="border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10"
               isEmpty={!selectedScript}
-              emptyHint="Or let the format write it"
-              optional={!hasScript}
+              // NOT "Or let the format write it": B-Roll stopped writing
+              // scripts in July 2026, so that offered a deleted feature — and
+              // the slot wore an OPTIONAL tag while being half of `canGenerate`,
+              // which is why an empty script left Generate grey with nothing on
+              // screen saying so. It's required, and the dot says it.
+              emptyHint="Pick one from your bank, or paste it below"
+              required
+              filled={hasScript}
               onSelect={onSelectScript}
               onClear={selectedScript ? onClearScript : undefined}
               flat
@@ -454,6 +472,35 @@ export default function InputPanel({
               <ExpandButton onClick={() => setScriptExpanded(true)} className="absolute bottom-2 right-2" />
             </div>
           </div>
+        </SectionCard>
+
+          {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
+              card silent, for a voiceover laid over in the edit; "With
+              Dialogue" makes all three the character speaking that line, staged
+              three different ways. It sits directly under the References card
+              and above the Instructions box: it decides what KIND of storyboard
+              the references just gathered are for, so it reads as the answer to
+              the card above it rather than as a setting down in the generate
+              band. Shrink-0 — it's a fixed h-12 row between two boxes that
+              split the column's leftover height. (It has also led the settings
+              band, sat at that band's bottom directly above Generate, and sat
+              at the very top of the column above the References heading.)
+              Continuous has no deliveries — it's narration over footage — so
+              it isn't rendered there at all. **With Dialogue leads and is the
+              default**: the character speaking the line is what most members
+              are here to make, and silent b-roll is the one you opt into. */}
+          {isLineMode(mode) && (
+            <SegmentedToggle<BrollDelivery>
+              className="mb-2 h-12 shrink-0 !p-1"
+              value={lineDelivery}
+              onChange={onLineDeliveryChange}
+              accent="broll"
+              options={[
+                { value: 'dialogue', label: 'With Dialogue' },
+                { value: 'silent', label: 'B-Roll Clips' },
+              ]}
+            />
+          )}
 
           {/* Additional instructions — a real textarea you type straight into.
               It was a pill that opened a centred editor popup, which put a
@@ -462,7 +509,7 @@ export default function InputPanel({
               still one tap away on the expand button for anything longer.
               Doubles as the creative brief when there's no script yet — the
               product row carries the rest, so blank stays a normal answer. */}
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-ink/20">
+          <div className="relative flex min-h-[72px] flex-1 flex-col overflow-hidden rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-ink/20">
             <div className="flex items-center justify-between gap-2 px-4 pt-2.5">
               <div className="flex min-w-0 items-center gap-1.5">
                 <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
@@ -486,8 +533,6 @@ export default function InputPanel({
             />
             <ExpandButton onClick={() => setInstructionsExpanded(true)} className="absolute bottom-2 right-2" />
           </div>
-
-        </div>
       </div>
 
       {/* Render-settings + Generate band. It used to be a tinted, bordered card
@@ -523,27 +568,6 @@ export default function InputPanel({
               column, Visual Style now among them. */}
           <ScriptModelRow appId="broll-studio" className="" />
 
-          {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
-              card silent, for a voiceover laid over in the edit; "With
-              Dialogue" makes all three the character speaking that line, staged
-              three different ways. It sits LAST, under the model row and
-              directly above Generate: it's the switch you'd flip on your way to
-              firing, and it changes what comes back more than the row above it.
-              (It led the column above References for a day in August 2026 and
-              came back here.) Continuous has no deliveries — it's narration
-              over footage — so the toggle isn't rendered there at all. */}
-          {isLineMode(mode) && (
-            <SegmentedToggle<BrollDelivery>
-              className="h-12 !p-1"
-              value={lineDelivery}
-              onChange={onLineDeliveryChange}
-              accent="broll"
-              options={[
-                { value: 'silent', label: 'B-Roll Clips' },
-                { value: 'dialogue', label: 'With Dialogue' },
-              ]}
-            />
-          )}
 
         </div>
 

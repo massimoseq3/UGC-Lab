@@ -1,16 +1,17 @@
-import { ChevronRight, Mic, RotateCcw, X } from 'lucide-react'
+import { ChevronRight, Mic, RotateCcw, X, SlidersHorizontal } from 'lucide-react'
 import type { VoiceSettings } from '../types'
 import { DEFAULT_VOICE_SETTINGS, getVoiceById, VOICE_STYLES, VOICE_PACES, VOICE_ACCENTS } from '../types'
 import { seedColor } from './seedColor'
 import Slider from './Slider'
 import Dropdown from '../../../components/Dropdown'
+import SectionCard, { StatusDot } from '../../../components/SectionCard'
 
-// One size for every setting subheading (Voice / Style / Pace / Accent /
-// Expressiveness / Tone / Scene). 13px — a step down from the 14px they were,
-// so the column reads as controls rather than headings, without shrinking to
-// the 11px subtext register. Slider carries the same class on its own label —
-// keep the two in step.
-const SETTING_LABEL = 'text-[13px] font-medium text-ink-200'
+// One size for every setting subheading (Style / Pace / Accent /
+// Expressiveness / Tone / Scene). Influencers' small-caps field register: the
+// settings now sit inside titled section cards, and a 13px sentence-case label
+// under a 13px card title reads as two competing headings. Slider carries the
+// same class on its own label — keep the two in step.
+const SETTING_LABEL = 'text-[11px] font-medium uppercase tracking-widest text-ink-300'
 
 interface SettingsViewProps {
   settings: VoiceSettings
@@ -36,24 +37,19 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <div className="flex flex-col gap-4 px-5 pb-6 pt-2">
-        {/* Preset — loads a saved voice from the bank in one click (voice,
-            delivery params, scene and tone all together). Scrolls with the rest
-            of the column: pinning it over the scroll (the Characters controls
-            pattern) was tried and reverted — it's one row among the settings
-            here, not a header. */}
-        <PresetRow
-          label={settings.presetLabel}
-          onOpen={onOpenPresetPicker}
-          onClear={() => onSettingsChange({ ...settings, presetId: undefined, presetLabel: undefined })}
-        />
-
-        {/* Voice — clickable, slides into picker */}
-        <div>
-          <span className={SETTING_LABEL}>Voice</span>
+      <div className="flex flex-col gap-3 px-5 pb-6 pt-2">
+        {/* Who is speaking. The voice row leads and the preset row sits under
+            it: a preset is a shortcut TO a voice, and it was reading as the
+            first decision when it's a convenience on the way to the second.
+            The card takes no dots — every control in it always holds a value,
+            and a permanent row of green dots is decoration that teaches you to
+            stop reading them. */}
+        <SectionCard icon={Mic} title="Voice">
+          {/* Voice — clickable, slides into picker. Its name is the row itself,
+              so the small-caps label above it is gone with the card title. */}
           <button
             onClick={onOpenVoicePicker}
-            className="mt-1.5 flex w-full items-center gap-3 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-2.5 text-left transition-colors hover:bg-ink/[0.06]"
+            className="flex w-full items-center gap-3 rounded-full border border-voice-500/25 bg-voice-500/[0.06] px-3.5 py-2.5 text-left transition-colors hover:bg-voice-500/10"
           >
             <span
               className="h-8 w-8 shrink-0 rounded-full"
@@ -69,41 +65,80 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-ink-400" />
           </button>
-        </div>
 
-        {/* Style — full width */}
-        <Field label="Style">
-          <Dropdown value={settings.style} options={VOICE_STYLES} onChange={(style) => update({ style })} />
-        </Field>
-
-        {/* Pace + Accent — side by side to save vertical space */}
-        <div className="grid grid-cols-2 gap-2.5">
-          <Field label="Pace">
-            <Dropdown compact value={settings.pace} options={VOICE_PACES} onChange={(pace) => update({ pace })} />
-          </Field>
-          <Field label="Accent">
-            <Dropdown compact value={settings.accent} options={VOICE_ACCENTS} onChange={(accent) => update({ accent })} />
-          </Field>
-        </div>
-
-        {/* Expressiveness (temperature) — extra top space so it doesn't crowd
-            the dropdowns above. */}
-        <div className="pt-2">
-          <Slider
-            label="Expressiveness"
-            tooltip="Controls how much the delivery varies. Lower values are more predictable and consistent between re-generations; higher values are more creative and expressive but less repeatable."
-            value={settings.temperature}
-            min={0}
-            max={2}
-            step={0.05}
-            leftHint="Focused"
-            rightHint="Creative"
-            onChange={(temperature) => update({ temperature })}
-            format={(v) => v.toFixed(2)}
+          {/* Preset — loads a saved voice from the bank in one click (voice,
+              delivery params, scene and tone all together). Scrolls with the
+              rest of the column: pinning it over the scroll (the Influencers
+              controls pattern) was tried and reverted — it's one row among the
+              settings here, not a header. */}
+          <PresetRow
+            label={settings.presetLabel}
+            onOpen={onOpenPresetPicker}
+            onClear={() => onSettingsChange({ ...settings, presetId: undefined, presetLabel: undefined })}
           />
-        </div>
+        </SectionCard>
 
-        {/* Optional direction — overall tone + scene (always visible) */}
+        {/* How it's said. Reset rides on this card's header rather than at the
+            foot of the whole column, where it sat a long scroll away from the
+            controls it restores and read as a panel-level action. */}
+        <SectionCard
+          icon={SlidersHorizontal}
+          title="Delivery"
+          contentClassName="flex flex-col gap-3"
+          right={
+            /* Toned like the shared ClearAllButton ("New") so the two read as
+               the same class of affordance; not that component, since this
+               restores defaults rather than clearing inputs and stays a single
+               click. */
+            <button
+              type="button"
+              onClick={handleReset}
+              title="Restore the delivery settings to their defaults"
+              className="flex items-center gap-1 rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-300"
+            >
+              <RotateCcw className="h-2.5 w-2.5" strokeWidth={2.5} />
+              Reset
+            </button>
+          }
+        >
+          {/* Style — full width */}
+          <Field label="Style">
+            <Dropdown value={settings.style} options={VOICE_STYLES} onChange={(style) => update({ style })} />
+          </Field>
+
+          {/* Pace + Accent — side by side to save vertical space */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <Field label="Pace">
+              <Dropdown compact value={settings.pace} options={VOICE_PACES} onChange={(pace) => update({ pace })} />
+            </Field>
+            <Field label="Accent">
+              <Dropdown compact value={settings.accent} options={VOICE_ACCENTS} onChange={(accent) => update({ accent })} />
+            </Field>
+          </div>
+
+          {/* Expressiveness (temperature) — extra top space so it doesn't crowd
+              the dropdowns above. */}
+          <div className="pt-1">
+            <Slider
+              label="Expressiveness"
+              tooltip="Controls how much the delivery varies. Lower values are more predictable and consistent between re-generations; higher values are more creative and expressive but less repeatable."
+              value={settings.temperature}
+              min={0}
+              max={2}
+              step={0.05}
+              leftHint="Focused"
+              rightHint="Creative"
+              onChange={(temperature) => update({ temperature })}
+              format={(v) => v.toFixed(2)}
+            />
+          </div>
+        </SectionCard>
+
+        {/* Optional direction — overall tone + scene. Deliberately NOT carded:
+            they're the two extras at the end, and leaving them bare under the
+            cards is what says so. They're also the only settings in this panel
+            that are ever actually empty, so they're the only ones carrying a
+            status dot. */}
         <DirectionBox
           label="Tone / Context"
           value={settings.sampleContext}
@@ -116,22 +151,6 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
           placeholder="e.g. A bright, upbeat product demo in a sunny kitchen."
           onChange={(scene) => update({ scene })}
         />
-
-        {/* Reset — closes the column, under the settings it restores. Toned
-            like the shared ClearAllButton ("New") so the two read as the same
-            class of affordance; not that component, since this restores
-            defaults rather than clearing inputs and stays a single click. */}
-        <div className="mt-1">
-          <button
-            type="button"
-            onClick={handleReset}
-            title="Restore the delivery settings to their defaults"
-            className="flex items-center gap-1 rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-300"
-          >
-            <RotateCcw className="h-2.5 w-2.5" strokeWidth={2.5} />
-            Reset
-          </button>
-        </div>
       </div>
     </div>
   )
@@ -211,9 +230,13 @@ function DirectionBox({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="flex items-center gap-2">
+      <span className="flex items-center gap-1.5">
+        {/* Never `required` — nothing is waiting on either of these, so an
+            empty one is neutral. Red is reserved for an input that's actually
+            holding a Generate button shut. */}
+        <StatusDot filled={value.trim() !== ''} />
         <span className={SETTING_LABEL}>{label}</span>
-        <span className="rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">optional</span>
+        <span className="ml-0.5 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">optional</span>
       </span>
       <textarea
         value={value}

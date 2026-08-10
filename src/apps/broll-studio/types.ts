@@ -131,7 +131,7 @@ export interface BrollInput {
   styleId: string
   styleBrief?: string
   styleName?: string
-  // 'silent'   — every variation is silent b-roll (the default; a voiceover is
+  // 'silent'   — every variation is silent b-roll (a voiceover is
   //              laid over in the edit).
   // 'dialogue' — every variation is the character speaking the scene's exact
   //              line, staged three different ways.

@@ -9,8 +9,11 @@ import {
   VolumeX,
   Coins,
   Star,
+  Layers,
+  Eraser,
 } from 'lucide-react'
 import ModelPicker from '../../../components/ModelPicker'
+import SectionCard from '../../../components/SectionCard'
 import ModelSidePanel from '../../../components/ModelSidePanel'
 import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
@@ -564,6 +567,12 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
   )
   void isGenerating
 
+  // Every attached slot, whatever kind — frames, ref images, Seedance clips,
+  // Omni characters/voices, Motion Control's pair. Clear empties them all; the
+  // prompt is the member's own writing and is deliberately left alone.
+  const hasAnyRef = state.refs.length > 0
+  const clearRefs = () => onChange({ ...state, refs: [] })
+
   const hasRefsSection = state.mode === 'video' || state.mode === 'image'
   // Presets are prompt formats; Motion Control's prompt is secondary, so skip them.
   const presetsApplicable = state.mode === 'image' || (state.mode === 'video' && !isMotionControl)
@@ -629,8 +638,36 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             {/* Reference inputs — every slot the active model accepts renders
                 as a labelled group (big frame squares, thumbnail tiles, media
                 cards) stacked in one column. */}
-            {hasRefsSection && (
-              <>
+            {/* References — the Influencers section card around every slot the
+                ACTIVE MODEL accepts. It renders exactly where the slots
+                themselves do, so it inherits the model's own capabilities
+                instead of adding a second set of conditionals: Music has no
+                slots and gets no card, a text-only video model likewise
+                (`hasAnyRefSlot`), Motion Control's own section takes the card
+                over, Omni's characters/voices/clip stack under the images, and
+                the Seedance clip strips share a row inside it. Image mode's
+                single group still gets the card — a lone row of three tiles
+                floating with no boundary is the thing the card exists to fix,
+                and one mode reading structurally differently to save 22px is a
+                worse trade than the 22px. Clear empties the slots (and only the
+                slots — the prompt is the member's writing, not a reference). */}
+            {hasRefsSection && (hasAnyRefSlot || state.mode === 'image') && (
+              <SectionCard
+                icon={Layers}
+                title="References"
+                contentClassName="flex flex-col gap-3"
+                right={hasAnyRef ? (
+                  <button
+                    type="button"
+                    onClick={clearRefs}
+                    title="Remove every attached reference"
+                    className="flex items-center gap-1 rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-300"
+                  >
+                    <Eraser className="h-2.5 w-2.5" strokeWidth={2.5} />
+                    Clear
+                  </button>
+                ) : undefined}
+              >
                 {state.mode === 'video' && isMotionControl && (
                   <MotionControlSection
                     refs={state.refs}
@@ -665,6 +702,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                     {refsAllowed && (
                       <RefTiles
                         label="Reference Images"
+                        filled={refStripValues().length > 0}
                         values={refStripValues()}
                         onChange={setRefStrip}
                         max={maxRefs}
@@ -682,6 +720,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                         {supportsRefAudio && (
                           <MediaRefStrip
                             label="Reference Audio"
+                            filled={mediaStripValues('audio').length > 0}
                             kind="audio"
                             values={mediaStripValues('audio')}
                             onChange={(v) => setMediaStrip('audio', v)}
@@ -693,6 +732,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                         {supportsRefVideos && (
                           <MediaRefStrip
                             label="Reference Videos"
+                            filled={mediaStripValues('video').length > 0}
                             kind="video"
                             values={mediaStripValues('video')}
                             onChange={(v) => setMediaStrip('video', v)}
@@ -711,6 +751,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 {state.mode === 'image' && (
                   <RefTiles
                     label="Reference Images"
+                    filled={refStripValues().length > 0}
                     values={refStripValues()}
                     onChange={setRefStrip}
                     max={4}
@@ -718,7 +759,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                     tabs={PLAYGROUND_REF_TABS}
                   />
                 )}
-              </>
+              </SectionCard>
             )}
 
             {/* Prompt — takes the column's leftover height, and never more.
