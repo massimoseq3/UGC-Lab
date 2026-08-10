@@ -372,7 +372,13 @@ export default function Discover() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex h-[57px] shrink-0 items-center gap-3 border-b border-ink/5 px-4">
+      {/* Wraps on a phone: the platform toggle, a search field, a Search button
+          and the credits chip don't fit on one 390px line — the field ended up
+          ~60px wide, showing neither the placeholder nor what you typed. The
+          field + button take their own full-width row (`order-last`); md+ is the
+          single 57px band, unchanged, because the wrapper holding them turns
+          into `display: contents` there and puts them straight back in place. */}
+      <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink/5 px-4 py-2 md:h-[57px] md:flex-nowrap md:gap-3 md:py-0">
         <SegmentedToggle
           options={[
             { value: 'tiktok', label: 'TikTok' },
@@ -387,6 +393,7 @@ export default function Discover() {
           dense
         />
 
+        <div className="order-last flex w-full min-w-0 items-center gap-2 md:order-none md:contents">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-600" />
           <input
@@ -407,6 +414,7 @@ export default function Discover() {
           {searching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Radar className="h-3.5 w-3.5" />}
           Search
         </button>
+        </div>
 
         {credits !== null && (
           <span className="shrink-0 rounded-full bg-ink/5 px-2.5 py-1 text-[11px] text-ink-500" title="ScrapeCreators credits remaining">

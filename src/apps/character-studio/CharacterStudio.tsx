@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
-import { Dna } from 'lucide-react'
+import { Dna, Images, SlidersHorizontal } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
@@ -8,6 +8,7 @@ import type { CharacterProfile, CharacterRefItem, InFlightCharacterGen, LaunchGe
 import { createEmptyProfile, profileFromFlat } from './types'
 import type { AspectRatio, ImageResolution } from '../../utils/models'
 import { getDefaultModel, clampImageResolution } from '../../utils/models'
+import MobilePaneTabs, { paneClass } from '../../components/MobilePaneTabs'
 import ControlsPanel from './components/ControlsPanel'
 import GalleryPanel from './components/GalleryPanel'
 import ReferenceLibrarySlideOver from './components/ReferenceLibrarySlideOver'
@@ -68,6 +69,8 @@ export default function CharacterStudio() {
   // stuck on a phantom spinner.
   const [inFlight, setInFlight] = usePersistedState<InFlightCharacterGen[]>(`${baseKey}:in-flight`, [])
   const [error, setError] = useState<string | null>(null)
+  // Phone-only: which of the two panes is on screen (ignored from md up).
+  const [pane, setPane] = useState<'controls' | 'gallery'>('controls')
 
   // Fill the form from an analysed reference and mark it as the active one.
   const applyReference = useCallback((item: CharacterRefItem) => {
@@ -272,6 +275,8 @@ export default function CharacterStudio() {
   const handleGenerate = () => {
     // Snapshot every input the gen depends on at click time — the user can
     // freely mutate the form while this job runs in parallel.
+    // On a phone only one pane is on screen — follow the run to the gallery.
+    setPane('gallery')
     const snapshotKind: GenerationKind = sheetMode ? 'sheet' : 'portrait'
     const snapshotAspect = sheetMode ? sheetAspect : (profile.aspectRatio || '9:16')
     void launchGen({ profile: { ...profile }, resolution, kind: snapshotKind, aspect: snapshotAspect })
@@ -329,14 +334,24 @@ export default function CharacterStudio() {
 
   return (
     <div
-      className="relative flex flex-col pb-72 md:flex-row md:h-full md:pb-0"
+      className="relative flex h-full flex-col md:flex-row"
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleOverlayDrop}
     >
+      <MobilePaneTabs
+        options={[
+          { value: 'controls', label: 'Controls', icon: SlidersHorizontal },
+          { value: 'gallery', label: 'Gallery', icon: Images },
+        ]}
+        value={pane}
+        onChange={setPane}
+        accent="influencers"
+      />
+
       {/* Controls panel — 50% on desktop */}
-      <div className="flex w-full min-w-0 md:w-1/2 shrink-0 flex-col border-b md:border-b-0 md:border-r border-ink/5">
+      <div className={paneClass(pane === 'controls', 'md:w-1/2 md:shrink-0 md:border-r md:border-ink/5')}>
         <ControlsPanel
           profile={profile}
           onProfileChange={setProfile}
@@ -362,7 +377,7 @@ export default function CharacterStudio() {
       </div>
 
       {/* Gallery panel — 50% on desktop */}
-      <div className="flex min-w-0 w-full md:w-1/2 flex-col md:overflow-hidden">
+      <div className={paneClass(pane === 'gallery', 'md:w-1/2 md:overflow-hidden')}>
         <GalleryPanel
           inFlight={inFlight}
           onCancelGen={handleCancelGen}

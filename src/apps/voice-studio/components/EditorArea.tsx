@@ -50,11 +50,11 @@ export default function EditorArea({
   const creditsLabel = charCount > 0 ? formatCredits(estimateCredits(TTS_MODEL_ID, { charCount })) : null
 
   return (
-    <div className="flex flex-col md:h-full md:overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* Body — no header band here on purpose: the panel-level "New" reset
           rides in the action row above the textarea (beside Enhance) instead,
           so the editor column has no near-empty strip across its top. */}
-      <div className="flex flex-1 flex-col px-8 pt-6 md:overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pt-5 md:px-8 md:pt-6">
         {/* Pull from Script bank — dashed "click to select" when empty; a
             filled pill with a hover refresh icon / X-clear once a bank script
             is loaded. Editing the textarea below reverts it to the empty state. */}
@@ -168,23 +168,23 @@ export default function EditorArea({
         </div>
       )}
 
-      {/* Footer row — pinned to the app window's bottom edge on mobile so
-          Generate is always reachable. Opaque bg (not /95 + blur): backdrop-
-          filter doesn't re-blur inside the already-blurred window frame, so
-          any alpha lets the form underneath ghost through. */}
-      <div className={`fixed bottom-0 left-0 right-0 z-30 flex items-center justify-between border-t border-ink/5 bg-surface-0 px-5 py-3 md:static md:left-auto md:right-auto md:z-auto md:bg-transparent ${isGenerating ? 'md:mt-0' : 'md:mt-4'}`}>
+      {/* Footer row — the pane owns its own height now (the phone shows one
+          pane at a time), so this is an ordinary last row in the column rather
+          than a fixed bar over the window. It used to be `fixed`, which is what
+          laid the character count across the Generate button on a phone. */}
+      <div className={`flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-ink/5 px-5 py-3 ${isGenerating ? 'md:mt-0' : 'md:mt-4'}`}>
         {/* Left — generate, then the model chip beside it. The model indicator
             lives here (not in the settings panel) since there's only one model. */}
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <button
             onClick={onGenerate}
             // Stays live while a voiceover renders — a second click queues
             // another one alongside it. The progress bar above is the feedback.
             disabled={!canGenerate || overLimit}
-            className="flex items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-16 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-6 py-4 md:flex-none md:px-16 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Mic className="h-4 w-4" strokeWidth={2.5} />
-            <span>Generate Voiceover</span>
+            <span className="truncate">Generate Voiceover</span>
             {creditsLabel && (
               <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                 <Coins className="h-3 w-3" strokeWidth={2} />
@@ -197,10 +197,12 @@ export default function EditorArea({
           </div>
         </div>
 
-        {/* Right — character count */}
-        <div className={`text-sm tabular-nums ${overLimit ? 'text-red-400 light:text-red-600' : 'text-ink-400'}`}>
+        {/* Right — character count. The word "characters" is desktop-only: on a
+            phone it wrapped to a second line beside the button. */}
+        <div className={`shrink-0 text-sm tabular-nums ${overLimit ? 'text-red-400 light:text-red-600' : 'text-ink-400'}`}>
           <span className={overLimit ? 'text-red-300 light:text-red-700' : 'text-ink-200'}>{charCount.toLocaleString()}</span>
-          <span className="text-ink-500"> / {MAX_CHARACTERS.toLocaleString()} characters</span>
+          <span className="text-ink-500"> / {MAX_CHARACTERS.toLocaleString()}</span>
+          <span className="hidden text-ink-500 md:inline"> characters</span>
         </div>
       </div>
     </div>

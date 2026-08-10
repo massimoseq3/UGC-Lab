@@ -276,7 +276,7 @@ export default function InputPanel({
   const promptCredits = hasScript ? formatCredits(estimatePromptCredits(mode, scriptText, lineDelivery)) : null
 
   return (
-    <div className="flex flex-col md:h-full">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Mode toggle header — the two shapes of workspace this app has:
           Line-by-Line (script → per-line shot prompts) vs Continuous (script →
           keyframe chain). Whether the cards SPEAK is not a mode — both
@@ -302,7 +302,7 @@ export default function InputPanel({
       {/* pb-2, not pb-4: the settings band below is part of this column, and
           16px of column padding plus the band's own top padding opened a gap
           twice the 8px the reference cards sit apart. */}
-      <div className="flex flex-1 flex-col px-5 pb-2 pt-3 md:overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-2 pt-3">
         {/* The References card — the Influencers section card, holding
             everything the storyboard is built FROM. Its centred header carries
             the panel's two utilities on its edges (Influencers' TabDivider
@@ -314,7 +314,7 @@ export default function InputPanel({
         <SectionCard
           icon={Layers}
           title="References"
-          className="mb-2 flex flex-[5] flex-col"
+          className="mb-2 flex flex-[5] flex-col max-md:flex-none"
           contentClassName="flex flex-1 flex-col gap-2"
           left={
             /* Bring your own prompts — write them in Claude (or anywhere) and
@@ -437,7 +437,7 @@ export default function InputPanel({
               between them. With basis-0 they were always an even split whatever
               was in them — a matched pair on an empty panel, and a script fighting
               for room the moment one was pasted in. */}
-          <div className={`flex min-h-[140px] flex-1 flex-col overflow-hidden rounded-3xl border transition-colors ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
+          <div className={`flex min-h-[140px] flex-1 flex-col overflow-hidden rounded-3xl border transition-colors max-md:min-h-[220px] max-md:flex-none ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
             <BankCard
               icon={FileText}
               label="Script / Hooks"
@@ -509,7 +509,7 @@ export default function InputPanel({
               still one tap away on the expand button for anything longer.
               Doubles as the creative brief when there's no script yet — the
               product row carries the rest, so blank stays a normal answer. */}
-          <div className="relative flex min-h-[72px] flex-1 flex-col overflow-hidden rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-ink/20">
+          <div className="relative flex min-h-[72px] flex-1 flex-col overflow-hidden rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-ink/20 max-md:min-h-[120px] max-md:flex-none">
             <div className="flex items-center justify-between gap-2 px-4 pt-2.5">
               <div className="flex min-w-0 items-center gap-1.5">
                 <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
@@ -540,7 +540,7 @@ export default function InputPanel({
           panel, so it's gone and the rows sit straight on the column. Sticky on
           mobile (where it floats over scrolling content, hence the opaque fill
           — see the note under bg-surface-0), plain and static on desktop. */}
-      <div className="sticky bottom-0 z-30 bg-surface-0 px-5 pb-2.5 pt-0 md:static md:z-auto md:bg-transparent">
+      <div className="shrink-0 bg-surface-0 px-5 pb-2.5 pt-0 md:bg-transparent">
         <div className="mb-2 flex flex-col gap-2">
 
           {/* Who writes the shot prompts, then how the cards are delivered.

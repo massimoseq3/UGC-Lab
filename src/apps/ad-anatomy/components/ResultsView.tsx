@@ -645,7 +645,7 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
       {hasMedia && (
         // max-h on phones: a portrait video would otherwise fill the whole
         // stacked column and leave no room for the scorecard below.
-        <div className="flex max-h-[45dvh] md:h-full md:max-h-none w-full md:w-1/3 shrink-0 flex-col gap-4 border-b md:border-b-0 md:border-r border-ink/5 p-4 md:p-5 min-h-0">
+        <div className="flex max-h-[38dvh] md:h-full md:max-h-none w-full md:w-1/3 shrink-0 flex-col gap-4 border-b md:border-b-0 md:border-r border-ink/5 p-4 md:p-5 min-h-0">
           {/* Media sizes to its own aspect ratio so there are no letterbox
               black bars. The flex parent centers it within whatever vertical
               space is left after the caption / filename. */}

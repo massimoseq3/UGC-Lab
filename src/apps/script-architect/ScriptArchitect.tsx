@@ -1,5 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
+import { FileText, PenLine } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
+import MobilePaneTabs, { paneClass } from '../../components/MobilePaneTabs'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
 import type { Product, ScriptHistoryItem } from '../../stores/types'
@@ -108,6 +110,8 @@ export default function ScriptArchitect() {
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Phone-only: which of the two panes is on screen (ignored from md up).
+  const [pane, setPane] = useState<'input' | 'output'>('input')
   const [highlightField, setHighlightField] = useState<string | null>(null)
 
   // Pulse the dock dot while the script LLM call runs.
@@ -181,6 +185,8 @@ export default function ScriptArchitect() {
     setIsGenerating(true)
     setError(null)
     setActiveHistoryId(null)
+    // On a phone only one pane is on screen — follow the run to the takes.
+    setPane('output')
     // Lock the output's labelling context to this run up front, so the
     // loading copy and the resulting cards reflect what was generated.
     setOutputMode(resolvedMode)
@@ -313,8 +319,18 @@ export default function ScriptArchitect() {
   // labels are pinned to outputMode/outputStyle snapshots, so leaving the
   // shown cards untouched is safe even as the live left-panel toggles reset.)
   return (
-    <div className="relative flex flex-col pb-32 md:flex-row md:h-full md:pb-0">
-      <div className="flex w-full md:w-1/2 shrink-0 flex-col border-b md:border-b-0 md:border-r border-ink/5">
+    <div className="relative flex h-full flex-col md:flex-row">
+      <MobilePaneTabs
+        options={[
+          { value: 'input', label: 'Setup', icon: PenLine },
+          { value: 'output', label: 'Output', icon: FileText },
+        ]}
+        value={pane}
+        onChange={setPane}
+        accent="scripts"
+      />
+
+      <div className={paneClass(pane === 'input', 'md:w-1/2 md:shrink-0 md:border-r md:border-ink/5')}>
         <InputPanel
           mode={mode}
           onModeChange={setMode}
@@ -350,7 +366,7 @@ export default function ScriptArchitect() {
         />
       </div>
 
-      <div className="flex w-full md:w-1/2 flex-col min-h-[300px] md:min-h-0">
+      <div className={paneClass(pane === 'output', 'md:w-1/2')}>
         <RightPanel
           variations={variations}
           mode={resolvedMode}

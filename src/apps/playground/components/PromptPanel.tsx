@@ -630,7 +630,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               stretched to its own content and the box overflowed the port —
               its toolbar was pushed out of sight and clipped by the box's own
               overflow-hidden. */}
-          <div className="flex h-full min-h-0 flex-col gap-2 px-5 pb-2 pt-3">
+          <div className="flex h-full min-h-0 flex-col gap-2 px-5 pb-2 pt-3 max-md:h-auto max-md:min-h-full">
             {/* Model picker now lives in the footer, above the output-settings
                 pills (see below) — the scrollable body opens straight into the
                 reference inputs. */}
@@ -783,7 +783,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 + ref rows filled did exactly that). 206px = the 48px preset row,
                 a 120px field and the 38px toolbar — so at the floor the field is
                 still the 120 it used to declare for itself. */}
-            <div className="relative flex min-h-[206px] grow flex-col">
+            <div className="relative flex min-h-[206px] grow flex-col max-md:grow-0">
               {/* Prompt field — a normal, visible textarea on top of a
                   transparent backdrop that only paints the [bracket] highlights.
                   The textarea owns every glyph, so the caret, selection and

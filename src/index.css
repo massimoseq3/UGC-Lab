@@ -722,3 +722,19 @@ textarea,
 .slider-thin:active::-moz-range-thumb {
   transform: scale(1.15);
 }
+
+/* iOS Safari zooms the whole page in whenever a focused field's font-size is
+   under 16px — and it does NOT zoom back out when the field blurs. The app's
+   chrome type is 12–14px, so on a phone every prompt box, search field and
+   chip input was a one-way trip into a zoomed viewport with the dock pushed
+   off screen. Below the md breakpoint fields render at 16px, which is also
+   simply the right size to type at on a phone; desktop is untouched.
+   Range inputs are excluded — they carry no text and the rule would resize
+   the slider tracks. */
+@media (max-width: 767px) {
+  input:not([type='range']),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

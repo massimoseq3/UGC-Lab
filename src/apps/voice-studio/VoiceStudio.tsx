@@ -1,5 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
+import { FileText, Mic } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
+import MobilePaneTabs, { paneClass } from '../../components/MobilePaneTabs'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
 import { useCreditsStore } from '../../stores/creditsStore'
@@ -80,6 +82,8 @@ export default function VoiceStudio() {
   const [selectedScript, setSelectedScript] = useState<Script | null>(null)
   const [highlightField, setHighlightField] = useState<string | null>(null)
   const [detailsItem, setDetailsItem] = useState<VoiceHistoryItem | null>(null)
+  // Phone-only: which of the two panes is on screen (ignored from md up).
+  const [pane, setPane] = useState<'editor' | 'settings'>('editor')
 
   const history = useBankStore((s) => s.voiceHistory)
   const activePlayerItem = useMemo<VoiceHistoryItem | null>(
@@ -251,14 +255,23 @@ export default function VoiceStudio() {
   }
 
   return (
-    <div className="relative flex flex-col pb-28 md:h-full md:pb-0">
-      <div className="flex flex-1 flex-col md:min-h-0 md:flex-row">
+    <div className="relative flex h-full flex-col">
+      <MobilePaneTabs
+        options={[
+          { value: 'editor', label: 'Script', icon: FileText },
+          { value: 'settings', label: 'Voice', icon: Mic },
+        ]}
+        value={pane}
+        onChange={setPane}
+        accent="voice"
+      />
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         {/* Left — settings / voice picker / history. First in the DOM so the
             desktop reading order matches the visual one (and so this app has the
             same source shape as Scripts / B-Roll); the editor takes `order-first`
             below to keep the mobile stack unchanged — settings are long, and
             they'd push the script box off the first screen. */}
-        <div className="flex w-full md:w-[400px] shrink-0 flex-col border-t md:border-t-0 md:border-r border-ink/5">
+        <div className={paneClass(pane === 'settings', 'md:w-[400px] md:shrink-0 md:border-r md:border-ink/5')}>
           <SidePanel
             settings={settings}
             onSettingsChange={setSettings}
@@ -278,7 +291,7 @@ export default function VoiceStudio() {
         {/* Right — editor, with the player docked under it. The player belongs
             to this column, not to the window: stretched across the bottom it
             cut the side panel off short and left dead space under History. */}
-        <div className="order-first flex flex-1 flex-col md:order-none md:min-h-0 md:overflow-hidden">
+        <div className={paneClass(pane === 'editor', 'md:flex-1 md:overflow-hidden')}>
           <div className="flex min-h-0 flex-1 flex-col">
             <EditorArea
               scriptText={scriptText}

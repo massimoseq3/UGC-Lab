@@ -32,10 +32,14 @@ const SCENE_KEYS = getTabFields(TABS[1]).map((f) => f.key)
 // optional actions (Clear / Copy), pinned to the row's edges.
 function TabDivider({ center, left, right }: { center: ReactNode; left?: ReactNode; right?: ReactNode }) {
   return (
-    <div className="relative flex items-center justify-center">
-      {left && <div className="absolute left-0">{left}</div>}
-      {center}
-      {right && <div className="absolute right-0">{right}</div>}
+    // grid-cols-[1fr_auto_1fr], not absolute edge slots: the equal gutters keep
+    // the centre pill genuinely centred, and a phone-width column squeezes the
+    // side pills instead of sliding them underneath the title (which is exactly
+    // what "Copy Physical" did on top of "Physical Presets" at 390px).
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1">
+      <div className="flex min-w-0 justify-start">{left}</div>
+      <div className="flex min-w-0 justify-center">{center}</div>
+      <div className="flex min-w-0 justify-end">{right}</div>
     </div>
   )
 }
@@ -194,7 +198,7 @@ export default function ControlsPanel({
   const scenePrompt = buildScenePrompt(profile)
 
   return (
-    <div className="flex min-w-0 flex-col md:h-full">
+    <div className="flex h-full min-h-0 min-w-0 flex-col">
       {/* Rounded segmented toggle — filled so all tabs share the column with no
           horizontal scroll. The h-[57px] band + bottom hairline is the app-wide
           panel-header spec (Scripts, B-Roll, Bank, Playground, Ad Analyzer and
@@ -213,7 +217,7 @@ export default function ControlsPanel({
         />
       </div>
 
-      {/* Scrollable parameter fields (only scrolls internally on desktop). Every
+      {/* Scrollable parameter fields. Every
           tab's groups render on one page — each group sits in its own card, and
           the top toggle scroll-jumps between tab blocks (Ad Analyzer pattern).
           The bottom edge feathers out under the Generate bar, mirroring the
@@ -221,7 +225,7 @@ export default function ControlsPanel({
           mid-row against the bar and read as a render glitch. */}
       <div
         ref={scrollRef}
-        className="min-w-0 flex-1 px-4 pb-4 md:overflow-y-auto [mask-image:linear-gradient(to_bottom,black_calc(100%-1.5rem),transparent_100%)]"
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 pb-4 [mask-image:linear-gradient(to_bottom,black_calc(100%-1.5rem),transparent_100%)]"
       >
         <div className="flex flex-col gap-4">
           {/* Preset loader + reference-photo autofill — pinned just under the
@@ -230,7 +234,9 @@ export default function ControlsPanel({
               instead of clipping against a hard edge. The -mx-4/px-4 stretches
               the backdrop across the scroll container's own padding. */}
           <div className="sticky top-0 z-10 -mx-4 bg-surface-0 px-4 pt-2">
-            <div className="flex items-center gap-2">
+            {/* Stacked under sm: two picker rows sharing a phone-width column
+                truncate to "Load Cha…" / "Extract C…", which names neither. */}
+            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">
                 <LoadPresetDropdown onLoadProfile={onProfileChange} />
               </div>

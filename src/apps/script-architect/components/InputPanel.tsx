@@ -462,7 +462,7 @@ export default function InputPanel({
   )
 
   return (
-    <div className="flex flex-col md:h-full">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Mode toggle — rounded segmented pill, mirrored by the Output/History
           toggle in the right panel so both strips share the same baseline. */}
       {/* Full-width divider in the subtle vertical-divider tone (border-ink/5).
@@ -491,7 +491,7 @@ export default function InputPanel({
       {/* 8px between every row, and 8px from the last one to the footer band
           (pb-2 + the band's pt-0) — B-Roll's rhythm. This column ran on 12s
           and 16s, which read as loose beside it. */}
-      <div className="flex flex-1 flex-col overflow-y-auto px-5 pb-2 pt-3">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-2 pt-3">
         {mode === 'write' ? (
           <>
             {/* Output sub-mode toggle — governs the form below (which style
@@ -657,7 +657,12 @@ export default function InputPanel({
             {/* No top margin: the product row above already carries mb-2, and
                 the pair of them stacked a 16px gap where every other row in the
                 column sits 8 apart. */}
-            <div className="flex min-h-[160px] flex-1 basis-0 flex-col">
+            {/* max-md: the growable boxes stop sharing the leftover height. On a
+                phone there IS no leftover — the column is shorter than its own
+                contents — so flex-1 just squeezes every box until the card's
+                overflow-hidden slices it. Fixed floors + a scrolling column is
+                the phone shape; the height-sharing is a desktop luxury. */}
+            <div className="flex min-h-[160px] flex-1 basis-0 flex-col max-md:min-h-[220px] max-md:flex-none max-md:basis-auto">
               <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
                 <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-2.5">
                   <div className="flex min-w-0 items-center gap-1.5">
@@ -700,11 +705,11 @@ export default function InputPanel({
           <SectionCard
             icon={Layers}
             title="References"
-            className="mb-2 flex flex-1 flex-col"
+            className="mb-2 flex flex-1 flex-col max-md:flex-none"
             contentClassName="flex flex-1 flex-col gap-2"
           >
           {productSection}
-          <div className="flex min-h-[140px] flex-1 flex-col">
+          <div className="flex min-h-[140px] flex-1 flex-col max-md:min-h-[240px] max-md:flex-none">
             {/* Select from bank (header) + paste manually (textarea) merged into
                 one rounded box so the two sources read as a single input. One
                 box serves both remix pipelines: the pasted source's format is
@@ -774,7 +779,7 @@ export default function InputPanel({
           // the box's overflow-hidden sliced the footer toolbar in half. A
           // min-height on the section overrides its auto min-size, so it shrinks
           // to a real, known floor and everything inside shrinks with it.
-          <div className="flex min-h-[120px] flex-1 flex-col">
+          <div className="flex min-h-[120px] flex-1 flex-col max-md:min-h-[200px] max-md:flex-none">
             {/* Single rounded box (matches the Write New brief): a header row
                 naming the field, the textarea taking whatever height is left,
                 then Enhance / Clear / Undo / Redo + Expand in a footer. The

@@ -206,7 +206,9 @@ export default memo(function GalleryPanel({
         <AwaitingCanvas
           icon={UserRound}
           title="No generations yet"
-          hint="Configure parameters on the left and hit Generate. Every character you make lands here, sorted by day."
+          // No "on the left" — on a phone the controls are the other tab, not a
+          // column beside this one.
+          hint="Fill in the Controls and hit Generate. Every character you make lands here, sorted by day."
         />
       ) : viewMode === 'single' ? (
         // Every callback targets the item ACTUALLY on the stage. They used to
