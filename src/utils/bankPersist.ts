@@ -84,16 +84,30 @@ export async function readBanks(): Promise<unknown | null> {
   }
 }
 
+// The data fields, and ONLY these. Callers hand us the whole Zustand state,
+// which carries every action alongside the banks — JSON.stringify used to drop
+// those functions silently, but structured clone throws DataCloneError on them
+// and takes the write down with it. Picking explicitly also stops any stray
+// non-serialisable field ever reaching the store.
+const BANK_DATA_KEYS = [
+  'products', 'models', 'scripts', 'voices', 'brolls', 'styles', 'swipes',
+  'voiceHistory', 'videoHistory', 'imageHistory', 'musicHistory', 'scriptHistory',
+  'brollHistory', 'characterHistory', 'adAnatomyHistory', 'usageDays',
+] as const satisfies readonly (keyof BankData)[]
+
 /**
- * Structured-clone the state in rather than a JSON string: it skips a
+ * Structured-clone the banks in rather than a JSON string: it skips a
  * serialise/parse of the whole blob on every save, and IndexedDB stores the
  * object graph directly.
  */
 export async function writeBanks(state: BankData): Promise<void> {
+  const data: Record<string, unknown> = {}
+  for (const key of BANK_DATA_KEYS) data[key] = state[key]
+
   const db = await openDB()
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite')
-    tx.objectStore(STORE_NAME).put(state, RECORD_KEY)
+    tx.objectStore(STORE_NAME).put(data, RECORD_KEY)
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
     // A quota-exceeded write aborts rather than erroring; without this the
