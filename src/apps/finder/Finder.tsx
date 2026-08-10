@@ -30,17 +30,44 @@ const SIDEBAR_ICONS: Record<BankType, React.ElementType> = {
 
 const BANK_TYPES: BankType[] = ['products', 'models', 'scripts', 'voices', 'brolls', 'styles', 'swipes']
 
+// One photo's trip from data URI to stored asset, remembered by the exact bytes
+// it came in as. The form autosaves, and it adopts the asset ref a save hands
+// back through React state — so a debounce that fires in the window before that
+// adoption commits offers us the SAME data URI a second time. Persisting it
+// twice minted a second asset, which `updateProduct` then read as a replaced
+// photo and purged the first for; the form's pending adoption put the first ref
+// back on the row, so the second was purged in its turn — and the row was left
+// pointing at a blob that no longer existed. That is the placeholder card, and
+// it took every angle on the product with it.
+//
+// The map is per open form (cleared with the rest of the form's scratch state)
+// and holds the in-flight PROMISE, not the resolved ref, so a submit racing an
+// autosave over the same photo waits on the one save instead of starting a
+// second. Keying by the data URI costs nothing — JS strings are shared, so this
+// is another reference to bytes the form is already holding.
+type ImageMemo = Map<string, Promise<string>>
+
+function persistImage(src: string, memo: ImageMemo): Promise<string> {
+  if (!src.startsWith('data:')) return Promise.resolve(src)
+  const inFlight = memo.get(src)
+  if (inFlight) return inFlight
+  const pending = saveFromDataUrl(src)
+  memo.set(src, pending)
+  // A failed save must not be remembered, or the retry would hand back the
+  // same rejection for as long as the form stays open.
+  pending.catch(() => { if (memo.get(src) === pending) memo.delete(src) })
+  return pending
+}
+
 // Photos arrive from the Product form as data URIs on first add; already-saved
 // ones come back as asset:// refs and pass through untouched.
-async function persistProductImages(data: Omit<Product, 'id' | 'createdAt'>) {
+async function persistProductImages(data: Omit<Product, 'id' | 'createdAt'>, memo: ImageMemo) {
   const saved: Omit<Product, 'id' | 'createdAt'> = { ...data }
-  if (saved.productImage && saved.productImage.startsWith('data:')) {
-    saved.productImage = await saveFromDataUrl(saved.productImage)
+  if (saved.productImage) {
+    saved.productImage = await persistImage(saved.productImage, memo)
   }
   if (saved.extraImages?.length) {
-    saved.extraImages = await Promise.all(
-      saved.extraImages.map((src) => (src.startsWith('data:') ? saveFromDataUrl(src) : Promise.resolve(src))),
-    )
+    saved.extraImages = await Promise.all(saved.extraImages.map((src) => persistImage(src, memo)))
   }
   return saved
 }
@@ -136,25 +163,35 @@ export default function Finder() {
   // and reset the fields out from under whoever is typing in them.
   const autosavedIdRef = useRef<string | null>(null)
 
+  // Photos this form has already handed to the asset store, so the same bytes
+  // are never persisted twice (see the ImageMemo note above the helper). Lives
+  // and dies with the open form, alongside `autosavedIdRef`.
+  const imageMemoRef = useRef<ImageMemo>(new Map())
+
   // Everything that WRITES this ref stays above the memoized callbacks that
   // read it — the compiler won't allow a value captured by a hook to be
   // modified afterwards, and none of these need memoizing anyway.
+
+  // Everything the open form accumulated: which row its autosaves are writing,
+  // and which photos it has already persisted.
+  const forgetFormScratch = () => {
+    autosavedIdRef.current = null
+    imageMemoRef.current = new Map()
+  }
 
   // Both of these start a fresh row: pressing Add (or opening another product)
   // with a form already open must not keep writing into the last one.
   const handleAdd = () => {
     setEditingId(null)
-    autosavedIdRef.current = null
+    forgetFormScratch()
     setShowForm(true)
   }
 
   const handleEdit = (id: string) => {
     setEditingId(id)
-    autosavedIdRef.current = null
+    forgetFormScratch()
     setShowForm(true)
   }
-
-  const forgetAutosavedId = () => { autosavedIdRef.current = null }
 
   // Autosave. Runs on a debounce from the form and on the way out of it, so
   // dropping an extra angle and clicking away can never lose the work. A
@@ -163,7 +200,7 @@ export default function Finder() {
   // Returns the row as persisted, so the form can adopt the asset refs and stop
   // re-uploading the same data URI on every pass.
   const handleAutosaveProduct = async (data: Omit<Product, 'id' | 'createdAt'>) => {
-    const saved = await persistProductImages(data)
+    const saved = await persistProductImages(data, imageMemoRef.current)
     const id = editingId ?? autosavedIdRef.current
     if (id) {
       await updateProduct(id, saved, { silent: true })
@@ -177,12 +214,12 @@ export default function Finder() {
   // be referentially stable for the React Compiler to keep their memoization.
   const closeForm = useCallback(() => {
     setEditingId(null)
-    forgetAutosavedId()
+    forgetFormScratch()
     setShowForm(false)
   }, [])
 
   const handleSaveProduct = useCallback(async (data: Omit<Product, 'id' | 'createdAt'>) => {
-    const saved = { ...(await persistProductImages(data)), confirmed: true }
+    const saved = { ...(await persistProductImages(data, imageMemoRef.current)), confirmed: true }
     const id = editingId ?? autosavedIdRef.current
     if (id) await updateProduct(id, saved)
     else await addProduct(saved)
