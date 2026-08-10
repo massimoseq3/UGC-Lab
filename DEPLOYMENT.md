@@ -31,6 +31,12 @@ model and known limitations, see [SECURITY.md](SECURITY.md).
    the `profiles`, `allowlist`, bank tables, `assets` table, RLS
    policies, and the signup trigger that gates new signups against the
    allowlist.
+   Then run every later file in `supabase/migrations/` in number order
+   (each is idempotent, so re-running one is safe). `0021_signup_code.sql`
+   is what adds the **access code** new members type on the Create account
+   form — it defaults to `3500` and you can change it any time in
+   **Admin → Allowlist** (clearing it turns the code off). Skip that
+   migration and the field still shows, but nothing checks what's typed.
 4. Add yourself to the allowlist so you can sign up:
    ```sql
    insert into public.allowlist (email, source) values ('you@example.com', 'manual');

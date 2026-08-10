@@ -106,21 +106,66 @@ export default function AllowlistEditor() {
   const [enforced, setEnforced] = useState<boolean | null>(null)
   const [enforceBusy, setEnforceBusy] = useState(false)
 
+  // Shared signup access code (public.app_config.signup_code, migration 0021).
+  // `savedCode` is what's in the database; `draftCode` is the input. null on
+  // either = the column isn't there yet (migration not run).
+  const [savedCode, setSavedCode] = useState<string | null>(null)
+  const [draftCode, setDraftCode] = useState('')
+  const [codeBusy, setCodeBusy] = useState(false)
+  const [codeSupported, setCodeSupported] = useState(true)
+
   async function loadConfig() {
     try {
       await readyAdminSession()
       const sb = getSupabase()
-      const { data, error } = await withTimeout(
-        (signal) => sb.from('app_config').select('enforce_allowlist').eq('id', true).abortSignal(signal).maybeSingle(),
+      const run = (cols: string) => withTimeout(
+        (signal) => sb.from('app_config').select(cols).eq('id', true).abortSignal(signal).maybeSingle(),
         QUERY_TIMEOUT_MS,
         'app_config query',
-      ) as { data: { enforce_allowlist: boolean } | null; error: { message: string } | null }
+      ) as Promise<{ data: { enforce_allowlist: boolean; signup_code?: string | null } | null; error: { message: string; code?: string } | null }>
+
+      let { data, error } = await run('enforce_allowlist, signup_code')
+      // Migration 0021 not applied here yet — fall back so the enforcement
+      // toggle still loads instead of the whole card reading as broken.
+      if (error && /column .* does not exist|42703/i.test(`${error.message} ${error.code ?? ''}`)) {
+        setCodeSupported(false)
+        ;({ data, error } = await run('enforce_allowlist'))
+      }
       if (error) throw error
       setEnforced(data?.enforce_allowlist ?? true)
+      const code = data?.signup_code ?? null
+      setSavedCode(code ?? '')
+      setDraftCode(code ?? '')
     } catch {
       // Leave as null — the toggle card shows a "couldn't load" hint and the
       // allowlist table below still works.
       setEnforced(null)
+    }
+  }
+
+  async function saveCode() {
+    const next = draftCode.trim()
+    if (next === (savedCode ?? '')) return
+    if (!next && !confirm('Clear the access code? Anyone who gets past the allowlist will be able to create an account without one.')) return
+    setCodeBusy(true)
+    try {
+      await readyAdminSession()
+      const sb = getSupabase()
+      const { error } = await withTimeout(
+        (signal) => sb.from('app_config')
+          .update({ signup_code: next || null, updated_at: new Date().toISOString() })
+          .eq('id', true)
+          .abortSignal(signal),
+        QUERY_TIMEOUT_MS,
+        'app_config update',
+      ) as { error: { message: string } | null }
+      if (error) throw error
+      setSavedCode(next)
+      setDraftCode(next)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : String(e))
+    } finally {
+      setCodeBusy(false)
     }
   }
 
@@ -427,6 +472,42 @@ export default function AllowlistEditor() {
         {enforced === null && (
           <p className="mt-2 text-[11px] text-ink-600">Couldn't load enforcement state — run migration 0013, then refresh.</p>
         )}
+      </div>
+
+      {/* Shared signup access code. Never shipped to the browser — the signup
+          form posts what the member typed and the trigger compares. */}
+      <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-4">
+        <div className="text-[13px] font-medium text-ink-100">Signup access code</div>
+        <p className="mt-0.5 text-[12px] text-ink-500">
+          {!codeSupported
+            ? "Not available — run migration 0021, then refresh."
+            : savedCode
+              ? 'New accounts must enter this code. Post it in the Skool community.'
+              : 'No code set — the Create account form will accept any code.'}
+        </p>
+        {codeSupported && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input
+              type="text"
+              value={draftCode}
+              onChange={(e) => setDraftCode(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') saveCode() }}
+              placeholder="Set a code"
+              className="min-w-[160px] flex-1 rounded-lg border border-ink/10 bg-ink/5 px-3 py-2 text-[12px] text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
+            />
+            <button
+              onClick={saveCode}
+              disabled={codeBusy || draftCode.trim() === (savedCode ?? '')}
+              className="flex items-center gap-1.5 rounded-lg bg-ink py-2 px-3 text-[12px] font-medium text-ink-900 transition-colors hover:bg-ink-100 disabled:opacity-60"
+            >
+              {codeBusy && <Loader2 className="h-3 w-3 animate-spin" />}
+              Save
+            </button>
+          </div>
+        )}
+        <p className="mt-2 text-[11px] text-ink-600">
+          Only affects new signups — members who already have an account sign in as usual.
+        </p>
       </div>
 
       <p className="text-[12px] text-ink-500">

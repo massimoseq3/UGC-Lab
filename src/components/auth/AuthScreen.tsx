@@ -20,6 +20,9 @@ export default function AuthScreen() {
   const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  // Shared community access code, checked server-side by the signup trigger
+  // (migration 0021). Signup only — existing members sign in as before.
+  const [signupCode, setSignupCode] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [needsConfirm, setNeedsConfirm] = useState(false)
@@ -29,7 +32,7 @@ export default function AuthScreen() {
     setError(null)
     setNeedsConfirm(false)
     if (!email.trim() || !password) return
-    if (mode === 'signup' && (!firstName.trim() || !lastName.trim())) return
+    if (mode === 'signup' && (!firstName.trim() || !lastName.trim() || !signupCode.trim())) return
     setBusy(true)
     try {
       if (mode === 'login') {
@@ -38,7 +41,7 @@ export default function AuthScreen() {
         // accessRevoked in the store), not the inline error row.
         if (!res.ok && !res.revoked) setError(res.error)
       } else {
-        const res = await signUp(email, password, firstName, lastName)
+        const res = await signUp(email, password, firstName, lastName, signupCode)
         if (!res.ok) setError(res.error)
         else if (res.needsConfirm) setNeedsConfirm(true)
         else {
@@ -137,6 +140,26 @@ export default function AuthScreen() {
               />
             </div>
 
+            {mode === 'signup' && (
+              <div>
+                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-500">
+                  Access code
+                </label>
+                <input
+                  type="text"
+                  autoComplete="off"
+                  value={signupCode}
+                  onChange={(e) => setSignupCode(e.target.value)}
+                  required
+                  className="w-full rounded-lg border border-ink/10 bg-ink/5 px-3 py-2.5 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
+                  placeholder="Code from the community"
+                />
+                <p className="mt-1 text-[11px] text-ink-600">
+                  Posted in the Skool community — ask there if you don't have it.
+                </p>
+              </div>
+            )}
+
             {error && (
               <div className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 light:text-red-700">
                 <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
@@ -153,7 +176,7 @@ export default function AuthScreen() {
 
             <button
               type="submit"
-              disabled={busy || !email.trim() || !password || (mode === 'signup' && (!firstName.trim() || !lastName.trim()))}
+              disabled={busy || !email.trim() || !password || (mode === 'signup' && (!firstName.trim() || !lastName.trim() || !signupCode.trim()))}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink py-2.5 text-sm font-medium text-ink-900 transition-colors hover:bg-ink-100 disabled:opacity-60"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -187,7 +210,7 @@ export default function AuthScreen() {
                 Already have an account?{' '}
                 <button
                   type="button"
-                  onClick={() => { setMode('login'); setError(null); setNeedsConfirm(false); setFirstName(''); setLastName('') }}
+                  onClick={() => { setMode('login'); setError(null); setNeedsConfirm(false); setFirstName(''); setLastName(''); setSignupCode('') }}
                   className="text-ink-300 transition-colors hover:text-ink"
                 >
                   Sign in
