@@ -651,7 +651,15 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 and one mode reading structurally differently to save 22px is a
                 worse trade than the 22px. Clear empties the slots (and only the
                 slots — the prompt is the member's writing, not a reference). */}
-            {hasRefsSection && (hasAnyRefSlot || state.mode === 'image') && (
+            {/* `isMotionControl` is in this gate explicitly, and has to be:
+                the model declares `modes: ['motion-control']` and no
+                `supportsReferenceImages`, so `hasAnyRefSlot` is FALSE for it.
+                Without this term the card never renders — and since Motion
+                Control's section lives inside the card, its character image and
+                driving video had nowhere to be attached, which left the model
+                impossible to run (`hasMotionInputs` can never become true).
+                Regression from #437, which added the `hasAnyRefSlot` gate. */}
+            {hasRefsSection && (hasAnyRefSlot || isMotionControl || state.mode === 'image') && (
               <SectionCard
                 icon={Layers}
                 title="References"

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, FileText } from 'lucide-react'
 import type { Script } from '../../stores/types'
 import { useBankStore } from '../../stores/bankStore'
+import SectionCard, { SectionLabel } from '../../components/SectionCard'
 
 interface ScriptFormProps {
   item?: Script | null
@@ -54,9 +55,10 @@ export default function ScriptForm({ item, onSave, onCancel }: ScriptFormProps) 
 
       {/* Two-column: tall script editor on the left, controls on the right. */}
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-        {/* Left — script editor fills the space */}
+        {/* Left — script editor fills the space. Uncarded on purpose: it's a
+            lone control, and the border is what says "these belong together". */}
         <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <span className="text-[11px] font-medium uppercase tracking-widest text-ink-500">Script Text *</span>
+          <SectionLabel label="Script text" filled={!!scriptText.trim()} required />
           <textarea
             value={scriptText}
             onChange={(e) => setScriptText(e.target.value)}
@@ -66,31 +68,35 @@ export default function ScriptForm({ item, onSave, onCancel }: ScriptFormProps) 
           />
         </label>
 
-        {/* Right — title, linked product, save (sticky on desktop) */}
-        <div className="flex w-full shrink-0 flex-col gap-4 lg:sticky lg:top-1 lg:w-72">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-medium uppercase tracking-widest text-ink-500">Title *</span>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder='e.g. "LARQ - Lazy Girl Hook"'
-              className="rounded-full border border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
-            />
-          </label>
+        {/* Right — title, linked product, save (sticky on desktop). The two
+            fields are one group, so they sit in a card; Save stays outside it,
+            the same way every panel's Generate sits outside its input card. */}
+        <div className="flex w-full shrink-0 flex-col gap-3 lg:sticky lg:top-1 lg:w-72">
+          <SectionCard icon={FileText} title="Details" contentClassName="flex flex-col gap-4">
+            <label className="flex flex-col gap-1.5">
+              <SectionLabel label="Title" filled={!!title.trim()} required />
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder='e.g. "LARQ - Lazy Girl Hook"'
+                className="rounded-full border border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
+              />
+            </label>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-medium uppercase tracking-widest text-ink-500">Linked Product</span>
-            <select
-              value={linkedProductId}
-              onChange={(e) => setLinkedProductId(e.target.value)}
-              className="rounded-full border border-ink/10 bg-surface-1 px-4 py-2.5 text-sm text-ink-200 outline-none transition-colors focus:border-ink/20"
-            >
-              <option value="">None</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>{p.productName}</option>
-              ))}
-            </select>
-          </label>
+            <label className="flex flex-col gap-1.5">
+              <SectionLabel label="Linked product" filled={!!linkedProductId} />
+              <select
+                value={linkedProductId}
+                onChange={(e) => setLinkedProductId(e.target.value)}
+                className="rounded-full border border-ink/10 bg-surface-1 px-4 py-2.5 text-sm text-ink-200 outline-none transition-colors focus:border-ink/20"
+              >
+                <option value="">None</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>{p.productName}</option>
+                ))}
+              </select>
+            </label>
+          </SectionCard>
 
           <button
             type="submit"

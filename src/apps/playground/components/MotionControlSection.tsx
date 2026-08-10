@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import { Film } from 'lucide-react'
 import VideoInputSlot, { type VideoInputValue } from '../../../components/video/VideoInputSlot'
 import { RefSlotPill, RefChip } from '../../../components/video/RefSlot'
+import { RefGroup } from '../../../components/video/refInputParts'
 import { fileToDataUri } from '../../../utils/kie'
 import { readMediaDuration } from '../../../utils/media'
 import type { BankType } from '../../../utils/constants'
@@ -74,8 +75,16 @@ export default function MotionControlSection({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center gap-1.5">
+    /* Three labelled groups, not one wrapping row of three different shapes.
+       This section sits inside Playground's References card and was the one
+       thing in it with no labels at all — its two input names were captions
+       INSIDE the empty slots, so they vanished the moment you filled them,
+       which is exactly when you want to check you filled the right one.
+       Both dots are `required` and this is the only place in Playground that
+       is true: the run refuses without both (see Playground.tsx), so an empty
+       slot here really is why nothing generates. */
+    <div className="flex flex-col gap-3">
+      <RefGroup label="Character image" filled={!!imageRef} required>
         <VideoInputSlot
           label="Character Image"
           value={imageRef ? { dataUri: imageRef.url } : null}
@@ -83,7 +92,14 @@ export default function MotionControlSection({
           bankType="models"
           tabs={MOTION_IMAGE_TABS}
         />
+      </RefGroup>
 
+      <RefGroup
+        label="Driving video"
+        filled={!!videoRef}
+        required
+        note={`≤ ${orientation === 'video' ? MAX_DRIVING_SECONDS : 10}s`}
+      >
         {videoRef ? (
           <RefChip
             icon={Film}
@@ -92,7 +108,7 @@ export default function MotionControlSection({
             onRemove={() => onChangeRefs(refs.filter((r) => r.slot !== 'motion-video'))}
           />
         ) : (
-          <RefSlotPill icon={Film} label="Driving Video" onClick={() => videoInputRef.current?.click()} />
+          <RefSlotPill icon={Film} label="Upload a clip" onClick={() => videoInputRef.current?.click()} />
         )}
         <input
           ref={videoInputRef}
@@ -104,9 +120,12 @@ export default function MotionControlSection({
             e.target.value = ''
           }}
         />
+      </RefGroup>
 
-        {/* Orientation */}
-        <div className="flex h-9 shrink-0 items-center rounded-full border border-ink/10 bg-ink/[0.02] p-0.5">
+      {/* Orientation — its own group, so it stops queueing in the run of
+          attachments as though it were one. No dot: it always holds a value. */}
+      <RefGroup label="Follow the">
+        <div className="flex h-9 w-fit items-center rounded-full border border-ink/10 bg-ink/[0.02] p-0.5">
           <button
             type="button"
             onClick={() => onChangeOrientation('video')}
@@ -130,7 +149,7 @@ export default function MotionControlSection({
             Match photo
           </button>
         </div>
-      </div>
+      </RefGroup>
 
       <p className="text-[11px] text-ink-600">
         The image sets the look, the video sets the motion.{' '}

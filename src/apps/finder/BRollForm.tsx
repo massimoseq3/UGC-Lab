@@ -5,6 +5,7 @@ import { useAssetUrl } from '../../hooks/useAssetUrl'
 import { useAppStore } from '../../stores/appStore'
 import { getAsBase64, isAssetRef } from '../../utils/assetStore'
 import { downloadImage } from '../../utils/downloadImage'
+import { SectionLabel } from '../../components/SectionCard'
 
 interface BRollFormProps {
   item?: BRoll | null
@@ -135,8 +136,12 @@ export default function BRollForm({ item, onSave, onCancel }: BRollFormProps) {
 
         {/* Right — prompt + save */}
         <div className="flex flex-1 flex-col gap-3 min-w-0">
+          {/* No card: the prompt is the only input on this side, and a border
+              around one row says nothing while costing 24px. The label picks up
+              the shared register and the dot, so the `*` stops being the one
+              thing on the row you can't see. */}
           <label className="flex flex-1 flex-col gap-1.5">
-            <span className="text-[11px] font-medium uppercase tracking-widest text-ink-500">Prompt *</span>
+            <SectionLabel label="Prompt" filled={!!prompt.trim()} required />
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}

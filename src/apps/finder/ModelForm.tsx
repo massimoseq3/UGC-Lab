@@ -8,6 +8,7 @@ import { copyToClipboard } from '../../utils/clipboard'
 // Long parameter values wrap onto several lines and the field grows to fit —
 // one shared idiom, so it can't drift from the one the product form uses.
 import AutoGrowTextarea from '../../components/AutoGrowTextarea'
+import SectionCard, { SectionLabel } from '../../components/SectionCard'
 // The influencer DNA schema (tabs → subheading groups → fields) is owned by the
 // Influencers studio. We read it here so the bank detail view groups, labels and
 // ordering stay in lockstep with the create form instead of drifting apart.
@@ -366,60 +367,57 @@ export default function ModelForm({ item, onSave, onCancel }: ModelFormProps) {
                     <h3 className="text-[11px] font-medium uppercase tracking-widest text-ink-400">{tab.label}</h3>
                     <span className="ml-1 h-px flex-1 bg-ink/5" />
                   </div>
-                  {tab.groups.map((group) => {
-                    const GroupIcon = group.icon
-                    return (
-                      <section key={group.id}>
-                        {/* Subheading — icon + title-case label + hairline, mirroring the studio form */}
-                        <div className="mb-3 flex items-center gap-1.5">
-                          {GroupIcon && <GroupIcon className="h-3.5 w-3.5 text-ink-100" />}
-                          <h4 className="text-sm font-semibold tracking-tight text-ink-100">{group.label}</h4>
-                        </div>
-                        <div className="mb-4 border-t border-ink/10" />
-                        <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-                          {group.rows.map((row) => (
-                            <div key={row.path.join('.')} className={`flex flex-col gap-0.5 ${row.wide ? 'sm:col-span-2' : ''}`}>
-                              <dt className="px-3 text-[10px] font-medium uppercase tracking-widest text-ink-500">{row.label}</dt>
-                              <dd>
-                                <AutoGrowTextarea
-                                  rows={1}
-                                  value={getAtPath(profile, row.path)}
-                                  onChange={(e) => setProfileField(row.path, e.target.value)}
-                                  className="w-full resize-none overflow-hidden rounded-2xl border border-transparent bg-transparent px-3 py-1.5 text-sm leading-snug text-ink-200 outline-none transition-colors hover:bg-ink/[0.04] focus:border-ink/15 focus:bg-ink/[0.04]"
-                                />
-                              </dd>
-                            </div>
-                          ))}
-                        </dl>
-                      </section>
-                    )
-                  })}
-                </div>
-              ))}
-
-              {/* Profile fields not part of the current schema — never silently dropped. */}
-              {other.length > 0 && (
-                <section>
-                  <div className="mb-3 flex items-center gap-1.5">
-                    <h4 className="text-sm font-semibold tracking-tight text-ink-100">Other</h4>
-                  </div>
-                  <div className="mb-4 border-t border-ink/10" />
-                  <dl className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
-                    {other.map((row) => (
-                      <div key={row.path.join('.')} className="flex flex-col gap-0.5">
-                        <dt className="px-3 text-[10px] font-medium uppercase tracking-widest text-ink-500">{row.label}</dt>
-                        <dd>
+                  {/* One card per DNA group. The heading was already the right
+                      shape — icon + title + hairline, taken from the studio
+                      form — but left-aligned and with no card around it, so the
+                      Bank's view of a character read differently to the column
+                      that made it. Centring it and closing the border is the
+                      whole change; the fields are untouched. */}
+                  {tab.groups.map((group) => (
+                    <SectionCard
+                      key={group.id}
+                      icon={group.icon}
+                      title={group.label}
+                      contentClassName="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2"
+                    >
+                      {group.rows.map((row) => (
+                        <div key={row.path.join('.')} className={`flex flex-col gap-0.5 ${row.wide ? 'sm:col-span-2' : ''}`}>
+                          <div className="px-3">
+                            {/* No dots anywhere in this form: every DNA field is
+                                the same kind of optional and nothing here gates
+                                a save, so a column of them would be decoration. */}
+                            <SectionLabel label={row.label} />
+                          </div>
                           <AutoGrowTextarea
                             rows={1}
                             value={getAtPath(profile, row.path)}
                             onChange={(e) => setProfileField(row.path, e.target.value)}
                             className="w-full resize-none overflow-hidden rounded-2xl border border-transparent bg-transparent px-3 py-1.5 text-sm leading-snug text-ink-200 outline-none transition-colors hover:bg-ink/[0.04] focus:border-ink/15 focus:bg-ink/[0.04]"
                           />
-                        </dd>
+                        </div>
+                      ))}
+                    </SectionCard>
+                  ))}
+                </div>
+              ))}
+
+              {/* Profile fields not part of the current schema — never silently dropped. */}
+              {other.length > 0 && (
+                <SectionCard title="Other" contentClassName="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2">
+                  {other.map((row) => (
+                    <div key={row.path.join('.')} className="flex flex-col gap-0.5">
+                      <div className="px-3">
+                        <SectionLabel label={row.label} />
                       </div>
-                    ))}
-                  </dl>
-                </section>
+                      <AutoGrowTextarea
+                        rows={1}
+                        value={getAtPath(profile, row.path)}
+                        onChange={(e) => setProfileField(row.path, e.target.value)}
+                        className="w-full resize-none overflow-hidden rounded-2xl border border-transparent bg-transparent px-3 py-1.5 text-sm leading-snug text-ink-200 outline-none transition-colors hover:bg-ink/[0.04] focus:border-ink/15 focus:bg-ink/[0.04]"
+                      />
+                    </div>
+                  ))}
+                </SectionCard>
               )}
             </div>
           )}

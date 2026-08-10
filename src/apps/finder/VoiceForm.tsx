@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, Mic, SlidersHorizontal } from 'lucide-react'
 import type { VoicePreset } from '../../stores/types'
 import { VOICES, DEFAULT_VOICE_SETTINGS, VOICE_STYLES, VOICE_PACES, VOICE_ACCENTS } from '../voice-studio/types'
+import SectionCard, { SectionLabel } from '../../components/SectionCard'
 
 interface VoiceFormProps {
   item?: VoicePreset | null
@@ -70,36 +71,45 @@ export default function VoiceForm({ item, onSave, onCancel }: VoiceFormProps) {
         </button>
       </div>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-[11px] font-medium uppercase tracking-widest text-ink-500">Label *</span>
-        <input
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder={`e.g. "Punchy hook voice"`}
-          className="rounded-lg border border-ink/10 bg-transparent px-3 py-2 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
-        />
-      </label>
+      {/* Two cards then two bare extras — the exact shape of the Voiceovers side
+          panel this form edits the presets for, so a preset reads the same way
+          wherever you meet it. Only Label carries a dot: it's what gates Save,
+          while the voice and the three delivery controls always hold a value,
+          and a permanent row of green dots teaches you to stop reading dots. */}
+      <SectionCard icon={Mic} title="Voice" contentClassName="flex flex-col gap-3">
+        <label className="flex flex-col gap-1.5">
+          <SectionLabel label="Label" filled={!!label.trim()} required />
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder={`e.g. "Punchy hook voice"`}
+            className="rounded-full border border-ink/10 bg-transparent px-3.5 py-2 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
+          />
+        </label>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-[11px] font-medium uppercase tracking-widest text-ink-500">Voice *</span>
-        <select
-          value={voiceId}
-          onChange={(e) => setVoiceId(e.target.value)}
-          className="rounded-lg border border-ink/10 bg-surface-1 px-3 py-2 text-sm text-ink-200 outline-none focus:border-ink/20"
-        >
-          {VOICES.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.name} · {v.category} · {v.description}
-            </option>
-          ))}
-        </select>
-      </label>
+        <label className="flex flex-col gap-1.5">
+          <SectionLabel label="Voice" />
+          <select
+            value={voiceId}
+            onChange={(e) => setVoiceId(e.target.value)}
+            className="rounded-full border border-ink/10 bg-surface-1 px-3.5 py-2 text-sm text-ink-200 outline-none focus:border-ink/20"
+          >
+            {VOICES.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name} · {v.category} · {v.description}
+              </option>
+            ))}
+          </select>
+        </label>
+      </SectionCard>
 
-      <div className="grid grid-cols-3 gap-2">
-        <SelectField label="Style" value={style} options={VOICE_STYLES} onChange={setStyle} />
-        <SelectField label="Pace" value={pace} options={VOICE_PACES} onChange={setPace} />
-        <SelectField label="Accent" value={accent} options={VOICE_ACCENTS} onChange={setAccent} />
-      </div>
+      <SectionCard icon={SlidersHorizontal} title="Delivery">
+        <div className="grid grid-cols-3 gap-2">
+          <SelectField label="Style" value={style} options={VOICE_STYLES} onChange={setStyle} />
+          <SelectField label="Pace" value={pace} options={VOICE_PACES} onChange={setPace} />
+          <SelectField label="Accent" value={accent} options={VOICE_ACCENTS} onChange={setAccent} />
+        </div>
+      </SectionCard>
 
       <TextAreaField
         label="Scene"
@@ -138,10 +148,14 @@ function TextAreaField({
   onChange: (value: string) => void
 }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium uppercase tracking-widest text-ink-500">
-        {label} <span className="normal-case tracking-normal text-ink-600">· optional</span>
-      </span>
+    <label className="flex flex-col gap-1.5">
+      {/* Bare, under the cards — the two extras, same as the Voiceovers panel.
+          A neutral dot, because these are the only optional inputs here. */}
+      <SectionLabel
+        label={label}
+        filled={!!value.trim()}
+        right={<span className="text-[10px] tracking-tight text-ink-600">optional</span>}
+      />
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -166,12 +180,12 @@ function SelectField({
   onChange: (value: string) => void
 }) {
   return (
-    <label className="flex flex-col gap-1">
-      <span className="text-[11px] font-medium uppercase tracking-widest text-ink-500">{label}</span>
+    <label className="flex flex-col gap-1.5">
+      <SectionLabel label={label} />
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-lg border border-ink/10 bg-surface-1 px-2.5 py-2 text-sm text-ink-200 outline-none focus:border-ink/20"
+        className="rounded-full border border-ink/10 bg-surface-1 px-2.5 py-2 text-sm text-ink-200 outline-none focus:border-ink/20"
       >
         {options.map((o) => (
           <option key={o} value={o}>{o}</option>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Loader2, Download, Bookmark, Check, ImagePlus, Wand2, LayoutGrid, Pencil, Upload, FolderOpen, Copy, Maximize2, Coins, Palette, ChevronRight } from 'lucide-react'
+import { X, Loader2, Download, Bookmark, Check, ImagePlus, Wand2, LayoutGrid, Pencil, Upload, FolderOpen, Copy, Maximize2, Coins, Palette, ChevronRight, Layers, Eraser } from 'lucide-react'
+import SectionCard, { SectionLabel } from '../../../components/SectionCard'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import { useSettingsStore } from '../../../stores/settingsStore'
@@ -551,12 +552,44 @@ export default function InfluencerEditModal({
                 instruction you set up carry across either way. */}
             <div className="flex grow flex-col gap-3 px-5 pb-1 pt-5">
                 <>
-                  {/* Reference images — Playground-style: picked thumbnails in a
-                      four-up strip above a full-width dashed add card (Optional
-                      badge left, count right, centered icon + label). */}
-                  <div>
-                    {refs.length > 0 && (
-                      <div className="mb-2 grid grid-cols-4 gap-2">
+                  {/* Everything this render is built FROM, in the References
+                      card the controls column three metres to the left has worn
+                      since #437 — this panel was the one surface in Characters
+                      that never got it. The reference thumbnails and the visual
+                      style were two unlabelled affordances stacked on each
+                      other, which is why the add card had to pin `Optional` and
+                      its count into its own corners: there was no header to put
+                      them on. */}
+                  <SectionCard
+                    icon={Layers}
+                    title="References"
+                    contentClassName="flex flex-col gap-3"
+                    right={refs.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setRefs([])}
+                        title="Remove every attached reference"
+                        className="flex items-center gap-1 rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-300"
+                      >
+                        <Eraser className="h-2.5 w-2.5" strokeWidth={2.5} />
+                        Clear
+                      </button>
+                    ) : undefined}
+                  >
+                    {/* The add tile joins the grid rather than sitting as a slab
+                        under it — the Playground `RefTiles` shape. On a
+                        reference image the PICTURE is the point, so they stay
+                        square thumbnails and take no status dot. */}
+                    <div className="flex flex-col gap-1.5">
+                      <SectionLabel
+                        label="Reference images"
+                        right={(
+                          <span className="text-[10px] tabular-nums tracking-tight text-ink-600">
+                            {refs.length}/{MAX_REFS}
+                          </span>
+                        )}
+                      />
+                      <div className="grid grid-cols-4 gap-2">
                         {refs.map((r, i) => (
                           <div key={i} className="relative aspect-square w-full overflow-hidden rounded-xl border border-ink/10 bg-ink/[0.02]">
                             <img src={r.url} alt="" className="h-full w-full object-cover" />
@@ -570,74 +603,67 @@ export default function InfluencerEditModal({
                             </button>
                           </div>
                         ))}
+                        {refs.length < MAX_REFS && (
+                          <div className="relative aspect-square w-full" onMouseEnter={openRefMenu} onMouseLeave={closeRefMenuSoon}>
+                            <button
+                              type="button"
+                              onClick={() => setRefMenuOpen((v) => !v)}
+                              title="Add a reference image"
+                              className="group flex h-full w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-ink/15 bg-ink/[0.02] transition-colors hover:border-ink/25 hover:bg-ink/[0.04]"
+                            >
+                              <ImagePlus className="h-4 w-4 text-ink-500 transition-colors group-hover:text-ink-200" />
+                            </button>
+                            {refMenuOpen && (
+                              <div
+                                className="absolute left-0 top-full z-[62] mt-1 w-40 overflow-hidden rounded-xl border border-ink/10 bg-surface-2/95 p-1 shadow-xl backdrop-blur-xl"
+                                onMouseEnter={openRefMenu}
+                                onMouseLeave={closeRefMenuSoon}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => { setRefMenuOpen(false); fileInputRef.current?.click() }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] text-ink-300 transition-colors hover:bg-ink/[0.06]"
+                                >
+                                  <Upload className="h-3.5 w-3.5" />
+                                  Upload Image
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => { setRefMenuOpen(false); setBankPickerOpen(true) }}
+                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] text-ink-300 transition-colors hover:bg-ink/[0.06]"
+                                >
+                                  <FolderOpen className="h-3.5 w-3.5" />
+                                  Pick from Bank
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <div className="relative" onMouseEnter={openRefMenu} onMouseLeave={closeRefMenuSoon}>
-                      <button
-                        type="button"
-                        disabled={refs.length >= MAX_REFS}
-                        onClick={() => { if (refs.length < MAX_REFS) setRefMenuOpen((v) => !v) }}
-                        className={`group relative flex h-20 w-full flex-col items-center justify-center gap-1.5 rounded-2xl border border-dashed border-ink/15 bg-ink/[0.02] transition-colors ${
-                          refs.length >= MAX_REFS ? 'cursor-not-allowed opacity-50' : 'hover:border-ink/25 hover:bg-ink/[0.04]'
-                        }`}
-                      >
-                        <span className="absolute left-2 top-2 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[9px] font-medium capitalize tracking-tight text-ink-500">
-                          Optional
-                        </span>
-                        <span className="absolute right-2 top-2 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[9px] font-medium tabular-nums tracking-tight text-ink-500">
-                          {refs.length}/{MAX_REFS}
-                        </span>
-                        <span className="flex h-8 w-8 items-center justify-center rounded-full border border-ink/15 bg-ink/[0.03] text-ink-400 transition-colors group-hover:text-ink-200">
-                          <ImagePlus className="h-3.5 w-3.5" />
-                        </span>
-                        <span className="text-[12px] font-normal text-ink-500">Reference images</span>
-                      </button>
-                      {refMenuOpen && refs.length < MAX_REFS && (
-                        <div
-                          className="absolute left-0 top-full z-[62] mt-1 w-40 overflow-hidden rounded-xl border border-ink/10 bg-surface-2/95 p-1 shadow-xl backdrop-blur-xl"
-                          onMouseEnter={openRefMenu}
-                          onMouseLeave={closeRefMenuSoon}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => { setRefMenuOpen(false); fileInputRef.current?.click() }}
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] text-ink-300 transition-colors hover:bg-ink/[0.06]"
-                          >
-                            <Upload className="h-3.5 w-3.5" />
-                            Upload Image
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setRefMenuOpen(false); setBankPickerOpen(true) }}
-                            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] text-ink-300 transition-colors hover:bg-ink/[0.06]"
-                          >
-                            <FolderOpen className="h-3.5 w-3.5" />
-                            Pick from Bank
-                          </button>
-                        </div>
-                      )}
+                      <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handlePickFiles} />
                     </div>
-                    <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handlePickFiles} />
-                  </div>
 
-                  {/* Edit instruction — grows to absorb leftover height.
-                      Textarea + a footer toolbar (Expand) inside one rounded
-                      box, matching the Playground prompt field. */}
-                  <div className="flex grow flex-col">
-                    <div className="relative flex grow flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
-                      {/* Visual Style — a header row inside the prompt box,
-                          mirroring the Playground's UGC Prompt Preset row. It
-                          rides ON TOP of whatever is typed below, so it reads
-                          as part of the instruction rather than a separate
-                          setting. Neutral until a look other than the default
-                          is picked. */}
+                    {/* Visual Style — LIFTED OUT of the prompt box (August 2026).
+                        It rode inside it, as a header row on top of whatever was
+                        typed below, so it read as part of the instruction. B-Roll
+                        made the opposite call for its own style row: the look is
+                        something the render is built FROM, like the reference
+                        photos, so it belongs with them and the prompt box goes
+                        back to being only a prompt box. The two apps now agree. */}
+                    <div className="flex flex-col gap-1.5">
+                      {/* No dot, and neither has the group above: nothing in this
+                          card gates Generate (the base image does, and that's on
+                          the right), so every dot here could only ever be green
+                          or neutral — decoration. Leaving both bare also keeps
+                          the two labels on one left edge. */}
+                      <SectionLabel label="Visual style" />
                       <button
                         type="button"
                         onClick={() => setStyleModalOpen(true)}
-                        className={`flex w-full shrink-0 items-center gap-3 border-b border-dashed px-3.5 py-3 text-left transition-colors ${
+                        className={`group flex h-[58px] w-full items-center gap-3 rounded-full border px-4 text-left transition-colors ${
                           styleActive
                             ? 'border-influencers-500/30 bg-influencers-500/10 hover:bg-influencers-500/[0.16]'
-                            : 'border-ink/10 hover:bg-ink/[0.04]'
+                            : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-influencers-500/30 hover:bg-influencers-500/5'
                         }`}
                       >
                         <span
@@ -672,6 +698,16 @@ export default function InfluencerEditModal({
                           <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
                         )}
                       </button>
+                    </div>
+                  </SectionCard>
+
+                  {/* Edit instruction — grows to absorb leftover height.
+                      Textarea + a footer toolbar (Expand) inside one rounded
+                      box, matching the Playground prompt field. */}
+                  <div className="flex grow flex-col">
+                    <div className="relative flex grow flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
+                      {/* Only a prompt box now — the Visual Style row that used
+                          to head it lives in the References card above. */}
                       <textarea
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
