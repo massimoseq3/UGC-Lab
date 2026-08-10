@@ -302,30 +302,6 @@ export default function InputPanel({
           16px of column padding plus the band's own top padding opened a gap
           twice the 8px the reference cards sit apart. */}
       <div className="flex flex-1 flex-col px-5 pb-2 pt-3 md:overflow-y-auto">
-        {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
-            card silent, for a voiceover laid over in the edit; "With Dialogue"
-            makes all three the character speaking that line, staged three
-            different ways. It leads the column, above the References heading:
-            it decides what KIND of storyboard the references are gathered for,
-            so it reads as a second mode switch under the mode toggle rather
-            than a setting at the far end of the panel. (It sat last, directly
-            above Generate, until August 2026.) Continuous has no deliveries —
-            it's narration over footage — so it isn't rendered there at all. */}
-        {isLineMode(mode) && (
-          <div className="mb-2">
-            <SegmentedToggle<BrollDelivery>
-              className="h-12 !p-1"
-              value={lineDelivery}
-              onChange={onLineDeliveryChange}
-              accent="broll"
-              options={[
-                { value: 'silent', label: 'B-Roll Clips' },
-                { value: 'dialogue', label: 'With Dialogue' },
-              ]}
-            />
-          </div>
-        )}
-
         {/* "References" label + the panel-level New reset. It sits here rather
             than in the header band because the three-way mode toggle already
             fills that row in this narrow (25%) pane. */}
@@ -547,6 +523,27 @@ export default function InputPanel({
               column, Visual Style now among them. */}
           <ScriptModelRow appId="broll-studio" className="" />
 
+          {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
+              card silent, for a voiceover laid over in the edit; "With
+              Dialogue" makes all three the character speaking that line, staged
+              three different ways. It sits LAST, under the model row and
+              directly above Generate: it's the switch you'd flip on your way to
+              firing, and it changes what comes back more than the row above it.
+              (It led the column above References for a day in August 2026 and
+              came back here.) Continuous has no deliveries — it's narration
+              over footage — so the toggle isn't rendered there at all. */}
+          {isLineMode(mode) && (
+            <SegmentedToggle<BrollDelivery>
+              className="h-12 !p-1"
+              value={lineDelivery}
+              onChange={onLineDeliveryChange}
+              accent="broll"
+              options={[
+                { value: 'silent', label: 'B-Roll Clips' },
+                { value: 'dialogue', label: 'With Dialogue' },
+              ]}
+            />
+          )}
 
         </div>
 
