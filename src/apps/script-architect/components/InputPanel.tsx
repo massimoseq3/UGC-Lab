@@ -992,12 +992,14 @@ export default function InputPanel({
         subtitle="What kind of content the ad looks like — and how it's built"
         size="wide"
       >
-        {/* Two sections: Structures (how the argument is built) and Formats
-            (the kind of content the ad imitates). Formats also stage the shots
-            in the Scenes output, so they're worth telling apart at the picker.
-            Shared with B-Roll, which picks from the same list. */}
+        {/* Two sections: Structures (how the argument is built) on top, then
+            Formats (the kind of content the ad imitates). Structures lead HERE
+            because the question this app is asking is how the argument is
+            built; B-Roll passes `formatsFirst` and leads with Formats, since
+            it's picking the kind of ad to shoot and a format is the half that
+            stages the shots. Same list either way — only the reading order
+            differs, and the component is shared so the slugs can't drift. */}
         <ScriptStyleList
-          formatsFirst
           value={styleChosen ? writeStyle : null}
           onSelect={(style) => { onWriteStyleChange(style); setStyleChosen(true); setStyleSlideOpen(false) }}
         />

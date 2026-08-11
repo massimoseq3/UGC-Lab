@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Copy, Check, Bookmark, ArrowUpRight, Mic, Film, PenLine, AlertCircle, ImagePlay, Pencil, X, Undo2, Redo2, Quote } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import GridCanvas from '../../../components/GridCanvas'
@@ -39,6 +39,20 @@ const SCENE_REGEX = /(^|\n)\s*(?:---\s*)?scene\s*\d+\s*[—:–-]/i
 interface SceneChunk {
   header: string
   body: string
+  // Where `body` sits in the text this chunk was parsed from, as character
+  // offsets. This is what makes editing a scene IN PLACE exact: a rendered
+  // block knows the span it came from, so committing an edit is a splice rather
+  // than a search-and-replace (two scenes can share a sentence) or a
+  // reconstruction (the parse trims, strips and filters — it doesn't round-trip).
+  bodyStart: number
+  bodyEnd: number
+}
+
+// What `splitHeaderLine` returns: the header/body split of ONE line, before
+// splitScenes places it in the document.
+interface HeaderSplit {
+  header: string
+  body: string
 }
 
 const HEADER_PARTS = /^(?:---\s*)?scene\s*\d+\s*[—:–-]\s*(.*)$/i
@@ -48,14 +62,14 @@ const HEADER_PARTS = /^(?:---\s*)?scene\s*\d+\s*[—:–-]\s*(.*)$/i
 // Treating the whole line as the header dropped that prose, and a scene whose
 // body came out empty was then filtered away entirely, so a blueprint of
 // single-line scenes rendered as a card reading "0 scenes".
-function splitHeaderLine(line: string): SceneChunk {
+function splitHeaderLine(line: string): HeaderSplit {
   const trimmed = line.trim()
   // The canonical "--- Scene 1: THE HOOK (00:00-00:04) ---" is a label only.
   if (/---\s*$/.test(trimmed)) return { header: trimmed, body: '' }
   const parts = HEADER_PARTS.exec(trimmed)
   if (!parts) return { header: trimmed, body: '' }
   const rest = parts[1]
-  const cut = (bodyText: string): SceneChunk => ({
+  const cut = (bodyText: string): HeaderSplit => ({
     header: trimmed.slice(0, trimmed.length - bodyText.length).replace(/[\s:]+$/, ''),
     body: bodyText,
   })
@@ -74,17 +88,33 @@ function splitScenes(text: string): SceneChunk[] | null {
   const lines = text.split('\n')
   const chunks: SceneChunk[] = []
   let current: SceneChunk | null = null
+  // Running character offset of the current line's first character. `text` is
+  // split on '\n' and rejoined with '\n', so line length + 1 is exact.
+  let offset = 0
   for (const line of lines) {
+    const lineStart = offset
+    offset += line.length + 1
     if (SCENE_HEADER.test(line.trim())) {
       if (current) chunks.push(current)
-      current = splitHeaderLine(line)
+      const split = splitHeaderLine(line)
+      // A header that carries its own prose ("SCENE 2 — B-ROLL DETAIL: …")
+      // starts the body mid-line; a label-only header starts it on the next.
+      const bodyStart = split.body ? lineStart + line.indexOf(split.body) : offset
+      current = { ...split, bodyStart, bodyEnd: bodyStart + split.body.length }
     } else if (current) {
       current.body += (current.body ? '\n' : '') + line
+      current.bodyEnd = lineStart + line.length
     }
   }
   if (current) chunks.push(current)
   return chunks
-    .map((c) => ({ ...c, body: c.body.trim() }))
+    .map((c) => {
+      // The trim has to move the span with it, or an edit would splice the
+      // surrounding blank lines away along with the body.
+      const lead = c.body.length - c.body.trimStart().length
+      const body = c.body.trim()
+      return { ...c, body, bodyStart: c.bodyStart + lead, bodyEnd: c.bodyStart + lead + body.length }
+    })
     .filter((c) => c.body.length > 0)
 }
 
@@ -138,9 +168,12 @@ function splitVoiceProfile(text: string): { body: string; rest: string } {
 // The quoted words are the only part the member reads aloud, records, and sends
 // to Voiceovers, so they're lifted out of the direction rather than left as the
 // tail clause of a paragraph about lens height.
+// `start`/`end` are offsets into the BODY this segment was split out of — the
+// other half of the in-place edit. Add the chunk's own `bodyStart` and you have
+// the exact span of the take text that one rendered block owns.
 type SceneSegment =
-  | { kind: 'direction'; text: string }
-  | { kind: 'line'; speaker: string | null; text: string }
+  | { kind: 'direction'; text: string; start: number; end: number }
+  | { kind: 'line'; speaker: string | null; text: string; start: number; end: number }
 
 const SPEECH_VERB_SRC = 'says?|said|adds?|continues?|whispers?|shouts?|asks?|replies'
 // The clause that hands off to a quote, anchored to the end of the preceding
@@ -180,12 +213,27 @@ function splitSpokenLines(body: string): SceneSegment[] {
       .slice(0, (named ?? bare)!.index)
       .replace(TRAILING_CONNECTIVE, '')
       .replace(/^[\s,;:]+|[\s,;:]+$/g, '')
-    if (direction) segments.push({ kind: 'direction', text: direction })
-    segments.push({ kind: 'line', speaker, text: match[1].trim() })
+    // Every step above only strips from the ENDS of a prefix of `before`, so
+    // the survivor is one contiguous run and indexOf finds its true offset —
+    // it can't match earlier, since a direction never begins with the
+    // whitespace/punctuation that was stripped off its front.
+    if (direction) {
+      const at = cursor + before.indexOf(direction)
+      segments.push({ kind: 'direction', text: direction, start: at, end: at + direction.length })
+    }
+    // The span is the quoted WORDS, inside the quote marks, so an edit can't
+    // delete the quotes the parser finds the line by.
+    const raw = match[1]
+    const lineStart = match.index + 1 + (raw.length - raw.trimStart().length)
+    segments.push({ kind: 'line', speaker, text: raw.trim(), start: lineStart, end: lineStart + raw.trim().length })
     cursor = match.index + match[0].length
   }
-  const tail = body.slice(cursor).replace(/^[\s,;:]+|[\s,;:]+$/g, '')
-  if (tail) segments.push({ kind: 'direction', text: tail })
+  const rest = body.slice(cursor)
+  const tail = rest.replace(/^[\s,;:]+|[\s,;:]+$/g, '')
+  if (tail) {
+    const at = cursor + rest.indexOf(tail)
+    segments.push({ kind: 'direction', text: tail, start: at, end: at + tail.length })
+  }
   return segments
 }
 
@@ -216,7 +264,7 @@ function TokenText({ text }: { text: string }) {
 
 // The spoken line — the thing that gets read aloud. Tinted, set at reading
 // size, and separately copyable, because it's what leaves this app.
-function SpokenLine({ speaker, text }: { speaker: string | null; text: string }) {
+function SpokenLine({ speaker, text, onChange }: { speaker: string | null; text: string; onChange?: (next: string) => void }) {
   const [copied, setCopied] = useState(false)
   const addToast = useAppStore((s) => s.addToast)
   const handleCopy = async () => {
@@ -237,7 +285,21 @@ function SpokenLine({ speaker, text }: { speaker: string | null; text: string })
           {speaker.replace(/^\[|\]$/g, '').toLowerCase()}
         </div>
       )}
-      <p className="text-[15px] font-light leading-snug tracking-tight text-ink-100">“{text}”</p>
+      {/* The quote marks sit OUTSIDE the field, and the span the edit writes
+          back is the words between them — so retyping the line can't delete the
+          quotes the scene parser finds it by. */}
+      <div className="flex items-start gap-0.5 text-[15px] font-light leading-snug tracking-tight text-ink-100">
+        <span aria-hidden className="select-none">“</span>
+        <EditableText
+          value={text}
+          onCommit={onChange}
+          singleLine
+          ariaLabel="Spoken line"
+          className="min-w-0 flex-1 text-[15px] font-light leading-snug tracking-tight text-ink-100"
+          render={<p className="min-w-0 flex-1 text-[15px] font-light leading-snug tracking-tight text-ink-100">{text}</p>}
+        />
+        <span aria-hidden className="select-none">”</span>
+      </div>
       <button
         onClick={handleCopy}
         title="Copy line"
@@ -320,6 +382,22 @@ function VariationCard({
   // Hooks: the raw text carries <FAMILY> tags — parse them into rows, and use
   // the clean spoken lines for copy / save-to-bank.
   const hooks = useMemo<ParsedHook[] | null>(() => (isHooks ? parseHooks(text) : null), [text, isHooks])
+
+  // The plain-script shape, each line with its offset in the take — the span an
+  // in-place edit writes back to.
+  // A plain loop, not a map over a closed-over counter: reassigning a captured
+  // variable from inside a render callback is what the compiler lint calls
+  // "reassign after render completes", and it's right — the accumulator would
+  // outlive the render that built it.
+  const scriptLines = useMemo(() => {
+    const out: Array<{ line: string; start: number }> = []
+    let at = 0
+    for (const line of text.split('\n')) {
+      out.push({ line, start: at })
+      at += line.length + 1
+    }
+    return out
+  }, [text])
   const shareText = isHooks ? hooksPlainText(text) : text
 
   // A plain spoken script (remix variation, or a write-mode 'script' output)
@@ -365,12 +443,29 @@ function VariationCard({
   // or DELETE a line, which is why its button survives here.
   const editHookLine = (index: number, next: string) => {
     if (!hooks) return
-    const rebuilt = hooksToText(hooks.map((h, i) => (i === index ? { ...h, text: next } : h)))
+    commitText(hooksToText(hooks.map((h, i) => (i === index ? { ...h, text: next } : h))))
+  }
+
+  // Push a rewritten take through the same commit path (and the same undo
+  // stack) the raw editor uses, so every way of editing this card is
+  // interchangeable and Undo steps back through all of them.
+  const commitText = (rebuilt: string) => {
     if (rebuilt === text) return
     const nextHistory = [...history.slice(0, histIndex + 1), rebuilt]
     setHistory(nextHistory)
     setHistIndex(nextHistory.length - 1)
     applyText(rebuilt)
+  }
+
+  // Splice one span of the take text — the primitive behind every in-place
+  // edit outside the hooks pack. The span comes from the parse (a scene's
+  // `bodyStart` plus a segment's own offset, or a script line's position), so
+  // this never has to find anything: it writes back exactly the characters the
+  // block on screen was rendered from. The bounds check is belt and braces
+  // against a stale span surviving one render past a text change.
+  const replaceRange = (start: number, end: number, next: string) => {
+    if (start < 0 || end > text.length || start > end) return
+    commitText(text.slice(0, start) + next + text.slice(end))
   }
 
   const handleUndo = () => {
@@ -467,12 +562,17 @@ function VariationCard({
         </div>
         {onEdit && !editing && (
           <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
+            {/* The raw take, in one box. No longer how you fix a typo — every
+                block on the card below is its own field now — but still the
+                only way to ADD or DELETE a scene, a line or a paragraph, which
+                is exactly the reason the hooks pack kept this button too. */}
             <button
               onClick={startEdit}
+              title="Edit the whole take as raw text — for adding or removing scenes and lines"
               className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
             >
               <Pencil className="h-3 w-3" />
-              Edit
+              Raw
             </button>
             <button
               onClick={handleUndo}
@@ -534,7 +634,9 @@ function VariationCard({
         ) : scenes ? (
           <>
             {voiceProfile && <VoiceProfileCard body={voiceProfile} />}
-            {scenes.map((scene, i) => <SceneChunkCard key={i} chunk={scene} />)}
+            {scenes.map((scene, i) => (
+              <SceneChunkCard key={i} chunk={scene} onEditRange={onEdit ? replaceRange : undefined} />
+            ))}
           </>
         ) : mode === 'reverse-engineer' ? (
           <pre className="whitespace-pre-wrap font-mono text-xs leading-relaxed tracking-tight text-ink-100">
@@ -544,11 +646,24 @@ function VariationCard({
           // Each source line is its own paragraph: normal line-height within a
           // (wrapped) sentence, a slight gap between sentences. No `font-sans`
           // — that falls back to system-ui; we want the inherited Geist.
+          // Each one is also the field that edits it — the line IS the editor,
+          // and the span it writes back is its own position in the take, so a
+          // sentence repeated twice in a script can't overwrite its twin.
           <div className="flex flex-col gap-2 text-sm font-light leading-normal tracking-tight text-ink-100">
-            {text.split('\n').map((line, i) =>
+            {scriptLines.map(({ line, start }, i) =>
               line.trim() === ''
                 ? <div key={i} aria-hidden className="h-1.5" />
-                : <p key={i}>{line}</p>
+                : (
+                  <EditableText
+                    key={i}
+                    value={line}
+                    onCommit={onEdit ? (next) => replaceRange(start, start + line.length, next) : undefined}
+                    singleLine
+                    ariaLabel={`Line ${i + 1}`}
+                    className="text-sm font-light leading-normal tracking-tight text-ink-100"
+                    render={<p>{line}</p>}
+                  />
+                )
             )}
           </div>
         )}
@@ -690,6 +805,117 @@ function VoiceProfileCard({ body }: { body: string }) {
   )
 }
 
+// The in-place editor every output block uses: a textarea styled as the prose
+// it replaces, with no chrome until you're in it (a hover tint says "editable"
+// without printing a box around every line). There is no edit MODE to enter —
+// you click the words and type, which is the whole point. The header's raw Edit
+// button survives as the escape hatch, because a single box over the take text
+// is still the only way to ADD or DELETE a scene, a line, or a hook.
+//
+// Two shapes, and the rule is what the read-only render adds:
+//   • default — the field is always on. Used wherever the rendered block is
+//     plain text (a hook, a spoken line, a script paragraph), where a field
+//     that looks identical to the paragraph costs nothing.
+//   • `clickToEdit` — `render` shows until you click it, then the field swaps
+//     in. Used for scene direction, whose render tints [CHARACTER] / [PRODUCT]
+//     tokens; an always-on field would trade that away permanently to save one
+//     click on the rare occasion you're rewriting the prose.
+// `render` also IS the read-only rendering when no `onCommit` is given, so a
+// card without an edit handler looks exactly as it did before.
+function EditableText({
+  value,
+  onCommit,
+  className,
+  ariaLabel,
+  singleLine = false,
+  clickToEdit = false,
+  render,
+}: {
+  value: string
+  // Omitted → read-only. A card with no edit handler renders exactly as before.
+  onCommit?: (next: string) => void
+  className: string
+  ariaLabel: string
+  // Enter commits instead of breaking the text in two, and anything pasted in
+  // is flattened. For a hook or a spoken line, which are one line by definition.
+  singleLine?: boolean
+  clickToEdit?: boolean
+  render?: ReactNode
+}) {
+  const [draft, setDraft] = useState(value)
+  const [sync, setSync] = useState(value)
+  const [open, setOpen] = useState(false)
+  // Escape has to be able to cancel WITHOUT the blur it triggers committing the
+  // draft it just discarded — setDraft is async, so `commit` would still read
+  // the typed value. A ref is the only thing that's already updated by then.
+  const reverting = useRef(false)
+  if (value !== sync) {
+    setSync(value)
+    setDraft(value)
+  }
+
+  if (!onCommit) return <>{render ?? value}</>
+
+  const commit = () => {
+    setOpen(false)
+    if (reverting.current) {
+      reverting.current = false
+      setDraft(value)
+      return
+    }
+    const next = singleLine ? draft.replace(/\s+/g, ' ').trim() : draft.trim()
+    // An emptied block reverts rather than committing: prose that vanishes as
+    // you clear it reads as the row deleting itself, and deleting is the raw
+    // editor's job.
+    if (!next) {
+      setDraft(value)
+      return
+    }
+    if (next !== draft) setDraft(next)
+    if (next !== value) onCommit(next)
+  }
+
+  if (clickToEdit && render && !open) {
+    return (
+      <div
+        role="button"
+        tabIndex={0}
+        title="Click to edit"
+        onClick={() => setOpen(true)}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setOpen(true) } }}
+        // Only the hover affordance — `className` styles the FIELD, and the
+        // read-only node already carries its own look. Applying both wrapped a
+        // scene prompt's tinted box inside an identical second one.
+        className="-mx-1 -my-0.5 cursor-text rounded-lg px-1 py-0.5 transition-colors hover:bg-ink/[0.05]"
+      >
+        {render}
+      </div>
+    )
+  }
+
+  return (
+    <AutoGrowTextarea
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      autoFocus={open}
+      onKeyDown={(e) => {
+        if (singleLine && e.key === 'Enter') {
+          e.preventDefault()
+          e.currentTarget.blur()
+        } else if (e.key === 'Escape') {
+          reverting.current = true
+          e.currentTarget.blur()
+        }
+      }}
+      rows={1}
+      spellCheck={false}
+      aria-label={ariaLabel}
+      className={`-mx-1.5 -my-1 w-[calc(100%+0.75rem)] cursor-text resize-none rounded-lg bg-transparent px-1.5 py-1 outline-none transition-colors hover:bg-ink/[0.05] focus:bg-surface-0 ${className}`}
+    />
+  )
+}
+
 // One hook in the pack — its family chip, the spoken line, and a copy button.
 // The copy target is the clean line only (the chip is UI metadata).
 //
@@ -703,29 +929,10 @@ function HookLineCard({ hook, index, onChange }: { hook: ParsedHook; index: numb
   // Local draft so a keystroke doesn't re-serialise and re-parse the whole
   // pack; committed on blur. `sync` tells our own commit from an external
   // change (an undo, a new generation) and re-seeds the draft for the latter.
-  const [draft, setDraft] = useState(hook.text)
-  const [sync, setSync] = useState(hook.text)
-  if (hook.text !== sync) {
-    setSync(hook.text)
-    setDraft(hook.text)
-  }
   const addToast = useAppStore((s) => s.addToast)
 
-  // One hook is one line, so anything pasted in gets flattened. An emptied line
-  // reverts instead of committing: a hook that vanishes as you clear it reads
-  // as the row deleting itself.
-  const commit = () => {
-    const next = draft.replace(/\s+/g, ' ').trim()
-    if (!next) {
-      setDraft(hook.text)
-      return
-    }
-    if (next !== draft) setDraft(next)
-    if (next !== hook.text) onChange?.(next)
-  }
-
   const handleCopy = async () => {
-    const ok = await copyToClipboard(draft.replace(/\s+/g, ' ').trim())
+    const ok = await copyToClipboard(hook.text.replace(/\s+/g, ' ').trim())
     if (ok) {
       setCopied(true)
       addToast('Hook copied to clipboard')
@@ -753,32 +960,15 @@ function HookLineCard({ hook, index, onChange }: { hook: ParsedHook; index: numb
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      {onChange ? (
-        // Same type as the <p> below it, on a field with no chrome until you're
-        // in it — a hover tint says "this is editable" without printing a box
-        // around every line. Enter commits rather than breaking the hook in two;
-        // Escape puts it back.
-        <AutoGrowTextarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              e.currentTarget.blur()
-            } else if (e.key === 'Escape') {
-              setDraft(hook.text)
-              e.currentTarget.blur()
-            }
-          }}
-          rows={1}
-          spellCheck={false}
-          aria-label={`Hook ${index + 1}`}
-          className="-mx-1.5 -my-1 w-[calc(100%+0.75rem)] cursor-text resize-none rounded-lg bg-transparent px-1.5 py-1 text-sm font-light leading-normal tracking-tight text-ink-100 outline-none transition-colors hover:bg-ink/[0.05] focus:bg-surface-0"
-        />
-      ) : (
-        <p className="text-sm font-light leading-normal tracking-tight text-ink-100">{hook.text}</p>
-      )}
+      <EditableText
+        value={hook.text}
+        onCommit={onChange}
+        singleLine
+        ariaLabel={`Hook ${index + 1}`}
+        className="text-sm font-light leading-normal tracking-tight text-ink-100"
+        // Read-only fallback keeps the paragraph it always was.
+        render={<p className="text-sm font-light leading-normal tracking-tight text-ink-100">{hook.text}</p>}
+      />
     </div>
   )
 }
@@ -797,7 +987,11 @@ function clearSelectionOnChrome(e: React.MouseEvent) {
   if (selection && !selection.isCollapsed) selection.removeAllRanges()
 }
 
-function SceneChunkCard({ chunk }: { chunk: SceneChunk }) {
+// `onEditRange` splices a span of the TAKE text — the chunk's own `bodyStart`
+// plus the segment's offset within the body. That's what makes editing a scene
+// where it sits exact: no search (two scenes can share a sentence) and no
+// reconstruction (the parse trims, strips and filters, so it doesn't round-trip).
+function SceneChunkCard({ chunk, onEditRange }: { chunk: SceneChunk; onEditRange?: (start: number, end: number, next: string) => void }) {
   const [copied, setCopied] = useState(false)
   const addToast = useAppStore((s) => s.addToast)
   const handleCopy = async () => {
@@ -833,22 +1027,54 @@ function SceneChunkCard({ chunk }: { chunk: SceneChunk }) {
         <div className="flex flex-col gap-2">
           {segments.map((segment, i) =>
             segment.kind === 'line' ? (
-              <SpokenLine key={i} speaker={segment.speaker} text={segment.text} />
+              <SpokenLine
+                key={i}
+                speaker={segment.speaker}
+                text={segment.text}
+                onChange={onEditRange ? (next) => onEditRange(chunk.bodyStart + segment.start, chunk.bodyStart + segment.end, next) : undefined}
+              />
             ) : (
               // Direction is context for the shot, not the script — set a step
               // down in size and weight so the eye lands on the line first.
-              <p key={i} className="px-1 text-[12.5px] font-light leading-relaxed tracking-tight text-ink-400">
-                <TokenText text={segment.text} />
-              </p>
+              // Click-to-edit rather than an always-on field: this is the one
+              // block whose render adds something (TokenText tints the
+              // [character] / [product] slots) that a bare textarea would lose.
+              <EditableText
+                key={i}
+                value={segment.text}
+                onCommit={onEditRange ? (next) => onEditRange(chunk.bodyStart + segment.start, chunk.bodyStart + segment.end, next) : undefined}
+                clickToEdit
+                ariaLabel="Scene direction"
+                className="px-1 text-[12.5px] font-light leading-relaxed tracking-tight text-ink-400"
+                render={(
+                  <p className="text-[12.5px] font-light leading-relaxed tracking-tight text-ink-400">
+                    <TokenText text={segment.text} />
+                  </p>
+                )}
+              />
             ),
           )}
         </div>
       ) : (
+        // No quoted line in this scene (a silent beat, or an Ad Analyzer
+        // blueprint whose scenes are pure direction) — the whole body is one
+        // block, and editing it writes back the whole body span. Same
+        // click-to-edit as a scene's direction prose, and for the same reason:
+        // the render tints the [character] / [product] slots.
         // Body matches the Write/Remix script output: inherited Geist + white
         // (a div, not <pre>, so it doesn't fall back to UA monospace).
-        <div className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100">
-          <TokenText text={chunk.body} />
-        </div>
+        <EditableText
+          value={chunk.body}
+          onCommit={onEditRange ? (next) => onEditRange(chunk.bodyStart, chunk.bodyEnd, next) : undefined}
+          clickToEdit
+          ariaLabel="Scene prompt"
+          className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100"
+          render={(
+            <div className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100">
+              <TokenText text={chunk.body} />
+            </div>
+          )}
+        />
       )}
     </div>
   )
