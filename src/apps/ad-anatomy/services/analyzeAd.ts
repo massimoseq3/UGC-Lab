@@ -8,7 +8,7 @@ import {
   CHAT_POLL_ATTEMPTS,
   type ChatMessage,
 } from '../../../utils/kie'
-import { getChatTarget, CHAT_MODEL_DEFAULT } from '../../../utils/models'
+import { getChatTarget, CHAT_MODEL_STRONG } from '../../../utils/models'
 import {
   CONTINUOUS_STYLES,
   STYLE_BRIEF_SPEC,
@@ -18,7 +18,16 @@ import {
 } from '../../../utils/visualStyle'
 import { VOICE_PROFILE_SPEC } from '../../../utils/voiceProfile'
 
-const CHAT_MODEL_ID = CHAT_MODEL_DEFAULT
+// The one surface on the STRONG tier (August 2026). Everything the analyser
+// returns is read by a person and acted on — a misread style family or a
+// hedged scene prompt costs a re-shoot, not a retry, which is exactly the
+// "wrong answer costs real rework" case CHAT_MODEL_STRONG is kept for.
+const CHAT_MODEL_ID = CHAT_MODEL_STRONG
+// Both transports read this. kieChatCompletions defaults to 'low', so the
+// streaming fallback would quietly analyse at a different effort from the task
+// path if it didn't pass one — and the fallback's whole point is that a member
+// can't tell which of the two ran.
+const REASONING_EFFORT = 'medium' as const
 // Streaming fallback timeout — kept generous since chat completions don't
 // have intermediate progress signals like the task-based flow.
 const STREAM_TIMEOUT_MS = 300_000
@@ -29,8 +38,14 @@ const STREAM_TIMEOUT_MS = 300_000
 // attached to pass 1. Every analysis came back rejected as invalid, and
 // budgeting the inline payload plus a video-only retry (#373) didn't fix it.
 // This is the shape that demonstrably worked: one call, the video inline as the
-// only media part, low reasoning effort. See git history for the two-pass
-// version before reaching for it again — bring back one variable at a time.
+// only media part. See git history for the two-pass version before reaching for
+// it again — bring back one variable at a time.
+//
+// What HAS moved since is inside that one call: the model (DEFAULT → STRONG)
+// and reasoning effort (low → medium), August 2026. Both are the cheap knobs
+// the revert left available; neither changes the transport, the message shape
+// or the JSON contract, so a regression here is a prompt-quality question and
+// not the payload-budget one that killed the split.
 
 // The style families the analyser classifies an ad into — read off the app's own
 // picker list so the two can never drift, plus 'other' for a look none of them
@@ -308,7 +323,7 @@ export async function startAnalysisTask(videoFile: File): Promise<StartAnalysisO
     const taskId = await createTask(apiKey, CHAT_MODEL_ID, {
       messages,
       stream: false,
-      reasoning_effort: 'low',
+      reasoning_effort: REASONING_EFFORT,
       include_thoughts: false,
     })
     if (!taskId || typeof taskId !== 'string') {
@@ -348,15 +363,16 @@ export async function pollAnalysisTask(taskId: string): Promise<AnalysisResult> 
 }
 
 // Streaming fallback — a safety net when createTask is unavailable for the
-// chat model. Pinned to the same model the task path uses. Cannot be resumed
-// across refresh; the queue knows this and the reconciler flips such rows to
-// error.
+// chat model. Pinned to the same model AND reasoning effort the task path uses.
+// Cannot be resumed across refresh; the queue knows this and the reconciler
+// flips such rows to error.
 export async function streamAnalysisFallback(videoFile: File): Promise<AnalysisResult> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const endpoint = getChatTarget(CHAT_MODEL_ID)
   const messages = await buildMessages(videoFile)
   const responseText = await kieChatCompletions(apiKey, endpoint, messages, {
     timeoutMs: STREAM_TIMEOUT_MS,
+    reasoningEffort: REASONING_EFFORT,
   })
   return parseAnalysisJson(responseText)
 }

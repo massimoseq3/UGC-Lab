@@ -192,11 +192,14 @@ export const TTS_MODEL_ID = 'google/gemini-3-1-flash-tts'
 //   DEFAULT — the app-wide workhorse. Prompt-shaping, storyboards, shot logs:
 //             structured output against heavily-tuned prompts, read by another
 //             model rather than by a person.
-//   STRONG  — ~2.6x the credits. Today: NOTHING. Scripts and product auto-fill
-//             each sat here and each moved back — the output didn't visibly
-//             improve, and members pay the difference on their own key. Kept as
-//             the named opt-in for a surface where a wrong answer would cost
-//             real rework; check git log before promoting anything back.
+//   STRONG  — ~2.6x the credits. Today: the Ad Analyzer, and only it. That is
+//             the surface the tier was kept for — its output is read by a
+//             person and shot against, so a misread style family or a hedged
+//             scene prompt costs a re-shoot rather than a retry. Scripts and
+//             product auto-fill each sat here and each moved back, because
+//             their output didn't visibly improve and members pay the
+//             difference on their own key; check git log before promoting
+//             anything else.
 //
 // Neither constant is what Scripts or B-Roll call any more: those two read the
 // member's own pick (see resolveScriptModel in stores/settingsStore.ts), which
@@ -245,11 +248,13 @@ const KIE_PRICING = 'https://kie.ai/pricing'
 export const MODEL_REGISTRY: ModelEntry[] = [
   // ── Chat / Vision ─────────────────────────────────────────────
 
-  // Chat has a DEFAULT that every surface runs on, plus a picker in the two
-  // apps that write words a person reads — Scripts and B-Roll. Everything else
-  // (vision extraction, the Ad Analyzer, style reads, prompt enhance) stays
-  // pinned to the default: those calls feed another model, not a reader, and
-  // paying Opus rates to shape a prompt is money lit on fire.
+  // Chat has a DEFAULT that most surfaces run on, plus a picker in the two apps
+  // that write words a person reads — Scripts and B-Roll. Vision extraction,
+  // style reads and prompt enhance stay pinned to the default: those calls feed
+  // another model, not a reader, and paying Opus rates to shape a prompt is
+  // money lit on fire. The Ad Analyzer is the one exception in the other
+  // direction — it is pinned to STRONG, because it writes for a reader too and
+  // is acted on rather than passed along.
   //
   // Order matters: Gemini 3 Flash is FIRST so it stays getDefaultModel's
   // candidates[0] fallback for any chat consumer without an explicit defaultFor.
@@ -299,10 +304,10 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     tags: ['recommended', 'fast', 'cheap'],
     pricing: { unit: 'per-1k-tokens', credits: 0.105 },
     official: chatOfficial(0.5, 3, KIE_PRICING),
-    // The default on every surface that ISN'T one of the two pickers: those
-    // calls feed another model rather than a reader, and the prompts were all
-    // written and tuned against this one.
-    defaultFor: ['ad-anatomy', 'character-studio'],
+    // The default on every surface that ISN'T one of the two pickers or the Ad
+    // Analyzer: those calls feed another model rather than a reader, and the
+    // prompts were all written and tuned against this one.
+    defaultFor: ['character-studio'],
     chatEndpoint: '/gemini-3-flash/v1/chat/completions',
     chatRating: {
       intelligence: 2,
@@ -319,9 +324,15 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     tags: ['new'],
     pricing: { unit: 'per-1k-tokens', credits: 0.27 },
     official: chatOfficial(1.5, 7.5, KIE_PRICING),
-    // Was the unpicked default in Scripts and B-Roll and is no longer — it holds
-    // a long prompt contract slightly better, but at ~2.6× the credits on the
-    // member's own key, which is theirs to opt into rather than to discover.
+    // CHAT_MODEL_STRONG, and the Ad Analyzer's pinned model (August 2026): it
+    // holds a long prompt contract slightly better, which is what that app's
+    // single call is — one JSON object carrying a scorecard, a transcript and
+    // every scene prompt.
+    //
+    // Was also the unpicked default in Scripts and B-Roll and is no longer — the
+    // same ~2.6× the credits buys prose a member can judge for themselves, so
+    // there it's theirs to opt into rather than to discover.
+    defaultFor: ['ad-anatomy'],
     // OpenAI-compatible variant slug on kie.ai (native 3.6 uses Google's own
     // generateContent shape; our transport speaks OpenAI chat/completions).
     chatEndpoint: '/gemini-3-6-flash-openai/v1/chat/completions',
