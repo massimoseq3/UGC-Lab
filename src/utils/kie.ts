@@ -526,9 +526,15 @@ export interface ChatMessage {
 // timer instead of a total one, is still the real fix.
 export const LONG_CHAT_TIMEOUT_MS = 300_000
 
+// The three rungs the OpenAI-compatible layer accepts. 'medium' sat unused
+// until the Ad Analyzer asked for it. Note the rungs don't survive every
+// transport intact: claude-messages has only a thinking on/off flag, so
+// anything above 'low' turns thinking on there.
+export type ReasoningEffort = 'low' | 'medium' | 'high'
+
 export interface ChatCompletionsOptions {
   signal?: AbortSignal
-  reasoningEffort?: 'low' | 'high'
+  reasoningEffort?: ReasoningEffort
   includeThoughts?: boolean
   timeoutMs?: number
 }
@@ -629,7 +635,7 @@ export async function kieChatCompletions(
 // Anthropic takes no role:'system' message — the system prompt is a top-level
 // field. Every caller in this app opens with one, so hoist it rather than
 // letting the API 400 on a shape our own services build.
-function claudeBody(slug: string | undefined, messages: ChatMessage[], effort: 'low' | 'high') {
+function claudeBody(slug: string | undefined, messages: ChatMessage[], effort: ReasoningEffort) {
   const system = messages
     .filter((m) => m.role === 'system' || m.role === 'developer')
     .map((m) => (typeof m.content === 'string' ? m.content : textOf(m.content)))
@@ -646,7 +652,10 @@ function claudeBody(slug: string | undefined, messages: ChatMessage[], effort: '
     messages: rest,
     max_tokens: CLAUDE_MAX_TOKENS,
     stream: false,
-    thinkingFlag: effort === 'high',
+    // Boolean, not a ladder — 'medium' reads as thinking-on rather than off,
+    // which is the closer of the two. Identical to the old `=== 'high'` for
+    // every caller that passes 'low' or 'high'.
+    thinkingFlag: effort !== 'low',
   }
 }
 
@@ -674,7 +683,7 @@ function parseClaudeContent(body: unknown): string {
 
 // The Responses API renames everything: `input` not `messages`, and part types
 // gain an `input_` prefix with the image URL flattened onto the part itself.
-function responsesBody(slug: string | undefined, messages: ChatMessage[], effort: 'low' | 'high') {
+function responsesBody(slug: string | undefined, messages: ChatMessage[], effort: ReasoningEffort) {
   return {
     model: slug,
     input: messages.map((m) => ({
