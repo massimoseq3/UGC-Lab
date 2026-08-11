@@ -15,7 +15,7 @@ import ScriptForm from './ScriptForm'
 import VoiceForm from './VoiceForm'
 import BRollForm from './BRollForm'
 import StyleForm from './StyleForm'
-import { isValidImageFile } from './services/imageValidation'
+import { partitionImageFiles } from './services/imageValidation'
 import { saveProductDraft } from './services/saveProductDraft'
 
 const SIDEBAR_ICONS: Record<BankType, React.ElementType> = {
@@ -58,6 +58,29 @@ function persistImage(src: string, memo: ImageMemo): Promise<string> {
   pending.catch(() => { if (memo.get(src) === pending) memo.delete(src) })
   return pending
 }
+
+// Everything ONE open form accumulates: the row its autosaves write into, and
+// the photos it has already persisted.
+//
+// It's a single object swapped out wholesale rather than two refs cleared in
+// place, because an autosave that is already in flight has to keep writing into
+// the form it started in. Closing the form flushes it, and the unmount flush
+// lands later still — both resolve AFTER the close handler has reset the
+// scratch. Reading the row id back out at that point returned null, the save
+// decided this product didn't exist yet, and added it a SECOND time. Two rows,
+// one blob: deleting either copy purged the shared photo (and its Supabase
+// `assets` row, so R2 couldn't give it back), leaving the survivor on the
+// package placeholder for good. Capturing the object before the first `await`
+// keeps a late flush pointed at its own row.
+interface FormScratch {
+  // The row this form's autosave created, held as the in-flight PROMISE — a
+  // submit racing an autosave then waits on the one add instead of racing it to
+  // a second row.
+  rowId: Promise<string> | null
+  images: ImageMemo
+}
+
+const newFormScratch = (): FormScratch => ({ rowId: null, images: new Map() })
 
 // Photos arrive from the Product form as data URIs on first add; already-saved
 // ones come back as asset:// refs and pass through untouched.
@@ -158,25 +181,19 @@ export default function Finder() {
 
   const [sort, setSort, sortOptions] = useBankSort(activeBank)
 
-  // Row the autosave created for a product that didn't exist yet. Deliberately
-  // NOT `editingId`: promoting it would swap a real `item` under the open form
-  // and reset the fields out from under whoever is typing in them.
-  const autosavedIdRef = useRef<string | null>(null)
-
-  // Photos this form has already handed to the asset store, so the same bytes
-  // are never persisted twice (see the ImageMemo note above the helper). Lives
-  // and dies with the open form, alongside `autosavedIdRef`.
-  const imageMemoRef = useRef<ImageMemo>(new Map())
+  // The open form's scratch (see FormScratch above). The row id it carries is
+  // deliberately NOT `editingId`: promoting it would swap a real `item` under
+  // the open form and reset the fields out from under whoever is typing.
+  const scratchRef = useRef<FormScratch>(newFormScratch())
 
   // Everything that WRITES this ref stays above the memoized callbacks that
   // read it — the compiler won't allow a value captured by a hook to be
   // modified afterwards, and none of these need memoizing anyway.
 
-  // Everything the open form accumulated: which row its autosaves are writing,
-  // and which photos it has already persisted.
+  // Start a new form. The outgoing object is REPLACED, never emptied, so a save
+  // still in flight for the old form keeps the row and the photos it began with.
   const forgetFormScratch = () => {
-    autosavedIdRef.current = null
-    imageMemoRef.current = new Map()
+    scratchRef.current = newFormScratch()
   }
 
   // Both of these start a fresh row: pressing Add (or opening another product)
@@ -200,12 +217,18 @@ export default function Finder() {
   // Returns the row as persisted, so the form can adopt the asset refs and stop
   // re-uploading the same data URI on every pass.
   const handleAutosaveProduct = async (data: Omit<Product, 'id' | 'createdAt'>) => {
-    const saved = await persistProductImages(data, imageMemoRef.current)
-    const id = editingId ?? autosavedIdRef.current
+    // Read before the first await — this call belongs to the form that started
+    // it, whatever the member has opened by the time it resolves.
+    const scratch = scratchRef.current
+    const saved = await persistProductImages(data, scratch.images)
+    const id = editingId ?? (scratch.rowId ? await scratch.rowId : null)
     if (id) {
       await updateProduct(id, saved, { silent: true })
     } else {
-      autosavedIdRef.current = await addProduct({ ...saved, confirmed: false }, { silent: true })
+      // Claim the slot with the promise itself, with no await in between, so a
+      // second pass can only ever wait on this add.
+      scratch.rowId = addProduct({ ...saved, confirmed: false }, { silent: true })
+      await scratch.rowId
     }
     return saved
   }
@@ -219,8 +242,11 @@ export default function Finder() {
   }, [])
 
   const handleSaveProduct = useCallback(async (data: Omit<Product, 'id' | 'createdAt'>) => {
-    const saved = { ...(await persistProductImages(data, imageMemoRef.current)), confirmed: true }
-    const id = editingId ?? autosavedIdRef.current
+    const scratch = scratchRef.current
+    const saved = { ...(await persistProductImages(data, scratch.images)), confirmed: true }
+    // Waits on the autosave's row when one is mid-flight — Add Product used to
+    // read past it and write a second copy of the product it was confirming.
+    const id = editingId ?? (scratch.rowId ? await scratch.rowId : null)
     if (id) await updateProduct(id, saved)
     else await addProduct(saved)
     closeForm()
@@ -235,11 +261,13 @@ export default function Finder() {
     })
   }, [])
 
-  const handleCancelDuringExtraction = useCallback((file: File, partial: Omit<Product, 'id' | 'createdAt'>, listingText?: string) => {
+  const handleCancelDuringExtraction = useCallback(async (file: File, partial: Omit<Product, 'id' | 'createdAt'>, listingText?: string) => {
     // The form autosaves, so the row it was editing (or created on the way)
     // usually already exists — finish the extraction into that one.
-    const existingId = editingId ?? autosavedIdRef.current ?? undefined
+    const scratch = scratchRef.current
+    const editing = editingId
     closeForm()
+    const existingId = editing ?? (scratch.rowId ? await scratch.rowId : undefined)
     saveProductDraft({
       file,
       listingText,
@@ -254,13 +282,11 @@ export default function Finder() {
   }, [editingId, trackInFlight, addToast, closeForm])
 
   const handleBulkFiles = useCallback(async (files: File[]) => {
-    const valid = files.filter(isValidImageFile)
-    const rejected = files.length - valid.length
-    if (valid.length === 0) {
-      addToast('No valid images (need JPG / PNG / WebP under 10 MB)', 'error')
-      return
-    }
-    if (rejected > 0) addToast(`Skipped ${rejected} unsupported file${rejected === 1 ? '' : 's'}`, 'info')
+    // Names the format that bounced (AVIF, HEIC, …) rather than a bare count —
+    // "skipped 3 files" doesn't tell anyone what to re-save them as.
+    const { accepted: valid, rejection } = partitionImageFiles(files)
+    if (rejection) addToast(rejection, valid.length === 0 ? 'error' : 'info')
+    if (valid.length === 0) return
 
     const results = await Promise.all(valid.map((file) => saveProductDraft({
       file,
