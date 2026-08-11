@@ -217,43 +217,45 @@ export default function ControlsPanel({
         />
       </div>
 
+      {/* Preset loader + reference-photo autofill — a FIXED band under the tab
+          toggle, outside the scroll container entirely. It used to be a
+          `sticky top-0` child of the scroller, which pins it only once the
+          scroll has started: at scroll-top it sat in normal flow and every
+          rubber-band / trackpad overscroll floated it, so the two rows read as
+          loose rather than as part of the panel's chrome. A row that must never
+          move doesn't belong in the thing that moves. */}
+      <div className="shrink-0 px-4 pb-2 pt-2">
+        {/* Stacked under sm: two picker rows sharing a phone-width column
+            truncate to "Load Cha…" / "Extract C…", which names neither. */}
+        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+          <div className="min-w-0 flex-1">
+            <LoadPresetDropdown onLoadProfile={onProfileChange} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <PhotoExtractZone
+              analyzingCount={analyzingCount}
+              extractError={extractError}
+              applied={referenceApplied}
+              thumbnail={extractedThumb}
+              onPhotoDrop={onPhotoDrop}
+              onReset={onResetExtract}
+              onOpenLibrary={onOpenLibrary}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Scrollable parameter fields. Every
           tab's groups render on one page — each group sits in its own card, and
           the top toggle scroll-jumps between tab blocks (Ad Analyzer pattern).
-          The bottom edge feathers out under the Generate bar, mirroring the
-          sticky preset row's fade at the top — without it the fields cut off
-          mid-row against the bar and read as a render glitch. */}
+          Both edges feather out — under the Generate bar and under the pinned
+          band above — so fields dissolve at the boundary instead of cutting off
+          mid-row, which reads as a render glitch. */}
       <div
         ref={scrollRef}
-        className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 pb-4 [mask-image:linear-gradient(to_bottom,black_calc(100%-1.5rem),transparent_100%)]"
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 pb-4 [mask-image:linear-gradient(to_bottom,transparent_0,black_0.5rem,black_calc(100%-1.5rem),transparent_100%)]"
       >
-        <div className="flex flex-col gap-4">
-          {/* Preset loader + reference-photo autofill — pinned just under the
-              Physical / Scene & Pose toggle (sticky over the scroll), with an
-              opaque backdrop + a feathered gradient so fields dissolve under it
-              instead of clipping against a hard edge. The -mx-4/px-4 stretches
-              the backdrop across the scroll container's own padding. */}
-          <div className="sticky top-0 z-10 -mx-4 bg-surface-0 px-4 pt-2">
-            {/* Stacked under sm: two picker rows sharing a phone-width column
-                truncate to "Load Cha…" / "Extract C…", which names neither. */}
-            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
-              <div className="min-w-0 flex-1">
-                <LoadPresetDropdown onLoadProfile={onProfileChange} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <PhotoExtractZone
-                  analyzingCount={analyzingCount}
-                  extractError={extractError}
-                  applied={referenceApplied}
-                  thumbnail={extractedThumb}
-                  onPhotoDrop={onPhotoDrop}
-                  onReset={onResetExtract}
-                  onOpenLibrary={onOpenLibrary}
-                />
-              </div>
-            </div>
-            <div className="pointer-events-none absolute inset-x-0 top-full h-5 bg-gradient-to-b from-surface-0 to-transparent" />
-          </div>
+        <div className="flex flex-col gap-4 pt-2">
           {TABS.map((tab, tabIndex) => (
             <div
               key={tab.id}

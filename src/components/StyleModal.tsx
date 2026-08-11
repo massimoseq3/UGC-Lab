@@ -7,29 +7,12 @@ import { useAssetUrl } from '../hooks/useAssetUrl'
 import { saveFromDataUrl } from '../utils/assetStore'
 import { CONTINUOUS_STYLES } from '../utils/visualStyle'
 import SlideOver from './SlideOver'
-// Preview art for the built-in styles — the same scene rendered in each look, so
-// the grid reads as one comparison set. Pre-scaled to ~640px JPEG (the cards are
-// ~137px wide) and keyed by style id, exactly like the Characters preset
-// portraits. Lives here rather than on the style itself so `visualStyle.ts` stays
-// plain data: it's imported by prompt builders and services that have no business
-// pulling bundler asset URLs. A style with no entry falls back to the glyph.
-import ugcPreview from '../assets/stylePresets/ugc.jpg'
-import zack3dPreview from '../assets/stylePresets/zack-3d.jpg'
-import clayPreview from '../assets/stylePresets/clay.jpg'
-import brickPreview from '../assets/stylePresets/brick.jpg'
-import paperPreview from '../assets/stylePresets/paper.jpg'
-import animePreview from '../assets/stylePresets/anime.jpg'
-import cartoonPreview from '../assets/stylePresets/cartoon.jpg'
+// Preview art + the per-app accent palettes. They live in their own module so a
+// host that only needs an accent (or, like Playground, only the artwork) doesn't
+// drag the whole modal in with it — see the note at the top of styleArt.ts.
+import { STYLE_PREVIEWS, type StyleModalAccent } from './styleArt'
 
-const STYLE_PREVIEWS: Record<string, string> = {
-  ugc: ugcPreview,
-  'zack-3d': zack3dPreview,
-  clay: clayPreview,
-  brick: brickPreview,
-  paper: paperPreview,
-  anime: animePreview,
-  cartoon: cartoonPreview,
-}
+export type { StyleModalAccent } from './styleArt'
 
 // How many reference frames one style can be read from. Matches the cap the
 // parent enforces when adding refs.
@@ -41,50 +24,6 @@ export interface StyleSelection {
   // bank. A one-off analysed brief has none and reads as "Custom style".
   name: string | null
   bankId: string | null
-}
-
-// Per-app accent classes. Tailwind can't build class names at runtime (the JIT
-// only sees literal strings), so each host passes its family's classes whole
-// rather than an accent name this file interpolates.
-export interface StyleModalAccent {
-  /** Selected card: border + fill. */
-  card: string
-  /** Solid accent chip/badge (the Check bubble). */
-  solid: string
-  /** Solid accent button, with its hover. */
-  button: string
-  /** Icon bubble on a selected card. */
-  iconOn: string
-  /** Selected card's title text. */
-  titleOn: string
-  /** "Custom style in use" banner: border + fill. */
-  banner: string
-  /** That banner's eyebrow label. */
-  bannerLabel: string
-  /** Dashed drop-zone in its active state. */
-  dropActive: string
-}
-
-export const BROLL_STYLE_ACCENT: StyleModalAccent = {
-  card: 'border-broll-500/40 bg-broll-500/10',
-  solid: 'bg-broll-500',
-  button: 'bg-broll-500 hover:bg-broll-400',
-  iconOn: 'bg-broll-500/20 text-broll-300',
-  titleOn: 'text-broll-200',
-  banner: 'border-broll-500/25 bg-broll-500/10',
-  bannerLabel: 'text-broll-300',
-  dropActive: 'border-broll-500/50 bg-broll-500/10',
-}
-
-export const INFLUENCERS_STYLE_ACCENT: StyleModalAccent = {
-  card: 'border-influencers-500/40 bg-influencers-500/10',
-  solid: 'bg-influencers-500',
-  button: 'bg-influencers-500 hover:bg-influencers-400',
-  iconOn: 'bg-influencers-500/20 text-influencers-300',
-  titleOn: 'text-influencers-200',
-  banner: 'border-influencers-500/25 bg-influencers-500/10',
-  bannerLabel: 'text-influencers-300',
-  dropActive: 'border-influencers-500/50 bg-influencers-500/10',
 }
 
 interface StyleModalProps {
@@ -123,7 +62,7 @@ interface StyleModalProps {
 // pass a bundled `imageUrl` from STYLE_PREVIEWS; a saved style passes an
 // `imageRef` and covers itself with the first frame it was read from. Neither
 // present (a style with no preview art yet) falls back to the glyph.
-function StyleTile({
+export function StyleTile({
   imageRef,
   imageUrl,
   name,

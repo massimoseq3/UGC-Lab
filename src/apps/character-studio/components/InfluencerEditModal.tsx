@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Loader2, Download, Bookmark, Check, ImagePlus, Wand2, LayoutGrid, Pencil, Upload, FolderOpen, Copy, Maximize2, Coins, Palette, ChevronRight, Layers, Eraser } from 'lucide-react'
+import { X, Loader2, Download, Bookmark, Check, Wand2, LayoutGrid, Pencil, Upload, FolderOpen, Copy, Maximize2, Coins, Palette, ChevronRight, Layers, Eraser } from 'lucide-react'
 import SectionCard, { SectionLabel } from '../../../components/SectionCard'
+import { ImageTile, AddTile } from '../../../components/video/refInputParts'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import { useSettingsStore } from '../../../stores/settingsStore'
@@ -36,7 +37,8 @@ import {
 import type { InFlightCharacterGen, LaunchGenOptions } from '../types'
 import { pickInfluencerName, sheetNameFrom, uniqueBankName, variantNameFrom } from './nameGenerator'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
-import StyleModal, { INFLUENCERS_STYLE_ACCENT, type StyleSelection } from '../../../components/StyleModal'
+import StyleModal, { type StyleSelection } from '../../../components/StyleModal'
+import { INFLUENCERS_STYLE_ACCENT } from '../../../components/styleArt'
 import { analyzeStyleReferences, getContinuousStyle, styleBriefForStill } from '../../../utils/visualStyle'
 import { fileToDataUri } from '../../../utils/kie'
 import { usePersistedState } from '../../../hooks/usePersistedState'
@@ -577,9 +579,14 @@ export default function InfluencerEditModal({
                     ) : undefined}
                   >
                     {/* The add tile joins the grid rather than sitting as a slab
-                        under it — the Playground `RefTiles` shape. On a
-                        reference image the PICTURE is the point, so they stay
-                        square thumbnails and take no status dot. */}
+                        under it — the Playground `RefTiles` shape, down to the
+                        shared 64px `ImageTile` / `AddTile` primitives. It was a
+                        four-up `grid` of `aspect-square` cells, so in this
+                        half-modal column each attached photo rendered ~110px
+                        wide — three times the size of the same reference in
+                        Playground. On a reference image the PICTURE is the
+                        point, but it's still a reference, not the output. No
+                        status dot: nothing in this card gates Generate. */}
                     <div className="flex flex-col gap-1.5">
                       <SectionLabel
                         label="Reference images"
@@ -589,30 +596,17 @@ export default function InfluencerEditModal({
                           </span>
                         )}
                       />
-                      <div className="grid grid-cols-4 gap-2">
+                      <div className="flex flex-wrap gap-1.5">
                         {refs.map((r, i) => (
-                          <div key={i} className="relative aspect-square w-full overflow-hidden rounded-xl border border-ink/10 bg-ink/[0.02]">
-                            <img src={r.url} alt="" className="h-full w-full object-cover" />
-                            <button
-                              type="button"
-                              title="Remove"
-                              onClick={() => setRefs((prev) => prev.filter((_, idx) => idx !== i))}
-                              className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-white/80 transition-colors hover:bg-black/90"
-                            >
-                              <X className="h-2.5 w-2.5" />
-                            </button>
-                          </div>
+                          <ImageTile
+                            key={i}
+                            src={r.url}
+                            onRemove={() => setRefs((prev) => prev.filter((_, idx) => idx !== i))}
+                          />
                         ))}
                         {refs.length < MAX_REFS && (
-                          <div className="relative aspect-square w-full" onMouseEnter={openRefMenu} onMouseLeave={closeRefMenuSoon}>
-                            <button
-                              type="button"
-                              onClick={() => setRefMenuOpen((v) => !v)}
-                              title="Add a reference image"
-                              className="group flex h-full w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-ink/15 bg-ink/[0.02] transition-colors hover:border-ink/25 hover:bg-ink/[0.04]"
-                            >
-                              <ImagePlus className="h-4 w-4 text-ink-500 transition-colors group-hover:text-ink-200" />
-                            </button>
+                          <div className="relative" onMouseEnter={openRefMenu} onMouseLeave={closeRefMenuSoon}>
+                            <AddTile onClick={() => setRefMenuOpen((v) => !v)} />
                             {refMenuOpen && (
                               <div
                                 className="absolute left-0 top-full z-[62] mt-1 w-40 overflow-hidden rounded-xl border border-ink/10 bg-surface-2/95 p-1 shadow-xl backdrop-blur-xl"

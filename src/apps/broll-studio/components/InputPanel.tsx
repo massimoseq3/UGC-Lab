@@ -85,7 +85,10 @@ function BankCard({
   // when the slot's job needs saying — the Script slot takes a paste as well as
   // a bank pick, and a card that only says "click to select" hides that.
   emptyHint?: string
-  // Gates the run — an empty one gets the red dot instead of the neutral one.
+  // An empty one gets the red dot instead of the neutral one. Every row in
+  // B-Roll's References card sets it: the script and the style genuinely gate
+  // Generate, and the product and the character are what a UGC storyboard is
+  // OF — a run without them technically fires and isn't worth the credits.
   // (This replaced an `optional` flag that painted an OPTIONAL tag on the
   // Script slot, which has been REQUIRED since B-Roll stopped writing scripts.)
   required?: boolean
@@ -333,14 +336,26 @@ export default function InputPanel({
           }
           right={<ClearAllButton onClear={onClearInputs} label="New" />}
         >
-          {/* Product — optional, so an empty one is a neutral dot. Red is
-              reserved for the two inputs that actually hold Generate shut. */}
+          {/* Product and Character — the two rows that used to be the odd ones
+              out in this card, on both counts.
+              COLOUR: their populated state was a gold / pink glassy fill, while
+              Visual Style and Script sit on the plain translucent surface, so
+              filling in a product visibly changed the KIND of row it was. They
+              take the same see-through surface now; each bank keeps its colour
+              where it belongs, on the icon disc.
+              DOT: they carried the neutral dot (nothing here holds Generate
+              shut but the script and the style). Massimo asked for red, and
+              the honest reading is that a UGC storyboard without its product or
+              its character isn't a storyboard you'd ship — so they're `required`
+              alongside the other two, and all four dots answer one question:
+              "have I filled this in?". */}
           <BankCard
             icon={Package}
             label="Product"
             accentClass="bg-gold-500/15 text-gold-400 light:text-gold-600"
-            selectedClass="border-gold-500/30 bg-gold-500/[0.06] hover:bg-gold-500/10"
+            selectedClass="border-ink/10 bg-ink/[0.02] hover:border-ink/20 hover:bg-ink/[0.04]"
             isEmpty={!selectedProduct}
+            required
             onSelect={onSelectProduct}
             onClear={selectedProduct ? onClearProduct : undefined}
           >
@@ -352,8 +367,9 @@ export default function InputPanel({
             icon={UserRound}
             label="Character"
             accentClass="bg-influencers-500/15 text-influencers-400"
-            selectedClass="border-influencers-500/30 bg-influencers-500/[0.06] hover:bg-influencers-500/10"
+            selectedClass="border-ink/10 bg-ink/[0.02] hover:border-ink/20 hover:bg-ink/[0.04]"
             isEmpty={!selectedModel}
+            required
             onSelect={onSelectModel}
             onClear={selectedModel ? onClearModel : undefined}
           >

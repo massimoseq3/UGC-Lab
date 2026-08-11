@@ -155,13 +155,30 @@ function Workspace() {
                 }`}
               >
                 <div className="h-full overflow-y-auto bg-transparent">
-                  {Component ? (
-                    <Suspense fallback={<AppPlaceholder appId={appId} />}>
-                      <Component />
-                    </Suspense>
-                  ) : (
-                    <AppPlaceholder appId={appId} />
-                  )}
+                  {/* A floor under the app's layout height, so a SHORT window
+                      scrolls the app instead of crushing it.
+                      Every workspace app is a full-height flex column: a header,
+                      a scrolling middle, a pinned generate band. The band and
+                      the header are `shrink-0`, so when the window is shorter
+                      than the two of them the middle is what gives — and it
+                      gives all the way. Measured in Scripts at 200% browser zoom
+                      (which is a 450px-tall viewport in CSS px): the input
+                      column's scroll port came out 20px high against 606px of
+                      content, which reads as the fields being clipped away
+                      rather than as something to scroll. Below this floor the
+                      app keeps its full layout and the pane above scrolls it,
+                      which is the behaviour zooming in for a screen recording
+                      wants. Above it — every normal window — nothing changes,
+                      since `h-full` already wins. */}
+                  <div className="h-full min-h-[600px]">
+                    {Component ? (
+                      <Suspense fallback={<AppPlaceholder appId={appId} />}>
+                        <Component />
+                      </Suspense>
+                    ) : (
+                      <AppPlaceholder appId={appId} />
+                    )}
+                  </div>
                 </div>
               </div>
             )
