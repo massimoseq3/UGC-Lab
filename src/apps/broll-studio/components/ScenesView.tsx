@@ -743,7 +743,14 @@ export default function ScenesView({
           backdrop-filter doesn't re-blur inside the already-blurred window
           frame, so a translucent strip let cards ghost through it and the bar
           read as scrolling with the storyboard instead of pinned. */}
-      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5">
+      {/* One row on desktop (`md:flex-nowrap`): four batch pills plus the meta
+          add up to more than the panel at 1280 and at any real zoom level, and
+          `flex-wrap` answered that by dropping the whole button group onto a
+          second line — so the strip was two rows tall on some windows and one
+          on others. The meta shrinks and truncates instead; the buttons are the
+          part you can't guess from a shorter label. Under md it still wraps,
+          where there genuinely isn't a row's worth of width. */}
+      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5 md:flex-nowrap">
         <div className="flex min-w-0 items-center gap-2">
           {/* Small-caps and dim — the count is a caption for the storyboard
               below it, so it takes the same eyebrow treatment as the style pill
@@ -760,9 +767,9 @@ export default function ScenesView({
         </div>
         {/* Batch actions, in the order the work happens — images, then the
             animate pass, then videos, then the export. Same shape and styling
-            as Continuous' top strip. Wraps rather than clipping its last
-            button on a narrow panel. */}
-        <div className="flex flex-wrap items-center justify-end gap-2">
+            as Continuous' top strip. One line from md up; below it they wrap
+            rather than clipping the last button. */}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 whitespace-nowrap md:flex-nowrap">
           <button
             type="button"
             onClick={() => requestBatch(allKeys, 'All scenes', true)}

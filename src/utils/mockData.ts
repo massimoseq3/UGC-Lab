@@ -842,7 +842,7 @@ export async function seedMockData(): Promise<void> {
       const cover = await makeImageAsset({ w: 1024, h: 1024, from: m.from, to: m.to, label: m.title, sub: 'TRACK' })
       const item: MusicHistoryItem = {
         id: `demo-music-${i}`,
-        modelId: 'suno-v5',
+        modelId: 'suno-v5_5',
         prompt: m.prompt,
         instrumental: m.instrumental,
         audioRef,

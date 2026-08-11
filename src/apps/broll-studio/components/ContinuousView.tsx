@@ -1223,8 +1223,13 @@ export default function ContinuousView({
       {/* Opaque, never translucent — see the note on the Line-by-Line strip:
           a blurred bar inside the already-blurred window frame doesn't re-blur,
           so frames ghost through it and the strip reads as unpinned. */}
-      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5">
-        <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
+      {/* One row on desktop — see the note on the Line-by-Line strip: with
+          `flex-wrap` alone the whole button group dropped to a second line the
+          moment the meta pills and the buttons together outgrew the panel, so
+          the strip's height changed with the window. The meta wraps and shrinks
+          instead. */}
+      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5 md:flex-nowrap">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
           {/* Scene count matches the per-line storyboard's — small-caps and dim,
               the same eyebrow treatment as the pills beside it. */}
           <span className="font-semibold text-ink-500">
@@ -1234,7 +1239,7 @@ export default function ContinuousView({
           <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">~{totalSeconds}s</span>
           <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{framesPicked}/{result.frames.length} keyframes picked</span>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
           <button
             type="button"
             onClick={() => requestFrames()}

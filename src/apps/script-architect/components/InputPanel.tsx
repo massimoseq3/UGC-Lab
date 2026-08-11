@@ -825,12 +825,22 @@ export default function InputPanel({
         )}
       </div>
 
-      {/* Generate button — pinned to the app window's bottom edge on mobile.
-          Opaque bg: backdrop-filter doesn't re-blur inside the already-blurred
-          window frame, so any alpha lets content underneath ghost through. No
-          rule above it: the brief box ends where its own toolbar ends, so a
+      {/* Generate band — a normal `shrink-0` footer at the foot of the column,
+          exactly as in B-Roll, Playground and Characters.
+          It used to go `position: fixed` under `md`, and that is a zoom trap,
+          not just a phone shape: browser zoom shrinks the viewport in CSS px, so
+          zooming a 1440px desktop to 200% lands under the 768px breakpoint with
+          the desktop two-pane layout still on screen. The bar then detached to
+          the window's bottom edge and covered the last ~150px of the scrolling
+          column — which is what clipped Additional Instructions at 2× in Write
+          New, and left Hooks looking fine only because its footer is one row
+          shorter. A static footer is laid out by the flex column above it, so
+          the scroll area can never run underneath it at any zoom.
+          Opaque bg under md: backdrop-filter doesn't re-blur inside the
+          already-blurred window frame, so any alpha lets content ghost through.
+          No rule above it: the brief box ends where its own toolbar ends, so a
           hairline there just fenced off controls that belong to the same column. */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 shrink-0 bg-surface-0 px-5 pb-3 pt-0 md:static md:left-auto md:right-auto md:z-auto md:bg-transparent">
+      <div className="shrink-0 bg-surface-0 px-5 pb-3 pt-0 md:bg-transparent">
         {/* Length and batch size — the same `ConstraintChip` pearls every other
             generate bar in the app uses for aspect / duration / resolution, and
             for the same reason: these are two small settings on the way to
@@ -982,12 +992,14 @@ export default function InputPanel({
         subtitle="What kind of content the ad looks like — and how it's built"
         size="wide"
       >
-        {/* Two sections: Structures (how the argument is built) and Formats
-            (the kind of content the ad imitates). Formats also stage the shots
-            in the Scenes output, so they're worth telling apart at the picker.
-            Shared with B-Roll, which picks from the same list. */}
+        {/* Two sections: Structures (how the argument is built) on top, then
+            Formats (the kind of content the ad imitates). Structures lead HERE
+            because the question this app is asking is how the argument is
+            built; B-Roll passes `formatsFirst` and leads with Formats, since
+            it's picking the kind of ad to shoot and a format is the half that
+            stages the shots. Same list either way — only the reading order
+            differs, and the component is shared so the slugs can't drift. */}
         <ScriptStyleList
-          formatsFirst
           value={styleChosen ? writeStyle : null}
           onSelect={(style) => { onWriteStyleChange(style); setStyleChosen(true); setStyleSlideOpen(false) }}
         />

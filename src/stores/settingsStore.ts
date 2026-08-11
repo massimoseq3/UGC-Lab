@@ -60,6 +60,32 @@ const MIGRATIONS_KEY = 'ai-ugc-lab-settings-migrations'
 // its name is recorded under MIGRATIONS_KEY so it never runs again.
 const MODEL_MIGRATIONS: Array<{ name: string; apply: (m: Record<string, string>) => void }> = [
   {
+    // Suno V5 removed from the registry; V5.5 is the only music model left.
+    // Same two repairs as the Veo removal below: getAppModel already drops an
+    // id that no longer resolves, but Playground ALSO snapshots modelId inside
+    // its draft `state` blob, which nothing validates, so a stale 'suno-v5'
+    // there would reach buildMusicInput and be sent to Suno as model 'V5'.
+    name: '2026-08-remove-suno-v5',
+    apply: (m) => {
+      for (const k of Object.keys(m)) {
+        if (m[k] === 'suno-v5') delete m[k]
+      }
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (!key || !key.endsWith(':playground:state')) continue
+          const raw = localStorage.getItem(key)
+          if (!raw) continue
+          const parsed = JSON.parse(raw)
+          if (parsed && parsed.modelId === 'suno-v5') {
+            parsed.modelId = 'suno-v5_5'
+            localStorage.setItem(key, JSON.stringify(parsed))
+          }
+        }
+      } catch { /* ignore */ }
+    },
+  },
+  {
     // Veo 3.1 Fast / Lite / Quality removed from the registry. getAppModel
     // already drops an id that no longer resolves, so this is belt-and-braces
     // for the picks — but Playground ALSO snapshots modelId inside its draft

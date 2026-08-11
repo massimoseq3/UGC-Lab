@@ -4,7 +4,7 @@
 // modal's orchestration (state + handlers). These all communicate via props.
 import { useState, useEffect, useRef } from 'react'
 import {
-  ImageIcon, Film, Loader2, Check, Download, Bookmark, Volume2, VolumeX, Play, Pause, Copy, Circle, AlertCircle, RefreshCw, X, ImagePlus, Palette,
+  ImageIcon, Film, Loader2, Check, Download, Bookmark, Volume2, VolumeX, Play, Pause, Copy, Circle, AlertCircle, RefreshCw, X, Palette,
 } from 'lucide-react'
 import { GeneratingMediaFill, PendingMedia, type GeneratingMediaProps } from '../../../components/GeneratingMedia'
 import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
@@ -13,6 +13,10 @@ import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import DayPill from '../../../components/DayPill'
 import BankPicker from '../../../components/BankPicker'
 import SlotActionMenu from '../../../components/video/SlotActionMenu'
+// The Playground reference-tile primitives. Aliased because this file has its
+// own gallery `ImageTile` (a full-width output tile) — a different thing
+// entirely from a 64px reference thumbnail.
+import { ImageTile as RefImageTile, AddTile } from '../../../components/video/refInputParts'
 import { SectionLabel } from '../../../components/SectionCard'
 import type { CardState, ReferenceImage } from '../types'
 import type { BRoll, AnyBankItem } from '../../../stores/types'
@@ -822,7 +826,10 @@ function ProductPhotoTile({
       type="button"
       onClick={onClick}
       title={index === 0 ? 'Hero packshot' : `Angle ${index}`}
-      className={`relative h-14 w-14 overflow-hidden rounded-xl border transition-colors ${
+      /* 64px — the shared reference-tile footprint (see refInputParts'
+         ImageTile), so the product angles and the extra references below them
+         read as one strip of thumbnails rather than two sizes of the same idea. */
+      className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border transition-colors ${
         active
           ? 'border-gold-500/60 ring-1 ring-inset ring-gold-500/25'
           : 'border-ink/10 opacity-45 hover:opacity-80'
@@ -901,46 +908,29 @@ export function ExtraRefsRow({
         )}
       />
 
-      {/* Picked references render as a four-up thumbnail strip above the add
-          card — same layout as the Playground reference strip. */}
-      {refs.length > 0 && (
-        <div className="grid grid-cols-4 gap-2">
-          {refs.map((r, i) => (
-            <RefThumb key={i} refStr={r.dataUrl} onRemove={() => onRemove(i)} />
-          ))}
-        </div>
-      )}
-
-      {/* Dashed add card — click opens Upload / Pick-from-Bank. Shorter than it
-          was (h-14, not h-20): the label above now says what it is, so the card
-          only has to be a target. */}
-      <div className="relative">
-        <button
-          ref={triggerRef}
-          type="button"
-          disabled={remaining <= 0}
-          onClick={() => { if (remaining > 0) setMenuOpen((v) => !v) }}
-          className={`group relative flex h-14 w-full flex-row items-center justify-center gap-2 rounded-2xl border border-dashed border-ink/15 bg-ink/[0.02] transition-colors ${
-            remaining <= 0 ? 'cursor-not-allowed opacity-50' : 'hover:border-ink/25 hover:bg-ink/[0.04]'
-          }`}
-        >
-          <span className="flex h-7 w-7 items-center justify-center rounded-full border border-ink/15 bg-ink/[0.03] text-ink-400 transition-colors group-hover:text-ink-200">
-            <ImagePlus className="h-3.5 w-3.5" />
-          </span>
-          <span className="text-[12px] font-normal text-ink-500">
-            {remaining <= 0 ? 'All slots used' : 'Upload or pick from a bank'}
-          </span>
-        </button>
+      {/* Playground's reference strip, exactly: 64px square thumbnails with the
+          dashed add tile joined into the same wrapping row. It was a four-up
+          `grid` of `aspect-square` cells over a full-width dashed slab, which in
+          a half-modal column made every attached photo ~110px — three times the
+          size of the same reference in Playground, and the biggest thing in a
+          panel where the prompt is the point. */}
+      <div className="flex flex-wrap gap-1.5">
+        {refs.map((r, i) => (
+          <RefThumb key={i} refStr={r.dataUrl} onRemove={() => onRemove(i)} />
+        ))}
         {remaining > 0 && (
-          <SlotActionMenu
-            anchorRef={triggerRef}
-            open={menuOpen}
-            onClose={() => setMenuOpen(false)}
-            onUpload={() => fileInputRef.current?.click()}
-            onPickFromBank={() => setPickerOpen(true)}
-          />
+          <AddTile triggerRef={triggerRef} onClick={() => setMenuOpen((v) => !v)} />
         )}
       </div>
+      {remaining > 0 && (
+        <SlotActionMenu
+          anchorRef={triggerRef}
+          open={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          onUpload={() => fileInputRef.current?.click()}
+          onPickFromBank={() => setPickerOpen(true)}
+        />
+      )}
 
       <input ref={fileInputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles} />
       <BankPicker
@@ -956,24 +946,18 @@ export function ExtraRefsRow({
 }
 
 // A single extra-reference thumbnail. Resolves asset:// refs through the asset
-// store; data: / http refs pass through. Mirrors the Playground thumbnail tile.
+// store; data: / http refs pass through, then hands the resolved URL to the
+// shared Playground tile so the two surfaces can't drift apart again.
 function RefThumb({ refStr, onRemove }: { refStr: string; onRemove: () => void }) {
   const url = useAssetUrl(refStr)
-  return (
-    <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-ink/10 bg-ink/[0.02]">
-      {url
-        ? <img src={url} alt="" className="h-full w-full object-cover" />
-        : <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-ink-500" /></div>}
-      <button
-        type="button"
-        title="Remove"
-        onClick={onRemove}
-        className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-white/80 transition-colors hover:bg-black/90"
-      >
-        <X className="h-2.5 w-2.5" />
-      </button>
-    </div>
-  )
+  if (!url) {
+    return (
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-ink/10 bg-ink/[0.02]">
+        <Loader2 className="h-4 w-4 animate-spin text-ink-500" />
+      </div>
+    )
+  }
+  return <RefImageTile src={url} onRemove={onRemove} />
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────

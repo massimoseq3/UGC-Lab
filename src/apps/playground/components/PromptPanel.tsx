@@ -46,6 +46,10 @@ import { useAppStore } from '../../../stores/appStore'
 import type { BankType } from '../../../utils/constants'
 import type { BRoll } from '../../../stores/types'
 import PresetCard from './PresetCard'
+import { StyleTile } from '../../../components/StyleModal'
+import { STYLE_PREVIEWS, PLAYGROUND_STYLE_ACCENT } from '../../../components/styleArt'
+import { CONTINUOUS_STYLES, styleBriefFor, styleBriefForStill } from '../../../utils/visualStyle'
+import { useBankStore } from '../../../stores/bankStore'
 import SlideOver from '../../../components/SlideOver'
 import ExpandTextModal, { BracketHighlightArea } from '../../../components/ExpandableText'
 import PromptToolbar from '../../../components/PromptToolbar'
@@ -225,6 +229,9 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
   const modelSavings = model ? officialSavingsPercent(model.id) : null
   const taskForMode: Task = state.mode === 'image' ? 'image' : state.mode === 'video' ? 'video' : 'music'
   const addToast = useAppStore((s) => s.addToast)
+  // The member's saved looks, listed beside the built-in styles in the presets
+  // panel.
+  const savedStyles = useBankStore((s) => s.styles)
 
   // Video ref slots derived from the refs[] array — start/end frames live as
   // single-value slots, ref strip as a list. Mutating these calls back through
@@ -505,6 +512,25 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
     textareaRef.current?.focus()
   }
 
+  // A visual style applies exactly like a preset: its brief is appended to
+  // whatever is already typed. Playground stores no "picked style" of its own —
+  // the prompt IS the state here, so a look you've applied stays visible and
+  // editable rather than hiding in a row above the box.
+  //
+  // Image mode gets the still-scoped brief (every style paragraph ends on camera
+  // movement and cutting cadence, which a single frame can't express);
+  // `styleBriefForStill` returns null for UGC Realism — the photoreal default —
+  // so that one falls back to the plain brief rather than applying nothing.
+  function applyStyle(input: { styleId: string; styleBrief?: string }) {
+    const brief = state.mode === 'video'
+      ? styleBriefFor(input)
+      : styleBriefForStill(input) ?? styleBriefFor(input)
+    if (!brief) return
+    const existing = state.prompt.trim()
+    onChange({ ...state, prompt: existing ? `${existing}\n\n${brief}` : brief })
+    textareaRef.current?.focus()
+  }
+
   // Adds a dropped audio/video file to the matching media strip, enforcing
   // the same total-length cap as the strip's own upload button.
   async function addDroppedMedia(slot: 'audio' | 'video', file: File) {
@@ -625,12 +651,19 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
       {/* Middle: scrollable body — model picker, preset, refs, prompt. */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <div className="flex h-full flex-col overflow-y-auto">
-          {/* h-full, not grow: the column is exactly the port, so the prompt box
-              below it has a CEILING to shrink against. With `grow` the column
-              stretched to its own content and the box overflowed the port —
-              its toolbar was pushed out of sight and clipped by the box's own
-              overflow-hidden. */}
-          <div className="flex h-full min-h-0 flex-col gap-2 px-5 pb-2 pt-3 max-md:h-auto max-md:min-h-full">
+          {/* `min-h-full`, not `h-full`. Both make the column at least the port,
+              so the prompt box below still has a ceiling to shrink against and
+              `grow` still fills a short panel — but `h-full` also made it at
+              MOST the port, which means the scroller never learns its content is
+              taller than it. Pick a model with a lot of inputs (Seedance 2: two
+              frame slots, a reference strip, and the audio + video clip strips)
+              and the References card alone outgrew the port: the prompt box was
+              pushed past the bottom edge and clipped there with no scrollbar to
+              recover it, while the wheel fell through to the page behind. With
+              `min-h-full` the column grows, this scroller scrolls, and the box
+              simply sits at its own 206px floor. Same rule on a phone, so the
+              `max-md` override is gone with it. */}
+          <div className="flex min-h-full min-w-0 flex-col gap-2 px-5 pb-2 pt-3">
             {/* Model picker now lives in the footer, above the output-settings
                 pills (see below) — the scrollable body opens straight into the
                 reference inputs. */}
@@ -770,6 +803,41 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               </SectionCard>
             )}
 
+            {/* Music's two controls sit ABOVE the prompt box, not down in the
+                footer with the other modes' output settings — model, then
+                delivery, then the box you write in, reading top to bottom.
+                Image and Video keep theirs in the footer because they're
+                genuinely output settings (resolution, aspect, duration) picked
+                on the way to Generate; Music has no output settings at all, so
+                its footer was a lone hand-rolled toggle standing in for a row of
+                chips, sized `h-10` to match chips that aren't there in this
+                mode. The toggle is a real `SegmentedToggle` at `h-12` now — the
+                same control at the same height as B-Roll's With Dialogue /
+                B-Roll Clips pair, which is the same question asked of a
+                generation. */}
+            {state.mode === 'music' && (
+              <div className="flex shrink-0 flex-col gap-2">
+                <ModelPicker
+                  row
+                  appId="playground"
+                  task="music"
+                  mode={pickerMode}
+                  value={state.modelId}
+                  onChange={(modelId) => onChange({ ...state, modelId })}
+                />
+                <SegmentedToggle<'instrumental' | 'lyrics'>
+                  className="h-12 !p-1"
+                  accent="playground"
+                  value={state.instrumental ? 'instrumental' : 'lyrics'}
+                  onChange={(v) => onChange({ ...state, instrumental: v === 'instrumental' })}
+                  options={[
+                    { value: 'instrumental', label: 'Instrumental' },
+                    { value: 'lyrics', label: 'With lyrics' },
+                  ]}
+                />
+              </div>
+            )}
+
             {/* Prompt — takes the column's leftover height, and never more.
                 `grow` fills the gap that would otherwise sit between the box and
                 the pinned footer; every wrapper below is `min-h-0` so the box can
@@ -797,13 +865,18 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   so it isn't clipped. */}
               <div className="relative flex min-h-0 grow flex-col">
                 <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
-                  {/* UGC Prompt Presets — header row inside the box. Opens the
-                      slide-in picker. One line at h-12, matching the model
-                      picker trigger in the footer: it's the same kind of
-                      control (tap a row, a panel slides in) and it was two
-                      lines tall at the top of the field the prompt is trying
-                      to fill. The old second line explained what a preset does
-                      — the picker itself does that better, and once. */}
+                  {/* UGC Prompt Presets & Visual Styles — header row inside the
+                      box. Opens the slide-in picker. One line at h-12, matching
+                      the model picker trigger in the footer: it's the same kind
+                      of control (tap a row, a panel slides in) and it was two
+                      lines tall at the top of the field the prompt is trying to
+                      fill. The old second line explained what a preset does —
+                      the picker itself does that better, and once.
+                      The visual styles ride in this SAME row rather than in a
+                      second one: both do exactly one thing to the prompt below
+                      (append a block of direction to it), and a column this
+                      narrow can't spare another 48px row above the box the
+                      whole panel exists to fill. */}
                   {presetsApplicable && (
                     <button
                       type="button"
@@ -813,7 +886,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-playground-500/10 text-playground-400">
                         <Camera className="h-3.5 w-3.5" />
                       </span>
-                      <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-100">UGC Prompt Preset</p>
+                      <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-100">UGC Prompt Presets &amp; Visual Styles</p>
                       <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
                     </button>
                   )}
@@ -877,25 +950,62 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
         <SlideOver
           open={presetOpen}
           onClose={() => setPresetOpen(false)}
-          title="UGC Prompt Presets"
-          subtitle="Pick a format to prefill the prompt + aspect ratio"
+          title="UGC Prompt Presets & Visual Styles"
+          subtitle="Add a look, a format, or both — each one appends to your prompt"
           // 460px — a step under the old 560px so more of the list is on screen
           // at once, but wider than the Characters picker's 380px: these tiles
           // are the only thing that says what a format looks like, and at 380
           // the frame is too small to read the shot.
           size="medium"
         >
-          <div className="grid grid-cols-3 gap-2 px-4 py-3">
-            {(state.mode === 'image' ? IMAGE_PRESETS : VIDEO_PRESETS).map((preset) => (
-              <PresetCard
-                key={preset.id}
-                preset={preset}
-                onClick={() => {
-                  applyPreset(preset)
-                  setPresetOpen(false)
-                }}
-              />
-            ))}
+          {/* Visual styles FIRST: a look is the broader decision — it applies to
+              anything you were going to make — where a preset is one specific
+              shot. Same 9:16 tiles and the same preview art as the B-Roll and
+              Characters style pickers, so a style is recognised by its picture
+              wherever it's offered. Nothing is marked "active": Playground keeps
+              no style of its own, it appends the brief to the prompt, which is
+              then the member's to edit like anything else they typed. */}
+          <div className="px-4 py-3">
+            <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-ink-600">Visual styles</p>
+            <div className="grid grid-cols-3 gap-2">
+              {CONTINUOUS_STYLES.map((s) => (
+                <StyleTile
+                  key={s.id}
+                  name={s.label}
+                  imageUrl={STYLE_PREVIEWS[s.id]}
+                  active={false}
+                  accent={PLAYGROUND_STYLE_ACCENT}
+                  onClick={() => { applyStyle({ styleId: s.id }); setPresetOpen(false) }}
+                />
+              ))}
+              {/* The member's own saved looks, from the Styles bank — read-only
+                  here; creating one still lives in B-Roll's style picker, which
+                  owns the reference-frame analysis. */}
+              {savedStyles.map((s) => (
+                <StyleTile
+                  key={s.id}
+                  imageRef={(s.thumbRefs ?? [])[0]}
+                  name={s.name}
+                  active={false}
+                  accent={PLAYGROUND_STYLE_ACCENT}
+                  onClick={() => { applyStyle({ styleId: 'ugc', styleBrief: s.brief }); setPresetOpen(false) }}
+                />
+              ))}
+            </div>
+
+            <p className="mb-2.5 mt-6 text-[11px] font-medium uppercase tracking-wider text-ink-600">UGC prompt presets</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(state.mode === 'image' ? IMAGE_PRESETS : VIDEO_PRESETS).map((preset) => (
+                <PresetCard
+                  key={preset.id}
+                  preset={preset}
+                  onClick={() => {
+                    applyPreset(preset)
+                    setPresetOpen(false)
+                  }}
+                />
+              ))}
+            </div>
           </div>
         </SlideOver>
 
@@ -925,8 +1035,11 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
       {/* 8px between the model row, the settings pills and Generate — the
           rhythm Scripts and B-Roll run on. */}
       <div className="shrink-0 px-5 pb-3 pt-0">
-        {/* Model — video mode uses the slide-in side panel (matching B-Roll);
-            image / music keep the inline dropdown (which auto-opens upward here). */}
+        {/* Model — video uses the slide-in side panel (matching B-Roll); image
+            keeps the inline dropdown (which auto-opens upward here). Music's
+            picker is not here at all: it moved above the prompt box, where its
+            delivery toggle is (see the note up there). */}
+        {state.mode !== 'music' && (
         <div className="mb-2">
           {state.mode === 'video' ? (
             <>
@@ -983,8 +1096,12 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             />
           )}
         </div>
-        {/* Output settings — resolution / aspect (+ duration, audio, lyrics
-            per mode). Sits just above Generate; dropdowns open upward. */}
+        )}
+        {/* Output settings — resolution / aspect / duration / audio. Music has
+            none (its delivery toggle lives above the prompt box), so the row
+            isn't rendered there rather than rendered empty with its own margin
+            under it. Sits just above Generate; dropdowns open upward. */}
+        {state.mode !== 'music' && (
         <div className="mb-2 flex flex-wrap items-center gap-1.5">
         {state.mode === 'video' && model?.videoConstraints && (
           <>
@@ -1089,36 +1206,8 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             )}
           </>
         )}
-
-        {state.mode === 'music' && (
-          // Sized h-10 to match the video/image constraint chips so the row
-          // doesn't jump when switching modes.
-          <div className="flex h-10 w-full items-center rounded-full border border-ink/10 bg-ink/[0.02] p-1">
-            <button
-              type="button"
-              onClick={() => onChange({ ...state, instrumental: true })}
-              className={`flex h-full flex-1 items-center justify-center rounded-full px-4 text-[12px] transition-colors ${
-                state.instrumental
-                  ? 'bg-playground-500/15 text-playground-200'
-                  : 'text-ink-400 hover:text-ink-200'
-              }`}
-            >
-              Instrumental
-            </button>
-            <button
-              type="button"
-              onClick={() => onChange({ ...state, instrumental: false })}
-              className={`flex h-full flex-1 items-center justify-center rounded-full px-4 text-[12px] transition-colors ${
-                !state.instrumental
-                  ? 'bg-playground-500/15 text-playground-200'
-                  : 'text-ink-400 hover:text-ink-200'
-              }`}
-            >
-              With lyrics
-            </button>
-          </div>
-        )}
         </div>
+        )}
         <button
           type="button"
           onClick={onSubmit}
