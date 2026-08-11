@@ -442,6 +442,21 @@ async function cleanupAssets(...refs: (string | undefined)[]) {
   }
 }
 
+// Is this blob still on ANOTHER product row? Two rows can legitimately point at
+// one photo — a duplicate created by an autosave that resolved after its form
+// closed, or the same shot picked into a second product — and purging it for
+// one of them takes the picture off the other permanently: cleanupAssets drops
+// the Supabase `assets` record too, and downloadAssetFromR2 bails without it, so
+// the cloud copy goes with the local one. Same shape as updateModel's
+// `stillReferenced` guard below.
+function productAssetInUse(products: Product[], ref: string, exceptId: string): boolean {
+  const id = assetIdFromRef(ref)
+  return products.some(
+    (p) => p.id !== exceptId
+      && [p.productImage, ...(p.extraImages ?? [])].some((r) => !!r && assetIdFromRef(r) === id),
+  )
+}
+
 // A B-Roll saved from Playground shares its blob with the history row that
 // created it (which stamps `linkedBRollId`), so B-Roll delete/replace must not
 // purge a blob a history tile still renders. Compare normalised ids — B-Roll
@@ -546,7 +561,7 @@ export const useBankStore = create<BankState>((set, get) => ({
       [updated.productImage, ...(updated.extraImages ?? [])].filter((r): r is string => !!r),
     )
     const dropped = [old.productImage, ...(old.extraImages ?? [])]
-      .filter((r): r is string => !!r && !kept.has(r))
+      .filter((r): r is string => !!r && !kept.has(r) && !productAssetInUse(get().products, r, id))
     if (dropped.length) cleanupAssets(...dropped)
     set((state) => {
       const next = { products: state.products.map((p) => p.id === id ? updated : p) }
@@ -566,7 +581,11 @@ export const useBankStore = create<BankState>((set, get) => ({
       return next
     })
     dropRow('products', id)
-    void cleanupAssets(item.productImage, ...(item.extraImages ?? []))
+    // Only the photos no other product is showing. `get().products` is the list
+    // WITHOUT this row by now, so anything left holding the ref is a live card.
+    const orphaned = [item.productImage, ...(item.extraImages ?? [])]
+      .filter((r): r is string => !!r && !productAssetInUse(get().products, r, id))
+    void cleanupAssets(...orphaned)
     reportSuccess('Product deleted')
   },
 

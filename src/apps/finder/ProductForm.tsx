@@ -1,17 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { X, ImagePlus, Download, Loader2, AlertCircle, Sparkles, Check, Package, Users, Star, Tag, Image as ImageIcon } from 'lucide-react'
+import { X, ImagePlus, Download, Loader2, AlertCircle, Sparkles, Check, Package, Users, Star, Tag } from 'lucide-react'
 import type { Product } from '../../stores/types'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
 import { useAppStore } from '../../stores/appStore'
 import { extractProductInfo } from './services/extractProductInfo'
 import { downloadImage } from '../../utils/downloadImage'
-import { ACCEPTED_IMAGE_TYPES, MAX_IMAGE_SIZE } from './services/imageValidation'
+import { imageRejectionReason, partitionImageFiles, IMAGE_ACCEPT_ATTR } from './services/imageValidation'
 import { humanizeError } from '../../utils/friendlyError'
 import SegmentedToggle from '../../components/SegmentedToggle'
 import ExpandTextModal, { ExpandButton } from '../../components/ExpandableText'
 import AutoGrowTextarea from '../../components/AutoGrowTextarea'
 import SectionCard, { SectionLabel } from '../../components/SectionCard'
-import { usePersistedState } from '../../hooks/usePersistedState'
 
 interface ProductFormProps {
   item?: Product | null
@@ -58,14 +57,6 @@ const SECTIONS: { key: SectionKey; label: string; icon: React.ElementType; field
 // photos as reference images (Photo only, below) has no copy to put in it, and
 // gating Add on a write-up they didn't ask for was the whole complaint.
 const REQUIRED_KEYS = ['productName'] as const
-
-// What a dropped photo does. Auto-fill is the default and the advertised flow;
-// Photo only attaches the shot and spends nothing, for a product whose copy is
-// already written — or one that exists purely to hand its photos to B-Roll and
-// Playground as references. The on-demand "Auto-fill from image" button under
-// the photo is the way back, so nothing is lost by switching.
-type DropMode = 'autofill' | 'photo'
-const DROP_MODE_KEY = 'ai-ugc-lab:products:drop-mode'
 
 // Extra angles beyond the hero shot. Four is enough to cover closed/open/label/
 // contents without turning the auto-fill call into a photo album.
@@ -163,7 +154,6 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
   const [expandedField, setExpandedField] = useState<string | null>(null)
   const [activeSection, setActiveSection] = useState<SectionKey>('identity')
   const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
-  const [dropMode, setDropMode] = usePersistedState<DropMode>(DROP_MODE_KEY, 'autofill')
   const resolvedAssetUrl = useAssetUrl(form.productImage)
   const displayImage = localPreview ?? resolvedAssetUrl
   const addToast = useAppStore((s) => s.addToast)
@@ -279,29 +269,43 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
     }
   }
 
-  // Picking a file through the tile follows the same mode a drop does. It used
-  // to attach silently whatever the tile's own "Drop to auto-fill" label said,
-  // so the two ways of adding the same photo behaved differently.
+  // The one gate every way of adding a photo goes through — the tile, the file
+  // picker, a drop, an extra angle. It TOASTS rather than writing to
+  // `extractError`, which renders at the bottom of the field column below four
+  // section cards: off screen on any normal window, so a rejected AVIF looked
+  // exactly like nothing happening.
+  const rejectFile = (file: File): boolean => {
+    const reason = imageRejectionReason(file)
+    if (!reason) return false
+    addToast(reason, 'error')
+    return true
+  }
+
   const handleImage = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
-    if (!file) return
-    if (dropMode === 'photo') attachImage(file)
-    else void runExtraction(file)
+    // `accept` is a filter, not a guarantee — every OS file dialog has a way
+    // past it, and a picked file is validated exactly like a dropped one.
+    if (!file || rejectFile(file)) return
+    void runExtraction(file)
   }
 
   // Extra angles are read straight to data URIs and held on the form; the save
   // path persists them to IndexedDB the same way the hero shot is persisted.
   const addExtraImages = (files: FileList | null) => {
     if (!files) return
+    const { accepted: valid, rejection } = partitionImageFiles(Array.from(files))
+    if (rejection) addToast(rejection, 'error')
     const room = MAX_EXTRA_IMAGES - form.extraImages.length
-    const accepted: File[] = []
-    let rejected = false
-    for (const file of Array.from(files)) {
-      if (!ACCEPTED_IMAGE_TYPES.includes(file.type) || file.size > MAX_IMAGE_SIZE) { rejected = true; continue }
-      if (accepted.length < room) accepted.push(file)
+    const accepted = valid.slice(0, room)
+    if (valid.length > room) {
+      addToast(
+        room === 0
+          ? `More Angles is full — ${MAX_EXTRA_IMAGES} is the limit.`
+          : `Only ${MAX_EXTRA_IMAGES} extra angles fit — kept the first ${room}.`,
+        'info',
+      )
     }
-    if (rejected) setExtractError('Skipped a file — use JPG, PNG, or WebP under 10 MB.')
     for (const file of accepted) {
       const reader = new FileReader()
       reader.onload = () => {
@@ -310,25 +314,15 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
           f.extraImages.length >= MAX_EXTRA_IMAGES ? f : { ...f, extraImages: [...f.extraImages, dataUrl] }
         ))
       }
+      // A read that fails silently leaves an angle the member watched
+      // themselves add simply not there.
+      reader.onerror = () => addToast(`Couldn't read ${file.name}.`, 'error')
       reader.readAsDataURL(file)
     }
   }
 
   const removeExtraImage = (index: number) => {
     setForm((f) => ({ ...f, extraImages: f.extraImages.filter((_, i) => i !== index) }))
-  }
-
-  // Attach a photo as the hero shot and stop there — no vision call, no credits.
-  // The same half of `runExtraction` that shows the picture, without the read.
-  const attachImage = (file: File) => {
-    setExtractError(null)
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') return
-      setForm((f) => ({ ...f, productImage: reader.result as string }))
-      setLocalPreview(reader.result as string)
-    }
-    reader.readAsDataURL(file)
   }
 
   const runExtraction = async (file: File) => {
@@ -344,6 +338,9 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
         setLocalPreview(reader.result as string)
       }
     }
+    // Without this the photo just never appears while the fields fill in around
+    // it — a product saved with every line of copy and no picture.
+    reader.onerror = () => addToast(`Couldn't read ${file.name}.`, 'error')
     reader.readAsDataURL(file)
 
     try {
@@ -411,17 +408,8 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
     dragDepthRef.current = 0
     setOverlayActive(false)
     const file = e.dataTransfer.files[0]
-    if (!file) return
-    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
-      setExtractError('Unsupported format. Use JPG, PNG, or WebP.')
-      return
-    }
-    if (file.size > MAX_IMAGE_SIZE) {
-      setExtractError('File too large. Maximum size is 10 MB.')
-      return
-    }
-    if (dropMode === 'photo') attachImage(file)
-    else void runExtraction(file)
+    if (!file || rejectFile(file)) return
+    void runExtraction(file)
   }
 
   const handleDownload = () => {
@@ -533,13 +521,11 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
       onDrop={handleDrop}
       className="relative flex flex-col gap-4 lg:min-h-0 lg:flex-1"
     >
-      {/* The overlay says what THIS drop will do, so the choice is visible
-          before the file lands rather than discovered from the credit spend. */}
       {overlayActive && (
         <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-xl border-2 border-dashed border-emerald-400/60 bg-emerald-500/10 backdrop-blur-sm">
           <div className="flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-emerald-200">
-            {dropMode === 'photo' ? <ImageIcon className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-            {dropMode === 'photo' ? 'Drop image to add the photo only' : 'Drop image to auto-fill product info'}
+            <Sparkles className="h-4 w-4" />
+            Drop image to auto-fill product info
           </div>
         </div>
       )}
@@ -586,21 +572,6 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
           ref={sideRef}
           className={`flex w-full shrink-0 flex-col gap-4 md:w-[300px] lg:min-h-0 lg:overflow-y-auto lg:pr-1 ${sideHasMore ? 'scroll-fade-b' : ''}`}
         >
-          {/* What a dropped photo does. Sits above the photo because it has to
-              be readable BEFORE the drop — the Auto-fill button below only
-              appears once there's already an image. */}
-          <SegmentedToggle<DropMode>
-            dense
-            accent="products"
-            value={dropMode}
-            onChange={setDropMode}
-            options={[
-              { value: 'autofill', label: 'Auto-fill', icon: Sparkles },
-              { value: 'photo', label: 'Photo only', icon: ImageIcon },
-            ]}
-            className="shrink-0"
-          />
-
           {displayImage ? (
             <div className="group/img relative aspect-[3/2] w-full shrink-0 overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] md:aspect-square">
               <img src={displayImage} alt="" className="h-full w-full object-cover" />
@@ -633,7 +604,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
             >
               <ImagePlus className="h-6 w-6 text-ink-600 transition-colors group-hover:text-ink-400" />
               <span className="text-[10px] font-medium uppercase tracking-widest text-ink-600 transition-colors group-hover:text-ink-500">
-                {dropMode === 'photo' ? 'Drop to add photo' : 'Drop to auto-fill'}
+                Drop to auto-fill
               </span>
             </button>
           )}
@@ -702,12 +673,12 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
             />
           </label>
         </div>
-        <input ref={fileRef} type="file" accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" className="hidden" onChange={handleImage} />
+        <input ref={fileRef} type="file" accept={IMAGE_ACCEPT_ATTR} className="hidden" onChange={handleImage} />
         <input
           ref={extraFileRef}
           type="file"
           multiple
-          accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+          accept={IMAGE_ACCEPT_ATTR}
           className="hidden"
           onChange={(e) => { addExtraImages(e.target.files); e.target.value = '' }}
         />
