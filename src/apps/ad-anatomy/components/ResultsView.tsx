@@ -11,6 +11,8 @@ import {
   Lightbulb,
   Palette,
   AudioLines,
+  Quote,
+  Type,
 } from 'lucide-react'
 import type {
   AnalysisResult,
@@ -19,6 +21,7 @@ import type {
   ReverseEngineeredPrompt,
   Scene,
 } from '../types'
+import { parseScenePrompt, type SceneSegment } from '../utils/scenePrompt'
 import { useAppStore } from '../../../stores/appStore'
 import { useBankStore } from '../../../stores/bankStore'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -424,8 +427,63 @@ function VoiceProfileBlock({ voice }: { voice: MasterVoiceProfile }) {
   )
 }
 
+// The `[0:00–0:03]` marker a beat opens with. Red, in its own brackets, on its
+// own line: it's the one thing in a scene prompt you navigate by, and inline in
+// the prose it was indistinguishable from the sentence around it.
+function BeatTime({ time }: { time: string }) {
+  return (
+    <span className="w-fit select-none rounded-full bg-[#FF5257]/10 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums tracking-tight text-[#FF5257] light:text-[#C4272C]">
+      [{time}]
+    </span>
+  )
+}
+
+// A verbatim quote pulled out of the direction, in the shape Scripts gives a
+// spoken line: separately copyable, because it's the part that leaves this app
+// (into a voiceover, or into the recreation's dialogue). Two variants — speech
+// carries the scene accent, on-screen text stays neutral chrome, since one is
+// heard and the other is read.
+function QuoteBlock({ segment }: { segment: Extract<SceneSegment, { kind: 'quote' }> }) {
+  const { copied, copy } = useCopy()
+  const speech = segment.variant === 'speech'
+  const Icon = speech ? Quote : Type
+  return (
+    <div
+      className={`relative rounded-xl border py-2.5 pl-3.5 pr-10 ${
+        speech ? 'border-fuchsia-500/15 bg-fuchsia-500/[0.06]' : 'border-ink/10 bg-ink/[0.04]'
+      }`}
+    >
+      <div
+        className={`mb-1 flex select-none items-center gap-1.5 text-[10px] font-semibold uppercase tracking-tight ${
+          speech ? 'text-fuchsia-300/90 light:text-fuchsia-700' : 'text-ink-500'
+        }`}
+      >
+        <Icon className="h-2.5 w-2.5" strokeWidth={2.5} />
+        {/* An unattributed line still gets a label — which kind of quote it is
+            is the thing the box is claiming, and a bare quote with no header
+            reads as a styling accident. */}
+        {segment.speaker || (speech ? 'Spoken line' : 'On-screen text')}
+      </div>
+      <p className="text-[14px] font-light leading-snug tracking-tight text-ink-100">“{segment.text}”</p>
+      <button
+        onClick={() => copy(segment.text)}
+        title={speech ? 'Copy line' : 'Copy text'}
+        aria-label={speech ? 'Copy line' : 'Copy text'}
+        className="absolute right-1.5 top-1.5 flex h-6 w-6 select-none items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
+      >
+        {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
+      </button>
+    </div>
+  )
+}
+
 function SceneCard({ scene }: { scene: Scene }) {
   const { copied, copy } = useCopy()
+  // The prompt read as its own beats. A scene the model wrote without a
+  // timeline comes back as one untimed beat, so nothing renders empty — and
+  // Copy still hands over `scene.prompt` verbatim, which is what gets pasted
+  // into a video model.
+  const beats = parseScenePrompt(scene.prompt)
   return (
     <div className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 card-soft-shadow">
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -446,8 +504,23 @@ function SceneCard({ scene }: { scene: Scene }) {
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <div className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-200">
-        {scene.prompt}
+      {/* Beats are spaced, not ruled: a hairline between them read as a divider
+          between unrelated blocks, when they're consecutive shots of one take. */}
+      <div className="flex flex-col gap-4 rounded-xl bg-surface-0 p-3">
+        {beats.map((beat, i) => (
+          <div key={i} className="flex flex-col gap-2">
+            {beat.time && <BeatTime time={beat.time} />}
+            {beat.segments.map((segment, j) =>
+              segment.kind === 'quote' ? (
+                <QuoteBlock key={j} segment={segment} />
+              ) : (
+                <p key={j} className="whitespace-pre-wrap text-[13px] font-light leading-relaxed tracking-tight text-ink-200">
+                  {segment.text}
+                </p>
+              ),
+            )}
+          </div>
+        ))}
       </div>
     </div>
   )
