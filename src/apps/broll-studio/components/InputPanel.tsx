@@ -110,10 +110,13 @@ function BankCard({
     return (
       <button
         onClick={onSelect}
+        // Empty: the same dashed surface the Visual Style row wears, fill
+        // included — it had none, so an unfilled Product read a shade darker
+        // than the unfilled style row directly under it.
         className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors ${
           flat
             ? 'border-b border-dashed border-ink/10 hover:bg-ink/[0.04]'
-            : 'rounded-full border border-dashed border-ink/10 hover:border-ink/20 hover:bg-ink/[0.02]'
+            : 'rounded-full border border-dashed border-ink/10 bg-ink/[0.02] hover:border-ink/20 hover:bg-ink/[0.04]'
         } ${className ?? ''}`}
       >
         <StatusDot filled={filled ?? false} required={required} />
@@ -302,10 +305,14 @@ export default function InputPanel({
       </div>
 
       {/* Bank selections */}
-      {/* pb-2, not pb-4: the settings band below is part of this column, and
-          16px of column padding plus the band's own top padding opened a gap
-          twice the 8px the reference cards sit apart. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-2 pt-3">
+      {/* pb-0, and the 8px to the band lives on the BAND (`pt-2`), not here.
+          It used to be this column's `pb-2`, which is inside the scroller — so
+          it was part of the scrolled content and slid out of view the moment
+          the column overflowed, which is its normal state once a script is
+          pasted in. Measured: the last box sat 2.5px off the band at scroll-top
+          (reading as touching), 8.5px scrolled to the bottom. A gap that
+          changes as you scroll isn't a gap. On the band it can't scroll away. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-0 pt-3">
         {/* The References card — the Influencers section card, holding
             everything the storyboard is built FROM. Its centred header carries
             the panel's two utilities on its edges (Influencers' TabDivider
@@ -336,13 +343,14 @@ export default function InputPanel({
           }
           right={<ClearAllButton onClear={onClearInputs} label="New" />}
         >
-          {/* Product and Character — the two rows that used to be the odd ones
-              out in this card, on both counts.
-              COLOUR: their populated state was a gold / pink glassy fill, while
-              Visual Style and Script sit on the plain translucent surface, so
-              filling in a product visibly changed the KIND of row it was. They
-              take the same see-through surface now; each bank keeps its colour
-              where it belongs, on the icon disc.
+          {/* Product and Character.
+              COLOUR: empty, they wear the same dashed surface as the Visual
+              Style row below them; filled, each lights up in its own bank's
+              colour — amber for products, pink for influencers — the way the
+              style row lights up purple. They were briefly neutral in both
+              states, which made a filled reference the quietest thing in the
+              card: the accent IS the "this is set" signal, and it's the colour
+              that says WHICH bank set it.
               DOT: they carried the neutral dot (nothing here holds Generate
               shut but the script and the style). Massimo asked for red, and
               the honest reading is that a UGC storyboard without its product or
@@ -353,7 +361,7 @@ export default function InputPanel({
             icon={Package}
             label="Product"
             accentClass="bg-gold-500/15 text-gold-400 light:text-gold-600"
-            selectedClass="border-ink/10 bg-ink/[0.02] hover:border-ink/20 hover:bg-ink/[0.04]"
+            selectedClass="border-gold-500/30 bg-gold-500/[0.07] hover:border-gold-500/40 hover:bg-gold-500/10"
             isEmpty={!selectedProduct}
             required
             onSelect={onSelectProduct}
@@ -367,7 +375,7 @@ export default function InputPanel({
             icon={UserRound}
             label="Character"
             accentClass="bg-influencers-500/15 text-influencers-400"
-            selectedClass="border-ink/10 bg-ink/[0.02] hover:border-ink/20 hover:bg-ink/[0.04]"
+            selectedClass="border-influencers-500/30 bg-influencers-500/[0.07] hover:border-influencers-500/40 hover:bg-influencers-500/10"
             isEmpty={!selectedModel}
             required
             onSelect={onSelectModel}
@@ -556,7 +564,7 @@ export default function InputPanel({
           panel, so it's gone and the rows sit straight on the column. Sticky on
           mobile (where it floats over scrolling content, hence the opaque fill
           — see the note under bg-surface-0), plain and static on desktop. */}
-      <div className="shrink-0 bg-surface-0 px-5 pb-2.5 pt-0 md:bg-transparent">
+      <div className="shrink-0 bg-surface-0 px-5 pb-2.5 pt-2 md:bg-transparent">
         <div className="mb-2 flex flex-col gap-2">
 
           {/* Who writes the shot prompts, then how the cards are delivered.

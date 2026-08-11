@@ -135,14 +135,23 @@ function extractIntro(text: string): string {
 // to emit it AFTER the last scene, so it gets appended to (and merged into) the
 // final scene's body unless we pull it out. Case-insensitive; tolerates the
 // "(same voice in every scene)" parenthetical and trailing "===" markers.
-const VOICE_HEADER_REGEX = /(^|\n)[=\s]*VOICE PROFILE\b[^\n]*\n?/i
+// `MASTER` is optional because the two producers word it differently: Scripts'
+// own prompts emit "=== VOICE PROFILE … ===", the Ad Analyzer's blueprint emits
+// "=== MASTER VOICE PROFILE … ===" (ResultsView), and that word sitting between
+// the markers and the label meant a blueprint remixed here rendered its voice
+// profile buried in the last scene's body instead of on its own card.
+const VOICE_HEADER_REGEX = /(^|\n)[=\s]*(?:MASTER\s+)?VOICE PROFILE\b[^\n]*\n?/i
 
 // Pulls the voice-profile block out of a scenes script. It can sit BEFORE the
 // first scene (legacy `extractIntro` shape) or be appended AFTER/within the last
 // scene (what the prompt actually produces). Returns the voice-profile body
 // (with its "=== ... ===" markers stripped) and the rest of the text with the
 // block removed, ready for scene-splitting.
-function splitVoiceProfile(text: string): { body: string; rest: string } {
+// `bodyStart`/`bodyEnd` are the body's span in `text`, present only for the
+// appended-header shape — the one whose boundaries are exactly known. The
+// `extractIntro` fallback deliberately reports none, so an unrecognised shape
+// renders read-only rather than risking a splice over the wrong characters.
+function splitVoiceProfile(text: string): { body: string; rest: string; bodyStart?: number; bodyEnd?: number } {
   const match = VOICE_HEADER_REGEX.exec(text)
   if (!match) {
     // No appended header — fall back to the intro-based shape.
@@ -151,15 +160,21 @@ function splitVoiceProfile(text: string): { body: string; rest: string } {
   const headerStart = match.index + match[1].length
   // Everything from the header to the end is the voice-profile block; strip the
   // header line and any standalone "===" divider lines from the body.
-  const body = text
-    .slice(headerStart)
-    .replace(VOICE_HEADER_REGEX, '')
-    .replace(/^[=\s]+|[=\s]+$/g, '')
-    .trim()
+  const afterHeader = text.slice(headerStart)
+  const header = VOICE_HEADER_REGEX.exec(afterHeader)
+  const regionStart = headerStart + (header ? header.index + header[0].length : 0)
+  const region = text.slice(regionStart)
+  const body = region.replace(/^[=\s]+|[=\s]+$/g, '').trim()
   const rest = text.slice(0, headerStart).replace(/\s+$/, '')
+  if (body) {
+    // Only the ends were stripped, so indexOf lands on the true offset — the
+    // body can't begin with the `=`/whitespace that was taken off its front.
+    const lead = region.indexOf(body)
+    return { body, rest, bodyStart: regionStart + lead, bodyEnd: regionStart + lead + body.length }
+  }
   // The intro shape and the appended shape are mutually exclusive in practice,
   // but prefer whichever yielded a body so both shapes work.
-  return { body: body || extractIntro(rest), rest }
+  return { body: extractIntro(rest), rest }
 }
 
 // A scene body is one prose paragraph with the spoken line quoted inline — the
@@ -372,11 +387,15 @@ function VariationCard({
   // Pull the voice-profile block (wherever it sits) out FIRST, then split the
   // remaining text into scenes — otherwise the appended profile gets merged into
   // the last scene's body.
-  const { scenes, voiceProfile } = useMemo(() => {
-    if (isHooks) return { scenes: null, voiceProfile: '' }
-    const { body, rest } = splitVoiceProfile(text)
+  const { scenes, voiceProfile, voiceSpan } = useMemo(() => {
+    if (isHooks) return { scenes: null, voiceProfile: '', voiceSpan: null }
+    const { body, rest, bodyStart, bodyEnd } = splitVoiceProfile(text)
     const parsed = splitScenes(rest)
-    return { scenes: parsed, voiceProfile: parsed ? body : '' }
+    return {
+      scenes: parsed,
+      voiceProfile: parsed ? body : '',
+      voiceSpan: bodyStart != null && bodyEnd != null ? { start: bodyStart, end: bodyEnd } : null,
+    }
   }, [text, isHooks])
 
   // Hooks: the raw text carries <FAMILY> tags — parse them into rows, and use
@@ -633,7 +652,12 @@ function VariationCard({
           </>
         ) : scenes ? (
           <>
-            {voiceProfile && <VoiceProfileCard body={voiceProfile} />}
+            {voiceProfile && (
+              <VoiceProfileCard
+                body={voiceProfile}
+                onChange={onEdit && voiceSpan ? (next) => replaceRange(voiceSpan.start, voiceSpan.end, next) : undefined}
+              />
+            )}
             {scenes.map((scene, i) => (
               <SceneChunkCard key={i} chunk={scene} onEditRange={onEdit ? replaceRange : undefined} />
             ))}
@@ -770,7 +794,7 @@ function VariationCard({
 // of a ten-scene column most members never scrolled far enough to find it. The
 // model still emits it last (the prompt says so); `splitVoiceProfile` lifts it
 // out either way, so only the render order moved.
-function VoiceProfileCard({ body }: { body: string }) {
+function VoiceProfileCard({ body, onChange }: { body: string; onChange?: (next: string) => void }) {
   const [copied, setCopied] = useState(false)
   const addToast = useAppStore((s) => s.addToast)
   const handleCopy = async () => {
@@ -798,9 +822,21 @@ function VoiceProfileCard({ body }: { body: string }) {
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
-      <div className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100">
-        {body}
-      </div>
+      {/* Always-on field, not click-to-edit: this block is plain prose with
+          nothing tinted in it, so a textarea styled as the paragraph looks
+          identical and costs nothing — the same rule a spoken line and a script
+          paragraph follow. Multi-line, since a voice profile is a paragraph. */}
+      <EditableText
+        value={body}
+        onCommit={onChange}
+        ariaLabel="Voice profile"
+        className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100"
+        render={(
+          <div className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100">
+            {body}
+          </div>
+        )}
+      />
     </div>
   )
 }

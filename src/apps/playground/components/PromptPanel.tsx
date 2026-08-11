@@ -663,7 +663,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               `min-h-full` the column grows, this scroller scrolls, and the box
               simply sits at its own 206px floor. Same rule on a phone, so the
               `max-md` override is gone with it. */}
-          <div className="flex min-h-full min-w-0 flex-col gap-2 px-5 pb-2 pt-3">
+          <div className="flex min-h-full min-w-0 flex-col gap-2 px-5 pb-0 pt-3">
             {/* Model picker now lives in the footer, above the output-settings
                 pills (see below) — the scrollable body opens straight into the
                 reference inputs. */}
@@ -740,47 +740,61 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                         />
                       </div>
                     )}
-                    {refsAllowed && (
-                      <RefTiles
-                        label="Reference Images"
-                        filled={refStripValues().length > 0}
-                        values={refStripValues()}
-                        onChange={setRefStrip}
-                        max={maxRefs}
-                        bankType="models"
-                        tabs={PLAYGROUND_REF_TABS}
-                      />
-                    )}
-                    {/* Audio and video references share a row when a model
-                        takes both (the Seedance 2 family) — two stacked
-                        full-width upload cards cost the prompt box its height
-                        in a column that also has to fit frames, ref images and
-                        the settings stack. Alone, either one spans the width. */}
-                    {(supportsRefAudio || supportsRefVideos) && (
-                      <div className={supportsRefAudio && supportsRefVideos ? 'grid grid-cols-2 gap-2' : ''}>
-                        {supportsRefAudio && (
-                          <MediaRefStrip
-                            label="Reference Audio"
-                            filled={mediaStripValues('audio').length > 0}
-                            kind="audio"
-                            values={mediaStripValues('audio')}
-                            onChange={(v) => setMediaStrip('audio', v)}
-                            max={3}
-                            maxTotalSeconds={refClipSeconds}
-                            onLimitError={(m) => addToast(m, 'error')}
+                    {/* Reference images and the clip strips SHARE a row when a
+                        model takes both (the Seedance 2 family), images left
+                        and the two clip cards stacked on the right. The images
+                        row is one 64px tile high whether it holds nothing or
+                        three, so on that model it was 210px of dead space
+                        beside an Add tile while the clip cards took a full row
+                        of their own underneath. Either kind alone spans the
+                        width — the split only pays when there's something to
+                        put in the gap, and the tiles want the width when the
+                        clips aren't there to claim it.
+                        `items-start` so a filled image grid doesn't stretch the
+                        clip column to match it. */}
+                    {(refsAllowed || supportsRefAudio || supportsRefVideos) && (
+                      <div className={refsAllowed && (supportsRefAudio || supportsRefVideos)
+                        ? 'grid grid-cols-2 items-start gap-2'
+                        : ''}
+                      >
+                        {refsAllowed && (
+                          <RefTiles
+                            label="Reference Images"
+                            filled={refStripValues().length > 0}
+                            values={refStripValues()}
+                            onChange={setRefStrip}
+                            max={maxRefs}
+                            bankType="models"
+                            tabs={PLAYGROUND_REF_TABS}
                           />
                         )}
-                        {supportsRefVideos && (
-                          <MediaRefStrip
-                            label="Reference Videos"
-                            filled={mediaStripValues('video').length > 0}
-                            kind="video"
-                            values={mediaStripValues('video')}
-                            onChange={(v) => setMediaStrip('video', v)}
-                            max={3}
-                            maxTotalSeconds={refClipSeconds}
-                            onLimitError={(m) => addToast(m, 'error')}
-                          />
+                        {(supportsRefAudio || supportsRefVideos) && (
+                          <div className="flex flex-col gap-2">
+                            {supportsRefAudio && (
+                              <MediaRefStrip
+                                label="Reference Audio"
+                                filled={mediaStripValues('audio').length > 0}
+                                kind="audio"
+                                values={mediaStripValues('audio')}
+                                onChange={(v) => setMediaStrip('audio', v)}
+                                max={3}
+                                maxTotalSeconds={refClipSeconds}
+                                onLimitError={(m) => addToast(m, 'error')}
+                              />
+                            )}
+                            {supportsRefVideos && (
+                              <MediaRefStrip
+                                label="Reference Videos"
+                                filled={mediaStripValues('video').length > 0}
+                                kind="video"
+                                values={mediaStripValues('video')}
+                                onChange={(v) => setMediaStrip('video', v)}
+                                max={3}
+                                maxTotalSeconds={refClipSeconds}
+                                onLimitError={(m) => addToast(m, 'error')}
+                              />
+                            )}
+                          </div>
                         )}
                       </div>
                     )}
@@ -848,10 +862,16 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 a min-height on the field: that pair lets the section collapse
                 while the field holds its own floor, and the box's overflow-hidden
                 then slices its footer toolbar off (a short window with the frame
-                + ref rows filled did exactly that). 206px = the 48px preset row,
-                a 120px field and the 38px toolbar — so at the floor the field is
-                still the 120 it used to declare for itself. */}
-            <div className="relative flex min-h-[206px] grow flex-col max-md:grow-0">
+                + ref rows filled did exactly that).
+                150px = the box's fixed chrome (the 48px preset row + the 38px
+                toolbar) plus ~4 lines of field. It was 206, which reserved a
+                120px field even when there was nothing spare to give it — and a
+                floor is what the box collapses TO under pressure, not the size
+                it normally renders at: `grow` still hands it every spare pixel
+                the moment the column has one. The 56px that bought is what puts
+                the prompt box (and its toolbar) on screen without scrolling on
+                the most input-heavy model in the picker. */}
+            <div className="relative flex min-h-[150px] grow flex-col max-md:grow-0">
               {/* Prompt field — a normal, visible textarea on top of a
                   transparent backdrop that only paints the [bracket] highlights.
                   The textarea owns every glyph, so the caret, selection and
@@ -1033,8 +1053,10 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
       {/* No hairline above this: the prompt box now ends where its text ends, so
           the gap between it and the model row already reads as the seam. */}
       {/* 8px between the model row, the settings pills and Generate — the
-          rhythm Scripts and B-Roll run on. */}
-      <div className="shrink-0 px-5 pb-3 pt-0">
+          rhythm Scripts and B-Roll run on — and 8px from the scrolling column
+          above, which is this band's own `pt-2` rather than the column's
+          padding: padding inside a scroller scrolls away with the content. */}
+      <div className="shrink-0 px-5 pb-3 pt-2">
         {/* Model — video uses the slide-in side panel (matching B-Roll); image
             keeps the inline dropdown (which auto-opens upward here). Music's
             picker is not here at all: it moved above the prompt box, where its

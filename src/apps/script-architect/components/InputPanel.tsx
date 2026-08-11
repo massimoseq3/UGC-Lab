@@ -491,7 +491,14 @@ export default function InputPanel({
       {/* 8px between every row, and 8px from the last one to the footer band
           (pb-2 + the band's pt-0) — B-Roll's rhythm. This column ran on 12s
           and 16s, which read as loose beside it. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-2 pt-3">
+      {/* pb-0, and the 8px to the band lives on the BAND (`pt-2`), not here.
+          It used to be this column's `pb-2`, which is inside the scroller — so
+          it was part of the scrolled content and slid out of view the moment
+          the column overflowed, which is its normal state once a script is
+          pasted in. Measured: the last box sat 2.5px off the band at scroll-top
+          (reading as touching), 8.5px scrolled to the bottom. A gap that
+          changes as you scroll isn't a gap. On the band it can't scroll away. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-0 pt-3">
         {mode === 'write' ? (
           <>
             {/* Output sub-mode toggle — governs the form below (which style
@@ -840,7 +847,7 @@ export default function InputPanel({
           already-blurred window frame, so any alpha lets content ghost through.
           No rule above it: the brief box ends where its own toolbar ends, so a
           hairline there just fenced off controls that belong to the same column. */}
-      <div className="shrink-0 bg-surface-0 px-5 pb-3 pt-0 md:bg-transparent">
+      <div className="shrink-0 bg-surface-0 px-5 pb-3 pt-2 md:bg-transparent">
         {/* Length and batch size — the same `ConstraintChip` pearls every other
             generate bar in the app uses for aspect / duration / resolution, and
             for the same reason: these are two small settings on the way to
