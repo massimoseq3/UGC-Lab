@@ -491,9 +491,22 @@ const AD_ANALYSES = [
           profile: 'A mid-pitched female voice in her mid-twenties, General American with no regional colour, running fast and conversational with the pace of someone telling a friend something before they forget it. The texture is warm and slightly breathy at the top of a sentence, dropping into a light vocal fry on the last two or three words of every line. Energy is up but never announced — she sounds amused rather than excited. Sentences trail upward at the end like a question even when they are not, and she half-laughs through the word before her punchline.',
         },
         scenes: [
-          { index: 1, startTime: '00:00', endTime: '00:09', durationSeconds: 9, label: 'Hook — Skeptic', prompt: 'Young woman talking candidly to the front camera in a sunlit apartment, raw UGC selfie, handheld.' },
-          { index: 2, startTime: '00:09', endTime: '00:15', durationSeconds: 6, label: 'Mechanism', prompt: 'Close-up of the serum bottle, dropper detail, soft morning light.' },
-          { index: 3, startTime: '00:15', endTime: '00:25', durationSeconds: 10, label: 'CTA', prompt: 'Woman holds the product beside her face, smiling, delivering the call to action.' },
+          // Written in the shape a real analysis comes back in: one `[m:ss–m:ss]`
+          // marker per camera cut, the spoken line quoted verbatim and
+          // attributed, and the on-screen text transcribed — a one-line prompt
+          // would render as a shape the app never actually produces.
+          {
+            index: 1, startTime: '00:00', endTime: '00:09', durationSeconds: 9, label: 'Hook — Skeptic',
+            prompt: `[0:00–0:04] Medium close-up at eye level, an arm's length away, square on: a woman in her mid-20s with shoulder-length wavy auburn hair parted in the middle, light freckled skin and bare lips, wearing an oversized cream cable-knit sweater, sits on the end of an unmade bed in a sunlit apartment. She holds the phone herself, so the frame drifts a little with her breathing, and she raises both eyebrows as she starts. She says: "Okay so I almost returned this serum… and now I'm on my third bottle." Window light from camera-left, soft and warm, with an open shadow down the right side of her face. White text with a black outline sits across the lower third: "I ALMOST RETURNED IT". [0:04–0:09] Cut to a slightly tighter handheld shot from the same side, her chin dropped and her hand flat against her cheek. She says: "My skin was so dull I'd cake on foundation just to look awake." Same window light, a white radiator and a half-open sash window behind her, no music yet — just room tone.`,
+          },
+          {
+            index: 2, startTime: '00:09', endTime: '00:15', durationSeconds: 6, label: 'Mechanism',
+            prompt: `[0:09–0:12] Macro insert, camera at chest height and a hand's width from the bottle: a 30ml clear glass dropper bottle of pale amber serum with a matte white label and a black rubber bulb, held between a thumb and two fingers with short unpainted nails, turned slowly toward the lens on a pale oak nightstand. The voiceover continues over the shot: "Then I tried this for a week and people asked if I'd been on holiday." [0:12–0:15] Cut to a top-down close-up of the dropper releasing three beads of serum into an open palm, the liquid catching the window light. Soft mid-tempo lo-fi music fades in under the voice. Yellow-highlighted caption at the top of frame: "15% VITAMIN C".`,
+          },
+          {
+            index: 3, startTime: '00:15', endTime: '00:25', durationSeconds: 10, label: 'CTA',
+            prompt: `[0:15–0:21] Back to the medium close-up, same bedroom and same cream sweater, the woman now holding the dropper bottle beside her cheek with the label turned to the lens, smiling with her head tilted. She says: "It's 15% vitamin C, no sticky finish, zero fragrance." Handheld, static apart from the drift, warm window light from camera-left. [0:21–0:25] Slow push in to a tighter framing as she taps the bottle twice with a fingernail and looks straight down the lens. She says: "They're doing 20% off right now. Don't sleep on it." A black pill with white text pops on over the lower third: "20% OFF TODAY", and the music ends on a soft sting.`,
+          },
         ],
       },
     },
@@ -532,7 +545,12 @@ const AD_ANALYSES = [
           brief: 'Studio product photography finished like a brand campaign: one hero object, critically sharp, on a seamless dark surface with a soft reflection under it. Forms read as machined and exact — polished titanium against matte charcoal, every edge clean, no clutter in frame. The palette is near-monochrome navy and graphite with a single cool cyan accent glowing from a screen just off the subject. Light is a large soft source from high camera-left plus a hard rim along the far edge, shadows deep and controlled with no fill spill. Shallow depth of field, gentle falloff into black, faint bloom on the accent, no grain.',
         },
         scenes: [
-          { index: 1, startTime: '00:00', endTime: '00:00', durationSeconds: 0, label: 'Static Hero', prompt: 'Smart ring on a dark nightstand beside a glowing sleep-graph phone, premium product photography, moody blue light.' },
+          // A still has no timeline, so this one stays a single untimed beat —
+          // the shape the card falls back to, and worth having seeded.
+          {
+            index: 1, startTime: '00:00', endTime: '00:00', durationSeconds: 0, label: 'Static Hero',
+            prompt: `Studio product still, camera at the height of the surface and about a forearm away, square on: a polished titanium smart ring standing on its edge on a seamless matte charcoal nightstand, a phone lying flat behind it showing a cyan sleep-stage graph on a black screen. A large soft source from high camera-left with a hard rim along the far edge of the ring; deep controlled shadows, a soft reflection under both objects, shallow depth of field falling off into black. Set in a near-monochrome navy and graphite palette with the screen's cyan as the only accent. Bold white sans text sits in the upper third: "SLEEP SCORE 94". No people, no hands, no clutter in frame.`,
+          },
         ],
       },
     },
