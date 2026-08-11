@@ -1137,15 +1137,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //
   // Pricing: kie.ai's pricing page is the authority. TODO: verify and replace
   // the placeholder once we have real per-call rates from kie.ai/pricing.
-  {
-    id: 'suno-v5',
-    displayName: 'Suno V5',
-    provider: 'Suno',
-    task: 'music',
-    modes: ['text-to-music'],
-    tags: [],
-    pricing: { unit: 'per-call', credits: 40 }, // TODO: confirm against kie.ai/pricing
-  },
+  // Suno V5 was removed in August 2026 — V5.5 is a strictly better model for
+  // 10 more credits a call, and offering the older one meant a picker whose
+  // only real choice was "the worse one, slightly cheaper". Migration
+  // `2026-08-remove-suno-v5` clears persisted picks (including Playground's
+  // draft `state` blob, which snapshots modelId outside perAppModel and is
+  // validated by nothing). The transport is untouched: `buildMusicInput` still
+  // derives the API variant from the id, so restoring the entry is one block.
   {
     id: 'suno-v5_5',
     displayName: 'Suno V5.5',
@@ -1836,7 +1834,7 @@ export function buildMusicInput(modelId: string, opts: MusicGenOptions): Record<
   const model = getModel(modelId)
   if (!model || model.task !== 'music') throw new Error(`Not a music model: ${modelId}`)
 
-  // ModelEntry.id stores the registry id ('suno-v5') but Suno's API expects
+  // ModelEntry.id stores the registry id ('suno-v5_5') but Suno's API expects
   // the bare variant string ('V5', 'V5_5', etc.). Strip the 'suno-' prefix.
   const sunoVariant = modelId.replace(/^suno-/i, '').toUpperCase().replace('.', '_')
 
