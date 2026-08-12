@@ -19,6 +19,7 @@ import AudioTile from './AudioTile'
 import GenerationProgress from '../../../components/GenerationProgress'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
+import ModelPill from '../../../components/ModelPill'
 import GeneratingBackdrop from '../../../components/GeneratingBackdrop'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import type { PlaygroundMode, InFlightGen } from '../types'
@@ -402,7 +403,14 @@ function HistoryListRow({
           </div>
         ) : status === 'ready' && url ? (
           entry.kind === 'video' ? (
-            <video {...rowVideo} src={url} controls playsInline preload="metadata" className="absolute inset-0 h-full w-full object-contain" />
+            // `#t=0.1` is load-bearing, not decoration: with `preload="metadata"`
+            // Safari fetches the duration and dimensions but decodes no frame, so
+            // the element painted as an empty black box — the clip was there and
+            // invisible until you pressed play, while the grid tiles (which
+            // autoplay muted on hover) looked fine. The media fragment makes it
+            // seek to 0.1s, which forces that frame to decode and show. Same fix
+            // as B-Roll's history CoverTile.
+            <video {...rowVideo} src={`${url}#t=0.1`} controls playsInline preload="metadata" className="absolute inset-0 h-full w-full object-contain" />
           ) : (
             <img
               src={url}
@@ -428,6 +436,10 @@ function HistoryListRow({
           prompt scrolls within the stretched panel. */}
       <div className="relative min-w-0 flex-[1]">
         <div className="absolute inset-0 flex flex-col gap-2 py-3 pr-3">
+        {/* Which model made this, on its own line above the meta pills — the
+            same reading order Characters' list row uses, so a row looks the
+            same across the two apps. Hidden when generation info is off. */}
+        <ModelPill modelId={entry.data.modelId} className="self-start" />
         {meta.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             {meta.map((m) => (

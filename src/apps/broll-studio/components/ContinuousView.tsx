@@ -79,6 +79,7 @@ import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { TileActionStack, TileActionButton } from '../../../components/tileActions'
+import ModelPill from '../../../components/ModelPill'
 import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
@@ -2170,6 +2171,16 @@ function FrameConceptCard({
           </TileActionStack>
         )}
 
+        {/* Which model drew this keyframe, bottom-left over the scrim. Fades on
+            hover — the Generate / Use-as-keyframe row lands on the same strip. */}
+        {image && imageUrl && (
+          <ModelPill
+            variant="media"
+            modelId={image.modelId}
+            className="absolute bottom-2 left-2 z-10 max-w-[70%] transition-opacity group-hover:opacity-0"
+          />
+        )}
+
         {/* Hover action row. Before any image → Generate. Once an image exists →
             "Use as keyframe" (select) only — the full-width regenerate button
             that used to sit here was removed because a stray click over an
@@ -2383,6 +2394,16 @@ function ClipCard({
               />
             )}
           </TileActionStack>
+        )}
+
+        {/* Which model rendered this take, bottom-left over the scrim. Fades on
+            hover — the Open shortcut lands on the same strip. */}
+        {currentVideo && videoUrl && (
+          <ModelPill
+            variant="media"
+            modelId={currentVideo.modelId}
+            className="absolute bottom-2 left-2 z-10 max-w-[70%] transition-opacity group-hover:opacity-0"
+          />
         )}
 
         {/* Bottom shortcut into the workspace — only once there's a clip to

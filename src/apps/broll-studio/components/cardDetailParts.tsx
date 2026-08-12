@@ -11,6 +11,7 @@ import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import DayPill from '../../../components/DayPill'
+import ModelPill from '../../../components/ModelPill'
 import BankPicker from '../../../components/BankPicker'
 import SlotActionMenu from '../../../components/video/SlotActionMenu'
 // The Playground reference-tile primitives. Aliased because this file has its
@@ -103,8 +104,8 @@ export interface ModalGalleryProps {
 }
 
 type ModalEntry =
-  | { kind: 'image'; idx: number; createdAt: number; imageUrl: string; prompt: string }
-  | { kind: 'video'; idx: number; createdAt: number; videoUrl: string; aspectRatio: string; prompt: string }
+  | { kind: 'image'; idx: number; createdAt: number; imageUrl: string; prompt: string; modelId?: string }
+  | { kind: 'video'; idx: number; createdAt: number; videoUrl: string; aspectRatio: string; prompt: string; modelId?: string }
   | { kind: 'in-flight-image'; id: string; createdAt: number; prompt: string; aspectRatio: string; modelId?: string | null; error?: string | null }
   | { kind: 'in-flight-video'; id: string; createdAt: number; prompt: string; mode: 'animating' | 'rendering'; aspectRatio: string; modelId?: string | null; error?: string | null }
 
@@ -157,10 +158,10 @@ export function ModalGallery({
     })
   }
   cardState.images.forEach((img, idx) => {
-    entries.push({ kind: 'image', idx, createdAt: img.createdAt ?? 0, imageUrl: img.imageUrl, prompt: img.prompt })
+    entries.push({ kind: 'image', idx, createdAt: img.createdAt ?? 0, imageUrl: img.imageUrl, prompt: img.prompt, modelId: img.modelId })
   })
   cardState.videos.forEach((v, idx) => {
-    entries.push({ kind: 'video', idx, createdAt: v.createdAt ?? 0, videoUrl: v.url, aspectRatio: v.aspectRatio, prompt: v.prompt })
+    entries.push({ kind: 'video', idx, createdAt: v.createdAt ?? 0, videoUrl: v.url, aspectRatio: v.aspectRatio, prompt: v.prompt, modelId: v.modelId })
   })
   entries.sort((a, b) => b.createdAt - a.createdAt)
 
@@ -242,6 +243,7 @@ export function ModalGallery({
                   <div key={`img-${entry.idx}`} className="mb-2 break-inside-avoid">
                     <ImageTile
                       imageRef={entry.imageUrl}
+                      modelId={entry.modelId}
                       selected={isImageSelected(entry.idx)}
                       saved={savedImageIdxs.has(entry.idx)}
                       saving={savingImageIdxs.has(entry.idx)}
@@ -262,6 +264,7 @@ export function ModalGallery({
                   <div key={`vid-${entry.idx}`} className="mb-2 break-inside-avoid">
                     <VideoTile
                       videoRef={entry.videoUrl}
+                      modelId={entry.modelId}
                       idx={entry.idx}
                       aspectRatio={entry.aspectRatio}
                       prompt={entry.prompt}
@@ -296,6 +299,7 @@ export function ModalGallery({
 // than the previous h-3 w-3) so they're easier to hit.
 function ImageTile({
   imageRef,
+  modelId,
   selected,
   saved,
   saving,
@@ -306,6 +310,7 @@ function ImageTile({
   onAnimate,
 }: {
   imageRef: string
+  modelId?: string
   selected: boolean
   saved: boolean
   saving: boolean
@@ -342,6 +347,15 @@ function ImageTile({
           Cover
         </span>
       )}
+      {/* Which model drew this take — the gallery is where a card's takes are
+          compared, so it's the one place the answer is actually being looked
+          for. Bottom-left on the scrim, fading on hover: the Animate bar and
+          the action stack both reach into the tile on hover. */}
+      <ModelPill
+        variant="media"
+        modelId={modelId}
+        className="absolute bottom-1.5 left-1.5 max-w-[calc(100%-0.75rem)] transition-opacity group-hover:opacity-0"
+      />
       {/* Animate — opens the Animate tab with this still as the start frame.
           Full-width, chunky bar across the bottom so it's an easy hit target. */}
       {onAnimate && (
@@ -387,6 +401,7 @@ function ImageTile({
 
 function VideoTile({
   videoRef,
+  modelId,
   idx,
   aspectRatio,
   prompt,
@@ -397,6 +412,7 @@ function VideoTile({
   onSendToPlayground,
 }: {
   videoRef: string
+  modelId?: string
   // Position in the card's video list — names downloaded files.
   idx: number
   aspectRatio: string
@@ -458,6 +474,13 @@ function VideoTile({
         </button>
       )}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
+      {/* Which model rendered this take. Bottom-left, capped so it can't run
+          into the centred Cover badge; fades on hover with the action stack. */}
+      <ModelPill
+        variant="media"
+        modelId={modelId}
+        className="absolute bottom-1.5 left-1.5 max-w-[55%] transition-opacity group-hover:opacity-0"
+      />
       {/* Cover badge, centred on the bottom edge — the top corners are taken by
           play/mute and the action stack. */}
       {selected && (
