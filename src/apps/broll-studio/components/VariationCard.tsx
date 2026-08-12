@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import { ExpandVideoButton } from '../../../components/VideoLightbox'
+import ModelPill from '../../../components/ModelPill'
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
 import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
@@ -1041,6 +1042,18 @@ export default function VariationCard(props: VariationCardProps) {
             )}
             <TileDeleteButton title="Delete variation" onDelete={onDelete} onArmedChange={setConfirmingDelete} />
           </TileActionStack>
+
+          {/* Which model drew the cover, bottom-left over its own scrim. It
+              fades on hover because the three-way tab shortcut row lands on
+              exactly this strip, and it stands down entirely for the error
+              banner, which owns the same strip and matters more. */}
+          {coverKind && !showImageError && (
+            <ModelPill
+              variant="media"
+              modelId={coverKind === 'video' ? coverVideo?.modelId : coverImage?.modelId}
+              className="absolute bottom-2 left-2 z-10 max-w-[70%] transition-opacity group-hover:opacity-0"
+            />
+          )}
 
           {showImageError && (
             <div className="absolute inset-x-2 bottom-2 flex items-start gap-1.5 rounded-lg border border-red-500/30 bg-red-500/15 px-2 py-1.5 backdrop-blur">

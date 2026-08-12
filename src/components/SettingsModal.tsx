@@ -4,6 +4,7 @@ import { X, Eye, EyeOff, Key, Check, ExternalLink, Loader2, AlertCircle, HardDri
 import { useAppStore } from '../stores/appStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useThemeStore, type ThemePref } from '../stores/themeStore'
+import { useGenerationInfoStore } from '../stores/generationInfoStore'
 import SegmentedToggle from './SegmentedToggle'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
@@ -101,6 +102,13 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   const showDemoTool = !isCloudEnabled() || !!profile?.is_admin
   const [demoLoaded, setDemoLoaded] = useState(false)
   const [demoBusy, setDemoBusy] = useState(false)
+
+  // Generation info — the model-name pill on generated media. Same "me only"
+  // gate as the demo tool above: it's on for every member and they never see
+  // the switch, which exists so a screen recording can be made without the
+  // model named on every tile.
+  const showGenerationInfo = useGenerationInfoStore((s) => s.show)
+  const setShowGenerationInfo = useGenerationInfoStore((s) => s.setShow)
 
   useEffect(() => {
     if (open) {
@@ -827,6 +835,41 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                     </span>
                     <ChevronRight className="h-3.5 w-3.5 shrink-0 text-ink-500" />
                   </button>
+                )}
+
+                {/* Generation info. On for every member, and this row is the
+                    only place it can be turned off — same operator-only gate as
+                    the demo tool below, and browser-local, so switching it off
+                    to record a clean screen never touches anyone else. */}
+                {showDemoTool && (
+                  <Card>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="min-w-0">
+                        <span className="block text-[12px] font-medium text-ink-300">Generation info</span>
+                        <span className="mt-1 block text-[11px] leading-relaxed text-ink-500">
+                          Name the model on generated media — Playground's list rows and
+                          B-Roll's cards. On for everyone; this switch is yours alone and
+                          only affects this browser.
+                        </span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setShowGenerationInfo(!showGenerationInfo)}
+                        role="switch"
+                        aria-checked={showGenerationInfo}
+                        aria-label="Show generation info"
+                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                          showGenerationInfo ? 'bg-emerald-500' : 'bg-ink/20'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            showGenerationInfo ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </Card>
                 )}
 
                 {showDemoTool && (
