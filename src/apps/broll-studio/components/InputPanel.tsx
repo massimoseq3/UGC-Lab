@@ -603,7 +603,7 @@ export default function InputPanel({
           {isGenerating ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{isContinuous ? 'Storyboarding...' : 'Generating Prompts...'}</span>
+              <span>Storyboarding...</span>
             </>
           ) : (
             <>
@@ -614,11 +614,11 @@ export default function InputPanel({
               ) : (
                 <Film className="h-4 w-4" strokeWidth={2.5} />
               )}
-              <span>
-                {isContinuous ? 'Generate Storyboard'
-                  : lineDelivery === 'dialogue' ? 'Generate Dialogue Prompts'
-                  : 'Generate B-Roll Prompts'}
-              </span>
+              {/* One label in all three cases. The button made the same thing
+                  every time — a storyboard — and named it three ways; the
+                  delivery toggle directly above already says which kind, and
+                  the icon carries it too. */}
+              <span>Generate Storyboard</span>
               {promptCredits && (
                 <span
                   title="Estimated cost of writing the prompts. Generating the images and videos afterwards is priced separately."

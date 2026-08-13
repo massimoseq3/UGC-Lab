@@ -64,12 +64,18 @@ export function createDefaultCardState(variation: PromptVariation): CardState {
     // The product photo(s) the storyboard picked for this shot — the state it's
     // actually in. Absent → the card falls back to the hero packshot alone.
     ...(variation.productPhotos ? { productPhotos: variation.productPhotos } : {}),
-    // Only read by DIALOGUE cards, and off by default — see CardState.chainLink.
-    // A Dialogue scene's three cards are three different situations, so
-    // anchoring each to the previous card's still would undo the variety they
-    // were written for. Sessions generated before the split stored an explicit
-    // `true` and keep their chain (see backfillCardState).
-    chainLink: false,
+    // ON, but it only ever bites on the ANCHOR card — the first DIALOGUE
+    // variation of each scene, which is the only card `dialogueChainRefs` hands
+    // a `chainImageRef` to. Every other card has nothing to chain from, so this
+    // flag is inert there (no reference attached, no "Previous cut" slot, and
+    // it can't join the batch's sequential queue, which filters `dialogueKeys`).
+    //
+    // The anchor column is one continuous sitting held across the whole ad, and
+    // prose alone can't hold a room across four separate image generations —
+    // the previous cut's still is what actually keeps the place, the light and
+    // the camera position from drifting. The two alternative cards stay free to
+    // be different situations, which is what they're written for.
+    chainLink: true,
     cardImageAspectRatio: '9:16',
     cardImageResolution: '1K',
     cardVideoAspectRatio: '9:16',
