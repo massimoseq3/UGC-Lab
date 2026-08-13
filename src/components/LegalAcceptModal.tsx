@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Loader2, ShieldCheck } from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
+import Spinner from './Spinner'
 import { useAuthStore } from '../stores/authStore'
 import { POLICY_VERSION } from '../legal/version'
 
@@ -71,7 +72,7 @@ export default function LegalAcceptModal() {
           disabled={busy}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink py-2.5 text-sm font-medium text-ink-900 transition-colors hover:bg-ink-100 disabled:opacity-50"
         >
-          {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+          {busy && <Spinner className="h-4 w-4" />}
           Accept &amp; continue
         </button>
 

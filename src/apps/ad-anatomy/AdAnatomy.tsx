@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, Eye, History, Loader2, RotateCcw, Upload, Volume2, VolumeX } from 'lucide-react'
+import { AlertCircle, Eye, History, RotateCcw, Upload, Volume2, VolumeX } from 'lucide-react'
+import Spinner from '../../components/Spinner'
 import MobilePaneTabs, { paneClass } from '../../components/MobilePaneTabs'
 import UploadView from './components/UploadView'
 import ResultsView from './components/ResultsView'
@@ -250,7 +251,7 @@ function CompletePane({ item, onReset }: { item: AdAnatomyHistoryItem; onReset: 
 function PreparingPane() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-      <Loader2 className="h-7 w-7 animate-spin text-[#FF5257]/70" strokeWidth={1.5} />
+      <Spinner className="h-7 w-7 text-[#FF5257]/70" />
       <div className="flex flex-col items-center gap-1">
         <h2 className="text-lg font-semibold tracking-tight text-ink-100">Getting your ad ready</h2>
         <p className="text-xs text-ink-500">Storing the clip before the analysis starts.</p>

@@ -1,5 +1,6 @@
 import { memo, useMemo, useRef, useState, useEffect } from 'react'
-import { Loader2, Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil, Frame, History } from 'lucide-react'
+import { Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil, Frame, History } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState } from '../../../hooks/useAssetUrl'
 import { getUrl } from '../../../utils/assetStore'
@@ -576,7 +577,7 @@ function NameEditor({
         disabled={saving || !nameDraft.trim()}
         className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/80 text-white hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+        {saving ? <Spinner className="h-3 w-3" /> : <Check className="h-3 w-3" />}
       </button>
     </div>
   )
@@ -890,7 +891,7 @@ function SingleCard({
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
                 {a.status === 'loading'
-                  ? <Loader2 className="h-6 w-6 animate-spin text-zinc-500" />
+                  ? <Spinner className="h-6 w-6 text-zinc-500" />
                   : <ImageIcon className="h-7 w-7 text-zinc-700" />}
               </div>
             )}
@@ -923,7 +924,7 @@ function SingleCard({
         // the whole row left of centre; it lives on the image now.
         <div className="flex flex-wrap items-center justify-center gap-1.5">
           <ActionPill
-            icon={a.savingToBank ? Loader2 : a.savedAsModel ? Check : Bookmark}
+            icon={a.savingToBank ? Spinner : a.savedAsModel ? Check : Bookmark}
             label={a.savedAsModel ? 'Saved' : 'Save to Bank'}
             title={a.savedAsModel ? 'Saved — click to remove from Bank' : 'Save to Bank'}
             tone={a.savedAsModel ? 'saved' : 'default'}
@@ -1103,7 +1104,7 @@ function HistoryTile({
           style={fitted ? undefined : aspectStyle(item.aspectRatio)}
         >
           {a.status === 'loading'
-            ? <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
+            ? <Spinner className="h-5 w-5 text-zinc-500" />
             : <ImageIcon className="h-6 w-6 text-zinc-700" />}
         </div>
       )}
@@ -1136,7 +1137,7 @@ function HistoryTile({
             tone={a.savedAsModel ? 'saved' : 'default'}
             onClick={() => a.toggleSave()}
           >
-            {a.savingToBank ? <Loader2 className="h-4 w-4 animate-spin" /> : a.savedAsModel ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+            {a.savingToBank ? <Spinner className="h-4 w-4" /> : a.savedAsModel ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
           </TileActionButton>
           <TileActionButton title="Copy prompt" onClick={() => onCopyPrompt()}>
             <Copy className="h-4 w-4" />
@@ -1261,7 +1262,7 @@ function HistoryListRow({
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             {a.status === 'loading'
-              ? <Loader2 className="h-6 w-6 animate-spin text-ink-600" />
+              ? <Spinner className="h-6 w-6 text-ink-600" />
               : <ImageIcon className="h-7 w-7 text-ink-700" />}
           </div>
         )}
@@ -1311,7 +1312,7 @@ function HistoryListRow({
               tone={a.savedAsModel ? 'saved' : 'default'}
               onClick={a.toggleSave}
             >
-              {a.savingToBank ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : a.savedAsModel ? <Check className="h-3.5 w-3.5" /> : <Bookmark className="h-3.5 w-3.5" />}
+              {a.savingToBank ? <Spinner className="h-3.5 w-3.5" /> : a.savedAsModel ? <Check className="h-3.5 w-3.5" /> : <Bookmark className="h-3.5 w-3.5" />}
             </ListRowButton>
             <ListRowButton title="Copy prompt" onClick={onCopyPrompt}>
               <Copy className="h-3.5 w-3.5" />

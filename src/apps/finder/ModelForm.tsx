@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import type { ElementType } from 'react'
-import { X, ImagePlus, Download, Loader2, Copy, Check } from 'lucide-react'
+import { X, ImagePlus, Download, Copy, Check } from 'lucide-react'
+import Spinner from '../../components/Spinner'
 import type { Model } from '../../stores/types'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
 import { downloadImage } from '../../utils/downloadImage'
@@ -297,7 +298,7 @@ export default function ModelForm({ item, onSave, onCancel }: ModelFormProps) {
             disabled={saving}
             className="flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-ink-900 transition-colors hover:bg-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving && <Spinner className="h-4 w-4" />}
             {saving ? 'Saving…' : (item ? 'Save Changes' : 'Add Character')}
           </button>
 

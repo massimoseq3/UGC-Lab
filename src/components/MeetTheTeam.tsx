@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react'
-import { ArrowUpRight, Check, ChevronRight, Eye, EyeOff, Loader2, X } from 'lucide-react'
+import { ArrowUpRight, Check, ChevronRight, Eye, EyeOff, X } from 'lucide-react'
+import Spinner from './Spinner'
 import { useAppStore } from '../stores/appStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { getAppConfig } from '../utils/constants'
@@ -298,7 +299,7 @@ function KeyBlock() {
             disabled={!key || status.phase === 'checking'}
             className="flex h-9 shrink-0 items-center gap-2 rounded-full bg-ink px-4 text-[13px] font-medium text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {status.phase === 'checking' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {status.phase === 'checking' && <Spinner className="h-3.5 w-3.5" />}
             {status.phase === 'checking' ? 'Checking…' : 'Connect'}
           </button>
         </div>

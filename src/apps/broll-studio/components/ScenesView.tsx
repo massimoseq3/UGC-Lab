@@ -708,18 +708,21 @@ export default function ScenesView({
   )
 
   return (
-    <div className="flex-1 overflow-y-auto px-5 pb-4">
-      {/* The strip pins to the top of the scroll port and keeps its own hairline
-          so the meta + batch actions stay reachable however far down the
-          storyboard the member has scrolled. Full-bleed via -mx-5 so the rule
-          runs edge to edge, and glass rather than opaque: the storyboard passes
-          under it blurred, which is what makes it read as a fixed pane of the
-          panel instead of a card-shaped hole. It was opaque for a while on the
-          theory that a nested backdrop-filter can't re-blur inside the window
-          frame's own `backdrop-blur-xl` — it can; what actually made a
-          translucent strip read as scrolling was too little blur and no
-          saturation, so cards ghosted through it sharp. `supports-` keeps the
-          solid fill wherever the browser can't blur at all. */}
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* The strip is a STATIC row above the scroll port, not a `sticky` child
+          inside it (August 2026). It was sticky and glass, and it visibly came
+          loose from the top edge on the way back up a long storyboard: a
+          backdrop-filter element re-samples its backdrop on the main thread
+          while the scroller itself is scrolled by the compositor, so the bar
+          lagged its own container by a frame or two and then snapped back.
+          Outside the scroller it cannot lag by construction — it is a sibling
+          of the scrolling box, exactly like the panel header above it, and
+          nothing about a scroll moves it. It never scrolled away anyway (it was
+          pinned at `top-0` from the first pixel), so the only thing given up is
+          cards passing under it blurred; the fill is opaque now, because glass
+          over a panel background that never moves is a backdrop root's cost for
+          no picture. `relative z-20` so a card's own positioned hover chrome
+          can't paint over it. */}
       {/* One row on desktop (`md:flex-nowrap`): four batch pills plus the meta
           add up to more than the panel at 1280 and at any real zoom level, and
           `flex-wrap` answered that by dropping the whole button group onto a
@@ -727,7 +730,7 @@ export default function ScenesView({
           on others. The meta shrinks and truncates instead; the buttons are the
           part you can't guess from a shorter label. Under md it still wraps,
           where there genuinely isn't a row's worth of width. */}
-      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5 supports-[backdrop-filter]:bg-surface-0/80 supports-[backdrop-filter]:backdrop-blur-xl supports-[backdrop-filter]:backdrop-saturate-150 md:flex-nowrap">
+      <div className="relative z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5 md:flex-nowrap">
         <div className="flex min-w-0 items-center gap-2">
           {/* Small-caps and dim — the count is a caption for the storyboard
               below it, so it takes the same eyebrow treatment as the style pill
@@ -794,6 +797,10 @@ export default function ScenesView({
           )}
         </div>
       </div>
+      {/* The scroll port. `pt-5` replaces the strip's old `mb-5` — the gap
+          between the bar and the first scene now belongs to the scrolling
+          content, which is where it was already being drawn. */}
+      <div className="flex-1 overflow-y-auto px-5 pb-4 pt-5">
       <div className="flex flex-col gap-10">
         {result.scenes.map((scene) => (
           <SceneSection
@@ -841,6 +848,7 @@ export default function ScenesView({
             onUpdateVoiceProfile={onUpdateVoiceProfile}
           />
         ))}
+      </div>
       </div>
 
       {batchConfirm && createPortal(

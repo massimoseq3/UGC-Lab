@@ -1,5 +1,6 @@
 import { useState, type ComponentType } from 'react'
-import { Package, Loader2, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkles, Shuffle, FishingHook, Video, Clock, Layers } from 'lucide-react'
+import { Package, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkles, Shuffle, FishingHook, Video, Clock, Layers } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import type { Product, Script } from '../../../stores/types'
 import { WRITE_LENGTHS, REMIX_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNTS, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type HookCount, type VariationCount } from '../types'
 import { useBankStore } from '../../../stores/bankStore'
@@ -923,7 +924,7 @@ export default function InputPanel({
         >
           {isGenerating ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Spinner className="h-4 w-4" />
               <span>{mode === 'write' ? (writeFormat === 'hooks' ? `Writing ${hookCount} Hooks...` : `Writing ${variationCount} Takes...`) : blueprintActive ? 'Rewriting Scene Prompts...' : `Generating ${variationCount} Script Variations...`}</span>
             </>
           ) : blocker ? (

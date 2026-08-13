@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, type ElementType } from 'react'
-import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, Loader2, ChevronDown, Sparkles, Check, LayoutGrid, Copy, Bookmark, Star, Palette, Eye, Heart, MessageCircle, Share2 } from 'lucide-react'
+import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, ChevronDown, Sparkles, Check, LayoutGrid, Copy, Bookmark, Star, Palette, Eye, Heart, MessageCircle, Share2 } from 'lucide-react'
+import Spinner from '../../components/Spinner'
 import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, SwipeItem } from '../../stores/types'
 import type { BankType } from '../../utils/constants'
 import type { ModelFilter } from './Finder'
@@ -123,7 +124,7 @@ function ProductCard({ item, onEdit, onDelete, inFlight }: { item: Product; onEd
       {/* Top-left status indicator: Extracting badge (while in-flight) OR draft/confirmed dot */}
       {inFlight ? (
         <span className="absolute left-2 top-2 z-10 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-medium text-emerald-300 backdrop-blur-sm">
-          <Loader2 className="h-2.5 w-2.5 animate-spin" />
+          <Spinner className="h-2.5 w-2.5" />
           Extracting
         </span>
       ) : state !== 'legacy' ? (

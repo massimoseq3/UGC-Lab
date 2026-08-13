@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Eye, ImagePlus, Loader2, Plus, RefreshCw, Siren, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Eye, ImagePlus, Plus, RefreshCw, Siren, Trash2, X } from 'lucide-react'
+import Spinner from '../../components/Spinner'
 import { useAuthStore } from '../../stores/authStore'
 import { APP_REGISTRY } from '../../utils/constants'
 import type { Announcement, AnnouncementLevel } from '../../stores/announcementStore'
@@ -211,7 +212,7 @@ function AnnouncementList({
   if (loading && items.length === 0) {
     return (
       <div className="flex items-center justify-center gap-2 py-16 text-[13px] text-ink-500">
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <Spinner className="h-4 w-4" />
         Loading announcements…
       </div>
     )
@@ -539,7 +540,7 @@ function Editor({
                 : 'bg-ink text-paper hover:bg-ink/90'
             }`}
           >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {saving && <Spinner className="h-3.5 w-3.5" />}
             {primaryLabel}
           </button>
           {goingLive && !armedPublish && (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Download, Copy, Check, Loader2, LayoutGrid } from 'lucide-react'
+import { X, Download, Copy, Check, LayoutGrid } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { getUrl } from '../../../utils/assetStore'
@@ -74,7 +75,7 @@ export default function InfluencerLightbox({
               className="max-h-full max-w-full rounded-xl border border-white/10 object-contain"
             />
           ) : (
-            <Loader2 className="h-6 w-6 animate-spin text-white/60" />
+            <Spinner className="h-6 w-6 text-white/60" />
           )}
         </div>
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Package, UserRound, FileText, RefreshCw, Loader2, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote, Layers } from 'lucide-react'
+import { Package, UserRound, FileText, RefreshCw, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote, Layers } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import type { Product, Model, Script } from '../../../stores/types'
 import { isLineMode, type BrollDelivery, type BrollMode } from '../types'
 import ScriptModelRow from '../../../components/ScriptModelRow'
@@ -602,7 +603,7 @@ export default function InputPanel({
         >
           {isGenerating ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Spinner className="h-4 w-4" />
               <span>Storyboarding...</span>
             </>
           ) : (

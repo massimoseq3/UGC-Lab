@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { ArrowUpRight, Bookmark, BookmarkCheck, Download, Eye, ExternalLink, FileText, Loader2, PenLine, RotateCw, Sparkles, X } from 'lucide-react'
+import { ArrowUpRight, Bookmark, BookmarkCheck, Download, Eye, ExternalLink, FileText, PenLine, RotateCw, Sparkles, X } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
@@ -174,7 +175,7 @@ export default function ResultDetailModal({
               )}
               {transcript.phase === 'loading' && (
                 <p className="flex items-center gap-2 text-[12px] text-ink-500">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Spinner className="h-3.5 w-3.5" />
                   Pulling the transcript…
                 </p>
               )}
@@ -246,7 +247,7 @@ export default function ResultDetailModal({
                 title={isTikTok ? 'Opens in Ad Analyzer' : 'Reads the video itself — the way to get this ad’s script'}
                 className="flex flex-1 items-center justify-center gap-2 rounded-full bg-ink py-2.5 text-[13px] font-medium text-ink-900 transition-colors hover:bg-ink-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {busy === 'analyze' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
+                {busy === 'analyze' ? <Spinner className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 Analyze Ad
                 <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
               </button>
@@ -264,7 +265,7 @@ export default function ResultDetailModal({
                   title={hasTranscript ? 'Opens in Scripts' : 'Get the transcript first'}
                   className="flex flex-1 items-center justify-center gap-2 rounded-full border border-ink/10 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {busy === 'remix' ? <Loader2 className="h-4 w-4 animate-spin" /> : <PenLine className="h-4 w-4" />}
+                  {busy === 'remix' ? <Spinner className="h-4 w-4" /> : <PenLine className="h-4 w-4" />}
                   Remix Transcript
                   <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
                 </button>
@@ -283,7 +284,7 @@ export default function ResultDetailModal({
                 }`}
               >
                 {busy === 'save'
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  ? <Spinner className="h-4 w-4" />
                   : saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
                 {saved ? 'Saved to Swipe File' : 'Save to Swipe File'}
               </button>
@@ -306,7 +307,7 @@ export default function ResultDetailModal({
                 className="flex w-11 shrink-0 items-center justify-center rounded-full border border-ink/10 py-2.5 text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {busy === 'download'
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  ? <Spinner className="h-4 w-4" />
                   : <Download className="h-4 w-4" />}
               </button>
             </div>

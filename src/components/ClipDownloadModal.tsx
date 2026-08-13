@@ -14,7 +14,8 @@
 
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Download, Loader2, Check, Star, Film } from 'lucide-react'
+import { X, Download, Check, Star, Film } from 'lucide-react'
+import Spinner from './Spinner'
 import { useAssetUrl } from '../hooks/useAssetUrl'
 import useNearViewport from '../hooks/useNearViewport'
 import { useAppStore } from '../stores/appStore'
@@ -176,7 +177,7 @@ export default function ClipDownloadModal({
             disabled={zipping || picked.size === 0}
             className={`flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${tint.cta}`}
           >
-            {zipping ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            {zipping ? <Spinner className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
             {zipping ? 'Zipping…' : `Download ${picked.size} clip${picked.size === 1 ? '' : 's'}`}
           </button>
         </div>
@@ -232,7 +233,7 @@ function ClipTile({
           // browser keeps ticking, and nothing is actually loading down there.
           <div className="flex h-full w-full items-center justify-center">
             {near
-              ? <Loader2 className="h-4 w-4 animate-spin text-white/40" />
+              ? <Spinner className="h-4 w-4 text-white/40" />
               : <Film className="h-4 w-4 text-white/20" />}
           </div>
         )}

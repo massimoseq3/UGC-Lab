@@ -1,30 +1,9 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  X,
-  Image as ImageIcon,
-  Video as VideoIcon,
-  Film,
-  Loader2,
-  AlertCircle,
-  Coins,
-  Volume2,
-  VolumeX,
-  UserRound,
-  Package,
-  Link2,
-  Download,
-  Bookmark,
-  Check,
-  RefreshCw,
-  Trash2,
-  Copy,
-  ArrowDown,
-  ChevronRight,
-  Star,
-  Layers,
-  Images,
+  X, Image as ImageIcon, Video as VideoIcon, Film, AlertCircle, Coins, Volume2, VolumeX, UserRound, Package, Link2, Download, Bookmark, Check, RefreshCw, Trash2, Copy, ArrowDown, ChevronRight, Star, Layers, Images,
 } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import SectionCard, { SectionLabel, StatusDot } from '../../../components/SectionCard'
 import ConstraintChip from '../../../components/ConstraintChip'
 import BatchCountStepper from '../../../components/BatchCountStepper'
@@ -825,7 +804,7 @@ function FrameImageTile({ imageRef, prompt, isKeyframe, onSelect, onSave }: {
       {url ? (
         <img src={url} alt="Keyframe option" className="aspect-[9/16] w-full object-cover" />
       ) : (
-        <div className="flex aspect-[9/16] w-full items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-white/40" /></div>
+        <div className="flex aspect-[9/16] w-full items-center justify-center"><Spinner className="h-4 w-4 text-white/40" /></div>
       )}
       {isKeyframe && (
         <span className="pointer-events-none absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-broll-500 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white">
@@ -842,7 +821,7 @@ function FrameImageTile({ imageRef, prompt, isKeyframe, onSelect, onSave }: {
             saved ? 'bg-emerald-500/40 text-emerald-100' : 'bg-black/60 text-white hover:bg-black/80'
           }`}
         >
-          {saved ? <Check className="h-3.5 w-3.5" /> : saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bookmark className="h-3.5 w-3.5" />}
+          {saved ? <Check className="h-3.5 w-3.5" /> : saving ? <Spinner className="h-3.5 w-3.5" /> : <Bookmark className="h-3.5 w-3.5" />}
         </button>
       </div>
     </div>

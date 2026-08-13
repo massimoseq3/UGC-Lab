@@ -1,5 +1,6 @@
 import { useState, useRef, useLayoutEffect } from 'react'
-import { X, Palette, Sparkles, Loader2, Check, ImagePlus, Package, Bookmark, Trash2 } from 'lucide-react'
+import { X, Palette, Sparkles, Check, ImagePlus, Package, Bookmark, Trash2 } from 'lucide-react'
+import Spinner from './Spinner'
 import type { StylePreset } from '../stores/types'
 import { useBankStore } from '../stores/bankStore'
 import { useAppStore } from '../stores/appStore'
@@ -259,7 +260,7 @@ export default function StyleModal({
               title={draftName.trim() ? undefined : 'Name the style to save it'}
               className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-[12px] font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${accent.button}`}
             >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bookmark className="h-3.5 w-3.5" />}
+              {saving ? <Spinner className="h-3.5 w-3.5" /> : <Bookmark className="h-3.5 w-3.5" />}
               Save to bank & use
             </button>
           </div>
@@ -462,7 +463,7 @@ export default function StyleModal({
                     disabled={isAnalyzing}
                     className={`flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[12px] font-semibold tracking-tight text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${accent.button}`}
                   >
-                    {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    {isAnalyzing ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
                     {isAnalyzing ? 'Reading the style…' : draftBrief ? 'Re-read the style' : `Read the style from ${styleRefs.length} image${styleRefs.length === 1 ? '' : 's'}`}
                   </button>
                 </div>

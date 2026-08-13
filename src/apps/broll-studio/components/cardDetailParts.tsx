@@ -4,8 +4,9 @@
 // modal's orchestration (state + handlers). These all communicate via props.
 import { useState, useEffect, useRef } from 'react'
 import {
-  ImageIcon, Film, Loader2, Check, Download, Bookmark, Volume2, VolumeX, Play, Pause, Copy, Circle, AlertCircle, RefreshCw, X, Palette,
+  ImageIcon, Film, Check, Download, Bookmark, Volume2, VolumeX, Play, Pause, Copy, Circle, AlertCircle, RefreshCw, X, Palette,
 } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import { GeneratingMediaFill, PendingMedia, type GeneratingMediaProps } from '../../../components/GeneratingMedia'
 import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
@@ -199,12 +200,26 @@ export function ModalGallery({
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-3">
+      {/* Two-column GRID, not CSS multi-column (August 2026). These three lists
+          were `columns-2 [column-fill:_balance]` with `break-inside-avoid` on
+          each tile, and multi-column balances its columns from the heights it
+          knows at layout time — but an ImageTile is `h-auto` until its blob
+          decodes, so every arriving picture changed the numbers the balance was
+          computed from and the browser re-fragmented. `break-inside-avoid` is a
+          request, not a guarantee, and what came out the other side was exactly
+          what was reported: a tile's border box split across the break, leaving
+          its top edge stranded in the other column as a stray purple line, and
+          an empty leftover box at the foot of a column reading as a black card
+          with nothing in it. A grid cell cannot fragment and there is no
+          balancing pass, so neither artifact has anywhere to come from.
+          `items-start` keeps each tile at its own content height instead of
+          stretching the shorter of a pair to its row. */}
       {inFlightActive.length > 0 && (
         <>
           <DayPill label="In progress" />
-          <div className="columns-2 gap-2 [column-fill:_balance]">
+          <div className="grid grid-cols-2 items-start gap-2">
             {inFlightActive.map((entry) => (
-              <div key={entry.kind === 'in-flight-image' || entry.kind === 'in-flight-video' ? entry.id : ''} className="mb-2 break-inside-avoid">
+              <div key={entry.kind === 'in-flight-image' || entry.kind === 'in-flight-video' ? entry.id : ''}>
                 <InFlightTile entry={entry} />
               </div>
             ))}
@@ -215,12 +230,12 @@ export function ModalGallery({
       {inFlightFailed.length > 0 && (
         <>
           <DayPill label="Failed" />
-          <div className="columns-2 gap-2 [column-fill:_balance]">
+          <div className="grid grid-cols-2 items-start gap-2">
             {inFlightFailed.map((entry) => {
               const id = entry.kind === 'in-flight-image' || entry.kind === 'in-flight-video' ? entry.id : ''
               const isVideo = entry.kind === 'in-flight-video'
               return (
-                <div key={id} className="mb-2 break-inside-avoid">
+                <div key={id}>
                   <FailedTile
                     entry={entry}
                     onRetry={() => onRetryInFlight(id, isVideo)}
@@ -236,11 +251,11 @@ export function ModalGallery({
       {dayGroupList.map(([dayTs, items]) => (
         <div key={dayTs}>
           <DayPill label={sectionLabel(dayTs)} />
-          <div className="columns-2 gap-2 [column-fill:_balance]">
+          <div className="grid grid-cols-2 items-start gap-2">
             {items.map((entry) => {
               if (entry.kind === 'image') {
                 return (
-                  <div key={`img-${entry.idx}`} className="mb-2 break-inside-avoid">
+                  <div key={`img-${entry.idx}`}>
                     <ImageTile
                       imageRef={entry.imageUrl}
                       modelId={entry.modelId}
@@ -261,7 +276,7 @@ export function ModalGallery({
               }
               if (entry.kind === 'video') {
                 return (
-                  <div key={`vid-${entry.idx}`} className="mb-2 break-inside-avoid">
+                  <div key={`vid-${entry.idx}`}>
                     <VideoTile
                       videoRef={entry.videoUrl}
                       modelId={entry.modelId}
@@ -334,7 +349,7 @@ function ImageTile({
         <img src={url} alt="" className="block h-auto w-full" />
       ) : (
         <div className="flex aspect-square w-full items-center justify-center">
-          {status === 'loading' ? <Loader2 className="h-5 w-5 animate-spin text-zinc-500" /> : <ImageIcon className="h-6 w-6 text-zinc-700" />}
+          {status === 'loading' ? <Spinner className="h-5 w-5 text-zinc-500" /> : <ImageIcon className="h-6 w-6 text-zinc-700" />}
         </div>
       )}
       {/* Bottom scrim — the Animate bar sits on it. */}
@@ -388,7 +403,7 @@ function ImageTile({
           tone={saved ? 'saved' : 'default'}
           onClick={(e) => { e.stopPropagation(); if (!saved && !saving) onSave() }}
         >
-          {saved ? <Check className="h-4 w-4" /> : saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bookmark className="h-4 w-4" />}
+          {saved ? <Check className="h-4 w-4" /> : saving ? <Spinner className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
         </TileActionButton>
         <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
           <Copy className="h-4 w-4" />
@@ -446,7 +461,7 @@ function VideoTile({
         <video {...inline.videoProps} src={url} className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full w-full items-center justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-ink-500" />
+          <Spinner className="h-5 w-5 text-ink-500" />
         </div>
       )}
       {/* Play / pause — always on the tile, so a clip playing with sound can
@@ -595,7 +610,7 @@ export function ModalVideoPlayer({
           className="aspect-[9/16] w-full object-cover"
         />
       ) : (
-        <div className="flex aspect-[9/16] w-full items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-white/40" /></div>
+        <div className="flex aspect-[9/16] w-full items-center justify-center"><Spinner className="h-4 w-4 text-white/40" /></div>
       )}
       {url && (
         <button
@@ -976,7 +991,7 @@ function RefThumb({ refStr, onRemove }: { refStr: string; onRemove: () => void }
   if (!url) {
     return (
       <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-ink/10 bg-ink/[0.02]">
-        <Loader2 className="h-4 w-4 animate-spin text-ink-500" />
+        <Spinner className="h-4 w-4 text-ink-500" />
       </div>
     )
   }

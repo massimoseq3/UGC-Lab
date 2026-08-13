@@ -1,4 +1,5 @@
-import { Sparkles, RefreshCw, Eraser, Undo2, Redo2, Loader2 } from 'lucide-react'
+import { Sparkles, RefreshCw, Eraser, Undo2, Redo2 } from 'lucide-react'
+import Spinner from './Spinner'
 import { ExpandButton } from './ExpandableText'
 
 // The footer strip under every editable prompt box — Enhance / Regenerate /
@@ -85,7 +86,7 @@ export default function PromptToolbar({
           disabled={busy || enhanceDisabled}
           className={`${PILL} ${ACCENT_HOVER[accent]}`}
         >
-          {busy ? <Loader2 className="h-3 w-3 shrink-0 animate-spin" /> : <Sparkles className="h-3 w-3 shrink-0" />}
+          {busy ? <Spinner className="h-3 w-3 shrink-0" /> : <Sparkles className="h-3 w-3 shrink-0" />}
           Enhance
         </button>
         {onRegenerate && (

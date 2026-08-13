@@ -432,7 +432,15 @@ export function parseResult(record: TaskRecord): ParsedResult {
 // never landed: the tile sat on "generating" with no error and no way back
 // except a reload. The whole point of the download is that kie's URLs expire in
 // 3 days, so failing loudly here is what lets the caller retry.
-const ASSET_DOWNLOAD_TIMEOUT_MS = 180_000
+//
+// Raised from 3 to 8 minutes in August 2026. The clips that trip it are the
+// biggest files the app pulls — Seedance 2.5 at 720p with audio, the one model
+// that reaches 30s — and members were hitting it on a generation kie had
+// already finished and charged for. This budget is a hang-breaker, not a
+// speed limit for a domestic line: the cost of setting it too high is a tile
+// that spins a few minutes longer, and the cost of setting it too low is a
+// paid-for clip thrown away.
+const ASSET_DOWNLOAD_TIMEOUT_MS = 480_000
 
 // Fetch a finished result off kie's CDN on a deadline.
 //
