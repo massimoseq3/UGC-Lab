@@ -23,6 +23,8 @@ import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
 import AspectIcon from '../../../components/AspectIcon'
 import ConstraintChip from '../../../components/ConstraintChip'
+import BatchCountStepper from '../../../components/BatchCountStepper'
+import { clampBatchCount } from '../../../utils/batchCount'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import type { PromptVariation, CardState, ReferenceImage } from '../types'
 import type { BRoll, Product, Model } from '../../../stores/types'
@@ -40,6 +42,7 @@ import ModelWaitNotice from '../../../components/ModelWaitNotice'
 import ExpandTextModal from '../../../components/ExpandableText'
 import PromptToolbar from '../../../components/PromptToolbar'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
+import { usePersistedState } from '../../../hooks/usePersistedState'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
 import {
   ModalGallery,
@@ -180,6 +183,13 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   // Video-model picker is a slide-in side panel (like the ref-image bank
   // picker) rather than an inline dropdown.
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
+  // How many takes of this card's prompt one press fires. Persisted per browser
+  // rather than per card: it's how the member likes to work, not something a
+  // particular scene owns — and a count stored on the card would ride into the
+  // history snapshot and re-arm itself when the session is reopened.
+  const [takeCount, setTakeCount] = usePersistedState<number>('ai-ugc-lab:broll:card-takes', 1, {
+    sanitize: (v) => clampBatchCount(v),
+  })
   // Animate tab: which still gets animated. Null → fall back to the cover /
   // latest image. Set explicitly when the user clicks "Animate" on a tile.
   const [animateFrameRef, setAnimateFrameRef] = useState<string | null>(null)
@@ -345,16 +355,22 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   }
 
   // Credits estimate strings — surfaced in the Generate buttons as "(N credits)".
-  const imageCreditsLabel = imageModelId
-    ? formatCredits(estimateCredits(imageModelId, { imageCount: 1, resolution: cardState.cardImageResolution }))
+  // Both price the whole run: the card's queues are parallel, so a count of 3
+  // is three tasks and three bills.
+  const imageCreditsFor = (n: number) => imageModelId
+    ? estimateCredits(imageModelId, { imageCount: n, resolution: cardState.cardImageResolution })
     : null
-  const videoCreditsLabel = videoModelId
-    ? formatCredits(estimateCredits(videoModelId, {
-        durationSeconds: cardState.cardVideoDurationSeconds,
-        resolution: cardState.cardVideoResolution,
-        audio: cardState.cardVideoAudio,
-      }))
-    : null
+  const videoCreditsFor = (n: number) => {
+    if (!videoModelId) return null
+    const one = estimateCredits(videoModelId, {
+      durationSeconds: cardState.cardVideoDurationSeconds,
+      resolution: cardState.cardVideoResolution,
+      audio: cardState.cardVideoAudio,
+    })
+    return one === null ? null : one * n
+  }
+  const imageCreditsLabel = formatCredits(imageCreditsFor(takeCount))
+  const videoCreditsLabel = formatCredits(videoCreditsFor(takeCount))
 
   // ─── Per-tile save ─────────────────────────────────────────────────────
   const handleSaveImageTile = async (index: number) => {
@@ -756,7 +772,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                             value={cardState.cardImageResolution}
                             onChange={(v) => onUpdateState({ cardImageResolution: v as ImageResolution })}
                             renderOption={(v) => {
-                              const credits = formatCredits(estimateCredits(imageModelId ?? '', { imageCount: 1, resolution: v as ImageResolution }))
+                              const credits = formatCredits(estimateCredits(imageModelId ?? '', { imageCount: takeCount, resolution: v as ImageResolution }))
                               return (
                                 <span className="flex w-full items-center justify-between gap-6">
                                   <span>{v}</span>
@@ -841,17 +857,31 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         )}
                       </>
                     )}
+                {/* How many takes of THIS prompt. The card's own gallery is
+                    what a batch lands in, and choosing between takes is what
+                    that gallery is for — the storyboard's three variations are
+                    three different ideas, which is a different axis entirely.
+                    Video caps at the same 4 but costs far more per take, which
+                    is why the button beside it prices the whole run. */}
+                <BatchCountStepper
+                  grow
+                  accent="broll"
+                  noun="take"
+                  value={takeCount}
+                  onChange={setTakeCount}
+                  creditsFor={tab === 'image' ? imageCreditsFor : videoCreditsFor}
+                />
               </div>
 
               {/* Generate — accent pill (image / video / animate). */}
               {tab === 'image' ? (
                 <button
-                  onClick={handleGenerateImage}
+                  onClick={() => { for (let i = 0; i < takeCount; i++) handleGenerateImage() }}
                   disabled={!cardState.editablePrompt.trim()}
                   className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <ImageIcon className="h-4 w-4" />
-                  Generate Image
+                  {takeCount === 1 ? 'Generate Image' : `Generate ${takeCount} Images`}
                   {imageCreditsLabel && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                       <Coins className="h-3 w-3" strokeWidth={2} />
@@ -861,12 +891,12 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                 </button>
               ) : tab === 'video' ? (
                 <button
-                  onClick={() => handleGenerateVideo(videoModelId)}
+                  onClick={() => { for (let i = 0; i < takeCount; i++) handleGenerateVideo(videoModelId) }}
                   disabled={!cardState.editablePrompt.trim()}
                   className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <VideoIcon className="h-4 w-4" />
-                  Generate Video
+                  {takeCount === 1 ? 'Generate Video' : `Generate ${takeCount} Videos`}
                   {videoCreditsLabel && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                       <Coins className="h-3 w-3" strokeWidth={2} />
@@ -876,13 +906,13 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                 </button>
               ) : (
                 <button
-                  onClick={() => handleAnimate(effectiveAnimateFrame, videoModelId)}
+                  onClick={() => { for (let i = 0; i < takeCount; i++) handleAnimate(effectiveAnimateFrame, videoModelId) }}
                   disabled={!cardState.editablePrompt.trim() || !effectiveAnimateFrame}
                   title={!effectiveAnimateFrame ? 'Generate an image first, then animate it' : undefined}
                   className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Film className="h-4 w-4" />
-                  Animate
+                  {takeCount === 1 ? 'Animate' : `Animate ${takeCount}×`}
                   {videoCreditsLabel && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                       <Coins className="h-3 w-3" strokeWidth={2} />

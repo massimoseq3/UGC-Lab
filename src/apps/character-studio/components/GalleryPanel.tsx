@@ -26,12 +26,30 @@ import { downloadImage } from '../../../utils/downloadImage'
 const LIST_CARD_MIN = 200
 const LIST_CARD_MAX = 560
 
-type ViewMode = 'single' | 'list' | 'grid'
+export type GalleryViewMode = 'single' | 'list' | 'grid'
+type ViewMode = GalleryViewMode
 
 interface GalleryPanelProps {
   inFlight: InFlightCharacterGen[]
+  // Owned by CharacterStudio (same localStorage key it has always used), because
+  // Generate moves the member to the view that can show what they just fired.
+  viewMode: ViewMode
+  onViewModeChange: (v: ViewMode) => void
   onCancelGen: (id: string) => void
   onLaunchGen: (opts: LaunchGenOptions) => void
+}
+
+// One cell on the Single stage: a generation still running, or a finished
+// character. A batch mixes both while it lands, which is the whole reason the
+// stage takes a list rather than one of each.
+type StageSlot =
+  | { key: string; order: number; kind: 'gen'; gen: InFlightCharacterGen }
+  | { key: string; order: number; kind: 'item'; item: CharacterHistoryItem }
+
+// A generation with no batch stamp is a group of one keyed by its own id, so
+// nothing below has to special-case "a batch of one".
+function batchKeyOf(entry: { id: string; batchId?: string }): string {
+  return entry.batchId ?? entry.id
 }
 
 // Memoized: this panel renders every character the member has ever generated
@@ -41,6 +59,8 @@ interface GalleryPanelProps {
 // parent useCallback's both handlers), so the subtree is skipped entirely.
 export default memo(function GalleryPanel({
   inFlight,
+  viewMode,
+  onViewModeChange: setViewMode,
   onCancelGen,
   onLaunchGen,
 }: GalleryPanelProps) {
@@ -53,11 +73,10 @@ export default memo(function GalleryPanel({
   // into sheet mode so the user just hits Generate; a normal click is edit.
   const [previewMode, setPreviewMode] = useState<'edit' | 'sheet'>('edit')
 
-  // Single (just the newest generation) vs Grid (masonry) vs List (stacked
-  // rows). Persisted globally so the choice sticks across reloads — Grid/List
-  // mirror the Playground's switch; Single is the distraction-free view for
-  // screen recording, where a full history of past characters is on camera.
-  const [viewMode, setViewMode] = usePersistedState<ViewMode>('ai-ugc-lab:influencers:history-view', 'grid')
+  // Single (just what's happening now) vs Grid (masonry) vs List (stacked
+  // rows). Grid/List mirror the Playground's switch; Single is the
+  // distraction-free view for screen recording, where a full history of past
+  // characters is on camera. The state itself lives in CharacterStudio.
   // List-view card size — the media frame height (px), set by the header slider.
   const [listCardHeight, setListCardHeight] = usePersistedState<number>('ai-ugc-lab:influencers:list-card-height', 300)
   const cardPct = ((listCardHeight - LIST_CARD_MIN) / (LIST_CARD_MAX - LIST_CARD_MIN)) * 100
@@ -119,6 +138,41 @@ export default memo(function GalleryPanel({
     ? characterHistory.find((h) => h.id === pin.id)
     : undefined
   const singleItem = frameCleared ? undefined : (pinnedItem ?? characterHistory[0])
+
+  // What the Single stage holds. One press of Generate can fire up to four
+  // characters, and they finish one at a time — so the stage is a LIST of
+  // slots, drawn from the in-flight queue and the history bank together, and
+  // a cell simply swaps from generating to a picture where it stands.
+  //
+  // Which group: whatever is running (the newest gen names its batch), else
+  // the batch the newest finished character belongs to. A pinned character is
+  // the exception — a pin is one face someone chose to have on camera, not a
+  // run — so it stays a single cell.
+  const activeGen = inFlight.length > 0 ? inFlight[inFlight.length - 1] : undefined
+  const stageKey = frameCleared ? undefined
+    : activeGen ? batchKeyOf(activeGen)
+    : pinnedItem ? undefined
+    : singleItem ? batchKeyOf(singleItem)
+    : undefined
+
+  let stageSlots: StageSlot[]
+  if (stageKey !== undefined) {
+    stageSlots = [
+      ...inFlight
+        .filter((g) => batchKeyOf(g) === stageKey)
+        .map((gen): StageSlot => ({ key: gen.id, order: gen.batchIndex ?? 0, kind: 'gen', gen })),
+      ...characterHistory
+        .filter((h) => batchKeyOf(h) === stageKey)
+        .map((item): StageSlot => ({ key: item.id, order: item.batchIndex ?? 0, kind: 'item', item })),
+    ].sort((a, b) => a.order - b.order)
+  } else {
+    stageSlots = singleItem ? [{ key: singleItem.id, order: 0, kind: 'item', item: singleItem }] : []
+  }
+
+  // Gens that belong to some OTHER run — a second batch fired while this one is
+  // still going, or an edit-modal generation. Reported as a count rather than
+  // crowding the stage, exactly as a queue was before batches existed.
+  const queuedElsewhere = inFlight.length - stageSlots.filter((s) => s.kind === 'gen').length
 
   // Put a character on the Single stage and go there, so the click has a
   // visible result rather than silently arming a view the member isn't on.
@@ -216,14 +270,14 @@ export default memo(function GalleryPanel({
         // because the stage was always the newest one; with a pin it would
         // delete or edit a character the member isn't looking at.
         <SingleView
-          inFlight={inFlight}
-          item={singleItem}
+          slots={stageSlots}
+          queuedElsewhere={queuedElsewhere}
           onCancelGen={onCancelGen}
-          onOpenGen={(id) => openEditor(id)}
-          onClick={() => singleItem && openEditor(singleItem.id)}
-          onDelete={() => singleItem && deleteCharacterHistory(singleItem.id)}
-          onMakeSheet={() => singleItem && openEditor(singleItem.id, 'sheet')}
-          onCopyPrompt={() => singleItem && handleCopyPrompt(singleItem)}
+          onOpen={(id) => openEditor(id)}
+          onDelete={(item) => deleteCharacterHistory(item.id)}
+          onMakeSheet={(item) => openEditor(item.id, 'sheet')}
+          onCopyPrompt={(item) => handleCopyPrompt(item)}
+          onShowInSingle={showInSingle}
         />
       ) : (
         <>
@@ -569,11 +623,10 @@ function useFitFrame(aspectRatio: string) {
   return { containerRef, frameStyle }
 }
 
-// The graph-paper stage every single-view frame sits on: the picture floats on
-// a faint grid instead of butting against the panel, which is what makes one
-// image on an otherwise empty column read as a deliberate composition. Hands
-// its children the fitted frame style (see `useFitFrame`).
-function Stage({
+// A cell that measures itself and hands its child a frame hugging the output's
+// aspect ratio. One per picture, so a 2×2 of 9:16 portraits packs each cell
+// without letterboxing any of them.
+function FittedFrame({
   aspectRatio,
   children,
 }: {
@@ -582,13 +635,46 @@ function Stage({
 }) {
   const { containerRef, frameStyle } = useFitFrame(aspectRatio)
   return (
-    <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.02] p-4">
-      <div aria-hidden className="stage-grid pointer-events-none absolute inset-0" />
-      <div ref={containerRef} className="relative flex h-full w-full items-center justify-center">
-        {children(frameStyle)}
-      </div>
+    <div ref={containerRef} className="relative flex h-full min-h-0 w-full items-center justify-center">
+      {children(frameStyle)}
     </div>
   )
+}
+
+// The graph-paper stage every single-view frame sits on: the picture floats on
+// a faint grid instead of butting against the panel, which is what makes one
+// image on an otherwise empty column read as a deliberate composition.
+function StageSurface({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.02] p-4">
+      <div aria-hidden className="stage-grid pointer-events-none absolute inset-0" />
+      {children}
+    </div>
+  )
+}
+
+// The one-picture stage. Hands its children the fitted frame style.
+function Stage({
+  aspectRatio,
+  children,
+}: {
+  aspectRatio: string
+  children: (frameStyle: React.CSSProperties) => React.ReactNode
+}) {
+  return (
+    <StageSurface>
+      <FittedFrame aspectRatio={aspectRatio}>{children}</FittedFrame>
+    </StageSurface>
+  )
+}
+
+// The batch stage. The grid follows the count the member asked for, because
+// that count is the composition: two side by side, three side by side, four as
+// a 2×2 — never a wrapping gallery, which is what the Grid view is for.
+function stageGridClass(count: number): string {
+  if (count >= 4) return 'grid-cols-2 grid-rows-2'
+  if (count === 3) return 'grid-cols-3 grid-rows-1'
+  return 'grid-cols-2 grid-rows-1'
 }
 
 // The distraction-free view: one generation, nothing else. Whatever is
@@ -597,53 +683,133 @@ function Stage({
 // the character being made and not the reel of everything made before it. The
 // history is untouched; the toggle brings it back.
 function SingleView({
-  inFlight,
-  item,
+  slots,
+  queuedElsewhere,
   onCancelGen,
-  onOpenGen,
-  onClick,
+  onOpen,
   onDelete,
   onMakeSheet,
   onCopyPrompt,
+  onShowInSingle,
 }: {
-  inFlight: InFlightCharacterGen[]
-  item: CharacterHistoryItem | undefined
+  slots: StageSlot[]
+  queuedElsewhere: number
   onCancelGen: (id: string) => void
-  onOpenGen: (id: string) => void
-  onClick: () => void
-  onDelete: () => void | Promise<unknown>
-  onMakeSheet: () => void
-  onCopyPrompt: () => void
+  onOpen: (id: string) => void
+  onDelete: (item: CharacterHistoryItem) => void | Promise<unknown>
+  onMakeSheet: (item: CharacterHistoryItem) => void
+  onCopyPrompt: (item: CharacterHistoryItem) => void
+  onShowInSingle: (item: CharacterHistoryItem) => void
 }) {
-  // Parallel gens are allowed, so show the one started last and only count the
-  // rest — a queue of tiles is exactly the clutter this view exists to avoid.
-  const active = inFlight.length > 0 ? inFlight[inFlight.length - 1] : undefined
-  const others = Math.max(0, inFlight.length - 1)
+  const generating = slots.filter((s) => s.kind === 'gen').length
+  // Every member of a run was fired from the same form, so one Prompt data
+  // block describes all of them — read off whichever slot is first.
+  const first = slots[0]
+  const stageProfile = first
+    ? first.kind === 'gen'
+      ? (first.gen.profile as CharacterProfile | undefined)
+      : first.item.profile
+    : undefined
 
   return (
     // min-h carries the mobile layout, where the column isn't height-constrained
     // and a flex-1 media frame sized by `height: 100%` would collapse to nothing.
     <div className="flex min-h-[420px] flex-1 flex-col gap-3 px-4 py-4">
-      {active ? (
-        <>
-          <SingleInFlight gen={active} onCancel={() => onCancelGen(active.id)} onClick={() => onOpenGen(active.id)} />
-          <PromptData profile={active.profile as CharacterProfile | undefined} />
-          <p className="text-center text-[10px] font-medium tracking-wider text-influencers-300">
-            {others > 0 ? `Generating · +${others} more in the queue` : 'Generating…'}
-          </p>
-        </>
-      ) : item ? (
-        <SingleCard
-          item={item}
-          onClick={onClick}
-          onDelete={onDelete}
-          onMakeSheet={onMakeSheet}
-          onCopyPrompt={onCopyPrompt}
-        />
-      ) : (
+      {slots.length === 0 ? (
         <AwaitingFrame />
+      ) : slots.length === 1 ? (
+        // One output keeps the view it always had: the picture as large as the
+        // panel allows, over its named actions and prompt data.
+        first!.kind === 'gen' ? (
+          <>
+            <SingleInFlight
+              gen={first!.gen}
+              onCancel={() => onCancelGen(first!.gen.id)}
+              onClick={() => onOpen(first!.gen.id)}
+            />
+            <PromptData profile={stageProfile} />
+            <StageCaption generating={1} total={1} queuedElsewhere={queuedElsewhere} />
+          </>
+        ) : (
+          <SingleCard
+            item={first!.item}
+            onClick={() => onOpen(first!.item.id)}
+            onDelete={() => onDelete(first!.item)}
+            onMakeSheet={() => onMakeSheet(first!.item)}
+            onCopyPrompt={() => onCopyPrompt(first!.item)}
+          />
+        )
+      ) : (
+        <>
+          <StageSurface>
+            <div className={`relative grid h-full w-full gap-3 ${stageGridClass(slots.length)}`}>
+              {slots.map((slot) => (
+                <FittedFrame
+                  key={slot.key}
+                  aspectRatio={slot.kind === 'gen' ? slot.gen.aspectRatio : slot.item.aspectRatio}
+                >
+                  {(frameStyle) => slot.kind === 'gen' ? (
+                    <div
+                      className="relative overflow-hidden rounded-xl shadow-[0_0_60px_-28px_rgba(247,79,158,0.35)]"
+                      style={frameStyle}
+                    >
+                      <GeneratingTile
+                        modelId={slot.gen.modelId}
+                        kind={slot.gen.kind}
+                        aspectRatio={slot.gen.aspectRatio}
+                        onCancel={() => onCancelGen(slot.gen.id)}
+                        onClick={() => onOpen(slot.gen.id)}
+                        fill
+                      />
+                    </div>
+                  ) : (
+                    // The finished cell is the grid view's own tile, fitted to
+                    // the frame — so its hover actions, badges and inline name
+                    // input are the ones the member already knows.
+                    <HistoryTile
+                      item={slot.item}
+                      frameStyle={frameStyle}
+                      onClick={() => onOpen(slot.item.id)}
+                      onDelete={() => onDelete(slot.item)}
+                      onMakeSheet={() => onMakeSheet(slot.item)}
+                      onCopyPrompt={() => onCopyPrompt(slot.item)}
+                      onShowInSingle={() => onShowInSingle(slot.item)}
+                    />
+                  )}
+                </FittedFrame>
+              ))}
+            </div>
+          </StageSurface>
+          <PromptData profile={stageProfile} />
+          <StageCaption generating={generating} total={slots.length} queuedElsewhere={queuedElsewhere} />
+        </>
       )}
     </div>
+  )
+}
+
+// The line under the stage while a run is in progress. Silent once everything
+// has landed — a finished single character captions itself with its model and
+// time, and a finished batch needs no commentary.
+function StageCaption({
+  generating,
+  total,
+  queuedElsewhere,
+}: {
+  generating: number
+  total: number
+  queuedElsewhere: number
+}) {
+  if (generating === 0 && queuedElsewhere === 0) return null
+  const parts: string[] = []
+  if (generating > 0) {
+    parts.push(total > 1 ? `Generating ${generating} of ${total}` : 'Generating…')
+  }
+  if (queuedElsewhere > 0) parts.push(`+${queuedElsewhere} more in the queue`)
+  return (
+    <p className="text-center text-[10px] font-medium tracking-wider text-influencers-300">
+      {parts.join(' · ')}
+    </p>
   )
 }
 
@@ -894,6 +1060,7 @@ function pendingItemFromGen(gen: InFlightCharacterGen): CharacterHistoryItem {
 
 function HistoryTile({
   item,
+  frameStyle,
   onClick,
   onDelete,
   onMakeSheet,
@@ -901,6 +1068,10 @@ function HistoryTile({
   onShowInSingle,
 }: {
   item: CharacterHistoryItem
+  // Set only on the Single stage, where the tile is sized to a measured cell
+  // rather than to its own image. The picture then fills that frame
+  // `object-contain` instead of driving the tile's height.
+  frameStyle?: React.CSSProperties
   onClick: () => void
   onDelete: () => void | Promise<unknown>
   onMakeSheet: () => void
@@ -908,16 +1079,29 @@ function HistoryTile({
   onShowInSingle: () => void
 }) {
   const a = useHistoryTileActions(item, onDelete)
+  const fitted = !!frameStyle
 
   return (
     <div
       onClick={onClick}
-      className="group relative cursor-pointer overflow-hidden rounded-lg border border-ink/10 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 hover:-translate-y-px card-soft-shadow"
+      style={frameStyle}
+      className={`group relative cursor-pointer overflow-hidden border border-ink/10 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 card-soft-shadow ${
+        fitted ? 'rounded-xl' : 'rounded-lg hover:-translate-y-px'
+      }`}
     >
       {a.status === 'ready' && a.url ? (
-        <img src={a.url} alt="" loading="lazy" decoding="async" className="block h-auto w-full" />
+        <img
+          src={a.url}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className={fitted ? 'absolute inset-0 h-full w-full object-contain' : 'block h-auto w-full'}
+        />
       ) : (
-        <div className="flex w-full items-center justify-center" style={aspectStyle(item.aspectRatio)}>
+        <div
+          className={fitted ? 'absolute inset-0 flex items-center justify-center' : 'flex w-full items-center justify-center'}
+          style={fitted ? undefined : aspectStyle(item.aspectRatio)}
+        >
           {a.status === 'loading'
             ? <Loader2 className="h-5 w-5 animate-spin text-zinc-500" />
             : <ImageIcon className="h-6 w-6 text-zinc-700" />}

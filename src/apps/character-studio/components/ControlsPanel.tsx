@@ -110,6 +110,8 @@ interface ControlsPanelProps {
   onResolutionChange: (value: ImageResolution) => void
   sheetMode: boolean
   onSheetModeChange: (value: boolean) => void
+  batchCount: number
+  onBatchCountChange: (value: number) => void
   inFlightCount: number
 }
 
@@ -133,6 +135,8 @@ export default function ControlsPanel({
   onResolutionChange,
   sheetMode,
   onSheetModeChange,
+  batchCount,
+  onBatchCountChange,
   inFlightCount,
 }: ControlsPanelProps) {
   const setField = (key: string, value: string) => {
@@ -349,6 +353,8 @@ export default function ControlsPanel({
         onResolutionChange={onResolutionChange}
         sheetMode={sheetMode}
         onSheetModeChange={onSheetModeChange}
+        batchCount={batchCount}
+        onBatchCountChange={onBatchCountChange}
         inFlightCount={inFlightCount}
       />
 

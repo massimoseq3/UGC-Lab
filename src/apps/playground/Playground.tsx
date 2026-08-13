@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Images, Wand2 } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import MobilePaneTabs, { paneClass } from '../../components/MobilePaneTabs'
+import { clampBatchCount } from '../../utils/batchCount'
 import { useReportActivity } from '../../stores/activityStore'
 import type { VideoSourceClipPayload, ImageHistoryItem } from '../../stores/types'
 import { isAssetRef, getAsBase64 } from '../../utils/assetStore'
@@ -140,6 +141,7 @@ function initialState(): PromptPanelState {
     audio: true,
     instrumental: true,
     refs: [],
+    batchCount: 1,
   }
 }
 
@@ -159,7 +161,7 @@ export default function Playground() {
   //   refresh. The default belongs to picking a model, not to reloading a draft.
   const [state, setState] = usePersistedState<PromptPanelState>(`${baseKey}:state`, initialState(), {
     sanitize: (v) => {
-      const next = { ...v, audio: true, instrumental: true }
+      const next = { ...v, audio: true, instrumental: true, batchCount: clampBatchCount(v.batchCount) }
       // A persisted draft can point at a model that has since been removed
       // from the registry (e.g. a retired video model). Snap back to the
       // mode's default so generate doesn't throw "Unknown model".
@@ -345,7 +347,6 @@ export default function Playground() {
     // On a phone only one pane is on screen — follow the run to the grid.
     setPane('history')
 
-    const id = crypto.randomUUID()
     const mode = state.mode
 
     // Snapshot every input synchronously so subsequent prompt-bar edits don't
@@ -419,6 +420,12 @@ export default function Playground() {
       ? { instrumental: state.instrumental }
       : undefined
 
+    // One member of the run. Everything above is snapshotted once and shared by
+    // all of them; each call here is its own kie task, its own in-flight tile
+    // and its own history row — exactly what pressing Generate N times has
+    // always produced, minus the N presses.
+    const runOne = async () => {
+    const id = crypto.randomUUID()
     // Add to inFlight WITHOUT a taskId yet — covers the createTask leg.
     setInFlight((prev) => [...prev, {
       id, mode, modelId, prompt: promptText, startedAt: Date.now(),
@@ -559,6 +566,13 @@ export default function Playground() {
         setInFlight((prev) => prev.filter((g) => g.id !== id))
       }
     }
+    }
+
+    // Music stays one per press: Suno already returns a pair of tracks for a
+    // single call, so a count chip there would be billing twice for something
+    // the API hands over anyway.
+    const count = mode === 'music' ? 1 : clampBatchCount(state.batchCount)
+    for (let i = 0; i < count; i++) void runOne()
   }
 
   // Switch tabs without bleeding inputs across them: stash the current tab's

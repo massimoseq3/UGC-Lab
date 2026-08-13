@@ -321,6 +321,12 @@ export interface CharacterHistoryItem {
   // prompt; it's what lets a save suggest "Mia - Claymation".
   styleName?: string
   linkedModelId?: string
+  // One press of Generate can fire up to four characters. Every member of that
+  // run shares `batchId` and keeps its position in `batchIndex`, so the Single
+  // view can lay the run out as one composition (2-up / 3-up / 2×2) whether its
+  // members are still rendering or already finished. Absent for a run of one.
+  batchId?: string
+  batchIndex?: number
   createdAt: number
 }
 

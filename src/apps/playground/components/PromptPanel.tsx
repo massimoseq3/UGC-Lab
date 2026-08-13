@@ -20,6 +20,8 @@ import SavingsPill from '../../../components/SavingsPill'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import AspectIcon from '../../../components/AspectIcon'
 import ConstraintChip from '../../../components/ConstraintChip'
+import BatchCountStepper from '../../../components/BatchCountStepper'
+import { clampBatchCount } from '../../../utils/batchCount'
 import ModelWaitNotice from '../../../components/ModelWaitNotice'
 import {
   getDefaultModel,
@@ -113,6 +115,10 @@ export interface PromptPanelState {
   audio: boolean
   instrumental: boolean
   refs: PromptRef[]
+  // How many outputs one press of Generate fires (image + video; music stays
+  // one per press). Absent on drafts saved before batching shipped — every
+  // read goes through clampBatchCount, which lands those on 1.
+  batchCount?: number
   // Kling Motion Control: how the output character is oriented. Defaults to
   // 'video' (follow the driving clip). Unused by other models.
   characterOrientation?: 'image' | 'video'
@@ -604,9 +610,10 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
   const presetsApplicable = state.mode === 'image' || (state.mode === 'video' && !isMotionControl)
 
   const generateLabel =
-    state.mode === 'image' ? 'Generate Image'
-    : state.mode === 'video' ? 'Generate Video'
-    : 'Generate Music'
+    state.mode === 'music' ? 'Generate Music'
+    : state.mode === 'image'
+      ? (clampBatchCount(state.batchCount) === 1 ? 'Generate Image' : `Generate ${clampBatchCount(state.batchCount)} Images`)
+      : (clampBatchCount(state.batchCount) === 1 ? 'Generate Video' : `Generate ${clampBatchCount(state.batchCount)} Videos`)
 
   const GenerateIcon =
     state.mode === 'image' ? ImageIcon
@@ -619,15 +626,23 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
   const motionDrivingSeconds = state.refs.find((r) => r.slot === 'motion-video')?.durationSeconds
   const motionDuration = Math.min(motionDrivingSeconds ?? 5, motionOrientation === 'image' ? 10 : 30)
 
-  const generateCredits = formatCredits(
-    estimateCredits(state.modelId, {
+  const batchCount = clampBatchCount(state.batchCount)
+
+  // Cost of a whole run. Image models price by `imageCount` natively; video and
+  // music have no count dimension, so the per-call estimate is multiplied here.
+  const creditsForRun = (n: number) => {
+    const one = estimateCredits(state.modelId, {
       durationSeconds: isMotionControl ? motionDuration : state.mode === 'video' ? state.durationSeconds : undefined,
-      imageCount: state.mode === 'image' ? 1 : undefined,
+      imageCount: state.mode === 'image' ? n : undefined,
       resolution: state.mode !== 'music' ? state.resolution : undefined,
       audio: state.mode === 'video' ? state.audio : undefined,
       videoInput: state.mode === 'video' ? state.refs.some((r) => r.slot === 'omni-clip') : undefined,
-    }),
-  )
+    })
+    if (one === null) return null
+    return state.mode === 'image' ? one : one * n
+  }
+
+  const generateCredits = formatCredits(creditsForRun(state.mode === 'music' ? 1 : batchCount))
 
   return (
     <div
@@ -1201,7 +1216,9 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               value={state.resolution}
               onChange={(v) => onChange({ ...state, resolution: v })}
               renderOption={(v) => {
-                const credits = formatCredits(estimateCredits(state.modelId, { imageCount: 1, resolution: v }))
+                // Priced for the armed run, so this menu and the Generate
+                // button can't quote two different numbers.
+                const credits = formatCredits(estimateCredits(state.modelId, { imageCount: batchCount, resolution: v }))
                 return (
                   <span className="flex w-full items-center justify-between gap-6">
                     <span>{v}</span>
@@ -1228,6 +1245,20 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             )}
           </>
         )}
+
+        {/* How many. Playground is where a prompt gets TRIED, so a run of one
+            is the wrong unit most of the time. The row itself is already
+            image/video-only — Suno returns a pair of tracks for one call, so
+            music has nothing to count. */}
+        <BatchCountStepper
+          grow
+          size="lg"
+          accent="playground"
+          noun={state.mode === 'video' ? 'clip' : 'image'}
+          value={batchCount}
+          onChange={(n) => onChange({ ...state, batchCount: n })}
+          creditsFor={creditsForRun}
+        />
         </div>
         )}
         <button

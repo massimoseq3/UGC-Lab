@@ -27,6 +27,9 @@ import {
 } from 'lucide-react'
 import SectionCard, { SectionLabel, StatusDot } from '../../../components/SectionCard'
 import ConstraintChip from '../../../components/ConstraintChip'
+import BatchCountStepper from '../../../components/BatchCountStepper'
+import { clampBatchCount } from '../../../utils/batchCount'
+import { usePersistedState } from '../../../hooks/usePersistedState'
 import AspectIcon from '../../../components/AspectIcon'
 import ModelPicker from '../../../components/ModelPicker'
 import ModelSidePanel from '../../../components/ModelSidePanel'
@@ -191,12 +194,27 @@ export function ContinuousFrameModal({
   // current still on its own using the storyboard's continuous video model.
   const [frameTab, setFrameTab] = useState<'image' | 'animate'>('image')
   const [animateModelPanelOpen, setAnimateModelPanelOpen] = useState(false)
+  // Takes of this concept — shared with the Line-by-Line card modal's count, so
+  // "how many takes I want" is one setting across the app rather than one per
+  // modal the member has to find twice.
+  const [takeCount, setTakeCount] = usePersistedState<number>('ai-ugc-lab:broll:card-takes', 1, {
+    sanitize: (v) => clampBatchCount(v),
+  })
   const animateModel = getModel(animateModelId)
   const animateConstraints = animateModel?.videoConstraints
   const startImageUrl = useAssetUrl(cardState.images[cardState.currentImageIndex]?.imageUrl)
-  const animateCredits = animateModel
-    ? formatCredits(estimateCredits(animateModelId, { durationSeconds: cardState.videoDurationSeconds, resolution: cardState.videoResolution, audio: cardState.videoAudio }))
-    : null
+  // Video has no count dimension in the registry, so a run of N is N × one
+  // clip. Null stays null — an unmeasurable price is never printed as zero.
+  const animateCreditsFor = (n: number) => {
+    if (!animateModel) return null
+    const one = estimateCredits(animateModelId, {
+      durationSeconds: cardState.videoDurationSeconds,
+      resolution: cardState.videoResolution,
+      audio: cardState.videoAudio,
+    })
+    return one === null ? null : one * n
+  }
+  const animateCredits = formatCredits(animateCreditsFor(takeCount))
   const animateCapable = (animateModel?.modes ?? []).some((m) => m === 'image-to-video' || m === 'reference-to-video')
 
   // Image model is the app-wide B-Roll pick (same ModelPicker as the
@@ -232,7 +250,7 @@ export function ContinuousFrameModal({
   const resolutions = (imageConstraints?.resolutions ?? imageResolutionsFor(imageModelId ?? '')) as ImageResolution[]
   const aspects = imageConstraints?.aspectRatios ?? ['9:16', '1:1', '16:9', '4:3', '3:4']
   const credits = imageModelId
-    ? formatCredits(estimateCredits(imageModelId, { imageCount: 1, resolution: cardState.resolution }))
+    ? formatCredits(estimateCredits(imageModelId, { imageCount: takeCount, resolution: cardState.resolution }))
     : null
 
   // ── Prompt history (Enhance / Regenerate / Undo / Redo) ──
@@ -473,7 +491,7 @@ export function ContinuousFrameModal({
                       value={cardState.resolution}
                       onChange={(v) => onUpdate(() => ({ resolution: v as ImageResolution }))}
                       render={(v) => {
-                        const c = imageModelId ? formatCredits(estimateCredits(imageModelId, { imageCount: 1, resolution: v as ImageResolution })) : null
+                        const c = imageModelId ? formatCredits(estimateCredits(imageModelId, { imageCount: takeCount, resolution: v as ImageResolution })) : null
                         return <span>{v}{c ? ` · ${c}` : ''}</span>
                       }}
                     />
@@ -493,14 +511,25 @@ export function ContinuousFrameModal({
                       )}
                     />
                   )}
+                  {/* How many takes of this concept. Three CONCEPTS are three
+                      different ideas for the beat; three TAKES are three rolls
+                      of the same one, which is the axis this modal was missing. */}
+                  <BatchCountStepper
+                    grow
+                    accent="broll"
+                    noun="take"
+                    value={takeCount}
+                    onChange={setTakeCount}
+                    creditsFor={(n) => imageModelId ? estimateCredits(imageModelId, { imageCount: n, resolution: cardState.resolution }) : null}
+                  />
                 </div>
                 <button
-                  onClick={onGenerate}
+                  onClick={() => { for (let i = 0; i < takeCount; i++) onGenerate() }}
                   disabled={!cardState.editablePrompt.trim()}
                   className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <ImageIcon className="h-4 w-4" />
-                  Generate Image
+                  {takeCount === 1 ? 'Generate Image' : `Generate ${takeCount} Images`}
                   {credits && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                       <Coins className="h-3 w-3" strokeWidth={2} />
@@ -590,9 +619,17 @@ export function ContinuousFrameModal({
                       )}
                     </>
                   )}
+                  <BatchCountStepper
+                    grow
+                    accent="broll"
+                    noun="take"
+                    value={takeCount}
+                    onChange={setTakeCount}
+                    creditsFor={animateCreditsFor}
+                  />
                 </div>
                 <button
-                  onClick={onAnimate}
+                  onClick={() => { for (let i = 0; i < takeCount; i++) onAnimate() }}
                   // Not gated on a render in flight — animations queue in
                   // parallel like every other B-Roll generation.
                   disabled={!startImageUrl || !animateCapable}
@@ -600,7 +637,7 @@ export function ContinuousFrameModal({
                   className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Film className="h-4 w-4" />
-                  Animate
+                  {takeCount === 1 ? 'Animate' : `Animate ${takeCount}×`}
                   {animateCredits && (
                     <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                       <Coins className="h-3 w-3" strokeWidth={2} />
@@ -919,11 +956,21 @@ export function ContinuousClipModal({
   const model = getModel(modelId)
   const constraints = model?.videoConstraints
   const framesReady = !!startImageRef && !!endImageRef
-  const credits = formatCredits(estimateCredits(modelId, {
-    durationSeconds: cardState.durationSeconds,
-    resolution: cardState.resolution,
-    audio: cardState.audio,
-  }))
+  // Takes of this clip — the same shared count the frame and Line-by-Line
+  // modals use. Priced for the whole run: video has no count dimension in the
+  // registry, so N clips are N × one, and null stays null.
+  const [takeCount, setTakeCount] = usePersistedState<number>('ai-ugc-lab:broll:card-takes', 1, {
+    sanitize: (v) => clampBatchCount(v),
+  })
+  const creditsFor = (n: number) => {
+    const one = estimateCredits(modelId, {
+      durationSeconds: cardState.durationSeconds,
+      resolution: cardState.resolution,
+      audio: cardState.audio,
+    })
+    return one === null ? null : one * n
+  }
+  const credits = formatCredits(creditsFor(takeCount))
 
   // Clamp this clip's settings onto the active model's grid whenever the model
   // changes, so the chips never offer something the model can't render.
@@ -1116,15 +1163,23 @@ export function ContinuousClipModal({
                   )}
                 </>
               )}
+              <BatchCountStepper
+                grow
+                accent="broll"
+                noun="take"
+                value={takeCount}
+                onChange={setTakeCount}
+                creditsFor={creditsFor}
+              />
             </div>
             <button
-              onClick={onGenerate}
+              onClick={() => { for (let i = 0; i < takeCount; i++) onGenerate() }}
               // Not gated on a render in flight — clips queue in parallel.
               disabled={!framesReady || !cardState.editablePrompt.trim()}
               className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <VideoIcon className="h-4 w-4" />
-              Generate Video
+              {takeCount === 1 ? 'Generate Video' : `Generate ${takeCount} Videos`}
               {credits && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                   <Coins className="h-3 w-3" strokeWidth={2} />
