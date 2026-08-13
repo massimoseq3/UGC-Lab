@@ -1,71 +1,34 @@
-// Gemini-style generating backdrop — soft accent-colored blobs that slowly
-// drift and breathe behind a dark frosted surface. Drop in as the first child of
-// a `relative overflow-hidden` container; foreground content layers on top (give
-// it z-10). Replaces the old harsh pulse on generating tiles.
-//
-// PERFORMANCE — read before touching the blobs.
-//
-// Each blob is a RADIAL GRADIENT, not a solid circle behind `filter: blur()`.
-// A soft-edged blob is exactly what a radial gradient already is, so the two
-// look the same; what they cost is not remotely the same. The old shape was
-// three `blur-2xl` (a 40px blur filter) elements per tile, each promoted to its
-// own compositor layer by `will-change` and each running an infinite transform
-// animation. That is 3 live blurred layers per generating tile — and this
-// surface's whole job is to appear in bulk: one B-Roll batch puts a dozen-plus
-// cards into generation at once, which was 36+ continuously animating blur
-// filters on screen at the same time. It read as the loading animation itself
-// being laggy, because it was.
-//
-// The cost did not stop at the tile, either. The app window frame in App.tsx is
-// a full-viewport element and every one of these tiles renders inside it — and
-// a repaint anywhere inside a `backdrop-filter` element invalidates that
-// element's whole backdrop. So each animation frame of each blob dragged a
-// full-window filter recompute behind it, which is how a card-sized animation
-// turned into app-wide lag (and, under that much pressure, a browser drops its
-// raster scale — which is what "the images went blocky" was).
-//
-// A gradient has no filter, needs no layer of its own beyond the transform it
-// animates, and re-rasters at zero cost. Keep it that way: animate `transform`
-// and `opacity` here, nothing else, and don't reintroduce `filter`.
+// Gemini-style generating backdrop — soft, blurred accent-colored blobs that
+// slowly drift and breathe behind a dark frosted surface. Drop in as the first
+// child of a `relative overflow-hidden` container; foreground content layers on
+// top (give it z-10). Replaces the old harsh pulse on generating tiles.
 type Family = 'playground' | 'broll' | 'influencers'
 
-// Literal CSS custom properties per app — Tailwind can't build class names from
-// props, and these go into a gradient rather than onto a `bg-` utility.
+// Literal class triples per app (Tailwind can't build class names from props).
 const BLOBS: Record<Family, [string, string, string]> = {
-  playground: ['--color-playground-300', '--color-playground-500', '--color-playground-400'],
-  broll: ['--color-broll-300', '--color-broll-500', '--color-broll-400'],
-  influencers: ['--color-influencers-300', '--color-influencers-500', '--color-influencers-400'],
-}
-
-// `closest-side` puts the gradient's edge on the element's own bounds, so the
-// blob fades out inside its box exactly as the blurred circle used to. The
-// middle stop is what matches the density: a blurred solid circle keeps full
-// colour across its core and only falls off at the fringe, while a bare
-// two-stop gradient starts fading from the centre pixel and comes out visibly
-// thinner. Holding the colour to 55% lands on the old weight.
-function blob(varName: string): React.CSSProperties {
-  const c = `var(${varName})`
-  return { background: `radial-gradient(closest-side, ${c} 0%, ${c} 55%, transparent 100%)` }
+  playground: ['bg-playground-300', 'bg-playground-500', 'bg-playground-400'],
+  broll: ['bg-broll-300', 'bg-broll-500', 'bg-broll-400'],
+  influencers: ['bg-influencers-300', 'bg-influencers-500', 'bg-influencers-400'],
 }
 
 export default function GeneratingBackdrop({ family = 'playground' }: { family?: Family }) {
   const [a, b, c] = BLOBS[family]
   return (
     // `offscreen-idle` is `content-visibility: auto` — the browser skips this
-    // subtree entirely while it's outside the viewport, so a tile the member
-    // can't see isn't animating. It landed against the blurred-circle version
-    // above, where it was load-bearing; with gradient blobs it's cheap
-    // insurance rather than a rescue, and it still earns its place: a batch
-    // puts one of these on every card of a storyboard at once, and not paying
-    // for three dozen off-screen animations is free. Nothing changes for a tile
-    // on screen, and the element is `absolute inset-0`, so the size containment
-    // that comes with the skip has nothing to collapse.
+    // subtree entirely while it's outside the viewport, which stops its blobs
+    // animating. Each one is a large blurred layer being scaled, so it has to be
+    // re-blurred every frame, and a batch puts one of these on every card of a
+    // storyboard at once: a dozen tiles is three dozen animated blur layers, and
+    // the whole window starts dropping frames while the member scrolls through
+    // work they can't even see yet. Nothing changes for a tile on screen, and
+    // the element is `absolute inset-0`, so the size containment that comes with
+    // the skip has nothing to collapse.
     <div aria-hidden className="offscreen-idle absolute inset-0 overflow-hidden">
       {/* Frosted base — dark in dark mode, light in light mode (ink ramp flips). */}
       <div className="absolute inset-0 bg-gradient-to-br from-ink-900 to-ink-950" />
-      <div className="absolute -left-1/4 -top-1/4 h-3/4 w-3/4 opacity-50 animate-blob-1" style={blob(a)} />
-      <div className="absolute -right-1/4 top-0 h-3/4 w-3/4 opacity-40 animate-blob-2" style={blob(b)} />
-      <div className="absolute -bottom-1/4 left-1/4 h-2/3 w-2/3 opacity-35 animate-blob-3" style={blob(c)} />
+      <div className={`absolute -left-1/4 -top-1/4 h-3/4 w-3/4 rounded-full ${a} opacity-50 blur-2xl animate-blob-1`} />
+      <div className={`absolute -right-1/4 top-0 h-3/4 w-3/4 rounded-full ${b} opacity-40 blur-2xl animate-blob-2`} />
+      <div className={`absolute -bottom-1/4 left-1/4 h-2/3 w-2/3 rounded-full ${c} opacity-35 blur-2xl animate-blob-3`} />
     </div>
   )
 }
