@@ -11,7 +11,7 @@ import { getDefaultModel, getChatTarget, buildImageInput, getModel, type ChatTar
 import { isAssetRef, getAsBase64 } from '../../../utils/assetStore'
 import { finishImageAssetTask } from '../../../utils/imageTask'
 import { useBankStore } from '../../../stores/bankStore'
-import { withIphoneRealism } from './realism'
+import { withIphoneRealism, withNoOnScreenText } from './realism'
 import { countProductAngles, parsePhotoPick, productPhotoDataUris, productPhotoInstruction } from './productAngles'
 import { extractBlock, extractNumberedBlock } from './xmlBlocks'
 import { styleBriefFor, styleUsesRealism } from './generateContinuous'
@@ -91,6 +91,8 @@ The footage is SILENT: no one speaks, mouths words, or addresses the viewer. A v
 // The talking-card format for "With Dialogue" delivery — the character speaks
 // the scene's line to camera. Used by the DIALOGUE regen/enhance paths.
 const PROMPT_FORMAT_DIALOGUE = `${PROMPT_FORMAT_CORE} The character SPEAKS the scene's line — embed the exact words verbatim inside double quotes (the character … says: "…"), copied character for character so the app can rewrite them when the line is edited. Audio is on: just them talking, no background music, no extra voiceover.
+
+THE QUOTED LINE IS HEARD, NEVER SEEN. It is what comes out of their mouth, not something written anywhere in the picture — no captions, no subtitles, no text overlay, no words on a wall, a screen, a sign, or a label. Never describe how the line appears on screen, and never ask for it to be shown, displayed, titled, or captioned. Real captions are added later in the edit.
 
 Say where they are and what they're doing while they talk. It's the same person and the same ad throughout, but not the same chair: a dialogue shot can happen anywhere their life plausibly takes them, and the interesting ones happen mid-something.`
 
@@ -252,6 +254,7 @@ Every variation, every scene:
 - <TAG>DIALOGUE</TAG>, always, on all three.
 - The character is on camera and SPEAKS the scene's exact <LINE> word-for-word. Write ONE flowing paragraph that embeds the line verbatim inside double quotes, e.g.: the character, [expression/gesture], [where they're looking] and says: "<the exact line>". Copy the line character for character — the app rewrites those quoted words when the member edits the line, and it can only find them if they are the line. A real person talking, natural, never a news anchor.
 - Audio is on: just them talking. No background music, no added voiceover.
+- THE LINE IS HEARD, NEVER SEEN. The quoted words are the sound of their voice, not a graphic: no captions, no subtitles, no text overlay, no on-screen words of any kind — not across the frame, not on a screen, a sign, a wall, a mirror, or a label in shot. Never write that the line appears, is displayed, is captioned, or is shown. The member burns real captions in later, in the edit.
 - Describe the delivery, expression, gesture, what their hands are doing, the room, and where the light comes from.
 
 THE THREE VARIATIONS ARE THREE DIFFERENT IDEAS, NOT THREE ANGLES ON ONE:
@@ -263,7 +266,7 @@ Each variation must be a shot you could actually cut to and feel a change. Two o
 WHEN A SCENE STAGING BLOCK IS PRESENT, IT WINS: it says what kind of content this ad imitates, and every variation stages that — three different spots along the same street for a street interview, three moments of the same routine for a GRWM, three angles of the same recording session for a podcast clip. Vary WITHIN the format; never break it. When there is no staging block, the ad is a plain organic UGC video and the character moves around their own life.
 
 - Product: follow VISIBILITY exactly as the rules above describe. When VISIBILITY is yes the character may hold, use, or be near the product while they talk, and <REFS> must include product so it's built from the real packaging. When VISIBILITY is no, no product anywhere — not in a hand, not on a counter behind them.
-- Still obey every other rule: camera is a viewpoint not a prop (never name the filming device), gender-neutral language ("the character", "they/them"), UGC realism, after-not-before, constant motion.
+- Still obey every other rule: camera is a viewpoint not a prop (never name the filming device), gender-neutral language ("the character", "they/them"), UGC realism, no captions or on-screen text, after-not-before, constant motion.
 
 # VOICE PROFILE (emit ONCE, after the last scene)
 
@@ -694,7 +697,10 @@ export async function startImageTask(
   // Scope the references to identity/appearance only so the model builds a
   // fresh composition from the prompt instead of inheriting the reference's
   // framing, pose, and background. Phrased by which refs are actually attached.
-  const scenePrompt = opts?.noRealism ? prompt.trim() : withIphoneRealism(prompt)
+  // The realism stack is style-dependent; the no-text guarantee is not — a
+  // still must never carry its own dialogue line as a burned-in caption,
+  // whatever look it's rendered in.
+  const scenePrompt = withNoOnScreenText(opts?.noRealism ? prompt.trim() : withIphoneRealism(prompt))
   const preamble = opts?.inheritReference ? buildStaticReferencePreamble : buildReferencePreamble
   const preambleText = opts?.preambleOverride ?? (inputUrls.length > 0 ? preamble(referenceImages!) : '')
   const finalPrompt = inputUrls.length > 0 && preambleText
@@ -731,7 +737,7 @@ export async function finishImageTask(taskId: string, modelId: string, resolutio
 const TAG_BRIEFS: Record<VariationTag, string> = {
   // DIALOGUE is the "With Dialogue" talking card: the character looks into the
   // lens and speaks the scene's exact line. STATIC stays a legacy silent anchor.
-  DIALOGUE: 'A talking-to-camera shot: the character looks into the lens and SPEAKS the scene\'s exact script line word-for-word, natural like a real person talking to their phone. Audio is on. Embed the line verbatim (the character ... says: "…"). Every dialogue shot in the ad is the same continuous take cut into pieces — same room, same spot, same wardrobe, same light, same camera distance and height — so only the moment changes: expression, gesture, posture. The subject is the person talking, never the product — don\'t stage it in their hands or in the background.',
+  DIALOGUE: 'A talking-to-camera shot: the character looks into the lens and SPEAKS the scene\'s exact script line word-for-word, natural like a real person talking to their phone. Audio is on. Embed the line verbatim (the character ... says: "…") — the words are heard out loud, never written anywhere in the picture. Every dialogue shot in the ad is the same continuous take cut into pieces — same room, same spot, same wardrobe, same light, same camera distance and height — so only the moment changes: expression, gesture, posture. The subject is the person talking, never the product — don\'t stage it in their hands or in the background.',
   STATIC: 'A silent shot of the character in their own space, present and natural but NOT speaking — lips closed, no words mouthed. A voiceover is added later.',
   ACTION: "Act out the line's strongest image, literally — if the line has a metaphor or comparison, make it real on screen (\"tasted like cardboard\" → the character deadpan biting actual cardboard). Silent.",
   EMOTIONAL: 'The feeling of the line landing on the character inside a real moment — a slump against the fridge, a slow exhale over the sink. Silent, never a face in a void.',
@@ -763,7 +769,7 @@ export async function generateNewVariation(
   // A DIALOGUE regen keeps the character speaking the line (dialogue format);
   // everything else is silent b-roll (the default doctrine).
   const deliveryClause = isDialogue
-    ? `This is a DIALOGUE shot: the character SPEAKS the line above word-for-word. Embed it verbatim inside double quotes, e.g.: the character, [expression/gesture], [where they're looking] and says: "${scriptLine}". Natural delivery — a real person talking, not a news anchor. Audio is on. Give this take its own situation — a different room, a different task in their hands, a different moment — rather than another angle on a person sat still.`
+    ? `This is a DIALOGUE shot: the character SPEAKS the line above word-for-word. Embed it verbatim inside double quotes, e.g.: the character, [expression/gesture], [where they're looking] and says: "${scriptLine}". Natural delivery — a real person talking, not a news anchor. Audio is on. The quoted line is HEARD, never SEEN: it is the sound of their voice, never a caption, subtitle, or any text in the picture — never describe it appearing on screen. Give this take its own situation — a different room, a different task in their hands, a different moment — rather than another angle on a person sat still.`
     : `This is SILENT b-roll — no one speaks; a voiceover is laid over the footage later. The character never talks to camera or mouths words.`
 
   const prompt = `Generate a single new creative image generation prompt for this B-Roll scene:
@@ -847,7 +853,7 @@ export async function enhanceVariationPrompt(
   // The silent doctrine governs every b-roll lens; a DIALOGUE card is the one
   // exception — the rewrite must KEEP the character speaking the line.
   const soundRule = isDialogue
-    ? `- This is a DIALOGUE shot: the character speaks the script line to camera. KEEP the spoken line in the rewrite, verbatim (the character … says: "…") — do not strip the speech or mute them. Audio is on; no background music or extra voiceover.`
+    ? `- This is a DIALOGUE shot: the character speaks the script line to camera. KEEP the spoken line in the rewrite, verbatim (the character … says: "…") — do not strip the speech or mute them. Audio is on; no background music or extra voiceover. The quoted line is HEARD, never SEEN — if the draft has it appearing as a caption, subtitle, title card, or text anywhere in frame, drop that: it is what they say, not something written in the picture.`
     : `- This is SILENT b-roll: no one speaks and no words are mouthed. If the draft has the character talking to camera, keep the shot, drop the speech. Sound, if mentioned, is only the natural sound of the moment — no dialogue, no music, no voiceover.`
 
   const userMessage = `Rewrite the draft below for the ${variation.tag} variation of this scene. Keep the user's intent; tighten the language; obey the framework.

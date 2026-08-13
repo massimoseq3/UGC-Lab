@@ -15,7 +15,7 @@ import type { ContinuousConcept, ContinuousFrame, ContinuousResult, ContinuousSc
 import { useSettingsStore, resolveScriptModel } from '../../../stores/settingsStore'
 import { kieChatCompletions, LONG_CHAT_TIMEOUT_MS, type ChatMessage } from '../../../utils/kie'
 import { getChatTarget, getModel, snapVideoDurationUp, type ChatTarget } from '../../../utils/models'
-import { IPHONE_REALISM_SUFFIX } from './realism'
+import { IPHONE_REALISM_SUFFIX, NO_ON_SCREEN_TEXT_SUFFIX } from './realism'
 import { extractBlock, extractNumberedBlock } from './xmlBlocks'
 import { parsePhotoPick, productPhotoDataUris, productPhotoInstruction } from './productAngles'
 
@@ -128,10 +128,12 @@ export function applyStyleToPrompt(
 export function appliedStyleNote(
   style: { style?: string; realism?: boolean } | null | undefined,
 ): { label: string; text: string } {
+  // The no-text guarantee rides on EVERY render, stylized or not (see
+  // withNoOnScreenText), so it joins both branches rather than one.
   if (style?.realism === false && style.style?.trim()) {
-    return { label: 'Style (applied automatically)', text: style.style.trim() }
+    return { label: 'Style (applied automatically)', text: `${style.style.trim()} ${NO_ON_SCREEN_TEXT_SUFFIX}` }
   }
-  return { label: 'Realism (applied automatically)', text: IPHONE_REALISM_SUFFIX }
+  return { label: 'Realism (applied automatically)', text: `${IPHONE_REALISM_SUFFIX} ${NO_ON_SCREEN_TEXT_SUFFIX}` }
 }
 
 // Reference preamble for keyframe image generation. The chain reference (the
