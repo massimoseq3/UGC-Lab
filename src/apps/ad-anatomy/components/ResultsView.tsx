@@ -26,6 +26,7 @@ import { useAppStore } from '../../../stores/appStore'
 import { useBankStore } from '../../../stores/bankStore'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import { useExclusiveVideo } from '../../../hooks/useInlineVideo'
+import { rangeDurationLabel } from '../../../utils/timecode'
 
 interface ResultsViewProps {
   result: AnalysisResult
@@ -430,10 +431,16 @@ function VoiceProfileBlock({ voice }: { voice: MasterVoiceProfile }) {
 // The `[0:00–0:03]` marker a beat opens with. Red, in its own brackets, on its
 // own line: it's the one thing in a scene prompt you navigate by, and inline in
 // the prose it was indistinguishable from the sentence around it.
+//
+// It's followed by how long the beat RUNS, because that's the number the beat is
+// reproduced at — a range on its own is two clock times to subtract, once per
+// scene, before you know whether a shot is three seconds or eight.
 function BeatTime({ time }: { time: string }) {
+  const duration = rangeDurationLabel(time)
   return (
     <span className="w-fit select-none rounded-full bg-[#FF5257]/10 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums tracking-tight text-[#FF5257] light:text-[#C4272C]">
       [{time}]
+      {duration && <span className="opacity-60"> · {duration}</span>}
     </span>
   )
 }
