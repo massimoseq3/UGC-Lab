@@ -125,7 +125,24 @@ function Workspace() {
             the menu bar and the dock, desktop gradient peeking around it. App
             chrome clips at the window edge instead of ending in a hard line
             against the dock gutter. */}
-        <div className="absolute inset-x-2 bottom-[108px] top-11 overflow-hidden rounded-2xl border border-ink/10 bg-surface-0/60 shadow-2xl shadow-black/25 backdrop-blur-xl md:inset-x-3">
+        {/* NO `backdrop-blur` on this frame, deliberately (August 2026).
+            It carried `backdrop-blur-xl` and it was the most expensive thing in
+            the app for the least return. What sits behind it is `AppBackground`
+            — a smooth near-black radial gradient with ±3 levels of dither —
+            and blurring a smooth gradient gives you back the same gradient, so
+            the blur was invisible. What it cost was not: a `backdrop-filter`
+            element is a backdrop root, and a repaint ANYWHERE inside it
+            invalidates the whole backdrop. This frame contains the entire
+            workspace, so every animating pixel in every app — a dozen
+            generating tiles during a B-Roll batch especially — dragged a
+            full-viewport filter recompute behind it. That surfaced as laggy
+            generation animations, laggy zoom (a zoom re-rasters everything, the
+            backdrop included), and images going blocky, since a browser under
+            that much compositing pressure drops its raster scale. The frame is
+            a plain translucent fill now and looks the same.
+            Glass belongs on small, static chrome over real content (B-Roll's
+            pinned storyboard strips), not on a full-window container. */}
+        <div className="absolute inset-x-2 bottom-[108px] top-11 overflow-hidden rounded-2xl border border-ink/10 bg-surface-0/60 shadow-2xl shadow-black/25 md:inset-x-3">
           {/* Empty state — visible when no app is active */}
           <div
             className={`absolute inset-0 ${
