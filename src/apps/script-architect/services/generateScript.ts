@@ -206,48 +206,104 @@ const HOOK_LIBRARY = `THE 7 HOOK FAMILIES AND THEIR PROVEN FORMULAS — every "(
 // library labels only — the scripts must never emit them.
 const HOOK_OPENING_INSTRUCTION = `THE OPENING LINE COMES FROM THE HOOK LIBRARY: build the script's first spoken line from one of the proven formulas above. Pick the family that fits this product, audience, and structure; fill the blanks with the product's real specifics; and keep the formula's COMPLETE shape — if it has a setup and a payoff clause, the opening line keeps both. A hook that stops where the payoff should be is a failed hook. Adapt the wording so it sounds like the same person speaking the rest of the script — never a bolted-on template — and never include the <FAMILY> tags in the output; they only label the library.`
 
+// ── Remix: the source-fidelity contract ──
+//
+// A remix is an ADAPTATION, and the app kept producing fresh scripts because
+// nothing here made that structural. "Rigorously maintain the original's
+// pacing" was asserted once and given no mechanism, while three other blocks
+// actively pulled the other way: HOOK_RULES ("write it to win in 3-4 words"),
+// SELF_AUDIT step 1 ("if the hook doesn't win, rewrite it") and every angle's
+// "Lead with X" all told the model to design its own opening — which is the one
+// thing a remix inherits. So the hook rules and the self-audit are remix-specific
+// here, the angles pick CONTENT rather than structure (see the block above
+// REMIX_ANGLE_INSTRUCTION), and this contract gives the model the missing
+// mechanism: map the source into beats first, then write against that map.
+const REMIX_SOURCE_FIDELITY = `HOW A REMIX WORKS — THIS IS AN ADAPTATION, NOT A NEW SCRIPT:
+The source script you are given is a proven winner. Its STRUCTURE is the thing being reused, so you don't get to redesign it. You are swapping a new product into a machine that already works.
+
+FIRST, silently map the source into its beats, in order: what the first line DOES (a confession, a number, a question, a callout, a mid-story drop, reading something out loud), then what each following line does (agitate, reveal, prove, handle an objection, demo, close), where the product first appears, where the script turns, and where the CTA lands and how hard it asks.
+
+THEN write the new script beat for beat against that map:
+- SAME BEATS, SAME ORDER, SAME COUNT. One source beat in, one new beat out. Don't add beats the source doesn't have, don't merge two of its beats into one, don't reorder them.
+- SAME OPENING DEVICE. Whatever the source's first line does, your first line does the same thing with this product's material. You copy the SHAPE, never the words.
+- SAME RHYTHM AND LINE LENGTHS. If a source line is three words, its replacement is about three words. The pacing is a big part of why this ad won.
+- SAME TURN, SAME CTA PLACEMENT. The product enters at the same point in the script, and the call-to-action sits in the same position with the same energy (hard ask, throwaway aside, or no ask at all).
+- SAME SPEAKER. Keep the source's point of view (I / you / we), its tense, and how casual or unhinged the person talking is.
+- Where these rules and the voice rules below disagree about rhythm or line count, THE SOURCE WINS. The voice rules govern word choice, not shape.
+
+WHAT DOES CHANGE — every product-specific fact. The pain point, the benefit, the proof, the numbers, the price, the category, the product name, the objection, the offer and the CTA wording all come from the NEW product's details. Nothing about the source's product, brand or category survives; never mention or imply it.
+
+A remix that reads like a fresh script written off the product brief is a FAILURE, even if it's a good script. Someone should be able to lay your script next to the source and see the same skeleton.`
+
+// A remix's hook is inherited — the source's opening is precisely why the ad is
+// being remixed. This replaces HOOK_RULES in this pipeline (which teaches the
+// model to design a hook from scratch) and keeps only the half that's still
+// true: the openers that scream "ad", and the open loop.
+const REMIX_HOOK_RULES = `THE HOOK IS INHERITED, NOT INVENTED: the source's first line already won — that's the whole reason this ad is being remixed. Keep its device, its shape and roughly its word count, and refill it with this product's specifics. Do NOT "improve" it into a different kind of hook, and do NOT put a warm-up in front of it. If the source opens a loop that pays off later, your version opens the same loop and pays it off in the same place. The only openers that are off-limits no matter what the source did: "So I've been...", "Have you ever...", "Let me tell you about...", "Introducing...", "If you struggle with...".`
+
+const REMIX_SELF_AUDIT = `SELF-AUDIT BEFORE YOU ANSWER (do this silently; output ONLY the final script):
+1. Lay your script next to the source, beat for beat. Same count, same order, same job per beat? Rewrite any beat that drifted.
+2. Does your first line DO what the source's first line does? If you invented a different kind of hook, replace it.
+3. Is the CTA in the same position, asking about as hard as the source's?
+4. Did any of the SOURCE's product, brand, category or specifics survive? Cut them — every fact comes from the new product.
+5. Scan every line for the 6 banned sentence shapes and any em-dash. Kill them.
+6. Read it out loud in your head. Any line you wouldn't actually say to a friend gets rewritten.`
+
 const REMIX_SYSTEM = `You are an elite UGC ad script writer with the specialized skill of "Structural Adaptation". Brands pay you because your rewrites hold attention and convert WITHOUT ever sounding like marketing — they sound like a real person talking to their phone camera.
 
-Your task is taking a winning ad script and rewriting it for a completely new product while rigorously maintaining the original script's pacing, hook style, psychological triggers, and call-to-action placement.
+Your task is taking a winning ad script and rewriting it for a completely new product while rigorously maintaining the original script's beats, pacing, hook device, psychological triggers, and call-to-action placement.
 
-${HOOK_RULES}
+${REMIX_SOURCE_FIDELITY}
+
+${REMIX_HOOK_RULES}
 
 ${HUMAN_VOICE_RULES}
 - Mention the product name at most twice, the casual way a person would ("so I got the X", "this thing").
 
 ${BANNED_AI_PATTERNS}
 
-${SELF_AUDIT}
+${REMIX_SELF_AUDIT}
 
-CRITICAL FORMATING RULES:
+CRITICAL FORMATTING RULES:
 1. ONLY return the spoken dialogue.
 2. Do NOT include any stage directions, timestamps, headers, bracketed text, or visual cues.
 3. Do NOT use quotation marks around the text.
 4. Do NOT include any introductions or conclusions (e.g., "Here is the script:").
 5. Return plain text only. EACH SENTENCE MUST BE ON ITS OWN LINE (Single spaced sentence-by-sentence format).`
 
+// What a variation ARGUES, never how it's built. Each of these used to open
+// "Lead with…", which is a structural instruction — and since a batch is N
+// parallel calls each carrying a different one, the three defaults told three
+// takes to design three different openings, throwing away the source's hook
+// every time. A remix's opening device belongs to the source; the angle only
+// decides which of the product's material fills the beats.
 const REMIX_ANGLE_INSTRUCTION: Record<RemixAngle, string> = {
   'hook-led':
-    'ANGLE: Lead with a punchy, pattern-interrupting hook line that stops the scroll. The first sentence must be provocative or surprising — never set up context first.',
+    'ANGLE: play the source\'s own opening device as hard as it will go — the most provocative, scroll-stopping fill for it this product allows — and keep that pattern-interrupting energy running through the beats that follow.',
   'pain-point-led':
-    'ANGLE: Lead with the customer\'s pain point in vivid, specific terms. Make the viewer feel the problem viscerally before the product appears.',
+    'ANGLE: build this variation on the customer\'s sharpest pain point, in vivid specific terms. Spend the source\'s beats making the viewer feel the problem, and let the product read as the relief at the point the source lets it in.',
   'curiosity-led':
-    'ANGLE: Lead with a curiosity gap or counter-intuitive claim that makes the viewer need to know more. Withhold the punchline until later in the script.',
+    'ANGLE: build this variation on a curiosity gap or counter-intuitive claim about the product. Whatever the source withholds, you withhold too — the payoff lands at the source\'s own reveal beat, never earlier.',
   'story-led':
-    'ANGLE: Lead with a short personal story or moment ("last week I..."). Pull the viewer in with a relatable narrative, then let the product emerge naturally as the turning point.',
+    'ANGLE: build this variation on one small personal moment ("last week I..."). Fit that story to the source\'s beats and let the product be the turning point exactly where the source turns.',
   'proof-led':
-    'ANGLE: Lead with a concrete result, number, or before/after proof point. Open on the outcome the viewer wants, then reveal how the product delivered it.',
+    'ANGLE: build this variation on a concrete result, number, or before/after proof point. The outcome the viewer wants carries whichever beats the source uses for its strongest claims.',
   'objection-led':
-    'ANGLE: Lead by saying out loud the exact reason someone wouldn\'t buy this — price, effort, "I\'ve tried things like this" — and then dismantle it. Name the doubt before the viewer can.',
+    'ANGLE: build this variation on the exact reason someone wouldn\'t buy this — price, effort, "I\'ve tried things like this" — said out loud and then dismantled inside the source\'s beats. Name the doubt before the viewer can.',
   'comparison-led':
-    'ANGLE: Lead with what the viewer is using right now and why it keeps letting them down, then position this as the switch. Never name a competitor brand — say "the one everyone buys", "the drugstore stuff".',
+    'ANGLE: build this variation on what the viewer is using right now and why it keeps letting them down, with this as the switch. Never name a competitor brand — say "the one everyone buys", "the drugstore stuff".',
   'mistake-led':
-    'ANGLE: Lead with a mistake the viewer is probably making without realising it. Make them recognise themselves in it, then reframe the product as what fixes the misdiagnosis.',
+    'ANGLE: build this variation on a mistake the viewer is probably making without realising it. Make them recognise themselves in it, then reframe the product as what fixes the misdiagnosis.',
   'social-proof-led':
-    'ANGLE: Lead with how you came across it — a friend who wouldn\'t shut up about it, a comment section, someone you trust. Let the recommendation carry the credibility before any claim does.',
+    'ANGLE: build this variation on how you came across it — a friend who wouldn\'t shut up about it, a comment section, someone you trust. Let the recommendation carry the credibility before any claim does.',
   'routine-led':
-    'ANGLE: Lead inside one specific moment in the day when the problem bites — a time, a place, a habit. Ground the whole script in that recurring moment and pay it off there.',
+    'ANGLE: build this variation on one specific moment in the day when the problem bites — a time, a place, a habit. Ground it there and pay it off there.',
 }
+
+// The angle block's frame. Without it, a bare "ANGLE: build this on the
+// customer's pain point" still reads as licence to restructure — this is what
+// scopes it to content and re-states that the shape belongs to the source.
+const REMIX_ANGLE_FRAME = `THE ANGLE BELOW DECIDES WHAT THIS VARIATION ARGUES, NEVER HOW IT'S BUILT. Several variations are being written off this same source at once, each filling the source's beats with a different angle from the product's details. The structure, the opening device, the pacing and the CTA placement are the source's in every one of them — the angle is what changes.`
 
 const REVERSE_ENGINEER_SYSTEM = `You are an elite UGC ad creative director. You take a comprehensive scene-by-scene blueprint of a winning ad — where the original character and the original product are described in full identifying detail — and you rewrite it so the SAME ad structure can be regenerated for a NEW product with a NEW character.
 
@@ -377,6 +433,15 @@ OUTPUT FORMAT — CRITICAL:
 - Valid tags: <EDUCATIONAL> <COMPARISON> <MYTH BUSTING> <STORYTELLING> <AUTHORITY> <DAY IN THE LIFE> <PATTERN INTERRUPT>
 - No numbering, no blank lines, no quotation marks, no commentary, no markdown.`
 
+// Attaching a bank product is optional in both modes: a member who has
+// described the product in the brief or the instructions shouldn't have to bank
+// it first just to generate. Every spoken-copy system prompt tells the model to
+// "mention the product name at most twice (given in the product context)", so
+// when there IS no product context that instruction has nothing to point at —
+// and the observed failure is a [Product Name] placeholder read aloud by TTS,
+// or a brand invented out of thin air and put in a member's ad.
+const NO_PRODUCT_DETAILS = `NO PRODUCT DETAILS ARE ATTACHED: the brief above is all you have, so take the product, the audience and the specifics from it. Where the brief leaves something unsaid, keep it general instead of inventing it — never make up a brand name, a price, or a statistic. If the brief never names the product, call it what it is ("this thing", or its plain category) and never write a bracketed placeholder like [Product Name]; those get read out loud word for word by the voice model.`
+
 async function runHooks(input: GenerateScriptInput, apiKey: string, endpoint: ChatTarget): Promise<string> {
   // Sanitised like the take count — it round-trips through a persisted draft
   // and a history row.
@@ -391,6 +456,12 @@ async function runHooks(input: GenerateScriptInput, apiKey: string, endpoint: Ch
   const ctxLines = productContextLines(input.productContext)
   if (ctxLines) {
     prompt += `The product being advertised:\n${ctxLines}\n\n`
+  } else {
+    // Same rule as the script pipelines, and it bites harder here: the hooks
+    // system prompt caps brand mentions at 2 of N and every formula is a
+    // fill-in-the-blank, so with no product context the blanks come back as
+    // literal "(...)" or an invented brand.
+    prompt += `${NO_PRODUCT_DETAILS}\n\n`
   }
 
   if (input.additionalContext) {
@@ -583,6 +654,12 @@ async function runWrite(input: GenerateScriptInput, take: number, takeCount: num
   const ctxLines = productContextLines(input.productContext)
   if (ctxLines) {
     prompt += `The product being advertised:\n${ctxLines}\n\n`
+  } else {
+    // A product is optional here — the brief carries it instead. Say so, or the
+    // system prompt's "name the product at most twice (given in the product
+    // context)" is an instruction with no referent, and the model fills the gap
+    // with a [Product Name] placeholder or an invented brand.
+    prompt += `${NO_PRODUCT_DETAILS}\n\n`
   }
 
   prompt += `${WRITE_STYLE_INSTRUCTION[style]}\n\n`
@@ -669,18 +746,29 @@ function spokenProductName(input: GenerateScriptInput): string | undefined {
 }
 
 async function runRemix(input: GenerateScriptInput, angle: RemixAngle, apiKey: string, endpoint: ChatTarget): Promise<string> {
+  // The panel requires a source in Remix, so this is filled in practice; the
+  // unsourced branches below are the honest fallback for a payload or a history
+  // row that arrives without one, and only there is this a from-scratch write.
+  const source = input.winningTranscript?.trim()
   let prompt = ''
 
-  if (input.winningTranscript) {
-    prompt += `Here is a winning ad transcript to use as inspiration for structure, pacing, and tone:\n\n${input.winningTranscript}\n\n`
+  // Fenced and named as the thing being rewritten, not as "inspiration" — that
+  // word was doing real damage, since a model handed a reference and a product
+  // brief and told to write "for the product" writes a new ad every time.
+  if (source) {
+    prompt += `THE SOURCE SCRIPT — this is the winning ad you are rewriting. Its beats, its opening device, its pacing and its CTA placement are what you keep:\n\n"""\n${source}\n"""\n\n`
   }
 
   const ctxLines = productContextLines(input.productContext)
   if (ctxLines) {
-    prompt += `Write a UGC ad script for the following product. Base it on the provided product details below:\n${ctxLines}\n\n`
+    prompt += source
+      ? `THE NEW PRODUCT this script is being rewritten for. Every fact in your script comes from here, and nothing about the source's product survives:\n${ctxLines}\n\n`
+      : `Write a UGC ad script for the following product. Base it on the provided product details below:\n${ctxLines}\n\n`
   } else if (input.productId) {
-    prompt += `Write a UGC ad script for this product. Use the product details provided in the context.\n\n`
-  } else {
+    prompt += source
+      ? `Rewrite the source script for a new product, using the product details provided in the context.\n\n`
+      : `Write a UGC ad script for this product. Use the product details provided in the context.\n\n`
+  } else if (!source) {
     prompt += `Write a UGC ad script.\n\n`
   }
 
@@ -688,18 +776,47 @@ async function runRemix(input: GenerateScriptInput, angle: RemixAngle, apiKey: s
     prompt += `Additional context and instructions:\n${input.additionalContext}\n\n`
   }
 
+  // No bank product attached — legal in both modes, since a member describing
+  // the product in the instructions shouldn't have to bank it first. The
+  // subject then comes from those instructions, and this has to say so: without
+  // it the closing line asks the model to rewrite the ad "for the new product"
+  // when nothing on the prompt names one, and a model handed that gap fills it
+  // with an invented brand.
+  if (source && !ctxLines && !input.productId) {
+    prompt += input.additionalContext.trim()
+      ? `NO PRODUCT DETAILS ARE ATTACHED, so the instructions above are the whole brief for what this is being rewritten FOR. Take the product, the audience and the specifics from them. Where they leave something unsaid, keep it general rather than inventing it — never make up a brand name, a price or a statistic, and refer to the product as the instructions do or by its plain category.\n\n`
+      : `NO PRODUCT DETAILS AND NO INSTRUCTIONS ARE ATTACHED, so this is a rewrite of the source ad for ITS OWN subject: keep what the ad is selling and write it fresh against the map — same beats, same opening device, new words. Never invent a brand name, a price or a statistic that isn't in the source.\n\n`
+  }
+
+  if (source) prompt += `${REMIX_ANGLE_FRAME}\n\n`
   prompt += `${REMIX_ANGLE_INSTRUCTION[angle]}\n\n${CREATOR_ANGLE_PRECEDENCE}\n\n`
+  // CREATOR_ANGLE_PRECEDENCE is shared with Write New, where takes that all
+  // argue the creator's angle are told to differ in their opening device. In a
+  // remix the opening device is the source's in every variation, so that one
+  // sentence needs scoping or it hands back the licence this whole pass removes.
+  if (source) {
+    prompt += `IN A REMIX, THE OPENING DEVICE IS NEVER WHAT MAKES VARIATIONS DIFFER — it is the source's in all of them. They differ in the angle they argue and the specifics they reach for.\n\n`
+  }
 
   // No target length means the 'default' pick: the remix inherits the source
   // ad's pacing, which is the whole point of remixing a winner. A picked length
-  // re-cuts it, and the word budget is what actually makes that land.
+  // re-cuts it, and the word budget is what actually makes that land — which
+  // means it's the one thing allowed to break the same-beat-count rule, so it
+  // has to say so outright the way the blueprint rewrite's does.
   const length = input.remixLength
   if (length) {
     const budget = WRITE_LENGTH_BUDGET[length]
-    prompt += `${lengthDiscipline(length)}\n\nLENGTH: this remix must read aloud in about ${length} seconds — write ${budget.words}, regardless of how long the source script is. Keep the source's hook style, structure and CTA placement; drop whole beats from the middle to fit. Count the words before you answer.\n\n`
+    prompt += `${lengthDiscipline(length)}\n\nLENGTH — THIS OVERRIDES THE SAME-BEAT-COUNT RULE, AND ONLY THAT RULE: this remix must read aloud in about ${length} seconds — write ${budget.words}, regardless of how long the source script is. Drop whole beats out of the MIDDLE of the source's map to fit, keeping the opening beat and the CTA beat and the order of everything you keep. The opening device, the rhythm of the lines you keep, and the CTA placement all stay the source's. Count the words before you answer.\n\n`
+  } else if (source) {
+    prompt += `LENGTH: keep the source's own length and beat count. It is not too long — you are not summarising it, you are rewriting it line for line.\n\n`
   }
 
-  prompt += `Generate the full script now.`
+  const hasProduct = Boolean(ctxLines || input.productId)
+  prompt += !source
+    ? `Generate the full script now.`
+    : hasProduct
+      ? `Rewrite the source script for the new product now, beat for beat: same structure, same opening device, same pacing, same CTA placement — new product, new specifics, new angle. Output the finished spoken script only.`
+      : `Rewrite the source script now, beat for beat: same structure, same opening device, same pacing, same CTA placement — new words and a new angle. Output the finished spoken script only.`
 
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: REMIX_SYSTEM }] },
@@ -728,7 +845,10 @@ async function runReverseEngineer(input: GenerateScriptInput, apiKey: string, en
   } else if (input.productId) {
     prompt += `Rewrite this blueprint for a new product using the product details provided.\n\n`
   } else {
-    prompt += `Rewrite this blueprint for a new product.\n\n`
+    // Reachable now that a product is optional. The four transformations still
+    // apply — what changes is where the new dialogue's facts come from.
+    const preserved = keepTiming ? 'camera, framing, scene count, durations,' : 'camera and framing style'
+    prompt += `Rewrite this blueprint with NO product details attached. Keep ${preserved} and the [CHARACTER] token unchanged, and still replace every visual description of the original product with [PRODUCT]. Take the rewritten dialogue's subject from the instructions below if there are any; otherwise keep what the ad is selling and just rewrite the lines fresh. Never invent a brand name, a price, or a statistic that isn't given.\n\n`
   }
 
   if (input.additionalContext) {

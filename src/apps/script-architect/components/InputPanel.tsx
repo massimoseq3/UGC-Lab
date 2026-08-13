@@ -299,18 +299,21 @@ export default function InputPanel({
     }
   }
 
-  // Write New's brief is optional (an empty brief lets the model invent the
-  // angle), so that mode only needs a selected product to generate.
   const sourceFilled = mode === 'write' ? true : source.trim().length > 0
   // What's still missing, in the order the column asks for it. A greyed
   // Generate is supposed to say what it wants on its own — but this form has
-  // two dashed picker rows and only ONE of them (Product) actually gates the
-  // run, so an unexplained grey-out reads as "pick a Script Style too". The
-  // button names the real blocker instead.
+  // several rows and only these gate the run, so an unexplained grey-out reads
+  // as "pick a Script Style too". The button names the real blocker instead.
+  //
+  // A product is OPTIONAL in both modes: a member describing the product in the
+  // brief or the instructions shouldn't have to bank it first. What each mode
+  // still needs is a subject from somewhere — Remix has its source script, and
+  // Write New needs the product or the brief, since with neither the empty-brief
+  // stand-in would be asking for an ad about nothing.
   const blocker = !sourceFilled
     ? { label: 'Paste a script to remix', icon: FileText }
-    : !selectedProduct
-      ? { label: 'Pick a product to generate', icon: Package }
+    : mode === 'write' && !selectedProduct && !brief.trim()
+      ? { label: 'Pick a product or write a brief', icon: Package }
       : null
   const canGenerate = blocker === null
 
@@ -364,11 +367,13 @@ export default function InputPanel({
   // Product picker — step 2 in every mode, but rendered in a different spot
   // for Write New (before the brief) than for the remix modes (after the
   // source text).
-  // Product — required in every mode (it's what the script is ABOUT), so it
-  // leads the References card and its dot is the one that can go red. Script
-  // Style sits under it: it's optional flavour, and the Generate button is
-  // already down the column saying "Pick a product to generate", which used to
-  // point at the second row rather than the first.
+  // Product leads the References card: it's what the script is ABOUT, where
+  // Script Style under it is optional flavour. It is no longer REQUIRED,
+  // though, so its dot tracks the blocker above rather than being red on sight
+  // — the house rule is that red means exactly one thing, "this is why
+  // Generate is grey", and the only case left where an empty product is that
+  // reason is a Write New with an empty brief too.
+  const productRequired = mode === 'write' && !brief.trim()
   const productSection = (
     <div>
       {selectedProduct ? (
@@ -383,7 +388,7 @@ export default function InputPanel({
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProductPickerOpen(true) } }}
             className="group flex w-full cursor-pointer items-center gap-2.5 rounded-full border border-gold-500/25 bg-gold-500/[0.06] px-4 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-inset ring-gold-500/10 transition-colors hover:bg-gold-500/10"
           >
-            <StatusDot filled required />
+            <StatusDot filled />
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gold-500/15">
               {resolvedProductImage ? (
                 <img src={resolvedProductImage} alt="" className="h-full w-full object-cover" />
@@ -434,19 +439,21 @@ export default function InputPanel({
               onClick={() => setProductPickerOpen(true)}
               className="flex w-full items-center gap-2.5 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-left transition-colors hover:border-scripts-500/30 hover:bg-scripts-500/5"
             >
-              <StatusDot filled={false} required />
+              <StatusDot filled={false} required={productRequired} />
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold-500/10">
                 <Package className="h-[18px] w-[18px] text-gold-400 light:text-gold-600" />
               </div>
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="text-[13px] font-medium text-ink-300">Product</span>
-                <span className="text-[11px] text-ink-600">Choose from your Product Bank</span>
+                <span className="text-[11px] text-ink-600">
+                  {productRequired ? 'Choose from your Product Bank' : 'Optional — choose from your Product Bank'}
+                </span>
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
             </button>
           ) : (
             <div className="flex items-center gap-2.5 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-4 py-2.5">
-              <StatusDot filled={false} required />
+              <StatusDot filled={false} required={productRequired} />
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-ink/5">
                 <Package className="h-[18px] w-[18px] text-ink-700" />
               </div>
