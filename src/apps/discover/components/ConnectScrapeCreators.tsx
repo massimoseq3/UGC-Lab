@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { ArrowUpRight, Eye, EyeOff, Loader2, X } from 'lucide-react'
+import { ArrowUpRight, Eye, EyeOff, X } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { scTestConnection } from '../../../utils/scrapecreators'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
@@ -159,7 +160,7 @@ export default function ConnectScrapeCreators({ onClose }: { onClose: () => void
               disabled={!connected && (!key || status.phase === 'checking')}
               className="flex h-9 items-center gap-2 rounded-full bg-ink px-5 text-[13px] font-medium text-paper transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {status.phase === 'checking' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {status.phase === 'checking' && <Spinner className="h-3.5 w-3.5" />}
               {connected ? 'Start searching' : status.phase === 'checking' ? 'Checking…' : 'Connect'}
             </button>
           </div>

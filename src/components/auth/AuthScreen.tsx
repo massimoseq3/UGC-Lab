@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Loader2, AlertCircle, CheckCircle2, Lock, ExternalLink, X } from 'lucide-react'
+import { AlertCircle, CheckCircle2, Lock, ExternalLink, X } from 'lucide-react'
+import Spinner from '../Spinner'
 import AppLogo from '../AppLogo'
 import AppBackground from '../AppBackground'
 import { useAuthStore } from '../../stores/authStore'
@@ -179,7 +180,7 @@ export default function AuthScreen() {
               disabled={busy || !email.trim() || !password || (mode === 'signup' && (!firstName.trim() || !lastName.trim() || !signupCode.trim()))}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink py-2.5 text-sm font-medium text-ink-900 transition-colors hover:bg-ink-100 disabled:opacity-60"
             >
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {busy && <Spinner className="h-4 w-4" />}
               {mode === 'login' ? 'Sign in' : 'Create account'}
             </button>
 

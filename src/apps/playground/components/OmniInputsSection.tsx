@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
-import { X, Plus, Mic, Film, User, Loader2 } from 'lucide-react'
+import { X, Plus, Mic, Film, User } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import BankPicker from '../../../components/BankPicker'
 import SlotActionMenu from '../../../components/video/SlotActionMenu'
 import AnchoredPopover from '../../../components/video/AnchoredPopover'
@@ -167,7 +168,7 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
           {uploadingCharacter && (
             <div className="flex items-center gap-2 rounded-xl border border-ink/10 bg-ink/[0.03] px-2.5 py-1.5 text-ink-400">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-ink/[0.06]">
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <Spinner className="h-3.5 w-3.5" />
               </span>
               <span className="truncate text-[12px] font-medium leading-tight">Adding…</span>
             </div>

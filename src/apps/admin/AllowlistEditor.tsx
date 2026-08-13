@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Trash2, Plus, RefreshCw, Upload, X, AlertTriangle } from 'lucide-react'
+import { Trash2, Plus, RefreshCw, Upload, X, AlertTriangle } from 'lucide-react'
+import Spinner from '../../components/Spinner'
 import { getSupabase } from '../../lib/supabase'
 import { QUERY_TIMEOUT_MS, readyAdminSession, withTimeout } from './adminQuery'
 
@@ -500,7 +501,7 @@ export default function AllowlistEditor() {
               disabled={codeBusy || draftCode.trim() === (savedCode ?? '')}
               className="flex items-center gap-1.5 rounded-lg bg-ink py-2 px-3 text-[12px] font-medium text-ink-900 transition-colors hover:bg-ink-100 disabled:opacity-60"
             >
-              {codeBusy && <Loader2 className="h-3 w-3 animate-spin" />}
+              {codeBusy && <Spinner className="h-3 w-3" />}
               Save
             </button>
           </div>
@@ -528,7 +529,7 @@ export default function AllowlistEditor() {
           disabled={!draftEmail.trim() || adding}
           className="flex items-center gap-1.5 rounded-lg bg-ink py-2 px-3 text-[12px] font-medium text-ink-900 transition-colors hover:bg-ink-100 disabled:opacity-60"
         >
-          {adding ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+          {adding ? <Spinner className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
           Add
         </button>
         <button
@@ -562,7 +563,7 @@ export default function AllowlistEditor() {
 
       {loading ? (
         <div className="flex h-32 flex-col items-center justify-center gap-2 text-ink-500">
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Spinner className="h-4 w-4" />
           {slowHint && <span className="text-[11px]">Still loading… will time out if it stalls.</span>}
         </div>
       ) : (
@@ -749,7 +750,7 @@ function ImportPreviewModal({
                 : 'bg-ink text-ink-900 hover:bg-ink-100'
             }`}
           >
-            {importing && <Loader2 className="h-3 w-3 animate-spin" />}
+            {importing && <Spinner className="h-3 w-3" />}
             {cta}
           </button>
         </div>

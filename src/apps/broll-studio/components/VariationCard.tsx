@@ -1,19 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import {
-  ImageIcon,
-  Video as VideoIcon,
-  Loader2,
-  AlertCircle,
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
-  Bookmark,
-  Check,
-  Copy,
-  Download,
-  Film,
+  ImageIcon, Video as VideoIcon, AlertCircle, Play, Pause, Volume2, VolumeX, Bookmark, Check, Copy, Download, Film,
 } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import ModelPill from '../../../components/ModelPill'
@@ -788,16 +777,122 @@ export default function VariationCard(props: VariationCardProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [generateVideoToken])
 
-  // Retry a failed in-flight gen: drop the errored entry, then re-fire the
-  // SAME generation. A clip that animated a still retries as that animation —
-  // routing it through handleGenerateVideo instead silently rebuilt it as a
-  // reference-/text-to-video from the current toggles, so the user paid again
-  // for a different clip than the one that failed. (The prompt is read live, so
-  // a retry after editing the prompt still picks up the edit.)
+  // Re-enter the FINISH half of a generation we still hold a kie taskId for:
+  // poll (a finished task answers on the first read) and download again. No new
+  // submission, so no second charge — which is the whole point. The failure this
+  // exists for is the download stalling on a clip kie has already rendered and
+  // billed: the biggest files in the app (Seedance 2.5 at 720p with audio) were
+  // timing out on the CDN hop and the only button on offer re-ran the whole
+  // generation at full price. kie's result URLs live 3 days, so a resume is
+  // free and usually instant.
+  const resumeInFlightVideo = async (entry: CardState['inFlightVideos'][number]) => {
+    const taskId = entry.taskId
+    if (!taskId) return
+    onUpdateStateFn((prev) => ({
+      inFlightVideos: prev.inFlightVideos.map((e) => (e.id === entry.id ? { ...e, error: null } : e)),
+    }))
+    // Whoever already owns this poll is doing the same work — don't double it.
+    if (!claimTask('video', taskId)) return
+    try {
+      const res = await finishVideoTask(taskId, entry.modelId, entry.endpoint, entry.durationSeconds, entry.aspectRatio)
+      const assetRef = `asset://${res.assetId}`
+      const newVideo = {
+        url: assetRef,
+        modelId: entry.modelId,
+        prompt: entry.prompt,
+        aspectRatio: res.aspectRatio,
+        durationSeconds: res.durationSeconds,
+        resolution: entry.resolution,
+        audio: entry.audio,
+        mode: entry.mode,
+        sourceBRollId: entry.sourceBRollId,
+        createdAt: Date.now(),
+      }
+      onUpdateStateFn((prev) => {
+        const newVideos = [...prev.videos, newVideo]
+        return {
+          videos: newVideos,
+          currentVideoIndex: newVideos.length - 1,
+          selected: { kind: 'video' as const, index: newVideos.length - 1 },
+          inFlightVideos: prev.inFlightVideos.filter((e) => e.id !== entry.id),
+        }
+      })
+      const historyEntry: VideoHistoryItem = {
+        id: crypto.randomUUID(),
+        modelId: entry.modelId,
+        prompt: entry.prompt,
+        mode: entry.mode,
+        aspectRatio: res.aspectRatio,
+        durationSeconds: res.durationSeconds,
+        resolution: entry.resolution,
+        audio: entry.audio,
+        videoUrl: assetRef,
+        sourceBRollId: entry.sourceBRollId,
+        sourceApp: 'broll-studio',
+        createdAt: Date.now(),
+      }
+      await useBankStore.getState().addVideoHistory(historyEntry)
+      useAppStore.getState().addToast('B-Roll video ready', 'success')
+    } catch (err) {
+      // Same rule as the generate path: a poll timeout means it's STILL
+      // rendering, so leave the entry in flight rather than offering a retry.
+      if (isPollTimeout(err)) return
+      const msg = humanizeError(err, 'Video generation failed.')
+      onUpdateStateFn((prev) => ({
+        inFlightVideos: prev.inFlightVideos.map((e) => (e.id === entry.id ? { ...e, error: msg } : e)),
+      }))
+      useAppStore.getState().addToast(msg, 'error')
+    } finally {
+      releaseTask('video', taskId)
+    }
+  }
+
+  // The image half of the same idea.
+  const resumeInFlightImage = async (entry: CardState['inFlightImages'][number]) => {
+    const taskId = entry.taskId
+    const modelId = entry.modelId
+    if (!taskId || !modelId) return
+    onUpdateStateFn((prev) => ({
+      inFlightImages: prev.inFlightImages.map((e) => (e.id === entry.id ? { ...e, error: null } : e)),
+    }))
+    if (!claimTask('image', taskId)) return
+    try {
+      const imageUrl = await finishImageTask(taskId, modelId, entry.resolution || undefined)
+      const newImage = { imageUrl, prompt: entry.prompt, modelId, createdAt: Date.now() }
+      onUpdateStateFn((prev) => {
+        const newImages = [...prev.images, newImage]
+        return {
+          images: newImages,
+          currentImageIndex: newImages.length - 1,
+          selected: { kind: 'image' as const, index: newImages.length - 1 },
+          inFlightImages: prev.inFlightImages.filter((e) => e.id !== entry.id),
+        }
+      })
+    } catch (err) {
+      if (isPollTimeout(err)) return
+      const msg = humanizeError(err, 'Image generation failed. Try again.')
+      onUpdateStateFn((prev) => ({
+        inFlightImages: prev.inFlightImages.map((e) => (e.id === entry.id ? { ...e, error: msg } : e)),
+      }))
+      useAppStore.getState().addToast(msg, 'error')
+    } finally {
+      releaseTask('image', taskId)
+    }
+  }
+
+  // Retry a failed in-flight gen. A generation that got as far as a kie taskId
+  // is already paid for, so it RESUMES (above) instead of firing a second one.
+  // Only a gen that never reached kie — no taskId — is re-fired: a clip that
+  // animated a still retries as that animation, since routing it through
+  // handleGenerateVideo instead silently rebuilt it as a reference-/text-to-video
+  // from the current toggles, so the user paid again for a different clip than
+  // the one that failed. (The prompt is read live, so a retry after editing the
+  // prompt still picks up the edit.)
   const handleRetryInFlight = (id: string, isVideo: boolean) => {
     if (isVideo) {
       const failed = cardState.inFlightVideos.find((e) => e.id === id)
       if (!failed) return
+      if (failed.taskId) { void resumeInFlightVideo(failed); return }
       onUpdateStateFn((prev) => ({ inFlightVideos: prev.inFlightVideos.filter((e) => e.id !== id) }))
       if (failed.startFrameRef) {
         void handleAnimate(failed.startFrameRef, failed.modelId)
@@ -807,6 +902,7 @@ export default function VariationCard(props: VariationCardProps) {
     } else {
       const failed = cardState.inFlightImages.find((e) => e.id === id)
       if (!failed) return
+      if (failed.taskId && failed.modelId) { void resumeInFlightImage(failed); return }
       onUpdateStateFn((prev) => ({ inFlightImages: prev.inFlightImages.filter((e) => e.id !== id) }))
       void runImageGen(failed.prompt, failed.aspectRatio, failed.resolution as ImageResolution, buildCardRefs())
     }
@@ -1021,7 +1117,7 @@ export default function VariationCard(props: VariationCardProps) {
                     tone={savedCover ? 'saved' : 'default'}
                     onClick={() => { void handleSaveCover() }}
                   >
-                    {savedCover ? <Check className="h-4 w-4" /> : savingCover ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bookmark className="h-4 w-4" />}
+                    {savedCover ? <Check className="h-4 w-4" /> : savingCover ? <Spinner className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
                   </TileActionButton>
                 )}
                 <TileActionButton

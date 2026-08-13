@@ -127,10 +127,24 @@ export default function ScriptModelRow({ appId, className = 'mb-3' }: ScriptMode
             </div>
             {/* The hint runs in both variants: a model name alone says which
                 model, never what it's for, and at 58px the second line is room
-                the row already has. */}
-            <div className="truncate text-[11px] leading-snug text-ink-500">{copy.hint}</div>
+                the row already has. Both meters ride at the END of that line,
+                in the panel's own order — cost, then intelligence. They belong
+                on the row at all because it's the only place the picked model
+                is visible without opening anything, and showing half the rating
+                there left the question the panel exists to answer ("is this the
+                good one or the cheap one?") behind a click. They do NOT belong
+                on the FIRST line beside the name: this row is half-width in
+                Scripts, and ~85px of meters against a `min-w-0` name column
+                truncated the model's name away to nothing — a picker row whose
+                one job is naming what's picked. The hint gives way instead. */}
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate text-[11px] leading-snug text-ink-500">{copy.hint}</span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                {model?.chatRating && <StarMeter value={model.chatRating.intelligence} tone={accent.star} />}
+                <CostGlyphs tier={chatCostTier(resolvedId)} />
+              </span>
+            </div>
           </div>
-          <CostGlyphs tier={chatCostTier(resolvedId)} />
           <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
         </div>
       </div>
@@ -261,8 +275,8 @@ function ModelCard({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           <span className="text-[13px] font-semibold leading-snug text-ink-100">{model.displayName}</span>
-          <CostGlyphs tier={chatCostTier(model.id)} />
           <StarMeter value={rating.intelligence} tone={accent.star} />
+          <CostGlyphs tier={chatCostTier(model.id)} />
           {active && <Check className={`h-3.5 w-3.5 shrink-0 ${accent.text}`} strokeWidth={2.5} />}
         </div>
         <p className="mt-0.5 text-[11px] leading-snug text-ink-500">{rating.blurb}</p>
@@ -288,11 +302,17 @@ function ratePerMillion(modelId: string): string {
 
 // Cost as five "$" — filled to the model's tier, the rest dim. Green through
 // red so the expensive end is visible before you read the number, matching how
-// every other price cue in this app leads with colour.
+// every other price cue in this app leads with colour. Tier 3 is a light green
+// rather than amber: the middle of this ladder is still a cheap model on
+// anyone's bill, and an amber warning tint on the default writer read as a
+// caution about picking it. The warning colours start where the price does.
+// That light green is `green-300`, not `lime-400` — lime is a yellow-green and
+// on a dark panel it reads acidic, which is the opposite of the "this is the
+// good pick" note it has to strike on the default writer's own row.
 const TIER_TONE: Record<number, string> = {
   1: 'text-emerald-400 light:text-emerald-600',
   2: 'text-emerald-400 light:text-emerald-600',
-  3: 'text-amber-400 light:text-amber-600',
+  3: 'text-green-300 light:text-green-600',
   4: 'text-orange-400 light:text-orange-600',
   5: 'text-red-400 light:text-red-600',
 }

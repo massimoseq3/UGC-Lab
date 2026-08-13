@@ -139,6 +139,17 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
       'The request was dropped before kie.ai answered. It may have finished anyway, so check kie.ai before retrying.',
   },
   {
+    // fetchGeneratedAsset's deadline: kie FINISHED and billed, and the download
+    // of the finished file stalled. This used to fall through to the poll-timeout
+    // rule below and tell the member their clip was "still running on kie.ai",
+    // which sent them off to check a task that was already done — and left them
+    // a Retry that re-billed a full generation. It's the biggest files that trip
+    // it, so this is the one a Seedance 2.5 clip lands on.
+    test: (m) => m.includes('timed out downloading'),
+    message:
+      "Your result finished, but downloading it timed out. Retry — it picks up the finished file rather than generating it again, so it costs no extra credits.",
+  },
+  {
     // PollTimeoutError on a healthy connection — the task is very likely still
     // rendering on kie.ai, and regenerating pays for it twice.
     test: (m) => m.includes('timed out') || m.includes('timeout'),

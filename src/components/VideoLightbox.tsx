@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Bookmark, Check, Copy, Download, Film, Loader2, Maximize2, X } from 'lucide-react'
+import { Bookmark, Check, Copy, Download, Film, Maximize2, X } from 'lucide-react'
+import Spinner from './Spinner'
 import { useExclusiveVideo } from '../hooks/useInlineVideo'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
@@ -281,7 +282,7 @@ function FrameCard({
             className="h-full w-full object-cover"
           />
         ) : status === 'loading' ? (
-          <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+          <Spinner className="h-4 w-4 text-zinc-400" />
         ) : (
           <Film className="h-5 w-5 text-zinc-600" />
         )}
@@ -294,7 +295,7 @@ function FrameCard({
           tone={saved ? 'saved' : 'default'}
           onClick={handleSave}
         >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+          {saving ? <Spinner className="h-4 w-4" /> : saved ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
           <span>{saved ? 'Saved' : 'Save'}</span>
         </FrameButton>
         <FrameButton title="Download frame" disabled={status !== 'ready'} onClick={handleDownload}>

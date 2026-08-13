@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, Loader2, Mic, Pause, Play, X } from 'lucide-react'
+import { Check, ChevronDown, Mic, Pause, Play, X } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import { kieOmniAudioCreate } from '../../../utils/kie'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { useOmniVoiceStore, type OmniVoice } from '../../../stores/omniVoiceStore'
@@ -180,7 +181,7 @@ export default function OmniVoiceDesigner({ open, onClose, onCreated }: OmniVoic
                           }`}
                         >
                           {isLoading
-                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ? <Spinner className="h-3.5 w-3.5" />
                             : isPlaying
                             ? <Pause className="h-3.5 w-3.5" />
                             : <Play className="h-3.5 w-3.5" />}
@@ -236,7 +237,7 @@ export default function OmniVoiceDesigner({ open, onClose, onCreated }: OmniVoic
           disabled={!canCreate}
           className="mt-4 flex w-full items-center justify-center gap-2 rounded-full bg-playground-500 py-2.5 text-[13px] font-bold tracking-tight text-white transition-all hover:bg-playground-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+          {busy && <Spinner className="h-4 w-4" />}
           Create voice
         </button>
       </div>

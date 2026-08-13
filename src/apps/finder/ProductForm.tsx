@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { X, ImagePlus, Download, Loader2, AlertCircle, Sparkles, Check, Package, Users, Star, Tag } from 'lucide-react'
+import { X, ImagePlus, Download, AlertCircle, Sparkles, Check, Package, Users, Star, Tag } from 'lucide-react'
+import Spinner from '../../components/Spinner'
 import type { Product } from '../../stores/types'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
 import { useAppStore } from '../../stores/appStore'
@@ -539,7 +540,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
             {item ? 'Edit product' : 'New product'}
           </h3>
           <span className="flex items-center gap-1.5 text-[11px] text-ink-500">
-            {autosaveState === 'saving' && <><Loader2 className="h-3 w-3 animate-spin" />Saving…</>}
+            {autosaveState === 'saving' && <><Spinner className="h-3 w-3" />Saving…</>}
             {autosaveState === 'saved' && <><Check className="h-3 w-3" />Saved</>}
           </span>
         </div>
@@ -549,7 +550,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
             disabled={saving || isExtracting}
             className="flex h-9 items-center gap-2 rounded-full bg-ink px-4 text-[13px] font-medium tracking-tight text-ink-900 transition-colors hover:bg-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {saving && <Spinner className="h-3.5 w-3.5" />}
             {item ? 'Done' : 'Add product'}
           </button>
           <button
@@ -577,7 +578,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
               <img src={displayImage} alt="" className="h-full w-full object-cover" />
               {isExtracting && (
                 <div className="absolute left-2 top-2 z-10 flex items-center gap-1.5 rounded-lg bg-black/70 px-2.5 py-1 text-[10px] font-medium text-emerald-200 backdrop-blur-sm">
-                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <Spinner className="h-3 w-3" />
                   Extracting…
                 </div>
               )}
@@ -617,7 +618,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
               disabled={isExtracting}
               className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-[12px] font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 light:text-emerald-700"
             >
-              {isExtracting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {isExtracting ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
               {isExtracting
                 ? 'Extracting…'
                 : `Auto-fill from ${form.extraImages.length > 0 ? `${form.extraImages.length + 1} photos` : 'image'}${listingText.trim() ? ' + copy' : ''}`}

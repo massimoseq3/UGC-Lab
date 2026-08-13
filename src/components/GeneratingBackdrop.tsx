@@ -26,9 +26,14 @@ export default function GeneratingBackdrop({ family = 'playground' }: { family?:
     <div aria-hidden className="offscreen-idle absolute inset-0 overflow-hidden">
       {/* Frosted base — dark in dark mode, light in light mode (ink ramp flips). */}
       <div className="absolute inset-0 bg-gradient-to-br from-ink-900 to-ink-950" />
-      <div className={`absolute -left-1/4 -top-1/4 h-3/4 w-3/4 rounded-full ${a} opacity-50 blur-2xl animate-blob-1`} />
-      <div className={`absolute -right-1/4 top-0 h-3/4 w-3/4 rounded-full ${b} opacity-40 blur-2xl animate-blob-2`} />
-      <div className={`absolute -bottom-1/4 left-1/4 h-2/3 w-2/3 rounded-full ${c} opacity-35 blur-2xl animate-blob-3`} />
+      {/* Sizes are the OLD size × the middle of the scale each blob used to
+          animate through (0.75×1.07, 0.75×1.25, 0.667×1.18). The scale came out
+          of the keyframes because scaling re-rasters a blurred layer every
+          frame — see the note above blob-drift-1 in index.css — so the reach it
+          bought is baked in here instead. */}
+      <div className={`absolute -left-1/4 -top-1/4 h-[80%] w-[80%] rounded-full ${a} opacity-50 blur-2xl animate-blob-1`} />
+      <div className={`absolute -right-1/4 top-0 h-[94%] w-[94%] rounded-full ${b} opacity-40 blur-2xl animate-blob-2`} />
+      <div className={`absolute -bottom-1/4 left-1/4 h-[79%] w-[79%] rounded-full ${c} opacity-35 blur-2xl animate-blob-3`} />
     </div>
   )
 }

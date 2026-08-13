@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Loader2, RefreshCw, Ban, CheckCircle2, AlertTriangle, ChevronUp, ChevronDown, Search, Download, Clock, Trash2, X } from 'lucide-react'
+import { RefreshCw, Ban, CheckCircle2, AlertTriangle, ChevronUp, ChevronDown, Search, Download, Clock, Trash2, X } from 'lucide-react'
+import Spinner from '../../components/Spinner'
 import { getSupabase } from '../../lib/supabase'
 import useCloseOnEscape from '../../hooks/useCloseOnEscape'
 import { deleteMember } from './deleteMember'
@@ -190,7 +191,7 @@ export default function MembersTable() {
   if (loading) {
     return (
       <div className="flex h-32 flex-col items-center justify-center gap-2 text-ink-500">
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <Spinner className="h-4 w-4" />
         {slowHint && <span className="text-[11px]">Still loading… retrying via timeout if it stalls.</span>}
       </div>
     )
@@ -534,7 +535,7 @@ function DeleteMembersModal({
             disabled={running || members.length === 0}
             className="flex items-center gap-1.5 rounded-lg bg-red-500 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-red-400 disabled:opacity-60"
           >
-            {running && <Loader2 className="h-3 w-3 animate-spin" />}
+            {running && <Spinner className="h-3 w-3" />}
             {running ? `Deleting ${progress + 1} of ${members.length}…` : `Delete ${members.length}`}
           </button>
         </div>

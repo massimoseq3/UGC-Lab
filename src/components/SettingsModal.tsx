@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { ElementType, ReactNode } from 'react'
-import { X, Eye, EyeOff, Key, Check, ExternalLink, Loader2, AlertCircle, HardDrive, Trash2, LogOut, User, Sun, Moon, Monitor, Palette, FlaskConical, Shield, ChevronRight, FileText } from 'lucide-react'
+import { X, Eye, EyeOff, Key, Check, ExternalLink, AlertCircle, HardDrive, Trash2, LogOut, User, Sun, Moon, Monitor, Palette, FlaskConical, Shield, ChevronRight, FileText } from 'lucide-react'
+import Spinner from './Spinner'
 import { useAppStore } from '../stores/appStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useThemeStore, type ThemePref } from '../stores/themeStore'
@@ -396,7 +397,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                           disabled={!kieDraft.trim() || testing}
                           className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-ink/[0.03]"
                         >
-                          {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5 text-ink-400" />}
+                          {testing ? <Spinner className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5 text-ink-400" />}
                           {testing ? 'Testing…' : 'Test connection'}
                         </button>
                         <button
@@ -412,7 +413,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                         >
                           {saving ? (
                             <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Spinner className="h-4 w-4" />
                               <span>Saving…</span>
                             </>
                           ) : saved ? (
@@ -490,7 +491,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                           disabled={!trimmedDraft || scTesting}
                           className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-ink/[0.03]"
                         >
-                          {scTesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5 text-ink-400" />}
+                          {scTesting ? <Spinner className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5 text-ink-400" />}
                           {scTesting ? 'Testing…' : 'Test connection'}
                         </button>
                         <button
@@ -506,7 +507,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                         >
                           {scSaving ? (
                             <>
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Spinner className="h-4 w-4" />
                               <span>Saving…</span>
                             </>
                           ) : scSaved ? (
@@ -588,7 +589,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                       }`}
                     >
                       {nameSaving ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <Spinner className="h-3.5 w-3.5" />
                       ) : nameSaved ? (
                         <><Check className="h-3.5 w-3.5" />Saved</>
                       ) : (
@@ -617,7 +618,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                 <Card>
                   {usageLoading ? (
                     <div className="flex items-center gap-2 text-[11px] text-ink-500">
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Spinner className="h-3 w-3" />
                       Checking usage…
                     </div>
                   ) : usageError ? (
@@ -702,7 +703,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                       disabled
                       className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-ink/10 py-2 text-[12px] font-medium text-ink-400"
                     >
-                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <Spinner className="h-3 w-3" />
                       Scanning…
                     </button>
                   )}
@@ -775,7 +776,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                   {storage.phase === 'purging' && (
                     <div className="mt-3 rounded-lg bg-ink/[0.03] px-3 py-2 text-[11px] text-ink-300">
                       <div className="flex items-center gap-2">
-                        <Loader2 className="h-3 w-3 animate-spin text-ink-400" />
+                        <Spinner className="h-3 w-3 text-ink-400" />
                         Cleaning… {storage.done} of {storage.total}
                       </div>
                       <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-ink/[0.04]">
@@ -884,7 +885,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                       disabled={demoBusy}
                       className="mt-3 flex w-full items-center justify-center gap-2 rounded-full border border-ink/10 py-2 text-[12px] font-medium text-ink-300 transition-colors hover:bg-ink/[0.05] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {demoBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FlaskConical className="h-3.5 w-3.5" />}
+                      {demoBusy ? <Spinner className="h-3.5 w-3.5" /> : <FlaskConical className="h-3.5 w-3.5" />}
                       {demoBusy ? (demoLoaded ? 'Removing…' : 'Loading…') : demoLoaded ? 'Remove demo data' : 'Load demo data'}
                     </button>
                   </Card>

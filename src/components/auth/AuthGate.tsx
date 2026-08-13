@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import {  } from 'lucide-react'
+import Spinner from '../Spinner'
 import { useAuthStore } from '../../stores/authStore'
 import { isCloudEnabled } from '../../lib/supabase'
 import { startCloudSync, stopCloudSync } from '../../lib/cloudSync'
@@ -55,7 +56,7 @@ export default function AuthGate({ children }: AuthGateProps) {
   if (bootstrapping) {
     return (
       <div className="flex h-dvh w-screen items-center justify-center bg-surface-0 text-ink-500">
-        <Loader2 className="h-5 w-5 animate-spin" />
+        <Spinner className="h-5 w-5" />
       </div>
     )
   }
@@ -67,7 +68,7 @@ export default function AuthGate({ children }: AuthGateProps) {
   if (syncing || !syncReady) {
     return (
       <div className="flex h-dvh w-screen flex-col items-center justify-center gap-3 bg-surface-0 text-ink-400">
-        <Loader2 className="h-5 w-5 animate-spin" />
+        <Spinner className="h-5 w-5" />
         <span className="text-[12px]">Syncing your workspace…</span>
       </div>
     )

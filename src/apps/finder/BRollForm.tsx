@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import { X, ImagePlus, Download, Film, Loader2 } from 'lucide-react'
+import { X, ImagePlus, Download, Film } from 'lucide-react'
+import Spinner from '../../components/Spinner'
 import type { BRoll } from '../../stores/types'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
 import { useAppStore } from '../../stores/appStore'
@@ -168,7 +169,7 @@ export default function BRollForm({ item, onSave, onCancel }: BRollFormProps) {
               disabled={saving}
               className="flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-ink-900 transition-colors hover:bg-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {saving && <Spinner className="h-4 w-4" />}
               {saving ? 'Saving…' : (item ? 'Save Changes' : 'Add B-Roll')}
             </button>
           </div>

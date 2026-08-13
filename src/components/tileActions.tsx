@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Star, Trash2 } from 'lucide-react'
+import { Star, Trash2 } from 'lucide-react'
+import Spinner from './Spinner'
 
 // The hover action controls that sit on top of a generated media tile —
 // Characters' gallery, Playground's history grid, B-Roll's variation /
@@ -217,7 +218,7 @@ export function TileDeleteButton({
       }`}
     >
       {busy
-        ? <Loader2 className={`${ICON[size]} animate-spin`} />
+        ? <Spinner className={ICON[size]} />
         : <Trash2 className={ICON[size]} />}
       {armed && !busy && <span className="text-[9px] font-medium uppercase tracking-wider">Confirm</span>}
     </button>

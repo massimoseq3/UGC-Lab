@@ -1,35 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  Box,
-  AlertCircle,
-  Loader2,
-  Sparkles,
-  Image as ImageIcon,
-  Video as VideoIcon,
-  Play,
-  Pause,
-  Volume2,
-  VolumeX,
-  Plus,
-  Coins,
-  Check,
-  X,
-  ArrowRight,
-  Download,
-  Copy,
-  Bookmark,
-  Film,
-  ChevronRight,
-  Star,
-  Link2,
-  Link2Off,
-  RefreshCw,
-  Pencil,
-  SplitSquareVertical,
-  Merge,
-  Trash2,
+  Box, AlertCircle, Sparkles, Image as ImageIcon, Video as VideoIcon, Play, Pause, Volume2, VolumeX, Plus, Coins, Check, X, ArrowRight, Download, Copy, Bookmark, Film, ChevronRight, Star, Link2, Link2Off, RefreshCw, Pencil, SplitSquareVertical, Merge, Trash2,
 } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import GenerationProgress from '../../../components/GenerationProgress'
 import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
 import { KEYFRAME_MESSAGES, INTERPOLATE_MESSAGES } from '../../../components/generatingMessages'
@@ -1207,29 +1181,18 @@ export default function ContinuousView({
   const openClipCard = openClipKey ? clipStates[openClipKey] : undefined
 
   return (
-    <div className="flex-1 overflow-y-auto px-5 pb-4">
-      {result.demo && (
-        <div className="mb-4 mt-4 flex items-start gap-2 rounded-2xl border border-broll-500/25 bg-broll-500/10 px-4 py-3">
-          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-broll-300" />
-          <p className="text-xs leading-relaxed text-ink-300">
-            <span className="font-semibold text-broll-300">Sample storyboard.</span>{' '}
-            This is a preview of what Continuous mode produces. Add your kie.ai key in Settings to storyboard your own script and generate the keyframes and clips.
-          </p>
-        </div>
-      )}
-
-      {/* Top strip — storyboard meta + the two batch actions. Pinned to the top
-          of the scroll port with its own hairline, so the batch buttons stay
-          reachable however far down the storyboard the member has scrolled. */}
-      {/* Glass — see the note on the Line-by-Line strip: the storyboard passes
-          under it blurred and saturated, with the solid fill kept as the
-          fallback wherever backdrop-filter isn't supported. */}
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Top strip — storyboard meta + the batch actions. A STATIC row above
+          the scroll port, not a `sticky` child inside it: see the note on the
+          Line-by-Line strip for why (a glass sticky bar lagged its own
+          scroller on the way back up and read as coming loose). It never
+          scrolled away, so nothing is lost but the blur-under. */}
       {/* One row on desktop — see the note on the Line-by-Line strip: with
           `flex-wrap` alone the whole button group dropped to a second line the
           moment the meta pills and the buttons together outgrew the panel, so
           the strip's height changed with the window. The meta wraps and shrinks
           instead. */}
-      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5 supports-[backdrop-filter]:bg-surface-0/80 supports-[backdrop-filter]:backdrop-blur-xl supports-[backdrop-filter]:backdrop-saturate-150 md:flex-nowrap">
+      <div className="relative z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5 md:flex-nowrap">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
           {/* Scene count matches the per-line storyboard's — small-caps and dim,
               the same eyebrow treatment as the pills beside it. */}
@@ -1250,7 +1213,7 @@ export default function ContinuousView({
             title="Generate a keyframe image for every frame that doesn't have one yet"
             className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {chainRunning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImageIcon className="h-3.5 w-3.5" />}
+            {chainRunning ? <Spinner className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
             {chainRunning
               ? chainAt ? `Frame ${chainAt.step} of ${chainAt.of}…` : 'Generating frames…'
               : 'Generate frames'}
@@ -1280,6 +1243,16 @@ export default function ContinuousView({
           )}
         </div>
       </div>
+      <div className="flex-1 overflow-y-auto px-5 pb-4 pt-5">
+      {result.demo && (
+        <div className="mb-4 mt-4 flex items-start gap-2 rounded-2xl border border-broll-500/25 bg-broll-500/10 px-4 py-3">
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-broll-300" />
+          <p className="text-xs leading-relaxed text-ink-300">
+            <span className="font-semibold text-broll-300">Sample storyboard.</span>{' '}
+            This is a preview of what Continuous mode produces. Add your kie.ai key in Settings to storyboard your own script and generate the keyframes and clips.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-col gap-10">
         {result.scenes.map((scene) => (
@@ -1329,6 +1302,7 @@ export default function ContinuousView({
           onAddConcept={() => onAddConcept(finalFrame.index)}
           onSaveImage={saveKeyframeToBank}
         />
+      </div>
       </div>
 
       {editingScene !== null && result.scenes.find((s) => s.index === editingScene) && (
@@ -2154,7 +2128,7 @@ function FrameConceptCard({
               tone={saved ? 'saved' : 'default'}
               onClick={() => { void handleSave() }}
             >
-              {saved ? <Check className="h-4 w-4" /> : saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bookmark className="h-4 w-4" />}
+              {saved ? <Check className="h-4 w-4" /> : saving ? <Spinner className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
             </TileActionButton>
             <TileActionButton
               title={copied ? 'Prompt copied' : 'Copy prompt'}

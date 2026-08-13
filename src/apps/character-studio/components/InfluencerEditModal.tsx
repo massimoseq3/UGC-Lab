@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Loader2, Download, Bookmark, Check, Wand2, LayoutGrid, Pencil, Upload, FolderOpen, Copy, Maximize2, Coins, Palette, ChevronRight, Layers, Eraser } from 'lucide-react'
+import { X, Download, Bookmark, Check, Wand2, LayoutGrid, Pencil, Upload, FolderOpen, Copy, Maximize2, Coins, Palette, ChevronRight, Layers, Eraser } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
+import DayPill from '../../../components/DayPill'
+import { sectionLabel, groupByDay } from '../../../utils/history'
 import SectionCard, { SectionLabel } from '../../../components/SectionCard'
 import { ImageTile, AddTile } from '../../../components/video/refInputParts'
 import { useBankStore } from '../../../stores/bankStore'
@@ -75,6 +78,9 @@ interface SessionOutput {
   imageRef: string
   aspectRatio: string
   kind: 'portrait' | 'sheet'
+  // When the row was made — day-groups this gallery under the same `DayPill`
+  // the main gallery uses, so a lineage that spans a week reads as one.
+  createdAt: number
   // The visual style this output was rendered in, when one was picked — used to
   // name it on save ("Mia - Claymation").
   styleName?: string
@@ -163,6 +169,7 @@ export default function InfluencerEditModal({
         kind: h.kind ?? 'portrait',
         styleName: h.styleName,
         linkedModelId: h.linkedModelId,
+        createdAt: h.createdAt,
       }))
     if (rows.length > 0) return rows
     // The editor can be opened on a generation that is still running (clicking
@@ -173,9 +180,12 @@ export default function InfluencerEditModal({
     // appears under this same id, because finishGen writes the row with the
     // generation's own id.
     return item.imageRef
-      ? [{ id: item.id, imageRef: item.imageRef, aspectRatio: item.aspectRatio, kind: item.kind ?? 'portrait', styleName: item.styleName }]
+      ? [{ id: item.id, imageRef: item.imageRef, aspectRatio: item.aspectRatio, kind: item.kind ?? 'portrait', styleName: item.styleName, createdAt: item.createdAt }]
       : []
   }, [characterHistory, lineageKey, item])
+  // Same day grouping the main gallery uses — one lineage can span weeks of
+  // edits, and until now the strip gave no clue which of these you made today.
+  const outputDayGroups = useMemo(() => groupByDay(outputs, (o) => o.createdAt), [outputs])
   const [selectedId, setSelectedId] = useState(item.id)
   const [prompt, setPrompt] = useState('')
   // Edit-instruction enhance + undo/redo (mirrors the Scripts / Playground
@@ -862,37 +872,55 @@ export default function InfluencerEditModal({
             </div>
           </div>
 
-          {/* RIGHT — outputs gallery: portraits pack 3-up; landscapes span the
-              row. */}
+          {/* RIGHT — outputs gallery. TWO across, not three (August 2026): this
+              column is half of a modal, so a third column bought a third tile at
+              the price of every face being too small to judge — which is the one
+              thing this gallery is for. It matches the main gallery's base grid
+              now (`grid-cols-2`), landscapes span the row in both, and the day
+              pills below are that gallery's too, so a lineage that ran across
+              several days reads here the same way it does out there. */}
           <div className="col-span-1 flex min-h-0 flex-col overflow-y-auto">
             <div className="px-4 py-4">
-              <div className="grid grid-cols-3 gap-2 [grid-auto-flow:dense]">
-                {lineageInFlight.map((gen) => (
-                  <div key={gen.id} className={gen.aspectRatio.includes('16:9') ? 'col-span-3' : ''}>
-                    <GeneratingTile
-                      modelId={gen.modelId}
-                      kind={gen.kind}
-                      aspectRatio={gen.aspectRatio}
-                      onCancel={() => onCancelGen(gen.id)}
-                    />
+              {lineageInFlight.length > 0 && (
+                <>
+                  <DayPill label={lineageInFlight.length === 1 ? 'In progress' : `In progress · ${lineageInFlight.length}`} />
+                  <div className="grid grid-cols-2 gap-2 [grid-auto-flow:dense]">
+                    {lineageInFlight.map((gen) => (
+                      <div key={gen.id} className={gen.aspectRatio.includes('16:9') ? 'col-span-2' : ''}>
+                        <GeneratingTile
+                          modelId={gen.modelId}
+                          kind={gen.kind}
+                          aspectRatio={gen.aspectRatio}
+                          onCancel={() => onCancelGen(gen.id)}
+                        />
+                      </div>
+                    ))}
                   </div>
-                ))}
-                {outputs.map((o) => (
-                  <OutputTile
-                    key={o.id}
-                    output={o}
-                    selected={o.id === selectedId}
-                    saved={savedIds.has(o.id) || !!o.linkedModelId}
-                    saving={savingId === o.id}
-                    promptText={o.kind === 'sheet' ? buildSheetPrompt(item.profile, o.aspectRatio) : buildImagePrompt(item.profile)}
-                    suggestName={() => suggestSaveName(o)}
-                    onSelect={() => setSelectedId(o.id)}
-                    onSave={(name) => handleSave(o, name)}
-                    onUnsave={() => handleUnsave(o)}
-                    onDownload={() => handleDownload(o)}
-                  />
-                ))}
-              </div>
+                </>
+              )}
+              {outputDayGroups.map(([dayTs, items]) => (
+                <div key={dayTs}>
+                  <DayPill label={sectionLabel(dayTs)} />
+                  <div className="grid grid-cols-2 gap-2 [grid-auto-flow:dense]">
+                    {items.map((o) => (
+                      <div key={o.id} className={o.aspectRatio.includes('16:9') ? 'col-span-2' : ''}>
+                        <OutputTile
+                          output={o}
+                          selected={o.id === selectedId}
+                          saved={savedIds.has(o.id) || !!o.linkedModelId}
+                          saving={savingId === o.id}
+                          promptText={o.kind === 'sheet' ? buildSheetPrompt(item.profile, o.aspectRatio) : buildImagePrompt(item.profile)}
+                          suggestName={() => suggestSaveName(o)}
+                          onSelect={() => setSelectedId(o.id)}
+                          onSave={(name) => handleSave(o, name)}
+                          onUnsave={() => handleUnsave(o)}
+                          onDownload={() => handleDownload(o)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -1007,21 +1035,19 @@ function OutputTile({
       window.setTimeout(() => setCopied(false), 1600)
     }
   }
-  // Landscape outputs (sheets / 16:9 portraits) span the full row; portraits
-  // pack three to a row.
-  const isWide = output.aspectRatio.includes('16:9')
+  // The row span for a landscape output is set by the grid cell around this
+  // tile, not here — the gallery is day-grouped now and the wrapper is what
+  // knows which grid it's in.
   return (
     <div
       onClick={onSelect}
       className={`group relative cursor-pointer overflow-hidden rounded-lg bg-black light:bg-zinc-200 transition-all card-soft-shadow ${
-        isWide ? 'col-span-3' : ''
-      } ${
         selected ? 'ring-2 ring-influencers-500/60' : 'hover:-translate-y-px'
       }`}
     >
       {url
         ? <img src={url} alt="" className="block h-auto w-full" />
-        : <div className="flex w-full items-center justify-center" style={aspectStyle(output.aspectRatio)}><Loader2 className="h-5 w-5 animate-spin text-ink-500" /></div>}
+        : <div className="flex w-full items-center justify-center" style={aspectStyle(output.aspectRatio)}><Spinner className="h-5 w-5 text-ink-500" /></div>}
 
       {output.kind === 'sheet' && (
         <span className="pointer-events-none absolute left-1.5 top-1.5 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[9px] font-medium text-zinc-200 backdrop-blur">
@@ -1054,7 +1080,7 @@ function OutputTile({
             tone={saved ? 'saved' : 'default'}
             onClick={handleSaveClick}
           >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : saved ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+            {saving ? <Spinner className="h-4 w-4" /> : saved ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
           </TileActionButton>
           <TileActionButton
             title={copied ? 'Prompt copied' : 'Copy prompt'}
@@ -1105,7 +1131,7 @@ function OutputTile({
             disabled={saving || !nameDraft.trim()}
             className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/80 text-white hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+            {saving ? <Spinner className="h-3 w-3" /> : <Check className="h-3 w-3" />}
           </button>
         </div>
       )}

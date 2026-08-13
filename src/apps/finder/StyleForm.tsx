@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { X, Loader2, Palette } from 'lucide-react'
+import { X, Palette } from 'lucide-react'
+import Spinner from '../../components/Spinner'
 import type { StylePreset } from '../../stores/types'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
 import SectionCard, { SectionLabel } from '../../components/SectionCard'
@@ -119,7 +120,7 @@ export default function StyleForm({ item, onSave, onCancel }: StyleFormProps) {
             disabled={saving}
             className="mt-1 flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-ink-900 transition-colors hover:bg-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving && <Spinner className="h-4 w-4" />}
             {saving ? 'Saving…' : item ? 'Save Changes' : 'Add Style'}
           </button>
         </div>

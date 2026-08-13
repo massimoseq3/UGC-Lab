@@ -1,9 +1,8 @@
 import { memo, useMemo, useRef, useState, useEffect } from 'react'
 import {
-  Loader2, Download, Bookmark, Check, Film, Image as ImageIcon,
-  Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy,
-  LayoutGrid, List, Maximize2,
+  Download, Bookmark, Check, Film, Image as ImageIcon, Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy, LayoutGrid, List, Maximize2,
 } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState, useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useInlineVideo, useExclusiveVideo } from '../../../hooks/useInlineVideo'
@@ -424,7 +423,7 @@ function HistoryListRow({
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             {status === 'loading'
-              ? <Loader2 className="h-6 w-6 animate-spin text-ink-600" />
+              ? <Spinner className="h-6 w-6 text-ink-600" />
               : entry.kind === 'video' ? <Film className="h-7 w-7 text-ink-700" /> : <ImageIcon className="h-7 w-7 text-ink-700" />}
           </div>
         )}
@@ -466,7 +465,7 @@ function HistoryListRow({
               tone={isSaved ? 'saved' : 'default'}
               onClick={() => { if (!isSaved && !isSaving) onSave() }}
             >
-              {isSaved ? <Check className="h-4 w-4" /> : isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bookmark className="h-4 w-4" />}
+              {isSaved ? <Check className="h-4 w-4" /> : isSaving ? <Spinner className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
             </ListRowButton>
           )}
           {prompt && (
@@ -588,7 +587,7 @@ function ImageTile({
           // shove the rest of the column around as it goes.
           <div className="flex w-full items-center justify-center" style={aspectStyle(item.aspectRatio)}>
             {status === 'loading'
-              ? <Loader2 className="h-5 w-5 animate-spin text-ink-500" />
+              ? <Spinner className="h-5 w-5 text-ink-500" />
               : <ImageIcon className="h-6 w-6 text-ink-700" />}
           </div>
         )}
@@ -610,7 +609,7 @@ function ImageTile({
             tone={isSaved ? 'saved' : 'default'}
             onClick={(e) => { e.stopPropagation(); if (!isSaved && !isSaving) onSave() }}
           >
-            {isSaved ? <Check className="h-4 w-4" /> : isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bookmark className="h-4 w-4" />}
+            {isSaved ? <Check className="h-4 w-4" /> : isSaving ? <Spinner className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
           </TileActionButton>
           {item.prompt && (
             <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
@@ -670,7 +669,7 @@ function VideoTile({
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             {status === 'loading'
-              ? <Loader2 className="h-5 w-5 animate-spin text-ink-500" />
+              ? <Spinner className="h-5 w-5 text-ink-500" />
               : <Film className="h-6 w-6 text-ink-700" />}
           </div>
         )}
@@ -955,7 +954,7 @@ function PreviewModal({
                 disabled={linked || isSaving}
                 tone={linked ? 'saved' : 'default'}
               >
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : linked ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+                {isSaving ? <Spinner className="h-4 w-4" /> : linked ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
                 <span>{linked ? 'Saved to Bank' : 'Save to Bank'}</span>
               </ModalBarButton>
             )}

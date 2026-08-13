@@ -192,19 +192,18 @@ export const TTS_MODEL_ID = 'google/gemini-3-1-flash-tts'
 //   DEFAULT — the app-wide workhorse. Prompt-shaping, storyboards, shot logs:
 //             structured output against heavily-tuned prompts, read by another
 //             model rather than by a person.
-//   STRONG  — ~2.6x the credits. Today: the Ad Analyzer, and only it. That is
-//             the surface the tier was kept for — its output is read by a
-//             person and shot against, so a misread style family or a hedged
-//             scene prompt costs a re-shoot rather than a retry. Scripts and
-//             product auto-fill each sat here and each moved back, because
-//             their output didn't visibly improve and members pay the
-//             difference on their own key; check git log before promoting
-//             anything else.
+//   STRONG  — ~2.6x the credits. The tier for output a person reads and acts
+//             on, where a misread style family or a hedged scene prompt costs
+//             a re-shoot rather than a retry. The Ad Analyzer names this
+//             constant; Scripts and B-Roll reach the same model through their
+//             own registry default (see the `defaultFor` on the Gemini 3.6
+//             Flash entry below). Product auto-fill sat here and moved back —
+//             it feeds another model, not a reader.
 //
 // Neither constant is what Scripts or B-Roll call any more: those two read the
 // member's own pick (see resolveScriptModel in stores/settingsStore.ts), which
-// falls back to DEFAULT when nothing is chosen. Every OTHER chat surface still
-// resolves through these two.
+// falls back to that pair's own registry default when nothing is chosen. Every
+// OTHER chat surface still resolves through these two.
 export const CHAT_MODEL_DEFAULT = 'gemini-3-flash'
 export const CHAT_MODEL_STRONG = 'gemini-3-6-flash'
 
@@ -258,10 +257,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //
   // Order matters: Gemini 3 Flash is FIRST so it stays getDefaultModel's
   // candidates[0] fallback for any chat consumer without an explicit defaultFor.
-  // The two PICKER apps default to GPT 5.6 Luna instead (August 2026) — it is
-  // both cheaper (0.0392 vs 0.105 blended) and the better writer of the two, so
-  // that swap costs a member who never opens the picker nothing and hands them
-  // prose they'd otherwise have to go looking for.
+  // The two PICKER apps default to Gemini 3.6 Flash instead (August 2026) — the
+  // strong tier, for the same reason the Ad Analyzer is pinned to it: what those
+  // two write is read by a person and shot against, and it holds a long prompt
+  // contract better than the cheaper entries. It costs a member who never opens
+  // the picker more per run, which is the trade being made deliberately here;
+  // GPT 5.6 Luna is one row away for anyone who wants the cheap run back.
   //
   // Every prompt in this app was written and tuned against Gemini 3 Flash, and
   // the storyboard parsers expect its tag discipline. A stronger model writes
@@ -324,22 +325,21 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     tags: ['new'],
     pricing: { unit: 'per-1k-tokens', credits: 0.27 },
     official: chatOfficial(1.5, 7.5, KIE_PRICING),
-    // CHAT_MODEL_STRONG, and the Ad Analyzer's pinned model (August 2026): it
-    // holds a long prompt contract slightly better, which is what that app's
-    // single call is — one JSON object carrying a scorecard, a transcript and
-    // every scene prompt.
-    //
-    // Was also the unpicked default in Scripts and B-Roll and is no longer — the
-    // same ~2.6× the credits buys prose a member can judge for themselves, so
-    // there it's theirs to opt into rather than to discover.
-    defaultFor: ['ad-anatomy'],
+    // CHAT_MODEL_STRONG, the Ad Analyzer's pinned model, and the unpicked
+    // default in the two picker apps: it holds a long prompt contract better
+    // than the cheaper entries, which is what all three of those calls are —
+    // the Ad Analyzer's single JSON object, Scripts' tagged takes, B-Roll's
+    // storyboard blocks. Every one of them is read by a person and shot
+    // against, so the ~2.6× on the member's own key buys the thing they'd
+    // otherwise re-run to get.
+    defaultFor: ['ad-anatomy', 'script-architect', 'broll-studio'],
     // OpenAI-compatible variant slug on kie.ai (native 3.6 uses Google's own
     // generateContent shape; our transport speaks OpenAI chat/completions).
     chatEndpoint: '/gemini-3-6-flash-openai/v1/chat/completions',
     chatRating: {
       intelligence: 4,
       blurb:
-        'A step up in writing, for a few times the credits.',
+        'The default here. A step up in writing, for a few times the credits.',
     },
   },
 
@@ -425,17 +425,17 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     tags: ['fast', 'cheap'],
     pricing: { unit: 'per-1k-tokens', credits: 0.0392 },
     official: chatOfficial(0.2, 1.2, KIE_PRICING),
-    // The unpicked default in Scripts and B-Roll — the two apps whose output a
-    // person reads. It undercuts Gemini 3 Flash on price AND out-writes it, so
-    // there's no trade to hand the member here.
-    defaultFor: ['script-architect', 'broll-studio'],
+    // Held the unpicked default in Scripts and B-Roll for a stint (August 2026)
+    // and handed it back to Gemini 3.6 Flash. Still the cheapest run in the
+    // list by a wide margin — it undercuts even Gemini 3 Flash — so it's the
+    // row to reach for when a member wants volume over polish.
     chatEndpoint: '/codex/v1/responses',
     chatTransport: 'openai-responses',
     chatSlug: 'gpt-5-6-luna',
     chatRating: {
       intelligence: 4,
       blurb:
-        'The default here. Cheaper than Gemini Flash and writes better.',
+        'The cheapest run here, and it still writes well.',
     },
   },
 

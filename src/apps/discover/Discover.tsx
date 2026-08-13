@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
-import { Key, Loader2, Plus, Radar, Search } from 'lucide-react'
+import { Key, Plus, Radar, Search } from 'lucide-react'
+import Spinner from '../../components/Spinner'
 import GridCanvas, { AwaitingBody } from '../../components/GridCanvas'
 import SegmentedToggle from '../../components/SegmentedToggle'
 import Dropdown from '../../components/Dropdown'
@@ -546,7 +547,7 @@ export default function Discover() {
           disabled={!query.trim() || !apiKey || searching}
           className="flex shrink-0 items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-ink-900 transition-colors hover:bg-ink-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {searching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Radar className="h-3.5 w-3.5" />}
+          {searching ? <Spinner className="h-3.5 w-3.5" /> : <Radar className="h-3.5 w-3.5" />}
           Search
         </button>
         </div>
@@ -656,7 +657,7 @@ export default function Discover() {
       ) : searching ? (
         <GridCanvas>
           <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-ink-500">
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Spinner className="h-4 w-4" />
             Searching {isTikTok ? 'TikTok' : 'the Meta Ad Library'}…
           </div>
         </GridCanvas>
@@ -711,7 +712,7 @@ export default function Discover() {
                 disabled={loadingMore}
                 className="flex items-center gap-2 rounded-full border border-ink/10 px-5 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:opacity-50"
               >
-                {loadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                {loadingMore && <Spinner className="h-3.5 w-3.5" />}
                 {loadingMore ? 'Loading…' : 'Load more — 1 credit'}
               </button>
             </div>

@@ -1,8 +1,8 @@
 import { memo, useState, type ElementType } from 'react'
 import {
-  Bookmark, BookmarkCheck, Download, Eye, ExternalLink, Heart, ImageOff, Loader2,
-  MessageCircle, Pause, PenLine, Play, Share2, Volume2, VolumeX,
+  Bookmark, BookmarkCheck, Download, Eye, ExternalLink, Heart, ImageOff, MessageCircle, Pause, PenLine, Play, Share2, Volume2, VolumeX,
 } from 'lucide-react'
+import Spinner from '../../../components/Spinner'
 import { TileActionStack, TileActionButton } from '../../../components/tileActions'
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { engagementRate, formatCount, formatMultiple, formatRate } from '../services/scoring'
@@ -207,7 +207,7 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
             disabled={busy === 'download' || !hasVideo}
           >
             {busy === 'download'
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ? <Spinner className="h-3.5 w-3.5" />
               : <Download className="h-3.5 w-3.5" />}
           </TileActionButton>
           {/* Save sits under it and, once filed, stays visible without a
@@ -220,7 +220,7 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
             disabled={busy === 'save'}
           >
             {busy === 'save'
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ? <Spinner className="h-3.5 w-3.5" />
               : saved
                 ? <BookmarkCheck className="h-3.5 w-3.5" />
                 : <Bookmark className="h-3.5 w-3.5" />}
@@ -231,7 +231,7 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
             disabled={busy === 'analyze' || !hasVideo}
           >
             {busy === 'analyze'
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ? <Spinner className="h-3.5 w-3.5" />
               : <Eye className="h-3.5 w-3.5" />}
           </TileActionButton>
           {/* The one-click shortcut past the modal: this pulls the transcript
@@ -245,7 +245,7 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
             disabled={busy === 'remix'}
           >
             {busy === 'remix'
-              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ? <Spinner className="h-3.5 w-3.5" />
               : <PenLine className="h-3.5 w-3.5" />}
           </TileActionButton>
           <TileActionButton

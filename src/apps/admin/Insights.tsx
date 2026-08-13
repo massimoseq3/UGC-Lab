@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Loader2, RefreshCw, Users, UserCheck, Clock, Ban, HardDrive, Sparkles, TrendingUp, TrendingDown, UserPlus, AlertTriangle } from 'lucide-react'
+import { RefreshCw, Users, UserCheck, Clock, Ban, HardDrive, Sparkles, TrendingUp, TrendingDown, UserPlus, AlertTriangle } from 'lucide-react'
+import Spinner from '../../components/Spinner'
 import { useMembers, formatBytes, formatRelative, memberName, isInactive, isActivated, type MemberRow } from './useMembers'
 
 const DAY = 24 * 60 * 60_000
@@ -95,7 +96,7 @@ export default function Insights() {
   if (loading) {
     return (
       <div className="flex h-32 flex-col items-center justify-center gap-2 text-ink-500">
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <Spinner className="h-4 w-4" />
         {slowHint && <span className="text-[11px]">Still loading…</span>}
       </div>
     )
