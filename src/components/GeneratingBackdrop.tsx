@@ -14,7 +14,16 @@ const BLOBS: Record<Family, [string, string, string]> = {
 export default function GeneratingBackdrop({ family = 'playground' }: { family?: Family }) {
   const [a, b, c] = BLOBS[family]
   return (
-    <div aria-hidden className="absolute inset-0 overflow-hidden">
+    // `offscreen-idle` is `content-visibility: auto` — the browser skips this
+    // subtree entirely while it's outside the viewport, which stops its blobs
+    // animating. Each one is a large blurred layer being scaled, so it has to be
+    // re-blurred every frame, and a batch puts one of these on every card of a
+    // storyboard at once: a dozen tiles is three dozen animated blur layers, and
+    // the whole window starts dropping frames while the member scrolls through
+    // work they can't even see yet. Nothing changes for a tile on screen, and
+    // the element is `absolute inset-0`, so the size containment that comes with
+    // the skip has nothing to collapse.
+    <div aria-hidden className="offscreen-idle absolute inset-0 overflow-hidden">
       {/* Frosted base — dark in dark mode, light in light mode (ink ramp flips). */}
       <div className="absolute inset-0 bg-gradient-to-br from-ink-900 to-ink-950" />
       <div className={`absolute -left-1/4 -top-1/4 h-3/4 w-3/4 rounded-full ${a} opacity-50 blur-2xl animate-blob-1`} />

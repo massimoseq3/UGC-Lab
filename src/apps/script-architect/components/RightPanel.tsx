@@ -107,6 +107,10 @@ export default function RightPanel({
             linkedProductId={linkedProductId}
             isGenerating={isGenerating}
             error={error}
+            // What a "new set of takes" is, is the parent's knowledge: a run,
+            // or the history row being shown. The panel scrolls back to the top
+            // on this and on nothing else.
+            runId={activeHistoryId}
             onEditVariation={onEditVariation}
           />
         ) : (
