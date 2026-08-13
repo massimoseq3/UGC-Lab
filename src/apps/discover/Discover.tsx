@@ -11,7 +11,7 @@ import { useSettingsStore } from '../../stores/settingsStore'
 import { useAppStore } from '../../stores/appStore'
 import { useBankStore } from '../../stores/bankStore'
 import { humanizeError } from '../../utils/friendlyError'
-import { applyMinViews, mergeResults, runSearch, sortResults } from './services/search'
+import { applyMinViews, isPreviewable, mergeResults, runSearch, sortResults } from './services/search'
 import { downloadResultVideo, fetchResultTranscript, saveResultVideoToDisk, saveThumbnail } from './services/handoff'
 import { DEFAULT_FILTERS, type DiscoverFilters, type DiscoverPlatform, type DiscoverResult, type DiscoverSort } from './types'
 
@@ -125,7 +125,10 @@ function restoreSearches(stored: Record<DiscoverPlatform, PlatformSearch> | null
     if (!fresh) return { ...BLANK_SEARCH, query }
     return {
       query,
-      results: s.results,
+      // Filtered on the way back in as well as on the way out of a search: a
+      // grid persisted before the unpreviewable rule existed still holds the
+      // blank tiles it was saved with, and it stays fresh for six hours.
+      results: s.results.filter(isPreviewable),
       cursor: s.cursor ?? null,
       searched: true,
       fetchedAt: s.fetchedAt,

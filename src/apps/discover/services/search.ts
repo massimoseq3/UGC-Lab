@@ -269,22 +269,41 @@ function warnIfAllDropped(platform: string, raw: number, kept: number): void {
 }
 
 /**
- * The other half of the same alarm: rows that survived normalisation but came
- * out with no media at all.
+ * A card with something to show — a video to play or a still to look at.
  *
- * A medialess card renders as a blank tile, which reads as the app failing
- * rather than as a field name having moved — the exact way the Meta creative
- * chain stayed broken. A handful is normal (Meta really does publish ads with
- * no fetchable creative); most of a page is a shape change.
+ * Exported because the persisted grid is filtered through it too: a search
+ * restored from before this rule existed would otherwise hand back the blank
+ * tiles it was saved with, for the six hours the results stay fresh.
  */
-function warnIfMedialess(platform: string, results: DiscoverResult[]): void {
-  const blank = results.filter((r) => !r.videoUrl && !r.coverUrl).length
-  if (blank > 0 && blank >= results.length / 2) {
+export function isPreviewable(result: DiscoverResult): boolean {
+  return !!result.videoUrl || !!result.coverUrl
+}
+
+/**
+ * Drops the cards there is nothing to see on.
+ *
+ * Meta publishes ads whose creative isn't fetchable at all — no video, no
+ * poster, nothing in any of the slots. There is no research to do on one of
+ * those: Analyze and Download are dead, the thumbnail is a placeholder, and the
+ * only route left is the Ad Library, which answers with a sign-in wall. It is a
+ * hole in a grid the member paid a credit for either way, so it shouldn't take
+ * up a tile that a real ad could have.
+ *
+ * The drop carries the shape-change alarm that `warnIfAllDropped` carries for
+ * the id checks — silently removing most of a page is exactly what a moved
+ * field name looks like from the outside, and it is now indistinguishable from
+ * a quiet keyword unless the console says otherwise.
+ */
+function dropUnpreviewable(platform: string, results: DiscoverResult[]): DiscoverResult[] {
+  const kept = results.filter(isPreviewable)
+  const dropped = results.length - kept.length
+  if (dropped > 0 && dropped >= results.length / 2) {
     console.warn(
-      `[outliers] ${platform}: ${blank} of ${results.length} card(s) normalised with no video and no cover. ` +
+      `[outliers] ${platform}: ${dropped} of ${results.length} card(s) had no video and no cover and were dropped. ` +
       'Check the creative field names in utils/scrapecreators.ts against a live response.',
     )
   }
+  return kept
 }
 
 export async function runSearch(
@@ -305,11 +324,11 @@ export async function runSearch(
       sortBy: filters.sort === 'recent' ? 'date-posted' : 'relevance',
       cursor: typeof cursor === 'number' ? cursor : undefined,
     })
-    const results = page.items
+    const normalised = page.items
       .map(normaliseTikTok)
       .filter((r): r is DiscoverResult => r !== null)
-    warnIfAllDropped('tiktok', page.items.length, results.length)
-    warnIfMedialess('tiktok', results)
+    warnIfAllDropped('tiktok', page.items.length, normalised.length)
+    const results = dropUnpreviewable('tiktok', normalised)
     return { results, cursor: page.cursor, creditsRemaining: page.creditsRemaining }
   }
 
@@ -321,11 +340,11 @@ export async function runSearch(
     exactPhrase: filters.exactPhrase,
     cursor: typeof cursor === 'string' ? cursor : undefined,
   })
-  const results = page.items
+  const normalised = page.items
     .map(normaliseMeta)
     .filter((r): r is DiscoverResult => r !== null)
-  warnIfAllDropped('meta', page.items.length, results.length)
-  warnIfMedialess('meta', results)
+  warnIfAllDropped('meta', page.items.length, normalised.length)
+  const results = dropUnpreviewable('meta', normalised)
   return { results, cursor: page.cursor, creditsRemaining: page.creditsRemaining }
 }
 
