@@ -363,7 +363,7 @@ function ImageTile({
           type="button"
           title="Animate this image into a video"
           onClick={(e) => { e.stopPropagation(); onAnimate() }}
-          className="absolute inset-x-2 bottom-2 flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-broll-400/50 bg-broll-500/90 text-[13px] font-semibold text-white opacity-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] backdrop-blur transition-opacity hover:bg-broll-500 group-hover:opacity-100"
+          className="absolute inset-x-2 bottom-2 flex h-11 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-broll-400/50 bg-broll-500/90 text-[13px] font-semibold text-white opacity-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)] transition-opacity hover:bg-broll-500 group-hover:opacity-100"
         >
           <Film className="h-4 w-4" />
           Animate B-Roll

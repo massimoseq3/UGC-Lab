@@ -130,11 +130,13 @@ export default function RightPanel(props: RightPanelProps) {
     <div className="flex h-full flex-col">
       {/* Toggle strip — no global Settings popover anymore: each card owns its
           own settings inside its detail modal. */}
-      {/* Opaque and stacked above the storyboard: the header is the panel's own
-          chrome, and a transparent one let the top edge of a scrolling card
-          show through the band under the tab strip — which reads as the pinned
-          bar below it letting content slide past. */}
-      <div className="relative z-30 flex h-[57px] shrink-0 items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5">
+      {/* Glass, and stacked above the storyboard: cards pass UNDER the header
+          blurred rather than being cut off by an opaque band. It reads as
+          pinned because it's blurred and saturated, not because it's solid —
+          `supports-[backdrop-filter]` keeps the opaque fill wherever the
+          browser can't blur, since a merely translucent bar with cards showing
+          through sharp is the one thing that reads as scrolling. */}
+      <div className="relative z-30 flex h-[57px] shrink-0 items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 supports-[backdrop-filter]:bg-surface-0/80 supports-[backdrop-filter]:backdrop-blur-xl supports-[backdrop-filter]:backdrop-saturate-150">
         <SegmentedToggle<Tab>
           className="h-10 !p-1 min-w-0"
           value={tab}
