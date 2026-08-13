@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Copy, Check, Bookmark, ArrowUpRight, Mic, Film, PenLine, AlertCircle, ImagePlay, Pencil, X, Undo2, Redo2, Quote } from 'lucide-react'
+import { Copy, Check, Bookmark, ArrowUpRight, Mic, Film, PenLine, AlertCircle, ImagePlay, Pencil, X, Undo2, Redo2, Quote, ChevronDown, ChevronRight } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import GridCanvas from '../../../components/GridCanvas'
 import AutoGrowTextarea from '../../../components/AutoGrowTextarea'
+import { TileDeleteButton } from '../../../components/tileActions'
+import { rangeDurationLabel } from '../../../utils/timecode'
+import TokenField from './TokenField'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import { REMIX_ANGLE_LABEL, remixAnglesForCount, HOOK_CATEGORY_META, DEFAULT_HOOK_COUNT, parseHooks, hooksPlainText, hooksToText, type ParsedHook, type RemixAngle, type ScriptMode, type WriteFormat } from '../types'
@@ -50,6 +53,13 @@ interface SceneChunk {
   // reconstruction (the parse trims, strips and filters — it doesn't round-trip).
   bodyStart: number
   bodyEnd: number
+  // The whole scene REGION — from the first character of its header line to the
+  // start of the next scene's header (or the end of the parsed text). `body`
+  // spans are for editing prose; this is what a DELETE splices out, header and
+  // all. It runs to the next header rather than to `bodyEnd` so the blank lines
+  // between two scenes go with the one being removed instead of stacking up.
+  start: number
+  end: number
 }
 
 // What `splitHeaderLine` returns: the header/body split of ONE line, before
@@ -124,8 +134,8 @@ function splitScenes(text: string): SceneChunk[] | null {
   // still moving the offsets, so every span in that scene sat one character
   // left of the text it described — and an edit then spliced over the newline
   // and dropped the body's last character.
-  const spans: Array<{ header: string; bodyStart: number; bodyEnd: number }> = []
-  let current: { header: string; bodyStart: number; bodyEnd: number } | null = null
+  const spans: Array<{ header: string; headerStart: number; bodyStart: number; bodyEnd: number }> = []
+  let current: { header: string; headerStart: number; bodyStart: number; bodyEnd: number } | null = null
   // Running character offset of the current line's first character. `text` is
   // split on '\n' and rejoined with '\n', so line length + 1 is exact.
   let offset = 0
@@ -138,22 +148,49 @@ function splitScenes(text: string): SceneChunk[] | null {
       // A header that carries its own prose ("SCENE 2 — B-ROLL DETAIL: …")
       // starts the body mid-line; a label-only header starts it on the next.
       const bodyStart = split.body ? lineStart + line.indexOf(split.body) : offset
-      current = { header: split.header, bodyStart, bodyEnd: bodyStart + split.body.length }
+      current = { header: split.header, headerStart: lineStart, bodyStart, bodyEnd: bodyStart + split.body.length }
     } else if (current) {
       current.bodyEnd = lineStart + line.length
     }
   }
   if (current) spans.push(current)
-  return spans
+  const chunks = spans
     .map((c) => {
       const raw = text.slice(c.bodyStart, Math.max(c.bodyStart, c.bodyEnd))
       // The trim has to move the span with it, or an edit would splice the
       // surrounding blank lines away along with the body.
       const lead = raw.length - raw.trimStart().length
       const body = raw.trim()
-      return { header: c.header, body, bodyStart: c.bodyStart + lead, bodyEnd: c.bodyStart + lead + body.length }
+      return {
+        header: c.header,
+        body,
+        bodyStart: c.bodyStart + lead,
+        bodyEnd: c.bodyStart + lead + body.length,
+        start: c.headerStart,
+        end: text.length,
+      }
     })
     .filter((c) => c.body.length > 0)
+  // Each surviving scene runs to the next SURVIVING one, so a bodiless header
+  // in between (which renders nothing) leaves with the scene above it rather
+  // than being stranded in the text with nothing on screen to remove it.
+  for (let i = 0; i < chunks.length - 1; i++) chunks[i].end = chunks[i + 1].start
+  return chunks
+}
+
+// Renumber the "SCENE N" headers after one is deleted — 1, 2, 4, 5 reads as a
+// bug, and the number is the one part of a header we can fix without inventing
+// anything. The timecodes are deliberately left alone: they're the model's own
+// timing, and re-cutting them here would be a guess printed as a fact.
+//
+// Only the digits are rewritten; the word keeps whatever case the take wrote it
+// in, and the trailing separator is required so nothing but a real header
+// matches.
+const SCENE_NUMBER = /^([ \t]*(?:---\s*)?)(scene)(\s*)(\d+)(?=\s*[—:–-])/gim
+
+function renumberScenes(text: string): string {
+  let n = 0
+  return text.replace(SCENE_NUMBER, (_m, lead: string, word: string, gap: string) => `${lead}${word}${gap}${++n}`)
 }
 
 // Content that precedes the first "--- Scene N ---" header — used by the scene
@@ -388,31 +425,6 @@ function splitSpokenLines(body: string): SceneSegment[] {
   return segments
 }
 
-// Reference-image slots, not typos — B-Roll binds them to the real character
-// and packaging, so they read as deliberate placeholders rather than raw text.
-const TOKEN_SPLIT = /(\[(?:CHARACTER|PRODUCT|INFLUENCER)\])/g
-const IS_TOKEN = /^\[(?:CHARACTER|PRODUCT|INFLUENCER)\]$/
-
-function TokenText({ text }: { text: string }) {
-  return (
-    <>
-      {text.split(TOKEN_SPLIT).map((part, i) =>
-        IS_TOKEN.test(part) ? (
-          // Tinted inline text, not a pill: a pill is an inline-block box, so
-          // it fractured the paragraph's line-breaking and orphaned the
-          // possessive in "[CHARACTER]'s hands". The brackets already say
-          // "slot"; the colour just stops it reading as a typo.
-          <span key={i} className="font-medium text-scripts-300/90">
-            [{part.slice(1, -1).toLowerCase()}]
-          </span>
-        ) : (
-          part
-        ),
-      )}
-    </>
-  )
-}
-
 // The spoken line — the thing that gets read aloud. Tinted, set at reading
 // size, and separately copyable, because it's what leaves this app.
 function SpokenLine({ speaker, text, onChange }: { speaker: string | null; text: string; onChange?: (next: string) => void }) {
@@ -505,10 +517,18 @@ function VariationCard({
   const [history, setHistory] = useState<string[]>([text])
   const [histIndex, setHistIndex] = useState(0)
   const [textSync, setTextSync] = useState(text)
+  // Which scenes are folded shut, by their index in the parsed list. Purely a
+  // view state — a folded scene is still in the take, still copied, still sent.
+  const [collapsed, setCollapsed] = useState<Set<number>>(() => new Set())
   if (text !== textSync) {
     setTextSync(text)
     setHistory([text])
     setHistIndex(0)
+    // Only an EXTERNAL change lands here (our own commits move `textSync` in
+    // step), so this is a new generation or a restored history row — different
+    // scenes entirely, and folds kept from the last one would land on them by
+    // index alone.
+    if (collapsed.size) setCollapsed(new Set())
   }
   const canUndo = histIndex > 0
   const canRedo = histIndex < history.length - 1
@@ -538,18 +558,42 @@ function VariationCard({
   // the clean spoken lines for copy / save-to-bank.
   const hooks = useMemo<ParsedHook[] | null>(() => (isHooks ? parseHooks(text) : null), [text, isHooks])
 
-  // The plain-script shape, each line with its offset in the take — the span an
-  // in-place edit writes back to.
+  // The plain-script shape: one row per line that has words in it, each with its
+  // offset in the take — the span an in-place edit writes back to — and whether
+  // a blank line came before it.
+  //
+  // **A paragraph break is worth one gap however many newlines produced it.**
+  // The take is the model's raw text and nothing normalises its whitespace, so
+  // the same three-paragraph script arrived spaced three different ways: one
+  // blank line between paragraphs rendered at 14px, two at 28px, and none at all
+  // at 0px — a wall of flush sentences. Which one you got depended on the model
+  // and the run, not on the writing, and that is the "some scripts come out with
+  // bigger gaps" report. Rendering every blank line as its own spacer is what
+  // made the take's whitespace visible; a RUN of them is one paragraph break.
+  //
+  // Fixed here rather than by rewriting the text: the take stays exactly what
+  // the model wrote (it's what Copy, Save and Send to Voiceovers hand over), and
+  // every span an edit splices back over stays where it was.
+  //
   // A plain loop, not a map over a closed-over counter: reassigning a captured
   // variable from inside a render callback is what the compiler lint calls
   // "reassign after render completes", and it's right — the accumulator would
   // outlive the render that built it.
   const scriptLines = useMemo(() => {
-    const out: Array<{ line: string; start: number }> = []
+    const out: Array<{ line: string; start: number; breakBefore: boolean }> = []
     let at = 0
+    let pendingBreak = false
     for (const line of text.split('\n')) {
-      out.push({ line, start: at })
+      const start = at
       at += line.length + 1
+      if (line.trim() === '') {
+        // Leading blank lines aren't a paragraph break — there's nothing above
+        // them to break FROM, and they used to open the card with a spacer.
+        pendingBreak = out.length > 0
+        continue
+      }
+      out.push({ line, start, breakBefore: pendingBreak })
+      pendingBreak = false
     }
     return out
   }, [text])
@@ -621,6 +665,37 @@ function VariationCard({
   const replaceRange = (start: number, end: number, next: string) => {
     if (start < 0 || end > text.length || start > end) return
     commitText(text.slice(0, start) + next + text.slice(end))
+  }
+
+  // Cut one scene out of the take — its header line, its body, and the blank
+  // lines between it and the next scene. The span comes from the parse, so this
+  // is the same splice every other edit here performs, and Undo steps back over
+  // it like any other. The remaining headers are renumbered, since 1, 2, 4
+  // reads as a bug in the take rather than as a deliberate cut.
+  const deleteScene = (index: number) => {
+    const chunk = scenes?.[index]
+    if (!chunk || chunk.start < 0 || chunk.end > text.length) return
+    const before = text.slice(0, chunk.start).replace(/\s+$/, '')
+    const after = text.slice(chunk.end).replace(/^\s+/, '')
+    commitText(renumberScenes(before && after ? `${before}\n\n${after}` : before || after))
+    // The folds are keyed by index, so everything below the cut shifts up one.
+    setCollapsed((prev) => {
+      if (!prev.size) return prev
+      const next = new Set<number>()
+      prev.forEach((i) => {
+        if (i < index) next.add(i)
+        else if (i > index) next.add(i - 1)
+      })
+      return next
+    })
+  }
+
+  const toggleCollapsed = (index: number) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev)
+      if (!next.delete(index)) next.add(index)
+      return next
+    })
   }
 
   const handleUndo = () => {
@@ -718,12 +793,13 @@ function VariationCard({
         {onEdit && !editing && (
           <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
             {/* The raw take, in one box. No longer how you fix a typo — every
-                block on the card below is its own field now — but still the
-                only way to ADD or DELETE a scene, a line or a paragraph, which
-                is exactly the reason the hooks pack kept this button too. */}
+                block on the card below is its own field — nor how you remove a
+                scene, which is the scene header's own button. What's left is
+                ADDING: a new scene, a line, a paragraph. Same for the hooks
+                pack, which has no per-row delete of its own. */}
             <button
               onClick={startEdit}
-              title="Edit the whole take as raw text — for adding or removing scenes and lines"
+              title="Edit the whole take as raw text — for adding scenes and lines"
               className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
             >
               <Pencil className="h-3 w-3" />
@@ -795,7 +871,14 @@ function VariationCard({
               />
             )}
             {scenes.map((scene, i) => (
-              <SceneChunkCard key={i} chunk={scene} onEditRange={onEdit ? replaceRange : undefined} />
+              <SceneChunkCard
+                key={i}
+                chunk={scene}
+                onEditRange={onEdit ? replaceRange : undefined}
+                onDelete={onEdit ? () => deleteScene(i) : undefined}
+                collapsed={collapsed.has(i)}
+                onToggleCollapsed={() => toggleCollapsed(i)}
+              />
             ))}
           </>
         ) : mode === 'reverse-engineer' ? (
@@ -804,27 +887,29 @@ function VariationCard({
           </pre>
         ) : (
           // Each source line is its own paragraph: normal line-height within a
-          // (wrapped) sentence, a slight gap between sentences. No `font-sans`
-          // — that falls back to system-ui; we want the inherited Geist.
+          // (wrapped) sentence, a slight gap between sentences, and a wider one
+          // where the model left a blank line. No `font-sans` — that falls back
+          // to system-ui; we want the inherited Geist.
           // Each one is also the field that edits it — the line IS the editor,
           // and the span it writes back is its own position in the take, so a
           // sentence repeated twice in a script can't overwrite its twin.
-          <div className="flex flex-col gap-2 text-sm font-light leading-normal tracking-tight text-ink-100">
-            {scriptLines.map(({ line, start }, i) =>
-              line.trim() === ''
-                ? <div key={i} aria-hidden className="h-1.5" />
-                : (
-                  <EditableText
-                    key={i}
-                    value={line}
-                    onCommit={onEdit ? (next) => replaceRange(start, start + line.length, next) : undefined}
-                    singleLine
-                    ariaLabel={`Line ${i + 1}`}
-                    className="text-sm font-light leading-normal tracking-tight text-ink-100"
-                    render={<p>{line}</p>}
-                  />
-                )
-            )}
+          //
+          // The two spacings are the row gap and `mt-2`, with no spacer elements
+          // between them: every field carries `-my-1` (its hover tint bleeds
+          // past the text), which eats 8px of whatever gap is set — so `gap-3.5`
+          // is the 6px between sentences, and a paragraph break is that plus 8.
+          <div className="flex flex-col gap-3.5 text-sm font-light leading-normal tracking-tight text-ink-100">
+            {scriptLines.map(({ line, start, breakBefore }, i) => (
+              <EditableText
+                key={i}
+                value={line}
+                onCommit={onEdit ? (next) => replaceRange(start, start + line.length, next) : undefined}
+                singleLine
+                ariaLabel={`Line ${i + 1}`}
+                className={`text-sm font-light leading-normal tracking-tight text-ink-100 ${breakBefore ? 'mt-2' : ''}`}
+                render={<p>{line}</p>}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -982,25 +1067,23 @@ function VoiceProfileCard({ body, onChange }: { body: string; onChange?: (next: 
 // without printing a box around every line). There is no edit MODE to enter —
 // you click the words and type, which is the whole point. The header's raw Edit
 // button survives as the escape hatch, because a single box over the take text
-// is still the only way to ADD or DELETE a scene, a line, or a hook.
+// is still the only way to ADD a scene, a line, or a hook (removing a scene is
+// the scene header's own button).
 //
-// Two shapes, and the rule is what the read-only render adds:
-//   • default — the field is always on. Used wherever the rendered block is
-//     plain text (a hook, a spoken line, a script paragraph), where a field
-//     that looks identical to the paragraph costs nothing.
-//   • `clickToEdit` — `render` shows until you click it, then the field swaps
-//     in. Used for scene direction, whose render tints [CHARACTER] / [PRODUCT]
-//     tokens; an always-on field would trade that away permanently to save one
-//     click on the rare occasion you're rewriting the prose.
-// `render` also IS the read-only rendering when no `onCommit` is given, so a
-// card without an edit handler looks exactly as it did before.
+// The field is ALWAYS on — every block that takes one is plain text, so a
+// textarea styled as the paragraph looks identical and costs nothing. A
+// `clickToEdit` variant used to exist for the two blocks whose render added the
+// [CHARACTER] / [PRODUCT] tint, which a bare textarea can't reproduce; those now
+// use `TokenField`, which paints the tint behind a real field instead, so
+// nothing has to swap on click any more.
+// `render` IS the read-only rendering when no `onCommit` is given, so a card
+// without an edit handler looks exactly as it did before.
 function EditableText({
   value,
   onCommit,
   className,
   ariaLabel,
   singleLine = false,
-  clickToEdit = false,
   render,
 }: {
   value: string
@@ -1011,12 +1094,10 @@ function EditableText({
   // Enter commits instead of breaking the text in two, and anything pasted in
   // is flattened. For a hook or a spoken line, which are one line by definition.
   singleLine?: boolean
-  clickToEdit?: boolean
   render?: ReactNode
 }) {
   const [draft, setDraft] = useState(value)
   const [sync, setSync] = useState(value)
-  const [open, setOpen] = useState(false)
   // Escape has to be able to cancel WITHOUT the blur it triggers committing the
   // draft it just discarded — setDraft is async, so `commit` would still read
   // the typed value. A ref is the only thing that's already updated by then.
@@ -1029,7 +1110,6 @@ function EditableText({
   if (!onCommit) return <>{render ?? value}</>
 
   const commit = () => {
-    setOpen(false)
     if (reverting.current) {
       reverting.current = false
       setDraft(value)
@@ -1047,30 +1127,11 @@ function EditableText({
     if (next !== value) onCommit(next)
   }
 
-  if (clickToEdit && render && !open) {
-    return (
-      <div
-        role="button"
-        tabIndex={0}
-        title="Click to edit"
-        onClick={() => setOpen(true)}
-        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setOpen(true) } }}
-        // Only the hover affordance — `className` styles the FIELD, and the
-        // read-only node already carries its own look. Applying both wrapped a
-        // scene prompt's tinted box inside an identical second one.
-        className="-mx-1 -my-0.5 cursor-text rounded-lg px-1 py-0.5 transition-colors hover:bg-ink/[0.05]"
-      >
-        {render}
-      </div>
-    )
-  }
-
   return (
     <AutoGrowTextarea
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
-      autoFocus={open}
       onKeyDown={(e) => {
         if (singleLine && e.key === 'Enter') {
           e.preventDefault()
@@ -1083,7 +1144,12 @@ function EditableText({
       rows={1}
       spellCheck={false}
       aria-label={ariaLabel}
-      className={`-mx-1.5 -my-1 w-[calc(100%+0.75rem)] cursor-text resize-none rounded-lg bg-transparent px-1.5 py-1 outline-none transition-colors hover:bg-ink/[0.05] focus:bg-surface-0 ${className}`}
+      // No fill on focus. It used to go `bg-surface-0` — near-black — the
+      // instant the caret landed, so clicking a line to fix a word read as a
+      // black editor box opening over the script. A field that looks exactly
+      // like the prose it replaced is the whole idea; the hover tint says
+      // "editable" on the way in and gets out of the way once you're typing.
+      className={`-mx-1.5 -my-1 w-[calc(100%+0.75rem)] cursor-text resize-none rounded-lg bg-transparent px-1.5 py-1 outline-none transition-colors hover:bg-ink/[0.04] ${className}`}
     />
   )
 }
@@ -1163,7 +1229,20 @@ function clearSelectionOnChrome(e: React.MouseEvent) {
 // plus the segment's offset within the body. That's what makes editing a scene
 // where it sits exact: no search (two scenes can share a sentence) and no
 // reconstruction (the parse trims, strips and filters, so it doesn't round-trip).
-function SceneChunkCard({ chunk, onEditRange }: { chunk: SceneChunk; onEditRange?: (start: number, end: number, next: string) => void }) {
+function SceneChunkCard({
+  chunk,
+  onEditRange,
+  onDelete,
+  collapsed = false,
+  onToggleCollapsed,
+}: {
+  chunk: SceneChunk
+  onEditRange?: (start: number, end: number, next: string) => void
+  // Omitted → no delete button (a card with no edit handler is read-only).
+  onDelete?: () => void
+  collapsed?: boolean
+  onToggleCollapsed?: () => void
+}) {
   const [copied, setCopied] = useState(false)
   const addToast = useAppStore((s) => s.addToast)
   const handleCopy = async () => {
@@ -1182,32 +1261,70 @@ function SceneChunkCard({ chunk, onEditRange }: { chunk: SceneChunk; onEditRange
   const segments = useMemo(() => splitSpokenLines(chunk.body), [chunk.body])
   const hasSpoken = segments.some((s) => s.kind === 'line')
   const { label, time } = splitHeaderTime(chunk.header)
+  const duration = time ? rangeDurationLabel(time) : null
   return (
     <div className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 card-soft-shadow">
       {/* The header wraps rather than truncating — a scene label plus its
           timecode outruns a narrow pane, and the timing is the half a member
-          came here to read. */}
-      <div className="relative mb-2 flex select-none flex-wrap items-center justify-center gap-x-2 gap-y-1 px-8">
+          came here to read. Symmetric padding on a row whose chrome is pinned
+          to both edges: the label centres on the CARD, not on whatever is left
+          over between the buttons. */}
+      <div className={`relative flex select-none flex-wrap items-center justify-center gap-x-2 gap-y-1 px-16 ${collapsed ? 'mb-1.5' : 'mb-2'}`}>
+        {/* Fold, not delete — a scene you're done with gets out of the way of
+            the one you're working on, and the take text is untouched. */}
+        {onToggleCollapsed && (
+          <button
+            onClick={onToggleCollapsed}
+            title={collapsed ? 'Show scene' : 'Hide scene'}
+            aria-label={collapsed ? 'Show scene' : 'Hide scene'}
+            aria-expanded={!collapsed}
+            className="absolute left-0 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
+          >
+            {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </button>
+        )}
         <span className="text-center text-[10px] font-semibold uppercase tracking-tight text-scripts-300">
           {label}
         </span>
         {/* The timecode as its own pill: tabular figures so a column of scenes
             lines up digit for digit, and one step brighter than the label,
-            because "where does this beat land" is what's being scanned for. */}
+            because "where does this beat land" is what's being scanned for.
+            The range is followed by how long it RUNS — the range alone is two
+            clock times to subtract, and the answer is what the scene gets shot
+            and generated at. */}
         {time && (
           <span className="shrink-0 rounded-full bg-scripts-500/[0.14] px-2 py-0.5 text-[10px] font-semibold tabular-nums tracking-tight text-scripts-200">
             {time}
+            {duration && <span className="text-scripts-200/60"> · {duration}</span>}
           </span>
         )}
-        <button
-          onClick={handleCopy}
-          className="absolute right-0 top-1/2 flex -translate-y-1/2 shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
-        >
-          {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
-          {copied ? 'Copied' : 'Copy'}
-        </button>
+        <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
+          <button
+            onClick={handleCopy}
+            className="flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
+          >
+            {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
+            {copied ? 'Copied' : 'Copy'}
+          </button>
+          {/* The house two-click delete, in its panel skin — never a modal. It
+              cuts the scene out of the take and renumbers what's left, and it
+              rides the card's undo stack like every other edit here. */}
+          {onDelete && (
+            <TileDeleteButton
+              onDelete={onDelete}
+              title="Delete scene"
+              variant="chrome"
+              size="sm"
+              alwaysVisible
+            />
+          )}
+        </div>
       </div>
-      {hasSpoken ? (
+      {collapsed ? (
+        // One dim line of the body, so a folded scene is still findable — the
+        // point is to get it out of the way, not to hide which one it is.
+        <p className="truncate px-1 text-[12px] font-light tracking-tight text-ink-600">{chunk.body}</p>
+      ) : hasSpoken ? (
         <div className="flex flex-col gap-2">
           {segments.map((segment, i) =>
             segment.kind === 'line' ? (
@@ -1220,21 +1337,17 @@ function SceneChunkCard({ chunk, onEditRange }: { chunk: SceneChunk; onEditRange
             ) : (
               // Direction is context for the shot, not the script — set a step
               // down in size and weight so the eye lands on the line first.
-              // Click-to-edit rather than an always-on field: this is the one
-              // block whose render adds something (TokenText tints the
-              // [character] / [product] slots) that a bare textarea would lose.
-              <EditableText
+              // A live field with the [CHARACTER] / [PRODUCT] slots washed in
+              // behind it: the tint is what used to force this block to be
+              // click-to-edit, and it survives while you type now.
+              <TokenField
                 key={i}
                 value={segment.text}
                 onCommit={onEditRange ? (next) => onEditRange(chunk.bodyStart + segment.start, chunk.bodyStart + segment.end, next) : undefined}
-                clickToEdit
                 ariaLabel="Scene direction"
-                className="px-1 text-[12.5px] font-light leading-relaxed tracking-tight text-ink-400"
-                render={(
-                  <p className="text-[12.5px] font-light leading-relaxed tracking-tight text-ink-400">
-                    <TokenText text={segment.text} />
-                  </p>
-                )}
+                className="-mx-1.5 -my-1 w-[calc(100%+0.75rem)] rounded-lg transition-colors hover:bg-ink/[0.04]"
+                padClass="px-1.5 py-1"
+                textClass="text-[12.5px] font-light leading-relaxed tracking-tight text-ink-400"
               />
             ),
           )}
@@ -1242,22 +1355,15 @@ function SceneChunkCard({ chunk, onEditRange }: { chunk: SceneChunk; onEditRange
       ) : (
         // No quoted line in this scene (a silent beat, or an Ad Analyzer
         // blueprint whose scenes are pure direction) — the whole body is one
-        // block, and editing it writes back the whole body span. Same
-        // click-to-edit as a scene's direction prose, and for the same reason:
-        // the render tints the [character] / [product] slots.
-        // Body matches the Write/Remix script output: inherited Geist + white
-        // (a div, not <pre>, so it doesn't fall back to UA monospace).
-        <EditableText
+        // block, and editing it writes back the whole body span.
+        // Body matches the Write/Remix script output: inherited Geist + white.
+        <TokenField
           value={chunk.body}
           onCommit={onEditRange ? (next) => onEditRange(chunk.bodyStart, chunk.bodyEnd, next) : undefined}
-          clickToEdit
           ariaLabel="Scene prompt"
-          className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100"
-          render={(
-            <div className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100">
-              <TokenText text={chunk.body} />
-            </div>
-          )}
+          className="rounded-xl bg-surface-0"
+          padClass="p-2.5"
+          textClass="text-[13px] font-light leading-relaxed tracking-tight text-ink-100"
         />
       )}
     </div>
