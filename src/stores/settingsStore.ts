@@ -60,6 +60,20 @@ const MIGRATIONS_KEY = 'ai-ugc-lab-settings-migrations'
 // its name is recorded under MIGRATIONS_KEY so it never runs again.
 const MODEL_MIGRATIONS: Array<{ name: string; apply: (m: Record<string, string>) => void }> = [
   {
+    // Characters' image default flipped from GPT Image 2 to Nano Banana 2.
+    // Targeted BY VALUE rather than deleting the slot outright: a member who
+    // picked Seedream keeps it, and only someone still sitting on the old
+    // default moves. (Someone who re-picked GPT Image 2 deliberately is
+    // indistinguishable from that, so they move too — the same trade-off the
+    // image-default migration below already accepted.)
+    name: '2026-08-character-studio-nano-banana-default',
+    apply: (m) => {
+      if (m['character-studio:image:text-to-image'] === 'gpt-image-2-text-to-image') {
+        delete m['character-studio:image:text-to-image']
+      }
+    },
+  },
+  {
     // Suno V5 removed from the registry; V5.5 is the only music model left.
     // Same two repairs as the Veo removal below: getAppModel already drops an
     // id that no longer resolves, but Playground ALSO snapshots modelId inside
@@ -230,44 +244,56 @@ const MODEL_MIGRATIONS: Array<{ name: string; apply: (m: Record<string, string>)
 ]
 
 function loadFromStorage(): PersistedSettings {
+  let parsed: PersistedShape = {}
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const parsed = JSON.parse(raw) as PersistedShape
-      const perAppModel = { ...(parsed.perAppModel ?? {}) }
+    if (raw) parsed = JSON.parse(raw) as PersistedShape
+  } catch {
+    // Corrupted data — start fresh, but still stamp the migrations below so a
+    // blob written later this session isn't migrated against on the next load.
+  }
+  const perAppModel = { ...(parsed.perAppModel ?? {}) }
 
-      let ranMigrations: Record<string, true> = {}
-      try {
-        const rawMig = localStorage.getItem(MIGRATIONS_KEY)
-        if (rawMig) ranMigrations = JSON.parse(rawMig) as Record<string, true>
-      } catch { /* ignore */ }
+  let ranMigrations: Record<string, true> = {}
+  try {
+    const rawMig = localStorage.getItem(MIGRATIONS_KEY)
+    if (rawMig) ranMigrations = JSON.parse(rawMig) as Record<string, true>
+  } catch { /* ignore */ }
 
-      let migrated = false
-      for (const m of MODEL_MIGRATIONS) {
-        if (!ranMigrations[m.name]) {
-          m.apply(perAppModel)
-          ranMigrations[m.name] = true
-          migrated = true
-        }
-      }
-      const next: PersistedSettings = {
-        kieApiKey: parsed.kieApiKey ?? '',
-        scrapeCreatorsKey: parsed.scrapeCreatorsKey ?? '',
-        perAppModel,
-      }
-      if (migrated) {
-        localStorage.setItem(MIGRATIONS_KEY, JSON.stringify(ranMigrations))
-        // Writes the WHOLE snapshot. An earlier version rebuilt a literal with
-        // only the two fields it knew about, which would wipe any key added to
-        // the shape later the first time a migration ran.
+  // Runs (and records) even with no settings blob yet. It used to be inside the
+  // `if (raw)`, so a browser arriving without one — a new device, or any browser
+  // after the sign-out wipe, which removes STORAGE_KEY — recorded nothing. The
+  // blob then appeared during that same session (a pasted kie key, a model pick,
+  // or cloudSync's own hydrate write), and the NEXT load found it and ran every
+  // migration for the first time — deleting the member's Characters and B-Roll
+  // picks. A pick that survives until you reload and then silently reverts to
+  // the default is exactly the bug this file's migrations are meant to be.
+  let migrated = false
+  for (const m of MODEL_MIGRATIONS) {
+    if (!ranMigrations[m.name]) {
+      m.apply(perAppModel)
+      ranMigrations[m.name] = true
+      migrated = true
+    }
+  }
+  const next: PersistedSettings = {
+    kieApiKey: parsed.kieApiKey ?? '',
+    scrapeCreatorsKey: parsed.scrapeCreatorsKey ?? '',
+    perAppModel,
+  }
+  if (migrated) {
+    try {
+      localStorage.setItem(MIGRATIONS_KEY, JSON.stringify(ranMigrations))
+      // Writes the WHOLE snapshot. An earlier version rebuilt a literal with
+      // only the two fields it knew about, which would wipe any key added to
+      // the shape later the first time a migration ran. Only when there was
+      // something to write back — a browser with no blob stays with no blob.
+      if (parsed.perAppModel || parsed.kieApiKey || parsed.scrapeCreatorsKey) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
       }
-      return next
-    }
-  } catch {
-    // Corrupted data — start fresh
+    } catch { /* quota / unavailable — the in-memory result below still stands */ }
   }
-  return { kieApiKey: '', scrapeCreatorsKey: '', perAppModel: {} }
+  return next
 }
 
 function saveToStorage(state: PersistedSettings) {

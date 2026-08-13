@@ -64,8 +64,15 @@ interface ModelPickerProps {
 
 export default function ModelPicker({ appId, task, mode, value, onChange, requireMode, requireAnyModes, requireModeNote, compact, large, row, costParams, allowedModelIds, persistKey }: ModelPickerProps) {
   const setAppModel = useSettingsStore((s) => s.setAppModel)
-  const getAppModel = useSettingsStore((s) => s.getAppModel)
   const persistedKey = persistKey ?? `${appId}:${task}${mode ? `:${mode}` : ''}`
+  // Read the pick THROUGH the selector, never by calling a getter pulled out of
+  // the store. `s.getAppModel` is a stable reference and `persistedKey` is a
+  // constant for a given picker, so `getAppModel(persistedKey)` in the body is
+  // a call the React Compiler caches on two deps that never change — it ran
+  // once on mount and the trigger then showed that first model forever, however
+  // many times you picked another one (the generation itself used the new pick,
+  // since the services read getState() fresh, so the picker was simply lying).
+  const persisted = useSettingsStore((s) => s.getAppModel(persistedKey))
 
   const [open, setOpen] = useState(false)
   const [openUpward, setOpenUpward] = useState(false)
@@ -89,7 +96,6 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
   const flatList = task === 'image'
   const recommended = flatList ? [] : models.filter((m) => m.tags.includes('recommended'))
   const fallback = getDefaultModel(appId, task, mode)
-  const persisted = getAppModel(persistedKey)
   const resolved = value ?? persisted ?? fallback?.id
   const selected = models.find((m) => m.id === resolved)
 
