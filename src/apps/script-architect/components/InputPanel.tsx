@@ -853,11 +853,14 @@ export default function InputPanel({
           No rule above it: the brief box ends where its own toolbar ends, so a
           hairline there just fenced off controls that belong to the same column. */}
       <div className="shrink-0 bg-surface-0 px-5 pb-3 pt-2 md:bg-transparent">
-        {/* ONE row above Generate, split into equal shares: who writes it, how
-            long it runs, how many come back. Every child is `flex-1` (Tailwind's
-            `flex: 1 1 0%`), so the three read as three equal thirds whatever is
-            in them — and as halves in Hooks, which has no duration. All at 58px,
-            the picker-row height the column's other rows share.
+        {/* ONE row above Generate: who writes it, how long it runs, how many
+            come back. The model takes HALF and the two chips a quarter each
+            (`flex-[2]` against `flex-1`, both zero-basis, so the ratio holds
+            whatever is in them). Equal thirds was tried first and the model row
+            is the one control here with something to say — at a third it read
+            "GPT 5.6…" over "The Scrip…", while the chips had spare room around
+            two words. All at 58px, the picker-row height the column's other
+            rows share.
             They were a chip band stacked over the model row, which made two
             rows out of one decision each. Both chips are pearls rather than
             fields: the pair was two full-width `SegmentedToggle` slabs, then
@@ -866,7 +869,7 @@ export default function InputPanel({
             duration, the blueprint rewrite has no count. Everything here opens
             UPWARD: a downward menu covers the button you're heading for. */}
         <div className="mb-2 flex items-stretch gap-1.5">
-          <ScriptModelRow appId="script-architect" className="min-w-0 flex-1" />
+          <ScriptModelRow appId="script-architect" className="min-w-0 flex-[2]" />
           {showLength && (
             // The clock carries the meaning the old dim "Length" label did —
             // "15s" alone doesn't say what it measures, and a chip has no
