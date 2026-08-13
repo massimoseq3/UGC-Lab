@@ -433,6 +433,15 @@ OUTPUT FORMAT — CRITICAL:
 - Valid tags: <EDUCATIONAL> <COMPARISON> <MYTH BUSTING> <STORYTELLING> <AUTHORITY> <DAY IN THE LIFE> <PATTERN INTERRUPT>
 - No numbering, no blank lines, no quotation marks, no commentary, no markdown.`
 
+// Attaching a bank product is optional in both modes: a member who has
+// described the product in the brief or the instructions shouldn't have to bank
+// it first just to generate. Every spoken-copy system prompt tells the model to
+// "mention the product name at most twice (given in the product context)", so
+// when there IS no product context that instruction has nothing to point at —
+// and the observed failure is a [Product Name] placeholder read aloud by TTS,
+// or a brand invented out of thin air and put in a member's ad.
+const NO_PRODUCT_DETAILS = `NO PRODUCT DETAILS ARE ATTACHED: the brief above is all you have, so take the product, the audience and the specifics from it. Where the brief leaves something unsaid, keep it general instead of inventing it — never make up a brand name, a price, or a statistic. If the brief never names the product, call it what it is ("this thing", or its plain category) and never write a bracketed placeholder like [Product Name]; those get read out loud word for word by the voice model.`
+
 async function runHooks(input: GenerateScriptInput, apiKey: string, endpoint: ChatTarget): Promise<string> {
   // Sanitised like the take count — it round-trips through a persisted draft
   // and a history row.
@@ -447,6 +456,12 @@ async function runHooks(input: GenerateScriptInput, apiKey: string, endpoint: Ch
   const ctxLines = productContextLines(input.productContext)
   if (ctxLines) {
     prompt += `The product being advertised:\n${ctxLines}\n\n`
+  } else {
+    // Same rule as the script pipelines, and it bites harder here: the hooks
+    // system prompt caps brand mentions at 2 of N and every formula is a
+    // fill-in-the-blank, so with no product context the blanks come back as
+    // literal "(...)" or an invented brand.
+    prompt += `${NO_PRODUCT_DETAILS}\n\n`
   }
 
   if (input.additionalContext) {
@@ -639,6 +654,12 @@ async function runWrite(input: GenerateScriptInput, take: number, takeCount: num
   const ctxLines = productContextLines(input.productContext)
   if (ctxLines) {
     prompt += `The product being advertised:\n${ctxLines}\n\n`
+  } else {
+    // A product is optional here — the brief carries it instead. Say so, or the
+    // system prompt's "name the product at most twice (given in the product
+    // context)" is an instruction with no referent, and the model fills the gap
+    // with a [Product Name] placeholder or an invented brand.
+    prompt += `${NO_PRODUCT_DETAILS}\n\n`
   }
 
   prompt += `${WRITE_STYLE_INSTRUCTION[style]}\n\n`
@@ -755,6 +776,18 @@ async function runRemix(input: GenerateScriptInput, angle: RemixAngle, apiKey: s
     prompt += `Additional context and instructions:\n${input.additionalContext}\n\n`
   }
 
+  // No bank product attached — legal in both modes, since a member describing
+  // the product in the instructions shouldn't have to bank it first. The
+  // subject then comes from those instructions, and this has to say so: without
+  // it the closing line asks the model to rewrite the ad "for the new product"
+  // when nothing on the prompt names one, and a model handed that gap fills it
+  // with an invented brand.
+  if (source && !ctxLines && !input.productId) {
+    prompt += input.additionalContext.trim()
+      ? `NO PRODUCT DETAILS ARE ATTACHED, so the instructions above are the whole brief for what this is being rewritten FOR. Take the product, the audience and the specifics from them. Where they leave something unsaid, keep it general rather than inventing it — never make up a brand name, a price or a statistic, and refer to the product as the instructions do or by its plain category.\n\n`
+      : `NO PRODUCT DETAILS AND NO INSTRUCTIONS ARE ATTACHED, so this is a rewrite of the source ad for ITS OWN subject: keep what the ad is selling and write it fresh against the map — same beats, same opening device, new words. Never invent a brand name, a price or a statistic that isn't in the source.\n\n`
+  }
+
   if (source) prompt += `${REMIX_ANGLE_FRAME}\n\n`
   prompt += `${REMIX_ANGLE_INSTRUCTION[angle]}\n\n${CREATOR_ANGLE_PRECEDENCE}\n\n`
   // CREATOR_ANGLE_PRECEDENCE is shared with Write New, where takes that all
@@ -778,9 +811,12 @@ async function runRemix(input: GenerateScriptInput, angle: RemixAngle, apiKey: s
     prompt += `LENGTH: keep the source's own length and beat count. It is not too long — you are not summarising it, you are rewriting it line for line.\n\n`
   }
 
-  prompt += source
-    ? `Rewrite the source script for the new product now, beat for beat: same structure, same opening device, same pacing, same CTA placement — new product, new specifics, new angle. Output the finished spoken script only.`
-    : `Generate the full script now.`
+  const hasProduct = Boolean(ctxLines || input.productId)
+  prompt += !source
+    ? `Generate the full script now.`
+    : hasProduct
+      ? `Rewrite the source script for the new product now, beat for beat: same structure, same opening device, same pacing, same CTA placement — new product, new specifics, new angle. Output the finished spoken script only.`
+      : `Rewrite the source script now, beat for beat: same structure, same opening device, same pacing, same CTA placement — new words and a new angle. Output the finished spoken script only.`
 
   const messages: ChatMessage[] = [
     { role: 'system', content: [{ type: 'text', text: REMIX_SYSTEM }] },
@@ -809,7 +845,10 @@ async function runReverseEngineer(input: GenerateScriptInput, apiKey: string, en
   } else if (input.productId) {
     prompt += `Rewrite this blueprint for a new product using the product details provided.\n\n`
   } else {
-    prompt += `Rewrite this blueprint for a new product.\n\n`
+    // Reachable now that a product is optional. The four transformations still
+    // apply — what changes is where the new dialogue's facts come from.
+    const preserved = keepTiming ? 'camera, framing, scene count, durations,' : 'camera and framing style'
+    prompt += `Rewrite this blueprint with NO product details attached. Keep ${preserved} and the [CHARACTER] token unchanged, and still replace every visual description of the original product with [PRODUCT]. Take the rewritten dialogue's subject from the instructions below if there are any; otherwise keep what the ad is selling and just rewrite the lines fresh. Never invent a brand name, a price, or a statistic that isn't given.\n\n`
   }
 
   if (input.additionalContext) {

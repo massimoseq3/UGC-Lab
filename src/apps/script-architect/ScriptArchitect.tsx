@@ -180,7 +180,13 @@ export default function ScriptArchitect() {
     // users who don't know what to write).
     const effectiveBrief = mode === 'write' && !brief.trim() ? OPEN_BRIEF : brief
     const sourceFilled = mode === 'write' ? true : source.trim()
-    if (!sourceFilled || !selectedProduct) return
+    // A product is OPTIONAL in both modes — a member describing the product in
+    // the brief or the instructions shouldn't have to bank it first. What each
+    // mode still needs is a subject from SOMEWHERE: Remix has its source
+    // script, and Write New needs the product or the brief (with neither, the
+    // OPEN_BRIEF stand-in would be asking for an ad about nothing).
+    if (!sourceFilled) return
+    if (mode === 'write' && !selectedProduct && !brief.trim()) return
 
     setIsGenerating(true)
     setError(null)
@@ -211,8 +217,8 @@ export default function ScriptArchitect() {
         hookCategory,
         hookCount,
         variationCount,
-        productId: selectedProduct.id,
-        productName: selectedProduct.productName,
+        productId: selectedProduct?.id ?? null,
+        productName: selectedProduct?.productName,
         productContext,
         additionalContext,
       })
@@ -225,8 +231,8 @@ export default function ScriptArchitect() {
         mode: resolvedMode,
         variations: result.variations,
         inputSummary: inputSource.slice(0, 200),
-        linkedProductId: selectedProduct.id,
-        productName: selectedProduct.productName,
+        linkedProductId: selectedProduct?.id,
+        productName: selectedProduct?.productName,
         winningTranscript,
         reversePrompt,
         additionalContext,
