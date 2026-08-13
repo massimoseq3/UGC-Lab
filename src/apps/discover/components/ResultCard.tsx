@@ -104,16 +104,17 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
             }`}
           />
         )}
-        {/* A glyph alone on a black tile reads as the app failing to load
-            something. It has to say which — Meta does publish the occasional ad
-            whose creative isn't fetchable, and the honest answer is that this
-            card is a link to the original rather than something gone wrong. */}
+        {/* A backstop, not a state the grid reaches: `dropUnpreviewable` takes
+            these cards out of the results, because an ad with no video and no
+            cover has nothing to research — Analyze and Download are dead on it
+            and the Ad Library answers with a sign-in wall. It stays because a
+            card shouldn't assume its own props, and because a cover that fails
+            to LOAD on a video-less ad lands here at render time, past any
+            filter. Glyph only: sending this member to "the original" is the
+            dead end the drop exists to remove. */}
         {!hasVideo && !showCover && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-3 text-center">
+          <div className="absolute inset-0 flex items-center justify-center">
             <ImageOff className="h-6 w-6 text-white/25" strokeWidth={1.5} />
-            <span className="text-[10px] leading-relaxed text-white/35">
-              No preview — open the original
-            </span>
           </div>
         )}
 
