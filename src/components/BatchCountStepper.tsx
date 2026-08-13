@@ -13,8 +13,14 @@ const ACCENT_ON: Record<string, string> = {
 }
 
 // Outer pill heights match ConstraintChip exactly, so the stepper sits in a
-// chip row as one of them rather than as a control of its own kind.
+// chip row as one of them rather than as a control of its own kind. `fill`
+// is the exception: it takes its height from the row it's in (an
+// `items-stretch` flex line), for the one place this stands beside a Generate
+// button rather than in a chip row — a 54px button next to a 58px pill is the
+// kind of 4px mismatch that reads as a mistake, and hard-coding the button's
+// height here would put the same number in two files.
 const SIZE: Record<string, { pill: string; btn: string; text: string }> = {
+  fill: { pill: 'self-stretch px-1.5', btn: 'h-9 w-9', text: 'text-[13px]' },
   xl: { pill: 'h-[58px] px-1.5', btn: 'h-9 w-9', text: 'text-[13px]' },
   lg: { pill: 'h-12 px-1.5', btn: 'h-8 w-8', text: 'text-[13px]' },
   md: { pill: 'h-10 px-1', btn: 'h-7 w-7', text: 'text-[12px]' },
@@ -34,6 +40,7 @@ export default function BatchCountStepper({
   max = MAX_BATCH_COUNT,
   noun,
   label,
+  stacked = false,
   accent,
   size = 'lg',
   grow = false,
@@ -47,8 +54,12 @@ export default function BatchCountStepper({
   // Optional dim word inside the pill, for a count whose number alone wouldn't
   // say what it counts (a row that isn't obviously a generate bar).
   label?: string
+  // Stack the label UNDER the number instead of beside it. For a tall pill in
+  // a generate bar, where the count is the thing being read and the word is
+  // what it counts — side by side at that height the pair floats mid-pill.
+  stacked?: boolean
   accent: keyof typeof ACCENT_ON
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'fill'
   grow?: boolean
   // Total credits for a run of n. Callers without a price omit it — an unknown
   // cost is never invented.
@@ -76,10 +87,17 @@ export default function BatchCountStepper({
         label={`One fewer ${noun}`}
         onClick={() => step(-1)}
       />
-      <span className={`flex min-w-0 items-center justify-center gap-1.5 px-1 tabular-nums ${s.text}`}>
-        {label && <span className="truncate text-[11px] text-ink-500">{label}</span>}
-        {count}
-      </span>
+      {stacked ? (
+        <span className={`flex min-w-0 flex-col items-center justify-center px-1 leading-none ${s.text}`}>
+          <span className="tabular-nums font-semibold">{count}</span>
+          {label && <span className="mt-1 truncate text-[10px] font-medium tracking-tight text-ink-500">{label}</span>}
+        </span>
+      ) : (
+        <span className={`flex min-w-0 items-center justify-center gap-1.5 px-1 tabular-nums ${s.text}`}>
+          {label && <span className="truncate text-[11px] text-ink-500">{label}</span>}
+          {count}
+        </span>
+      )}
       <StepButton
         icon={Plus}
         className={s.btn}

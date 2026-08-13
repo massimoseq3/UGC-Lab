@@ -145,10 +145,19 @@ export default function InputPanel({
   const resolvedProductImage = useAssetUrl(selectedProduct?.productImage)
   // Hooks format: one-liners, so no length toggle; the Script Style picker is
   // swapped for the hook-family picker.
-  const isHooksFormat = writeFormat === 'hooks'
+  // Write New ONLY — `writeFormat` is that mode's Script / Hooks / Scenes
+  // toggle and Remix has no equivalent, so an unguarded read let a member who
+  // last wrote hooks land in Remix with its Length chip gone and its batch size
+  // counting "10 Hooks", for a pipeline that returns script variations.
+  const isHooksFormat = mode === 'write' && writeFormat === 'hooks'
   // The scene-rewrite pipeline will run (blueprint detected, no override) —
   // drives the source box chrome, the chip copy, and the button labels.
-  const blueprintActive = isBlueprint && !forceTranscript
+  // Remix ONLY: `isBlueprint` is detected off the persisted `source` draft,
+  // which Write New never reads. Without the mode guard, a blueprint left in
+  // the remix box took Write New's batch-size chip off screen (a blueprint
+  // rewrite returns one script, so `showCount` is false) with nothing on the
+  // panel explaining where the 3 / 5 / 10 picker had gone.
+  const blueprintActive = mode !== 'write' && isBlueprint && !forceTranscript
   // The two footer dropdowns. Every output picks its batch size — takes for
   // Script / Scenes / Remix, hooks for Hooks (one-liners off a single call, so
   // their own list) — except the blueprint rewrite, which returns ONE script.
@@ -323,20 +332,16 @@ export default function InputPanel({
     setSourceScript(item)
   }
 
-  // Hooks has no Length chip to pair with, so its count rides beside the model
-  // row instead of taking a full-width row on its own.
-  const inlineCount = showCount && isHooksFormat
   // The count keeps its noun ("3 Variations" / "10 Hooks") instead of an icon:
   // a bare "3" beside a duration reads as another measurement, and the word is
-  // what makes the chip self-evident. Standalone it's `lg`, the size of the
-  // Characters generate bar's 1K / 9:16 pills; inline it takes the model row's
-  // 58px instead — two controls sharing a row that don't share a height read
-  // as a mistake — and anchors its menu right, the menu being wider than it.
+  // what makes the chip self-evident. `xl` — the picker-row height every
+  // control on this band shares — and its menu anchors right, since it's the
+  // rightmost thing in the row and the menu is wider than the chip.
   const countChip = (
     <ConstraintChip
       grow
-      size={inlineCount ? 'xl' : 'lg'}
-      align={inlineCount ? 'right' : 'left'}
+      size="xl"
+      align="right"
       openDirection="up"
       value={isHooksFormat ? `${hookCount} Hooks` : `${variationCount} Variations`}
       options={
@@ -848,31 +853,33 @@ export default function InputPanel({
           No rule above it: the brief box ends where its own toolbar ends, so a
           hairline there just fenced off controls that belong to the same column. */}
       <div className="shrink-0 bg-surface-0 px-5 pb-3 pt-2 md:bg-transparent">
-        {/* Length and batch size — the same `ConstraintChip` pearls every other
-            generate bar in the app uses for aspect / duration / resolution, and
-            for the same reason: these are two small settings on the way to
-            Generate, not fields. They were full-width `SegmentedToggle` slabs,
-            then full-width `Dropdown`s. `grow` + the centred label is exactly
-            Playground's 1K / 9:16 row — the pair splits the width and each
-            reads as a pearl rather than a bar with a value pushed to one end.
-            `size='xl'` puts them at the column's shared 58px, so the settings
-            stack (toggle → style row → chips → model row) is one ladder.
-            Each hides on its own, so the row can carry either alone — Hooks
-            have no duration, the blueprint rewrite has no count. Both open
-            UPWARD (`openDirection='up'`): they sit directly above the model row
-            and Generate, and a downward menu would cover the button you're
-            heading for. */}
-        {(showLength || (showCount && !inlineCount)) && (
-          <div className="mb-2 flex flex-wrap items-center justify-center gap-1.5">
-            {showLength && (
-              // The clock carries the meaning the old dim "Length" label did —
-              // "15s" alone doesn't say what it measures, and a chip has no
-              // room for a second word. Remix's list leads with "Default": the
-              // source ad already has a length, and keeping it is usually the
-              // point of remixing a winner. Write New has no source to inherit.
+        {/* ONE row above Generate, split into equal shares: who writes it, how
+            long it runs, how many come back. Every child is `flex-1` (Tailwind's
+            `flex: 1 1 0%`), so the three read as three equal thirds whatever is
+            in them — and as halves in Hooks, which has no duration. All at 58px,
+            the picker-row height the column's other rows share.
+            They were a chip band stacked over the model row, which made two
+            rows out of one decision each. Both chips are pearls rather than
+            fields: the pair was two full-width `SegmentedToggle` slabs, then
+            full-width `Dropdown`s, each costing the brief its height for a
+            control nobody sweeps through. Each hides on its own — Hooks have no
+            duration, the blueprint rewrite has no count. Everything here opens
+            UPWARD: a downward menu covers the button you're heading for. */}
+        <div className="mb-2 flex items-stretch gap-1.5">
+          <ScriptModelRow appId="script-architect" className="min-w-0 flex-1" />
+          {showLength && (
+            // The clock carries the meaning the old dim "Length" label did —
+            // "15s" alone doesn't say what it measures, and a chip has no
+            // room for a second word. Remix's list leads with "Default": the
+            // source ad already has a length, and keeping it is usually the
+            // point of remixing a winner. Write New has no source to inherit.
+            // It sits in the MIDDLE of the row, so its menu anchors left and
+            // has room either side; the count on the right is the one that has
+            // to hang its menu off the panel edge.
+            <div className="flex min-w-0 flex-1">
               <ConstraintChip
                 grow
-                size="lg"
+                size="xl"
                 openDirection="up"
                 value={mode === 'write' ? `${writeLength}s` : remixLength === 'default' ? 'Default' : `${remixLength}s`}
                 options={
@@ -886,31 +893,15 @@ export default function InputPanel({
                 }}
                 render={(v) => (
                   <span className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5" />
-                    <span>{v}</span>
+                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">{v}</span>
                   </span>
                 )}
               />
-            )}
-            {showCount && !inlineCount && countChip}
-          </div>
-        )}
-        {/* Who writes the takes — directly above Generate, because it's the
-            last thing you'd change before firing and the one that decides what
-            the click costs. In Hooks the count rides on this row's right: with
-            no Length to pair with it was a lone pearl on a full-width row of
-            its own, and the two sit better as one line. */}
-        {inlineCount ? (
-          <div className="mb-2 flex items-stretch gap-1.5">
-            <ScriptModelRow appId="script-architect" className="min-w-0 flex-1" />
-            {/* A fixed 132px rather than shrink-to-fit: "10 Hooks" sized to its
-                own text left a chip narrower than the words felt like they
-                needed, and every option in the list is the same length anyway. */}
-            <div className="flex w-[132px] shrink-0">{countChip}</div>
-          </div>
-        ) : (
-          <ScriptModelRow appId="script-architect" className="mb-2" />
-        )}
+            </div>
+          )}
+          {showCount && <div className="flex min-w-0 flex-1">{countChip}</div>}
+        </div>
         <button
           onClick={() => onGenerate(editableContext)}
           disabled={!canGenerate || isGenerating}
