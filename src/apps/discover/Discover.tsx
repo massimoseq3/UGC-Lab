@@ -65,12 +65,110 @@ interface PlatformSearch {
   cursor: string | number | null
   /** True once a search has actually run — tells "no results" from "not yet". */
   searched: boolean
+  /**
+   * When the FIRST page of this grid was fetched, or null if nothing has landed.
+   * It dates the oldest signed media url on screen, which is the one that
+   * expires first — see RESULTS_TTL_MS.
+   */
+  fetchedAt: number | null
 }
 
-const BLANK_SEARCH: PlatformSearch = { query: '', results: [], cursor: null, searched: false }
+const BLANK_SEARCH: PlatformSearch = { query: '', results: [], cursor: null, searched: false, fetchedAt: null }
 const EMPTY_SEARCHES: Record<DiscoverPlatform, PlatformSearch> = {
   tiktok: BLANK_SEARCH,
   meta: BLANK_SEARCH,
+}
+
+/**
+ * How long a restored grid is trusted.
+ *
+ * Every media url on a card is a signed CDN link with an expiry — TikTok's
+ * measured in hours, Meta's in days — which is why this state was session-only
+ * to begin with: restore a day-old grid and you get a wall of dead tiles. The
+ * window is deliberately short, because the two ways of being wrong don't cost
+ * the same. Expire too early and the member gets the empty state they used to
+ * get on every refresh anyway, with the query still in the box. Expire too late
+ * and they get a broken-looking grid, which reads as the app failing.
+ */
+const RESULTS_TTL_MS = 6 * 60 * 60 * 1000
+
+/**
+ * Rows persisted per tab (two pages — what the overwhelming majority of
+ * sessions ever fetch), bounding this slot at roughly 150KB a tab.
+ *
+ * The cap is not politeness: localStorage is shared with the bank blob, and
+ * `bankStore.flushSaveToStorage` responds to a refused write by SHEDDING
+ * HISTORY ROWS. An uncapped grid of 30-a-page search results would be paid for
+ * out of a member's saved work.
+ */
+const PERSIST_RESULT_CAP = 60
+
+/** Cards whose transcript text is kept across a refresh. See `transcripts`. */
+const PERSIST_TRANSCRIPT_CAP = 40
+
+/**
+ * Rebuilds both tabs from a stored blob, dropping anything past its freshness
+ * window. Runs on every hydrate, so it doubles as the shape guard for a blob
+ * written by an older build.
+ */
+function restoreSearches(stored: Record<DiscoverPlatform, PlatformSearch> | null | undefined): Record<DiscoverPlatform, PlatformSearch> {
+  const now = Date.now()
+  const restore = (s: PlatformSearch | undefined): PlatformSearch => {
+    if (!s || typeof s !== 'object') return BLANK_SEARCH
+    const query = typeof s.query === 'string' ? s.query : ''
+    const fresh = Array.isArray(s.results)
+      && typeof s.fetchedAt === 'number'
+      && now - s.fetchedAt < RESULTS_TTL_MS
+    // The QUERY outlives the results on purpose. When the grid has aged out the
+    // box still says what you were hunting, so re-running it is one click and
+    // one credit rather than trying to remember the phrase.
+    if (!fresh) return { ...BLANK_SEARCH, query }
+    return {
+      query,
+      results: s.results,
+      cursor: s.cursor ?? null,
+      searched: true,
+      fetchedAt: s.fetchedAt,
+    }
+  }
+  return { tiktok: restore(stored?.tiktok), meta: restore(stored?.meta) }
+}
+
+/** Caps what reaches localStorage. The in-memory grid is untouched. */
+function pruneSearches(all: Record<DiscoverPlatform, PlatformSearch>): Record<DiscoverPlatform, PlatformSearch> {
+  const trim = (s: PlatformSearch): PlatformSearch => {
+    if (s.results.length <= PERSIST_RESULT_CAP) return s
+    // Truncation drops whole trailing PAGES, so what comes back is contiguous
+    // from the top of the grid rather than holed. The cursor goes with them: a
+    // "Load more" continuing from past a page we didn't keep would open a gap
+    // in the middle that nothing on screen explains.
+    return { ...s, results: s.results.slice(0, PERSIST_RESULT_CAP), cursor: null }
+  }
+  return { tiktok: trim(all.tiktok), meta: trim(all.meta) }
+}
+
+/**
+ * The transcript phases worth a storage slot: the two settled ones.
+ *
+ * 'loading' and 'error' are deliberately dropped — restoring either would put a
+ * card back into a state no fetch is going to finish, which is exactly the
+ * stuck-spinner case `usePersistedState`'s sanitize exists for. Oldest entries
+ * are shed first (a Record keeps its insertion order for these keys).
+ */
+function keepSettledTranscripts(map: Record<string, TranscriptState>): Record<string, TranscriptState> {
+  const settled = Object.entries(map ?? {}).filter(
+    ([, v]) => v?.phase === 'ready' || v?.phase === 'empty',
+  )
+  return Object.fromEntries(settled.slice(-PERSIST_TRANSCRIPT_CAP))
+}
+
+/** The resolved-text view of the transcript map, for seeding the lookup ref. */
+function transcriptTexts(map: Record<string, TranscriptState>): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [key, state] of Object.entries(map)) {
+    if (state.phase === 'ready') out[key] = state.text
+  }
+  return out
 }
 
 /**
@@ -106,11 +204,18 @@ export default function Discover() {
   // lost to a glance. Each tab keeps its own query too, so the box always says
   // what produced the grid under it.
   //
-  // Session memory, deliberately not localStorage: a result carries signed CDN
-  // urls that expire within days, so a restored grid would be a wall of broken
-  // thumbnails — and 60 rows of captions is not what the quota is for. Its real
-  // lifetime is the app staying mounted, which covers dock switches too.
-  const [searches, setSearches] = useState<Record<DiscoverPlatform, PlatformSearch>>(EMPTY_SEARCHES)
+  // Persisted, and it took a freshness window to make that safe. This was
+  // session-only for a real reason — a result carries signed CDN urls that
+  // expire, so a stale restore is a wall of dead tiles — but "its real lifetime
+  // is the app staying mounted" quietly meant a refresh binned a grid of 30
+  // winners the member had PAID a credit for, which is the one loss here that
+  // costs money. `restoreSearches` drops a grid past RESULTS_TTL_MS instead of
+  // rendering it broken, and `pruneSearches` caps what reaches the quota.
+  const [searches, setSearches] = usePersistedState<Record<DiscoverPlatform, PlatformSearch>>(
+    `${baseKey}:searches`,
+    EMPTY_SEARCHES,
+    { sanitize: restoreSearches, prune: pruneSearches },
+  )
   const active = searches[platform]
   const { query, results, cursor, searched } = active
 
@@ -129,7 +234,12 @@ export default function Discover() {
       ...all,
       [target]: { ...all[target], ...(typeof patch === 'function' ? patch(all[target]) : patch) },
     }))
-  }, [])
+    // `setSearches` comes out of usePersistedState, so it's useState's own
+    // setter and stable — but the lint rule can't see through a custom hook to
+    // know that. Declared rather than disabled: an eslint-disable of any
+    // react-hooks rule anywhere in a file makes the React Compiler skip the
+    // whole component, and this one owns a 30-card grid.
+  }, [setSearches])
 
   const [openResult, setOpenResult] = useState<DiscoverResult | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -139,7 +249,18 @@ export default function Discover() {
   // Remix, so pulling the words and then sending them is ONE credit rather than
   // two. Lives here (not in the modal) so it survives closing the modal — a
   // card you paid for once stays paid for.
-  const [transcripts, setTranscripts] = useState<Record<string, TranscriptState>>({})
+  //
+  // Persisted for the same reason, and specifically because the grid above now
+  // is: restoring the cards without the words they'd already bought would hand
+  // a member back a card whose transcript costs a second credit to read again —
+  // a way to re-pay that only exists BECAUSE the card survived the refresh.
+  // Unlike the results these never rot (text, no signed urls), so they carry a
+  // count cap rather than a clock.
+  const [transcripts, setTranscripts] = usePersistedState<Record<string, TranscriptState>>(
+    `${baseKey}:transcripts`,
+    {},
+    { sanitize: keepSettledTranscripts, prune: keepSettledTranscripts },
+  )
 
   const apiKey = useSettingsStore((s) => s.scrapeCreatorsKey)
 
@@ -166,7 +287,10 @@ export default function Discover() {
   // The resolved text behind `transcripts`, in a ref so ensureTranscript can
   // check the cache without taking the state as a dependency — which would
   // hand the memoized card grid a new handler on every transcript that lands.
-  const transcriptCache = useRef<Record<string, string>>({})
+  // Seeded from the hydrated map, since `useRef` only ever uses this argument
+  // on the first render — which is the one where `transcripts` is what came
+  // back out of localStorage.
+  const transcriptCache = useRef<Record<string, string>>(transcriptTexts(transcripts))
 
   const search = useCallback(async (nextCursor?: string | number) => {
     const q = queryRef.current.trim()
@@ -177,7 +301,10 @@ export default function Discover() {
     const target = platform
     const more = nextCursor !== undefined
     if (more) setLoadingMore(true)
-    else { setSearching(true); patchSearch(target, { results: [] }) }
+    // Clearing `fetchedAt` alongside the rows is what keeps a refresh taken
+    // mid-search from restoring an empty grid as "No results" — with no stamp
+    // it reads as never having run, which is the truth.
+    else { setSearching(true); patchSearch(target, { results: [], fetchedAt: null }) }
 
     try {
       const page = await runSearch(apiKey, target, q, filters, nextCursor)
@@ -185,6 +312,10 @@ export default function Discover() {
         results: more ? mergeResults(s.results, page.results) : page.results,
         cursor: page.cursor,
         searched: true,
+        // Stamped by the FIRST page only. It dates the oldest signed url in the
+        // grid, which is the first one to expire; refreshing it on every "Load
+        // more" would keep page one alive on the strength of page three's links.
+        fetchedAt: more ? s.fetchedAt : Date.now(),
       }))
       if (page.creditsRemaining !== null) setCredits(page.creditsRemaining)
     } catch (e) {
@@ -262,7 +393,8 @@ export default function Discover() {
       setTranscripts((t) => ({ ...t, [cacheKey]: { phase: 'error', message } }))
       throw e
     }
-  }, [apiKey])
+    // Stable (useState's setter, via usePersistedState) — see patchSearch.
+  }, [apiKey, setTranscripts])
 
   const handleRemix = useCallback(async (result: DiscoverResult, useAi = false) => {
     if (!apiKey) return
