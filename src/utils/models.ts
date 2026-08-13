@@ -473,7 +473,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['text-to-image', 'image-to-image', 'image-edit'],
     tags: ['recommended', 'new'],
     supportsReferenceImages: true,
-    defaultFor: ['broll-studio'],
+    defaultFor: ['broll-studio', 'character-studio'],
     pricing: {
       unit: 'per-image',
       credits: 8,
@@ -497,9 +497,10 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     task: 'image',
     modes: ['text-to-image'],
     tags: ['recommended'],
-    // Influencers default to GPT Image 2 for portrait/sheet generation
-    // (text-to-image); other apps fall back to Nano Banana 2 (first in the list).
-    defaultFor: ['character-studio'],
+    // No defaultFor: Influencers ran on GPT Image 2 until August 2026 and now
+    // shares the app-wide Nano Banana 2 default (which is also the model its
+    // reference-driven runs already swapped to, so a portrait and the sheet made
+    // from it are finally drawn by the same one).
     // kie.ai defaults to GPT Image 2's higher-quality tier on the
     // /text-to-image endpoint — verified by real billing (2K = 10 credits).
     // Source: https://kie.ai/gpt-image-2.

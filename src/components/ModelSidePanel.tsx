@@ -112,8 +112,11 @@ export default function ModelSidePanel({
   onChange,
 }: ModelSidePanelProps) {
   const setAppModel = useSettingsStore((s) => s.setAppModel)
-  const getAppModel = useSettingsStore((s) => s.getAppModel)
   const persistedKey = `${appId}:${task}${mode ? `:${mode}` : ''}`
+  // Through the selector, not via a getter held in a const — see the note in
+  // ModelPicker: both deps of such a call are stable, so the compiler caches
+  // the result for the life of the mount and the checked row never moves.
+  const persisted = useSettingsStore((s) => s.getAppModel(persistedKey))
 
   const [search, setSearch] = useState('')
   // Active capability filters (video only). None = show all.
@@ -133,7 +136,7 @@ export default function ModelSidePanel({
     ? [...scopedModels].sort((a, b) => a.displayName.localeCompare(b.displayName))
     : scopedModels
   const fallback = getDefaultModel(appId, task, mode)
-  const resolved = value ?? getAppModel(persistedKey) ?? fallback?.id
+  const resolved = value ?? persisted ?? fallback?.id
 
   // Whether a model is selectable — greyed + disabled otherwise. A model is
   // muted when it falls outside the enabled set, OR when requireMode is set and
