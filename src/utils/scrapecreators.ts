@@ -100,31 +100,48 @@ interface TikTokSearchResponse {
   cursor?: number
 }
 
+// Every url field below is `string | null | undefined` on purpose. Meta does
+// not omit a creative field it has nothing for — it sends the key with a null,
+// which is why `a ?? b` chains over these read as "found it" and then hand back
+// nothing. Anything selecting from them has to test the VALUE, not the key.
 interface MetaImage {
-  original_image_url?: string
-  resized_image_url?: string
+  original_image_url?: string | null
+  resized_image_url?: string | null
+  /** Meta's own render, with its overlay burned in. Last resort — see below. */
+  watermarked_resized_image_url?: string | null
 }
 
 // `video_preview_image_url` is NOT always present — a plain video ad in the
-// live payload carries only the four url/handle fields and no poster at all,
-// which is why those cards rendered as empty black tiles. Everything here is
-// optional and the card falls back to painting a frame of the video itself.
+// live payload carries only the url/handle fields and no poster at all, which
+// is why those cards rendered as empty black tiles. Everything here is optional
+// and the card falls back to painting a frame of the video itself.
 interface MetaVideo {
-  video_hd_url?: string
-  video_sd_url?: string
-  video_preview_image_url?: string
-  video_hd_handle?: string
-  video_sd_handle?: string
+  video_hd_url?: string | null
+  video_sd_url?: string | null
+  video_preview_image_url?: string | null
+  video_hd_handle?: string | null
+  video_sd_handle?: string | null
+  // Meta blanks the clean urls on plenty of ads and publishes only these. A
+  // watermarked render is a worse source for the Ad Analyzer's vision read, so
+  // it's the last thing tried — but it is an ad you can watch, which beats the
+  // blank tile those ads used to render as.
+  watermarked_video_hd_url?: string | null
+  watermarked_video_sd_url?: string | null
 }
 
-/** A carousel/DCO slot. Meta puts the creative here instead of images/videos. */
-interface MetaCard extends MetaImage, MetaVideo {
+/**
+ * One slot the ad's creative can be filed in.
+ *
+ * `videos`, `images`, `extra_*` and a carousel/DCO `cards[]` entry are all the
+ * same bag of url fields, so they normalise as one type rather than four.
+ */
+export interface MetaCreative extends MetaImage, MetaVideo {
   body?: string
   title?: string
   link_url?: string
 }
 
-interface MetaSnapshot {
+export interface MetaSnapshot {
   body?: { text?: string }
   title?: string
   caption?: string
@@ -133,11 +150,17 @@ interface MetaSnapshot {
   page_name?: string
   page_profile_picture_url?: string
   page_like_count?: number
-  images?: MetaImage[]
-  videos?: MetaVideo[]
-  extra_images?: MetaImage[]
-  extra_videos?: MetaVideo[]
-  cards?: MetaCard[]
+  images?: MetaCreative[]
+  videos?: MetaCreative[]
+  extra_images?: MetaCreative[]
+  extra_videos?: MetaCreative[]
+  cards?: MetaCreative[]
+  /**
+   * A boosted organic post keeps its creative on the POST, so the ad's own
+   * `videos`/`images` come back empty and everything worth showing is one
+   * level down here.
+   */
+  root_reshared_post?: MetaSnapshot
   /** IMAGE / VIDEO / CAROUSEL / DCO / MEME … */
   display_format?: string
 }

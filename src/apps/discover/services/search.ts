@@ -7,6 +7,8 @@ import {
   firstUrl,
   type TikTokSearchItem,
   type MetaAdItem,
+  type MetaCreative,
+  type MetaSnapshot,
 } from '../../../utils/scrapecreators'
 import type { DiscoverFilters, DiscoverResult, DiscoverSort } from '../types'
 import { scoreOutlier } from './scoring'
@@ -92,19 +94,71 @@ function daysRunning(ad: MetaAdItem): number | null {
   return null
 }
 
+// Meta files an ad's creative in one of several places depending on its format,
+// and every url field it doesn't have comes back as an explicit `null` rather
+// than being omitted. Those two facts together are what put blank tiles in the
+// grid: `snap.videos?.[0] ?? snap.cards?.[0]` picks the first SLOT that exists,
+// so a DCO ad carrying `videos: [{ video_hd_url: null, … }]` locked onto that
+// empty entry and the real creative sitting in `cards[]` was never reached.
+// Select on the VALUE instead — the first slot that actually yields a url.
+
+/** Video sources, best first. Clean renders before Meta's watermarked ones. */
+const VIDEO_URL_FIELDS = [
+  'video_hd_url', 'video_sd_url',
+  'video_hd_handle', 'video_sd_handle',
+  'watermarked_video_hd_url', 'watermarked_video_sd_url',
+] as const satisfies readonly (keyof MetaCreative)[]
+
+/** Cover sources, best first. A video's own poster beats a carousel still. */
+const COVER_URL_FIELDS = [
+  'video_preview_image_url',
+  'original_image_url', 'resized_image_url',
+  'watermarked_resized_image_url',
+] as const satisfies readonly (keyof MetaCreative)[]
+
+/**
+ * Every slot an ad's creative could be filed in, in the order we prefer them.
+ *
+ * All of them, not just `[0]` of each: a carousel whose first card is text-only
+ * still has its video two cards along, and reading one index dropped it.
+ */
+function creativeSlots(snap: MetaSnapshot | undefined, depth = 0): MetaCreative[] {
+  // A reshared post can in principle nest again; two levels is plenty and the
+  // guard is what stops a self-referencing payload spinning here.
+  if (!snap || depth > 2) return []
+  return [
+    ...(snap.videos ?? []),
+    ...(snap.cards ?? []),
+    ...(snap.images ?? []),
+    ...(snap.extra_videos ?? []),
+    ...(snap.extra_images ?? []),
+    ...creativeSlots(snap.root_reshared_post, depth + 1),
+  ]
+}
+
+/** The first real url across those slots, or undefined if the ad carries none. */
+function pickCreativeUrl(
+  slots: MetaCreative[],
+  fields: readonly (keyof MetaCreative)[],
+): string | undefined {
+  for (const slot of slots) {
+    for (const field of fields) {
+      const value = slot[field]
+      // An absolute url or nothing. `null` is the common case, and a non-url
+      // handle landing in videoUrl renders play controls over a black frame
+      // that will never load — worse than the card admitting it has no video.
+      if (typeof value === 'string' && /^https?:\/\//.test(value)) return value
+    }
+  }
+  return undefined
+}
+
 function normaliseMeta(ad: MetaAdItem): DiscoverResult | null {
   const id = ad.ad_archive_id
   if (!id) return null
 
   const snap = ad.snapshot ?? {}
-
-  // Meta files an ad's creative in one of four places depending on its format,
-  // and a plain video ad populates ONLY `videos` — no images and, in the live
-  // payload, no `video_preview_image_url` either. Reading just videos[0] +
-  // images[0] therefore left every carousel and every poster-less video ad
-  // with no cover at all, which is what rendered them as empty black tiles.
-  const video = snap.videos?.[0] ?? snap.extra_videos?.[0] ?? snap.cards?.[0]
-  const image = snap.images?.[0] ?? snap.extra_images?.[0] ?? snap.cards?.[0]
+  const slots = creativeSlots(snap)
 
   return {
     id,
@@ -113,15 +167,10 @@ function normaliseMeta(ad: MetaAdItem): DiscoverResult | null {
     // separately, and the modal labels the two apart.
     caption: snap.body?.text ?? snap.title ?? '',
     postUrl: ad.url ?? `https://www.facebook.com/ads/library/?id=${id}`,
-    // May be undefined even now (a video ad with no poster anywhere). The card
+    // May still be undefined (a video ad with no poster anywhere). The card
     // handles that by painting a frame of the video itself.
-    coverUrl:
-      video?.video_preview_image_url ??
-      image?.original_image_url ??
-      image?.resized_image_url,
-    videoUrl:
-      video?.video_hd_url ?? video?.video_sd_url ??
-      video?.video_hd_handle ?? video?.video_sd_handle,
+    coverUrl: pickCreativeUrl(slots, COVER_URL_FIELDS),
+    videoUrl: pickCreativeUrl(slots, VIDEO_URL_FIELDS),
     createdAt: ad.start_date ? ad.start_date * 1000 : 0,
     author: {
       handle: ad.page_name ?? snap.page_name ?? '',
@@ -219,6 +268,25 @@ function warnIfAllDropped(platform: string, raw: number, kept: number): void {
   }
 }
 
+/**
+ * The other half of the same alarm: rows that survived normalisation but came
+ * out with no media at all.
+ *
+ * A medialess card renders as a blank tile, which reads as the app failing
+ * rather than as a field name having moved — the exact way the Meta creative
+ * chain stayed broken. A handful is normal (Meta really does publish ads with
+ * no fetchable creative); most of a page is a shape change.
+ */
+function warnIfMedialess(platform: string, results: DiscoverResult[]): void {
+  const blank = results.filter((r) => !r.videoUrl && !r.coverUrl).length
+  if (blank > 0 && blank >= results.length / 2) {
+    console.warn(
+      `[outliers] ${platform}: ${blank} of ${results.length} card(s) normalised with no video and no cover. ` +
+      'Check the creative field names in utils/scrapecreators.ts against a live response.',
+    )
+  }
+}
+
 export async function runSearch(
   apiKey: string,
   platform: 'tiktok' | 'meta',
@@ -241,6 +309,7 @@ export async function runSearch(
       .map(normaliseTikTok)
       .filter((r): r is DiscoverResult => r !== null)
     warnIfAllDropped('tiktok', page.items.length, results.length)
+    warnIfMedialess('tiktok', results)
     return { results, cursor: page.cursor, creditsRemaining: page.creditsRemaining }
   }
 
@@ -256,6 +325,7 @@ export async function runSearch(
     .map(normaliseMeta)
     .filter((r): r is DiscoverResult => r !== null)
   warnIfAllDropped('meta', page.items.length, results.length)
+  warnIfMedialess('meta', results)
   return { results, cursor: page.cursor, creditsRemaining: page.creditsRemaining }
 }
 

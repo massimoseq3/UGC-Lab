@@ -104,9 +104,16 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
             }`}
           />
         )}
+        {/* A glyph alone on a black tile reads as the app failing to load
+            something. It has to say which — Meta does publish the occasional ad
+            whose creative isn't fetchable, and the honest answer is that this
+            card is a link to the original rather than something gone wrong. */}
         {!hasVideo && !showCover && (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 px-3 text-center">
             <ImageOff className="h-6 w-6 text-white/25" strokeWidth={1.5} />
+            <span className="text-[10px] leading-relaxed text-white/35">
+              No preview — open the original
+            </span>
           </div>
         )}
 
