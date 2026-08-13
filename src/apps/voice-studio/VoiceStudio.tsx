@@ -11,7 +11,8 @@ import { createDefaultSettings, sanitizeVoiceSettings } from './types'
 import { startVoiceTask, finishVoiceTask } from './services/generateVoice'
 import { enhanceScriptWithTags } from './services/enhanceScript'
 import { humanizeError } from '../../utils/friendlyError'
-import EditorArea from './components/EditorArea'
+import EditorArea, { VOICE_BATCH_MAX } from './components/EditorArea'
+import { clampBatchCount } from '../../utils/batchCount'
 import SidePanel from './components/SidePanel'
 import BottomPlayer from './components/BottomPlayer'
 import BankPicker from '../../components/BankPicker'
@@ -68,6 +69,13 @@ export default function VoiceStudio() {
   )
   const setInFlightVoices = (updater: (prev: InFlightVoice[]) => InFlightVoice[]) =>
     setRawInFlight((prev) => updater(Array.isArray(prev) ? prev : prev ? [prev] : []))
+
+  // How many reads one press of Generate fires. Persisted like the other
+  // picker selections; sanitized on read so a stale blob can't arm a bigger
+  // run than the cap.
+  const [batchCount, setBatchCount] = usePersistedState<number>(`${baseKey}:batch-count`, 1, {
+    sanitize: (v) => clampBatchCount(v, VOICE_BATCH_MAX),
+  })
 
   // Clicks that have fired but whose kie taskId hasn't come back yet — they'd
   // otherwise leave the progress bar dark for the first second of a gen.
@@ -163,8 +171,10 @@ export default function VoiceStudio() {
     }
   }
 
-  const handleGenerate = async () => {
-    if (!scriptText.trim()) return
+  // One read. A batch fires several of these at once — each is its own kie
+  // task, its own in-flight entry and its own history row, exactly as pressing
+  // Generate repeatedly has always produced.
+  const runOneVoice = async () => {
     // No single-slot guard — a second click queues another voiceover alongside
     // the first, and each lands in history on its own.
     setStartingCount((c) => c + 1)
@@ -194,6 +204,12 @@ export default function VoiceStudio() {
     setInFlightVoices((prev) => [...prev, entry])
     setStartingCount((c) => c - 1)
     await finishVoice(entry)
+  }
+
+  const handleGenerate = () => {
+    if (!scriptText.trim()) return
+    const count = clampBatchCount(batchCount, VOICE_BATCH_MAX)
+    for (let i = 0; i < count; i++) void runOneVoice()
   }
 
   // Mount-time resume: poll every persisted in-flight TTS taskId that survived
@@ -301,6 +317,8 @@ export default function VoiceStudio() {
               onClearScript={() => setSelectedScript(null)}
               onClearInputs={() => { setSelectedScript(null); setScriptText('') }}
               onGenerate={handleGenerate}
+              batchCount={batchCount}
+              onBatchCountChange={setBatchCount}
               isGenerating={isGenerating}
               canGenerate={scriptText.trim().length > 0}
               onEnhance={handleEnhance}

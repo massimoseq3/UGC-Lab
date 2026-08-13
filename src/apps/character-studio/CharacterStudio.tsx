@@ -9,8 +9,9 @@ import { createEmptyProfile, profileFromFlat } from './types'
 import type { AspectRatio, ImageResolution } from '../../utils/models'
 import { getDefaultModel, clampImageResolution } from '../../utils/models'
 import MobilePaneTabs, { paneClass } from '../../components/MobilePaneTabs'
+import { clampBatchCount, DEFAULT_BATCH_COUNT } from '../../utils/batchCount'
 import ControlsPanel from './components/ControlsPanel'
-import GalleryPanel from './components/GalleryPanel'
+import GalleryPanel, { type GalleryViewMode } from './components/GalleryPanel'
 import ReferenceLibrarySlideOver from './components/ReferenceLibrarySlideOver'
 import { startCharacterTask, startCharacterEditTask, finishCharacterTask, type GenerationKind } from './services/generateCharacter'
 import { humanizeError } from '../../utils/friendlyError'
@@ -35,6 +36,21 @@ export default function CharacterStudio() {
   // silently undid a deliberate 4K or 9:16 choice.) Persisted so a refresh
   // mid-session keeps the mode.
   const [sheetMode, setSheetMode] = usePersistedState<boolean>(`${baseKey}:sheet-mode`, false)
+  // How many characters one press of Generate fires. Persisted like the other
+  // picker selections, sanitized on read so a hand-edited blob can't arm a run
+  // bigger than the cap.
+  const [batchCount, setBatchCount] = usePersistedState<number>(`${baseKey}:batch-count`, DEFAULT_BATCH_COUNT, {
+    sanitize: (v) => clampBatchCount(v),
+  })
+
+  // The gallery's Single / List / Grid mode lives up here (same localStorage key
+  // it has always used) because Generate needs to move the member to the view
+  // that can show what they just fired. GalleryPanel is memoized and both props
+  // are stable, so lifting it costs the history list nothing.
+  const [viewMode, setViewMode] = usePersistedState<GalleryViewMode>(
+    'ai-ugc-lab:influencers:history-view',
+    'grid',
+  )
 
   // The image model actually used for portraits/sheets (persisted picker
   // selection, else the app default). Subscribed reactively so a model swap
@@ -190,6 +206,10 @@ export default function CharacterStudio() {
         // Derived gens (edit modal) rejoin their source's lineage strip.
         lineageId: gen.lineageId,
         styleName: gen.styleName,
+        // Carried onto the finished row so a batch stays one group on the
+        // Single stage after its members stop being in-flight entries.
+        batchId: gen.batchId,
+        batchIndex: gen.batchIndex,
         createdAt: Date.now(),
       })
       // A lineage'd portrait can only have come from the modal's Edit tab —
@@ -239,6 +259,8 @@ export default function CharacterStudio() {
       profile: opts.profile,
       lineageId: opts.lineageId,
       styleName: opts.styleName,
+      batchId: opts.batchId,
+      batchIndex: opts.batchIndex,
     }
     setInFlight((prev) => [...prev, placeholder])
     setError(null)
@@ -279,7 +301,28 @@ export default function CharacterStudio() {
     setPane('gallery')
     const snapshotKind: GenerationKind = sheetMode ? 'sheet' : 'portrait'
     const snapshotAspect = sheetMode ? sheetAspect : (profile.aspectRatio || '9:16')
-    void launchGen({ profile: { ...profile }, resolution, kind: snapshotKind, aspect: snapshotAspect })
+    const count = clampBatchCount(batchCount)
+
+    // Follow the run to the view that can actually show it: a batch is a set to
+    // compare, which is the grid; one character is the single stage. Already ON
+    // the single stage, we stay — it lays a batch out as one composition, and
+    // being thrown into the grid from the view you deliberately chose (it's the
+    // one members record on) would undo that choice on every press.
+    if (viewMode !== 'single') setViewMode(count > 1 ? 'grid' : 'single')
+
+    // A run of one carries no stamp, so nothing downstream has to special-case
+    // "batch of 1" — an unstamped gen is its own group by construction.
+    const batchId = count > 1 ? crypto.randomUUID() : undefined
+    for (let i = 0; i < count; i++) {
+      void launchGen({
+        profile: { ...profile },
+        resolution,
+        kind: snapshotKind,
+        aspect: snapshotAspect,
+        batchId,
+        batchIndex: batchId ? i : undefined,
+      })
+    }
   }
 
   // Both gallery callbacks are useCallback'd with stable deps, and the gallery
@@ -372,6 +415,8 @@ export default function CharacterStudio() {
           onResolutionChange={setResolution}
           sheetMode={sheetMode}
           onSheetModeChange={setSheetMode}
+          batchCount={batchCount}
+          onBatchCountChange={setBatchCount}
           inFlightCount={inFlight.length}
         />
       </div>
@@ -380,6 +425,8 @@ export default function CharacterStudio() {
       <div className={paneClass(pane === 'gallery', 'md:w-1/2 md:overflow-hidden')}>
         <GalleryPanel
           inFlight={inFlight}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
           onCancelGen={handleCancelGen}
           onLaunchGen={handleLaunchGen}
         />

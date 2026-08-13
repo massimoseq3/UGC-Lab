@@ -2,6 +2,8 @@ import { UserRound, LayoutGrid, Coins } from 'lucide-react'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import ModelPicker from '../../../components/ModelPicker'
 import ConstraintChip from '../../../components/ConstraintChip'
+import BatchCountStepper from '../../../components/BatchCountStepper'
+import { clampBatchCount } from '../../../utils/batchCount'
 import AspectIcon from '../../../components/AspectIcon'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import { estimateCredits, formatCredits, getDefaultModel, getModel, type ImageResolution } from '../../../utils/models'
@@ -19,6 +21,10 @@ interface GenerateBarProps {
   // output settings the user picked.
   sheetMode: boolean
   onSheetModeChange: (value: boolean) => void
+  // How many characters one press fires. Portraits and sheets alike — a sheet
+  // is just as much a roll of the dice as a face.
+  batchCount: number
+  onBatchCountChange: (value: number) => void
   inFlightCount: number
 }
 
@@ -53,11 +59,17 @@ export default function GenerateBar({
   onResolutionChange,
   sheetMode,
   onSheetModeChange,
+  batchCount,
+  onBatchCountChange,
   inFlightCount,
 }: GenerateBarProps) {
   const persistedModel = useSettingsStore((s) => s.getAppModel('character-studio:image:text-to-image'))
   const selectedModelId = persistedModel ?? getDefaultModel('character-studio', 'image', 'text-to-image')?.id
-  const creditsLabel = formatCredits(estimateCredits(selectedModelId ?? '', { imageCount: 1, resolution }))
+  const count = clampBatchCount(batchCount)
+  // Every image model's priceFor already multiplies by imageCount, so the
+  // button's figure is the real cost of the whole run rather than one tile's.
+  const creditsFor = (n: number) => estimateCredits(selectedModelId ?? '', { imageCount: n, resolution })
+  const creditsLabel = formatCredits(creditsFor(count))
 
   return (
     // Opaque bg on mobile (not /95 + blur): backdrop-filter doesn't re-blur
@@ -104,7 +116,9 @@ export default function GenerateBar({
             value={resolution}
             onChange={(v) => onResolutionChange(v as ImageResolution)}
             renderOption={(v) => {
-              const credits = formatCredits(estimateCredits(selectedModelId ?? '', { imageCount: 1, resolution: v as ImageResolution }))
+              // Priced for the run that's actually armed, so this menu and the
+              // Generate button can never quote two different numbers.
+              const credits = formatCredits(estimateCredits(selectedModelId ?? '', { imageCount: count, resolution: v as ImageResolution }))
               return (
                 <span className="flex w-full items-center justify-between gap-6">
                   <span>{v}</span>
@@ -146,6 +160,18 @@ export default function GenerateBar({
               )}
             />
           )}
+          {/* How many. A portrait is a casting call — the first face is almost
+              never the one you keep — so the count sits with the other output
+              settings rather than behind the button. */}
+          <BatchCountStepper
+            grow
+            size="lg"
+            accent="influencers"
+            noun={sheetMode ? 'sheet' : 'character'}
+            value={count}
+            onChange={onBatchCountChange}
+            creditsFor={creditsFor}
+          />
         </div>
       </div>
       <button
@@ -155,7 +181,9 @@ export default function GenerateBar({
       >
         {sheetMode ? <LayoutGrid className="h-4 w-4" strokeWidth={2.5} /> : <UserRound className="h-4 w-4" strokeWidth={2.5} />}
         <span>
-          {sheetMode ? 'Generate Character Sheet' : 'Generate Character'}
+          {sheetMode
+            ? (count === 1 ? 'Generate Character Sheet' : `Generate ${count} Character Sheets`)
+            : (count === 1 ? 'Generate Character' : `Generate ${count} Characters`)}
           {inFlightCount > 0 && ` · ${inFlightCount} running`}
         </span>
         {creditsLabel && (

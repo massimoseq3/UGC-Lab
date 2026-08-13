@@ -2,12 +2,18 @@ import { FileText, Loader2, Mic, AlertCircle, RefreshCw, X, ChevronRight, Coins,
 import type { Script } from '../../../stores/types'
 import GenerationProgress from '../../../components/GenerationProgress'
 import ClearAllButton from '../../../components/ClearAllButton'
+import BatchCountStepper from '../../../components/BatchCountStepper'
+import { clampBatchCount } from '../../../utils/batchCount'
 import { estimateCredits, formatCredits, getModel } from '../../../utils/models'
 import { TTS_MODEL_ID } from '../services/generateVoice'
 
 const MODEL_NAME = getModel(TTS_MODEL_ID)?.displayName ?? 'Gemini 3.1 Flash TTS'
 
 const MAX_CHARACTERS = 5000
+
+// Three reads is a choice; more is an audition. TTS is the cheapest thing in
+// the app, so the ceiling here is about what's useful, not what it costs.
+export const VOICE_BATCH_MAX = 3
 
 interface EditorAreaProps {
   scriptText: string
@@ -19,6 +25,11 @@ interface EditorAreaProps {
   // text. Every generated voiceover stays in History.
   onClearInputs: () => void
   onGenerate: () => void
+  // How many reads of the same script one press fires. Capped at 3 (see
+  // VOICE_BATCH_MAX): same voice, same params, same words — the delivery still
+  // lands differently each time, and picking between three is the job.
+  batchCount: number
+  onBatchCountChange: (value: number) => void
   isGenerating: boolean
   canGenerate: boolean
   onEnhance: () => void
@@ -35,6 +46,8 @@ export default function EditorArea({
   onClearScript,
   onClearInputs,
   onGenerate,
+  batchCount,
+  onBatchCountChange,
   isGenerating,
   canGenerate,
   onEnhance,
@@ -47,7 +60,13 @@ export default function EditorArea({
   // Gemini 3.1 Flash TTS bills by tokens; we estimate from the script's char
   // count (see geminiTtsCredits in models.ts). Show the estimate on the Generate
   // button so cost is visible before spending.
-  const creditsLabel = charCount > 0 ? formatCredits(estimateCredits(TTS_MODEL_ID, { charCount })) : null
+  const count = clampBatchCount(batchCount, VOICE_BATCH_MAX)
+  // TTS is billed per call, so a run of N is N times one read.
+  const creditsFor = (n: number) => {
+    const one = estimateCredits(TTS_MODEL_ID, { charCount })
+    return one === null ? null : one * n
+  }
+  const creditsLabel = charCount > 0 ? formatCredits(creditsFor(count)) : null
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -184,7 +203,7 @@ export default function EditorArea({
             className="flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-6 py-4 md:flex-none md:px-16 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Mic className="h-4 w-4" strokeWidth={2.5} />
-            <span className="truncate">Generate Voiceover</span>
+            <span className="truncate">{count === 1 ? 'Generate Voiceover' : `Generate ${count} Voiceovers`}</span>
             {creditsLabel && (
               <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
                 <Coins className="h-3 w-3" strokeWidth={2} />
@@ -192,6 +211,19 @@ export default function EditorArea({
               </span>
             )}
           </button>
+          {/* How many reads. Beside the button rather than in a settings
+              column: it's a property of THIS press, like the button's own
+              cost pill, not a saved delivery setting. */}
+          <BatchCountStepper
+            size="md"
+            accent="voice"
+            noun="read"
+            label="Reads"
+            max={VOICE_BATCH_MAX}
+            value={count}
+            onChange={onBatchCountChange}
+            creditsFor={charCount > 0 ? creditsFor : undefined}
+          />
           <div className="hidden items-center rounded-full border border-ink/10 px-3.5 py-1.5 text-xs font-medium text-ink-400 md:flex">
             {MODEL_NAME}
           </div>

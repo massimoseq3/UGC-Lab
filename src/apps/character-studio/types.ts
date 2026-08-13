@@ -31,6 +31,13 @@ export interface InFlightCharacterGen {
   // Name of the visual style the edit modal rendered this in, stamped onto the
   // finished history row (label only — see CharacterHistoryItem.styleName).
   styleName?: string
+  // Set when one press of Generate fired several gens: every member of the run
+  // shares the id, and `batchIndex` is its position in it. The Single view
+  // groups on these so a batch stays one composition on the stage while its
+  // members finish one at a time — a tile that lands moves from this list into
+  // characterHistory, and both carry the stamp.
+  batchId?: string
+  batchIndex?: number
 }
 
 // Everything a caller needs to kick off a generation through CharacterStudio's
@@ -51,6 +58,9 @@ export interface LaunchGenOptions {
   extraReferenceUrls?: string[]
   // The picked visual style's label, when it isn't the default UGC Realism.
   styleName?: string
+  // Batch stamp — see InFlightCharacterGen. Absent for a run of one.
+  batchId?: string
+  batchIndex?: number
   edit?: {
     instruction: string
     baseImageRef: string
