@@ -485,7 +485,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                 the right panel's identity header (same px-5 pt-3, h-12 row, and
                 hairline) so the two line up across the modal. Image leads: the
                 still comes first, and it's the landing tab. */}
-            <div className="flex flex-col gap-3 px-5 pt-3">
+            <div className="flex flex-col gap-2 px-5 pt-3">
               <div className="flex h-12 items-center">
                 <SegmentedToggle<Tab>
                   className="h-10 !p-1"
@@ -503,7 +503,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
 
             {/* Scrollable body */}
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-              <div className="flex grow flex-col gap-3 px-5 pb-1 pt-3">
+              <div className="flex grow flex-col gap-2 px-5 pb-1 pt-2">
                 {/* The session's look, read-only at the top of the workspace —
                     same note Continuous' frame and clip modals carry. It's
                     appended at fire time, outside the editable prompt below, so
@@ -546,7 +546,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                   <SectionCard
                     icon={Layers}
                     title="References"
-                    contentClassName="flex flex-col gap-3"
+                    contentClassName="flex flex-col gap-2"
                     right={attachedRefCount > 0 ? (
                       <span className="rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] tabular-nums text-ink-500">
                         {attachedRefCount} attached
@@ -707,10 +707,10 @@ export default function CardDetailModal(props: CardDetailModalProps) {
             {/* Pinned footer — output settings (resolution / aspect / duration
                 / audio) just above the Generate button, separated by a hairline.
                 Matches the Playground panel's sticky footer; chips open upward. */}
-            <div className="shrink-0 px-5 pb-4 pt-2">
+            <div className="shrink-0 px-5 pb-3 pt-2">
               {/* Model picker — sits directly above the output chips (Playground
                   style); the picker's own dropdown/panel opens upward here. */}
-              <div className="mb-3">
+              <div className="mb-2">
                 {tab === 'image' ? (
                   <ModelPicker appId="broll-studio" task="image" mode="text-to-image" />
                 ) : (
@@ -760,13 +760,18 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                   </>
                 )}
               </div>
-              <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              {/* Output settings — every chip is `size='lg'` (h-12), which is
+                  the height of the take stepper at the end of the row and of
+                  the model trigger above it. They were the default `md`, so a
+                  row that reads as one control strip was three heights. */}
+              <div className="mb-2 flex flex-wrap items-center gap-1.5">
                 {tab === 'image'
                   ? imageConstraints && (
                       <>
                         {imageConstraints.resolutions && imageConstraints.resolutions.length > 0 && (
                           <ConstraintChip
                             grow
+                            size="lg"
                             openDirection="up"
                             options={imageConstraints.resolutions as string[]}
                             value={cardState.cardImageResolution}
@@ -785,6 +790,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         {imageConstraints.aspectRatios && imageConstraints.aspectRatios.length > 0 && (
                           <ConstraintChip
                             grow
+                            size="lg"
                             openDirection="up"
                             options={imageConstraints.aspectRatios}
                             value={cardState.cardImageAspectRatio}
@@ -803,6 +809,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                       <>
                         <ConstraintChip
                           grow
+                          size="lg"
                           openDirection="up"
                           options={videoConstraints.resolutions}
                           value={cardState.cardVideoResolution}
@@ -815,6 +822,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         {videoConstraints.aspectRatios.length > 0 && (
                           <ConstraintChip
                             grow
+                            size="lg"
                             openDirection="up"
                             options={videoConstraints.aspectRatios}
                             value={cardState.cardVideoAspectRatio}
@@ -830,6 +838,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         {videoConstraints.durations.length > 0 && (
                           <ConstraintChip
                             grow
+                            size="lg"
                             openDirection="up"
                             options={videoConstraints.durations.map(String)}
                             value={String(cardState.cardVideoDurationSeconds)}
@@ -840,6 +849,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         {videoConstraints.supportsAudio && (
                           <ConstraintChip
                             grow
+                            size="lg"
                             openDirection="up"
                             options={['Audio', 'Mute']}
                             value={cardState.cardVideoAudio ? 'Audio' : 'Mute'}
@@ -928,7 +938,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
           {/* RIGHT 50% — variation meta header (moved out of the removed top
               bar) + per-card gallery (Playground masonry). */}
           <div className="col-span-1 flex min-h-0 flex-col overflow-hidden">
-            <div className="flex flex-col gap-3 px-5 pt-3">
+            <div className="flex flex-col gap-2 px-5 pt-3">
               {/* Identity header — serif scene number, a vertical rule, then the
                   role pill stacked over the script line. Mirrors the main
                   storyboard rows (and the other detail modals) so all four read

@@ -17,6 +17,7 @@ import {
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import ModelPill from '../../../components/ModelPill'
+import { useShowGenerationInfo } from '../../../stores/generationInfoStore'
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
 import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
@@ -183,6 +184,7 @@ export default function VariationCard(props: VariationCardProps) {
   const cardVideo = useInlineVideo()
   const cardVideoPlaying = cardVideo.playing
   const cardVideoUnmuted = cardVideo.unmuted
+  const showGenerationInfo = useShowGenerationInfo()
 
   // Drive the in-flight indicator off the parallel-queue array — the legacy
   // single-slot `videoStatus` field is no longer written by runVideoTask so
@@ -843,6 +845,12 @@ export default function VariationCard(props: VariationCardProps) {
   const videoControlsExpanded = coverKind === 'video' && (cardVideoPlaying || cardVideoUnmuted)
   const tagText = tagLabel(variation.tag)
   const rollText = rollTypeForTag(variation.tag)
+  // Which model drew what the face is showing. `ModelPill` gates itself on the
+  // member's generation-info switch, but the caption's separator dot has to
+  // know whether the pill will render at all — a lone "·" after A-Roll is
+  // worse than no dot.
+  const coverModelId = coverKind === 'video' ? coverVideo?.modelId : coverImage?.modelId
+  const showCoverModel = showGenerationInfo && !!coverModelId
 
   return (
     <>
@@ -1043,18 +1051,6 @@ export default function VariationCard(props: VariationCardProps) {
             <TileDeleteButton title="Delete variation" onDelete={onDelete} onArmedChange={setConfirmingDelete} />
           </TileActionStack>
 
-          {/* Which model drew the cover, bottom-left over its own scrim. It
-              fades on hover because the three-way tab shortcut row lands on
-              exactly this strip, and it stands down entirely for the error
-              banner, which owns the same strip and matters more. */}
-          {coverKind && !showImageError && (
-            <ModelPill
-              variant="media"
-              modelId={coverKind === 'video' ? coverVideo?.modelId : coverImage?.modelId}
-              className="absolute bottom-2 left-2 z-10 max-w-[70%] transition-opacity group-hover:opacity-0"
-            />
-          )}
-
           {showImageError && (
             <div className="absolute inset-x-2 bottom-2 flex items-start gap-1.5 rounded-lg border border-red-500/30 bg-red-500/15 px-2 py-1.5 backdrop-blur">
               <AlertCircle className="mt-0.5 h-3 w-3 shrink-0 text-red-300 light:text-red-700" />
@@ -1110,11 +1106,22 @@ export default function VariationCard(props: VariationCardProps) {
           </div>
         </div>
 
-        {/* Bottom text — roll type. Centred + small so it reads as a quiet label. */}
-        {!isManual && (
-          <p className="text-center text-[10px] font-medium tracking-wider text-ink-500">
-            {rollText}
-          </p>
+        {/* Bottom caption — roll type, then which model drew the cover.
+            Centred + small so it reads as a quiet label.
+            The model used to sit ON the picture as a `media` pill, bottom-left
+            over the scrim: a white-on-black chip is the loudest thing on a
+            still whose whole job is to be judged, and it had to fade on hover
+            anyway because the three-way shortcut row lands on that exact strip.
+            Down here it's the `quiet` variant — bare dim text, no pill — beside
+            the label it belongs with, and nothing covers the shot. */}
+        {(!isManual || showCoverModel) && (
+          <div className="flex min-w-0 items-center justify-center gap-1.5 px-1">
+            {!isManual && (
+              <span className="shrink-0 text-[10px] font-medium tracking-wider text-ink-500">{rollText}</span>
+            )}
+            {!isManual && showCoverModel && <span aria-hidden className="text-[10px] leading-none text-ink-700">·</span>}
+            <ModelPill variant="quiet" modelId={coverModelId} className="min-w-0" />
+          </div>
         )}
       </div>
 

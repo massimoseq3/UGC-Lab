@@ -195,35 +195,42 @@ export default function EditorArea({
         {/* Left — generate, then the model chip beside it. The model indicator
             lives here (not in the settings panel) since there's only one model. */}
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <button
-            onClick={onGenerate}
-            // Stays live while a voiceover renders — a second click queues
-            // another one alongside it. The progress bar above is the feedback.
-            disabled={!canGenerate || overLimit}
-            className="flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-6 py-4 md:flex-none md:px-16 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Mic className="h-4 w-4" strokeWidth={2.5} />
-            <span className="truncate">{count === 1 ? 'Generate Voiceover' : `Generate ${count} Voiceovers`}</span>
-            {creditsLabel && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
-                <Coins className="h-3 w-3" strokeWidth={2} />
-                {creditsLabel}
-              </span>
-            )}
-          </button>
-          {/* How many reads. Beside the button rather than in a settings
-              column: it's a property of THIS press, like the button's own
-              cost pill, not a saved delivery setting. */}
-          <BatchCountStepper
-            size="md"
-            accent="voice"
-            noun="read"
-            label="Reads"
-            max={VOICE_BATCH_MAX}
-            value={count}
-            onChange={onBatchCountChange}
-            creditsFor={charCount > 0 ? creditsFor : undefined}
-          />
+          {/* How many voiceovers one press makes, then the button that makes
+              them — a count reads as a setting on the way to Generate, so it
+              sits on the approach to it rather than trailing behind. The pair
+              is `items-stretch` and the stepper takes `size='fill'`, so it is
+              exactly the button's height by construction rather than by a
+              matching magic number. It's a property of THIS press, like the
+              button's own cost pill, not a saved delivery setting. */}
+          <div className="flex min-w-0 flex-1 items-stretch gap-2 md:flex-none">
+            <BatchCountStepper
+              size="fill"
+              stacked
+              accent="voice"
+              noun="voiceover"
+              label="Voiceovers"
+              max={VOICE_BATCH_MAX}
+              value={count}
+              onChange={onBatchCountChange}
+              creditsFor={charCount > 0 ? creditsFor : undefined}
+            />
+            <button
+              onClick={onGenerate}
+              // Stays live while a voiceover renders — a second click queues
+              // another one alongside it. The progress bar above is the feedback.
+              disabled={!canGenerate || overLimit}
+              className="flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-6 py-4 md:flex-none md:px-16 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Mic className="h-4 w-4" strokeWidth={2.5} />
+              <span className="truncate">{count === 1 ? 'Generate Voiceover' : `Generate ${count} Voiceovers`}</span>
+              {creditsLabel && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
+                  <Coins className="h-3 w-3" strokeWidth={2} />
+                  {creditsLabel}
+                </span>
+              )}
+            </button>
+          </div>
           <div className="hidden items-center rounded-full border border-ink/10 px-3.5 py-1.5 text-xs font-medium text-ink-400 md:flex">
             {MODEL_NAME}
           </div>
