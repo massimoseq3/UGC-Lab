@@ -87,6 +87,32 @@ function splitHeaderLine(line: string): HeaderSplit {
   return { header: trimmed, body: '' }
 }
 
+// The timecode a scene header carries — `--- Scene 1: THE HOOK (00:00-00:04)
+// ---` — lifted out so the card can set it as a pill instead of leaving it as
+// the tail of one dim uppercase line. It's the thing a member scans a storyboard
+// FOR (how long is this beat, where does it land), and at 10px inside the label
+// it read as part of the label's own punctuation.
+//
+// Parens or brackets, a range or a lone stamp, any dash between the two halves —
+// the header is written by a model, and the surrounding chrome varies even when
+// the prompt contract doesn't. A header with no timecode just keeps its label.
+const HEADER_TIME =
+  /\s*[([]\s*(\d{1,2}:\d{2}(?:\s*[-–—]\s*\d{1,2}:\d{2})?)\s*[)\]]\s*$|\s*[-–—]?\s*\b(\d{1,2}:\d{2}\s*[-–—]\s*\d{1,2}:\d{2})\s*$/
+
+function splitHeaderTime(header: string): { label: string; time: string | null } {
+  const bare = header.replace(/^---\s*|\s*---$/g, '').trim()
+  const match = HEADER_TIME.exec(bare)
+  const time = match?.[1] ?? match?.[2]
+  if (!match || !time) return { label: bare, time: null }
+  // Strip the trailing punctuation the timecode was hanging off, so a label
+  // doesn't end on a dangling colon or dash once its bracket is gone.
+  const label = bare.slice(0, match.index).replace(/[\s:;,—–-]+$/, '')
+  // One dash for every scene: the same blueprint routinely mixes a hyphen and
+  // an en dash, and a column of pills is where that shows.
+  const normalised = time.replace(/\s*[-–—]\s*/, '–')
+  return { label: label || bare, time: normalised }
+}
+
 function splitScenes(text: string): SceneChunk[] | null {
   if (!SCENE_REGEX.test(text)) return null
   const lines = text.split('\n')
@@ -1155,12 +1181,24 @@ function SceneChunkCard({ chunk, onEditRange }: { chunk: SceneChunk; onEditRange
   // to the plain prose block, so nothing can render as an empty card.
   const segments = useMemo(() => splitSpokenLines(chunk.body), [chunk.body])
   const hasSpoken = segments.some((s) => s.kind === 'line')
+  const { label, time } = splitHeaderTime(chunk.header)
   return (
     <div className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 card-soft-shadow">
-      <div className="relative mb-2 flex select-none items-center justify-center gap-2 px-8">
+      {/* The header wraps rather than truncating — a scene label plus its
+          timecode outruns a narrow pane, and the timing is the half a member
+          came here to read. */}
+      <div className="relative mb-2 flex select-none flex-wrap items-center justify-center gap-x-2 gap-y-1 px-8">
         <span className="text-center text-[10px] font-semibold uppercase tracking-tight text-scripts-300">
-          {chunk.header.replace(/^---\s*|\s*---$/g, '')}
+          {label}
         </span>
+        {/* The timecode as its own pill: tabular figures so a column of scenes
+            lines up digit for digit, and one step brighter than the label,
+            because "where does this beat land" is what's being scanned for. */}
+        {time && (
+          <span className="shrink-0 rounded-full bg-scripts-500/[0.14] px-2 py-0.5 text-[10px] font-semibold tabular-nums tracking-tight text-scripts-200">
+            {time}
+          </span>
+        )}
         <button
           onClick={handleCopy}
           className="absolute right-0 top-1/2 flex -translate-y-1/2 shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
