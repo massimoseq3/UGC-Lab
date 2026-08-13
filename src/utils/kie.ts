@@ -5,6 +5,12 @@
 //   GET  https://api.kie.ai/api/v1/jobs/recordInfo?taskId=...                       -> { code, msg, data: { state, resultJson, ... } }
 //
 // All generation tasks are async. We poll recordInfo until state in {success, fail}.
+//
+// Every call that CREATES a generation goes through `submitToKie` — kie
+// rate-limits new generations per account, and the batch surfaces here fire a
+// whole storyboard at once. See utils/kieSubmitGate.ts.
+
+import { submitToKie, noteRateLimited } from './kieSubmitGate'
 
 const BASE_URL = 'https://api.kie.ai/api/v1'
 
@@ -149,6 +155,17 @@ function backoffMs(attempt: number): number {
   return Math.min(2 ** attempt * 1000 + Math.random() * 500, 10_000)
 }
 
+// kie sends Retry-After in seconds. Anything absent, unparseable or beyond a
+// minute falls back to null, so the caller uses its own backoff rather than
+// sleeping on a header it can't trust.
+function parseRetryAfterMs(header: string | null): number | null {
+  if (!header) return null
+  const seconds = parseInt(header, 10)
+  if (isNaN(seconds) || seconds <= 0) return null
+  const ms = seconds * 1000
+  return ms <= 60_000 ? ms : null
+}
+
 // fetch() settles as soon as the response HEADERS land, so the timeout below is
 // disarmed while the body is still in flight — and a chat call asks for
 // `stream: true`, which guarantees headers arrive early. A gateway that answered
@@ -240,15 +257,16 @@ async function fetchWithRetry(
         `${url} returned no response body`
 
       const tag = endpointTag(init.method, url)
+      // A 429 is the account's rate limit, not this request's problem — stand
+      // the whole submit queue down so the rest of a batch backs off together
+      // instead of each card walking into the same wall in turn.
+      const retryAfterMs = res.status === 429 ? parseRetryAfterMs(res.headers.get('Retry-After')) : null
+      if (res.status === 429) noteRateLimited(retryAfterMs ?? undefined)
       if (RETRYABLE_HTTP.has(res.status) && attempt < MAX_RETRIES) {
-        if (res.status === 429) {
-          const ra = res.headers.get('Retry-After')
-          const waitMs = ra ? parseInt(ra, 10) * 1000 : NaN
-          if (!isNaN(waitMs) && waitMs > 0 && waitMs <= 60_000) {
-            lastError = new KieHttpError(res.status, friendlyHttpError(res.status, msg, tag))
-            await new Promise(r => setTimeout(r, waitMs))
-            continue
-          }
+        if (retryAfterMs !== null) {
+          lastError = new KieHttpError(res.status, friendlyHttpError(res.status, msg, tag))
+          await new Promise(r => setTimeout(r, retryAfterMs))
+          continue
         }
         lastError = new KieHttpError(res.status, friendlyHttpError(res.status, msg, tag))
       } else {
@@ -310,11 +328,15 @@ export async function createTask(
   input: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<string> {
-  const data = await authedFetch<CreateTaskData>(
-    apiKey,
-    '/jobs/createTask',
-    { method: 'POST', body: JSON.stringify({ model, input }) },
-    { signal },
+  const data = await submitToKie(
+    () =>
+      authedFetch<CreateTaskData>(
+        apiKey,
+        '/jobs/createTask',
+        { method: 'POST', body: JSON.stringify({ model, input }) },
+        { signal },
+      ),
+    signal,
   )
   return data.taskId
 }
@@ -813,17 +835,21 @@ export async function kieVeoCreate(
   body: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<string> {
-  const createRes = await fetchWithRetry(
-    'https://api.kie.ai/api/v1/veo/generate',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-    },
-    { signal },
+  const createRes = await submitToKie(
+    () =>
+      fetchWithRetry(
+        'https://api.kie.ai/api/v1/veo/generate',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(body),
+        },
+        { signal },
+      ),
+    signal,
   )
   const createJson = (await createRes.json()) as KieEnvelope<VeoCreateData>
   if (createJson.code !== 200) throw new Error(friendlyHttpError(createJson.code, createJson.msg, 'POST /api/v1/veo/generate'))
@@ -949,17 +975,21 @@ export async function kieMusicGenerate(
   body: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<string> {
-  const res = await fetchWithRetry(
-    'https://api.kie.ai/api/v1/generate',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-    },
-    { signal },
+  const res = await submitToKie(
+    () =>
+      fetchWithRetry(
+        'https://api.kie.ai/api/v1/generate',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(body),
+        },
+        { signal },
+      ),
+    signal,
   )
   const json = (await res.json()) as KieEnvelope<{ taskId: string }>
   if (json.code !== 200) throw new Error(friendlyHttpError(json.code, json.msg, 'POST /api/v1/generate'))
@@ -1056,17 +1086,19 @@ export interface OmniCharacterCreateInput {
 }
 
 async function omniFetch<T>(apiKey: string, path: string, body: Record<string, unknown>): Promise<T> {
-  const res = await fetchWithRetry(
-    `${BASE_URL}${path}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+  const res = await submitToKie(() =>
+    fetchWithRetry(
+      `${BASE_URL}${path}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    },
-    {},
+      {},
+    ),
   )
   const json = (await res.json()) as KieEnvelope<T>
   if (json.code !== 200 && json.code !== 0) {
