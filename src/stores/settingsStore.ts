@@ -60,6 +60,23 @@ const MIGRATIONS_KEY = 'ai-ugc-lab-settings-migrations'
 // its name is recorded under MIGRATIONS_KEY so it never runs again.
 const MODEL_MIGRATIONS: Array<{ name: string; apply: (m: Record<string, string>) => void }> = [
   {
+    // ...and back again: Characters' image default returns to GPT Image 2.
+    // Exactly the migration below, mirrored — same by-value targeting, same
+    // accepted trade-off. A member sitting on the Nano Banana 2 default moves;
+    // a Seedream pick survives; someone who chose Nano Banana 2 deliberately is
+    // indistinguishable from the first group and moves with them.
+    //
+    // Without this the flip would only reach browsers with an empty slot, which
+    // after the migration below is most of them but not all — and a default
+    // that lands for some members and not others is worse than either default.
+    name: '2026-08-character-studio-gpt-image-2-default',
+    apply: (m) => {
+      if (m['character-studio:image:text-to-image'] === 'nano-banana-2') {
+        delete m['character-studio:image:text-to-image']
+      }
+    },
+  },
+  {
     // Characters' image default flipped from GPT Image 2 to Nano Banana 2.
     // Targeted BY VALUE rather than deleting the slot outright: a member who
     // picked Seedream keeps it, and only someone still sitting on the old
