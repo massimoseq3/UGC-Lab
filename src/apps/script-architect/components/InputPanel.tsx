@@ -364,11 +364,11 @@ export default function InputPanel({
     ? (writeFormat === 'scenes' ? `Generate ${variationCount} Scene Drafts` : writeFormat === 'hooks' ? `Generate ${hookCount} Hooks` : `Generate ${variationCount} Scripts`)
     : blueprintActive ? 'Rewrite Scene Prompts' : `Generate ${variationCount} Script Variations`
 
-  // Product picker — step 2 in every mode, but rendered in a different spot
-  // for Write New (before the brief) than for the remix modes (after the
-  // source text).
-  // Product leads the References card: it's what the script is ABOUT, where
-  // Script Style under it is optional flavour. It is no longer REQUIRED,
+  // Product picker — the same row in both modes, and in both it CLOSES the
+  // References card: under Script Style / Hook Style in Write New, under the
+  // source script in Remix. The rows above it are the ones you set once and
+  // leave; the product is what changes from script to script, so it sits
+  // nearest the Generate button. It is no longer REQUIRED,
   // though, so its dot tracks the blocker above rather than being red on sight
   // — the house rule is that red means exactly one thing, "this is why
   // Generate is grey", and the only case left where an empty product is that
@@ -538,11 +538,11 @@ export default function InputPanel({
                 thing rather than as two more rungs on a ladder. The card also
                 hosts the status dots: every row's dot sits at its left edge, so
                 they stack into one column you can scan without reading a word.
-                Product first — it's required, and it's what the script is
-                about. */}
+                The STYLE leads and the product closes the card, in both modes
+                (August 2026) — the picker above it is the one you set once and
+                leave, where the product is what changes from script to script,
+                so it belongs nearest the button you press next. */}
             <SectionCard icon={Layers} title="References" className="mb-2">
-            {productSection}
-
             {/* Hook Style — the hooks format's replacement for the Script Style
                 picker. 'auto' (Best Mix) is the default and renders as the
                 dashed unset affordance; picking a family flips it solid, and
@@ -604,9 +604,9 @@ export default function InputPanel({
             </div>
             )}
 
-            {/* Script Style — sits under the product row. Tapping the button
-                opens the style picker slide-over. Hidden in the hooks format,
-                which has its own family picker above. */}
+            {/* Script Style — leads the card, with the product under it.
+                Tapping the button opens the style picker slide-over. Hidden in
+                the hooks format, which has its own family picker above. */}
             {!isHooksFormat && (
             <div>
               <div
@@ -662,6 +662,8 @@ export default function InputPanel({
               </div>
             </div>
             )}
+
+            {productSection}
             </SectionCard>
 
             {/* The brief — the SAME box the remix modes get, header and all:
@@ -717,17 +719,18 @@ export default function InputPanel({
             </div>
           </>
         ) : (
-          // Same References card as Write New, holding the same product row
-          // plus the source the remix is built from. The source box goes LAST
-          // because it's the one thing here that grows as you paste — above the
-          // product row it would shove it down the column on every keystroke.
+          // Same References card as Write New, holding the source the remix is
+          // built from plus the same product row — and in the same order the
+          // other mode uses: what the script is MADE FROM first, the product it
+          // is made FOR last, nearest the button. The source box is a fixed
+          // share of the card's height (flex-1, its own scroller), so a row
+          // under it isn't pushed down as you paste.
           <SectionCard
             icon={Layers}
             title="References"
             className="mb-2 flex flex-1 flex-col max-md:flex-none"
             contentClassName="flex flex-1 flex-col gap-2"
           >
-          {productSection}
           <div className="flex min-h-[140px] flex-1 flex-col max-md:min-h-[240px] max-md:flex-none">
             {/* Select from bank (header) + paste manually (textarea) merged into
                 one rounded box so the two sources read as a single input. One
@@ -785,6 +788,7 @@ export default function InputPanel({
               )}
             </div>
           </div>
+          {productSection}
           </SectionCard>
         )}
 

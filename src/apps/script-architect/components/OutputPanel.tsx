@@ -87,6 +87,32 @@ function splitHeaderLine(line: string): HeaderSplit {
   return { header: trimmed, body: '' }
 }
 
+// The timecode a scene header carries — `--- Scene 1: THE HOOK (00:00-00:04)
+// ---` — lifted out so the card can set it as a pill instead of leaving it as
+// the tail of one dim uppercase line. It's the thing a member scans a storyboard
+// FOR (how long is this beat, where does it land), and at 10px inside the label
+// it read as part of the label's own punctuation.
+//
+// Parens or brackets, a range or a lone stamp, any dash between the two halves —
+// the header is written by a model, and the surrounding chrome varies even when
+// the prompt contract doesn't. A header with no timecode just keeps its label.
+const HEADER_TIME =
+  /\s*[([]\s*(\d{1,2}:\d{2}(?:\s*[-–—]\s*\d{1,2}:\d{2})?)\s*[)\]]\s*$|\s*[-–—]?\s*\b(\d{1,2}:\d{2}\s*[-–—]\s*\d{1,2}:\d{2})\s*$/
+
+function splitHeaderTime(header: string): { label: string; time: string | null } {
+  const bare = header.replace(/^---\s*|\s*---$/g, '').trim()
+  const match = HEADER_TIME.exec(bare)
+  const time = match?.[1] ?? match?.[2]
+  if (!match || !time) return { label: bare, time: null }
+  // Strip the trailing punctuation the timecode was hanging off, so a label
+  // doesn't end on a dangling colon or dash once its bracket is gone.
+  const label = bare.slice(0, match.index).replace(/[\s:;,—–-]+$/, '')
+  // One dash for every scene: the same blueprint routinely mixes a hyphen and
+  // an en dash, and a column of pills is where that shows.
+  const normalised = time.replace(/\s*[-–—]\s*/, '–')
+  return { label: label || bare, time: normalised }
+}
+
 function splitScenes(text: string): SceneChunk[] | null {
   if (!SCENE_REGEX.test(text)) return null
   const lines = text.split('\n')
@@ -225,11 +251,37 @@ type SceneSegment =
   | { kind: 'direction'; text: string; start: number; end: number }
   | { kind: 'line'; speaker: string | null; text: string; start: number; end: number }
 
-const SPEECH_VERB_SRC = 'says?|said|adds?|continues?|whispers?|shouts?|asks?|replies'
+// The verbs that introduce a line. `speaks` is the one a model reaches for
+// most naturally after a [TOKEN] and it was missing, which is most of why one
+// scene of a remix rendered as direction + line and the next as a single
+// block. Verbs that introduce ON-SCREEN text rather than speech — reads,
+// shows, displays — are deliberately absent: this app's scene prompts quote
+// overlay copy constantly ("text overlay reading "2 weeks""), and promoting
+// that to dialogue would send a caption to Voiceovers. `states` is out for the
+// same reason — `the label states clearly: "10g collagen"` is packaging, and
+// nothing writes `[CHARACTER] states:` often enough to pay for that.
+const SPEECH_VERB_SRC =
+  'says?|said|saying|speaks?|spoke|speaking|tells?|told|explains?|explained|adds?|continues?|whispers?|shouts?|asks?|replies|replied'
 // A word that can never be the speaker: it means the cue is prose running into
 // the verb ("…and says:", "the sign that says") rather than someone talking.
 const NOT_A_SPEAKER_SRC = 'and|then|or|but|as|while|that|which|who'
 const SPEAKER_SRC = `(?:\\[[A-Z_]+\\]|(?!(?:${NOT_A_SPEAKER_SRC})\\b)(?:the\\s+)?[\\w'’-]+)`
+// A short adverbial run between the verb and the quote — `says DIRECTLY TO
+// CAMERA: "…"`, `speaks TO THE LENS: "…"`, `says, SMILING: "…"`. Our own
+// prompt contract writes the tight `[CHARACTER] says: "…"`, but a blueprint
+// rewrite is told to keep the SOURCE's attribution format and the Ad Analyzer
+// transcribes what it heard, so a phrase between the verb and the colon is
+// what actually arrives here — and every one of those scenes fell through to
+// the single-block fallback.
+//
+// Two bounds keep it honest, because whatever the cue matches is peeled OFF
+// the direction: at most four plain words (no sentence punctuation, so it
+// can't cross into the previous clause), and a tail only counts when a colon
+// or comma follows it. That punctuation is the signal that the phrase was an
+// attribution at all — without it, `the overlay asks the viewer to tap
+// "Learn more"` is prose with a quote in it, not a spoken line.
+const CUE_TAIL_SRC = `(?:\\s*,)?(?:\\s+[\\w'’-]+){0,4}`
+const CUE_END_SRC = `(?:${CUE_TAIL_SRC}\\s*[:,]|\\s*[:,]?)`
 // The clause that hands off to a quote, anchored to the end of the preceding
 // prose so it can only ever eat the introduction itself. A speaker is a
 // [TOKEN], a pronoun, or a (optionally "the"-prefixed) name — never a
@@ -241,12 +293,12 @@ const SPEAKER_SRC = `(?:\\[[A-Z_]+\\]|(?!(?:${NOT_A_SPEAKER_SRC})\\b)(?:the\\s+)
 // heard, so `She says, "…"` arrives just as often. Requiring the colon left
 // those lines sitting inside the direction as prose.
 const NAMED_ATTRIBUTION = new RegExp(
-  `(?<=^|[\\s,;.!?—-])(${SPEAKER_SRC}\\s+(?:${SPEECH_VERB_SRC})|voice\\s*ove?r|narrator)\\s*[:,]?\\s*$`,
+  `(?<=^|[\\s,;.!?—-])(${SPEAKER_SRC}\\s+(?:${SPEECH_VERB_SRC})${CUE_END_SRC}|voice\\s*ove?r|narrator)\\s*[:,]?\\s*$`,
   'i',
 )
 // The model sometimes folds the cue into the sentence with no subject of its
 // own ("…turns it over and says:"). Still dialogue — just nobody to label.
-const BARE_ATTRIBUTION = new RegExp(`\\b(?:${SPEECH_VERB_SRC})\\s*[:,]?\\s*$`, 'i')
+const BARE_ATTRIBUTION = new RegExp(`\\b(?:${SPEECH_VERB_SRC})${CUE_END_SRC}\\s*$`, 'i')
 // The screenplay shape, with a speaker label and no verb at all. Only a
 // [TOKEN] counts here: a bare word in front of a colon is shot prose
 // ("Close-up: …") far more often than it's a speaker.
@@ -257,11 +309,26 @@ const TOKEN_ATTRIBUTION = /(?<=^|[\s,;.!?—-])(\[[A-Z_]+\])\s*:\s*$/
 // that rendered as direction, which is why scene 1 of a remixed blueprint kept
 // coming out as a plain block of text while every scene under it rendered as
 // direction plus a spoken line.
+//
+// No adverbial tail on this one, on purpose: what it matches is skipped over
+// rather than dropped, and the words after the verb here are the rest of the
+// sentence (`"…," she says, HOLDING IT UP TO THE LENS`) — direction that
+// belongs on the page.
 const TRAILING_ATTRIBUTION = new RegExp(
   `^[\\s,.;:—-]*(${SPEAKER_SRC}\\s+(?:${SPEECH_VERB_SRC})|voice\\s*ove?r|narrator)\\b`,
   'i',
 )
-const SPEECH_VERB = new RegExp(`\\s*\\b(?:${SPEECH_VERB_SRC})\\s*$`, 'i')
+// …and what disqualifies one: a cue that runs straight into ANOTHER quote is
+// introducing the line in front of it, not reporting the one behind it. The
+// shape that exposed this is a scene opening on overlay copy — `text "Days
+// 1-7". [CHARACTER] says directly to camera: "…"` — where reading the cue
+// backwards promoted the caption to dialogue and then skipped the cue, leaving
+// the real spoken line stranded in the direction.
+const NEXT_QUOTE_CUE = new RegExp(`^${CUE_TAIL_SRC}\\s*[:,]?\\s*["“]`)
+// Strips the cue off a matched label to leave the speaker — the same verb and
+// tail the cue was allowed to carry, or `[CHARACTER] says directly to camera`
+// would be printed as the speaker's name.
+const SPEECH_VERB = new RegExp(`\\s*\\b(?:${SPEECH_VERB_SRC})${CUE_END_SRC}\\s*$`, 'i')
 // The connective left dangling on the direction once its attribution is cut.
 const TRAILING_CONNECTIVE = /[\s,;:]*\b(?:and|then|as|while)\s*$/i
 
@@ -278,8 +345,11 @@ function splitSpokenLines(body: string): SceneSegment[] {
     const token = named || bare ? null : TOKEN_ATTRIBUTION.exec(lead)
     const cue = named ?? bare ?? token
     const quoteEnd = match.index + match[0].length
-    // Nothing in front of it? The attribution may still follow the line.
-    const after = cue ? null : TRAILING_ATTRIBUTION.exec(body.slice(quoteEnd))
+    // Nothing in front of it? The attribution may still follow the line —
+    // unless it turns out to be the cue for the NEXT quote, in which case this
+    // one has no attribution at all and stays in the direction.
+    let after = cue ? null : TRAILING_ATTRIBUTION.exec(body.slice(quoteEnd))
+    if (after && NEXT_QUOTE_CUE.test(body.slice(quoteEnd + after[0].length))) after = null
     // A quote nobody is introduced as speaking isn't dialogue — it's a scare
     // quote living inside the direction ("has a visible "wait, what?"
     // reaction"). Leaving `cursor` where it is keeps it in the prose instead of
@@ -1111,12 +1181,24 @@ function SceneChunkCard({ chunk, onEditRange }: { chunk: SceneChunk; onEditRange
   // to the plain prose block, so nothing can render as an empty card.
   const segments = useMemo(() => splitSpokenLines(chunk.body), [chunk.body])
   const hasSpoken = segments.some((s) => s.kind === 'line')
+  const { label, time } = splitHeaderTime(chunk.header)
   return (
     <div className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 card-soft-shadow">
-      <div className="relative mb-2 flex select-none items-center justify-center gap-2 px-8">
+      {/* The header wraps rather than truncating — a scene label plus its
+          timecode outruns a narrow pane, and the timing is the half a member
+          came here to read. */}
+      <div className="relative mb-2 flex select-none flex-wrap items-center justify-center gap-x-2 gap-y-1 px-8">
         <span className="text-center text-[10px] font-semibold uppercase tracking-tight text-scripts-300">
-          {chunk.header.replace(/^---\s*|\s*---$/g, '')}
+          {label}
         </span>
+        {/* The timecode as its own pill: tabular figures so a column of scenes
+            lines up digit for digit, and one step brighter than the label,
+            because "where does this beat land" is what's being scanned for. */}
+        {time && (
+          <span className="shrink-0 rounded-full bg-scripts-500/[0.14] px-2 py-0.5 text-[10px] font-semibold tabular-nums tracking-tight text-scripts-200">
+            {time}
+          </span>
+        )}
         <button
           onClick={handleCopy}
           className="absolute right-0 top-1/2 flex -translate-y-1/2 shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
