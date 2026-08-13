@@ -25,11 +25,11 @@ async function presign(op: 'put' | 'get', assetId: string, mimeType?: string, by
   const token = await getAccessToken()
   if (!token) throw new Error('Not signed in')
 
-  const attempt = (bearer: string) => withTimeout(fetch('/api/r2-sign', {
+  const attempt = (bearer: string) => fetchWithDeadline('/api/r2-sign', {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${bearer}` },
     body: JSON.stringify({ op, assetId, mimeType, byteSize }),
-  }), ATTEMPT_TIMEOUT_MS)
+  }, ATTEMPT_TIMEOUT_MS)
 
   let res = await attempt(token)
 
@@ -52,35 +52,172 @@ async function presign(op: 'put' | 'get', assetId: string, mimeType?: string, by
       const parsed = JSON.parse(text) as { error?: string }
       if (parsed.error) friendly = parsed.error
     } catch { /* not JSON — fall back to the raw text */ }
-    throw new Error(friendly)
+    throw isRetryableStatus(res.status) ? new TransientError(friendly) : new Error(friendly)
   }
   return await res.json() as SignedUrlResponse
+}
+
+// "Come back in a moment" — the mirror retries these instead of reporting them.
+// A class, so a failure we can already classify (a 503, a stall we timed out
+// ourselves) never has to be recognised by matching words in its own message.
+class TransientError extends Error {
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options)
+    this.name = 'TransientError'
+  }
 }
 
 // Thrown when an attempt outlives its budget. A distinct class (rather than a
 // bare Error the caller has to string-match) because a stall and a rejection
 // need opposite advice: check your connection vs. fix the bucket CORS policy.
-class NetworkTimeoutError extends Error {
+class NetworkTimeoutError extends TransientError {
   constructor(ms: number) {
     super(`Network timeout after ${Math.round(ms / 1000)}s`)
     this.name = 'NetworkTimeoutError'
   }
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new NetworkTimeoutError(ms)), ms)
-    p.then((v) => { clearTimeout(t); resolve(v) }, (e) => { clearTimeout(t); reject(e) })
+// A status the server is telling us to come back from. Everything else — a 400,
+// a 403, the 413 that means the storage cap is reached — is an answer, and
+// asking again just spends the member's time getting it three more times.
+function isRetryableStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500
+}
+
+// This used to be a `withTimeout(fetch(...))` race, which only ever rejected the
+// WRAPPER — the request it was racing kept running, invisibly, to completion.
+// That was survivable while every call here happened exactly once; it isn't now
+// that they retry, because attempt two would share the uplink with the zombie
+// whose stall caused it. So every request gets a real AbortController, and a body
+// read gets a fresh budget of its own:
+// fetch() settles at the response HEADERS, which leaves a plain timeout disarmed
+// while the body is still streaming.
+async function fetchWithDeadline(input: string, init: RequestInit, ms: number): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ms)
+  let res: Response
+  try {
+    res = await fetch(input, { ...init, signal: controller.signal })
+  } catch (err) {
+    // An abort we asked for is a timeout; report it as one, since the two need
+    // opposite advice and `AbortError` says neither.
+    throw controller.signal.aborted ? new NetworkTimeoutError(ms) : err
+  } finally {
+    clearTimeout(timer)
+  }
+
+  const guard = <T>(read: () => Promise<T>) => async (): Promise<T> => {
+    const bodyTimer = setTimeout(() => controller.abort(), ms)
+    try {
+      return await read()
+    } catch (err) {
+      throw controller.signal.aborted ? new NetworkTimeoutError(ms) : err
+    } finally {
+      clearTimeout(bodyTimer)
+    }
+  }
+  Object.defineProperties(res, {
+    json: { value: guard(() => Response.prototype.json.call(res)) },
+    text: { value: guard(() => Response.prototype.text.call(res)) },
+    blob: { value: guard(() => Response.prototype.blob.call(res)) },
+  })
+  return res
+}
+
+// ── Mirror retries ───────────────────────────────────────────────────
+//
+// The failures this path actually hits are transient, and they arrive with no
+// detail at all: WebKit reports every network-layer fetch failure as
+// `TypeError: Load failed` (Chromium: "Failed to fetch"), which is equally what
+// a backgrounded tab, a dropped Wi-Fi hop and a saturated uplink look like from
+// here. supabase-js stringifies that throw into `error.message`, so a member
+// generating a batch got "Cloud sync failed: assets row insert failed:
+// TypeError: Load failed" — an error they can neither read nor act on, for a
+// mirror that would have gone through a second later.
+const MAX_UPLOAD_ATTEMPTS = 4
+
+// A finished batch calls saveAsset once per output — finishImageAssetTask and
+// finishVideoAssetTask are the tail of EVERY generation — so a dozen-card B-Roll
+// run fires a dozen presigns, a dozen multi-MB PUTs and a dozen row upserts in
+// one tick. The PUTs saturate the uplink and the small requests sharing it are
+// the ones that lose, which is the reported failure. Three at a time mirrors a
+// batch promptly without stampeding; nothing is waiting on this, it's background.
+const MAX_CONCURRENT_UPLOADS = 3
+
+// A hidden tab is where these cluster: the browser throttles (and iOS suspends)
+// a page whose member has switched away to watch the generation land, killing
+// everything in flight at once. Retrying into a page that's still hidden mostly
+// spends an attempt, so the backoff waits for it to come back — bounded, because
+// a tab can stay hidden for an hour and an upload shouldn't hold its slot for it.
+const MAX_HIDDEN_WAIT_MS = 60_000
+
+const TRANSIENT_MARKERS = [
+  'load failed',            // WebKit, for any network-layer failure
+  'failed to fetch',        // Chromium
+  'networkerror',           // Firefox
+  'network request failed',
+  'network error',
+  'connection',
+  'timed out',
+  'timeout',
+  'aborted',
+]
+
+function isTransientNetworkFailure(reason: unknown): boolean {
+  if (reason instanceof TransientError) return true
+  // Everything else has to be recognised by its words, because that is genuinely
+  // all a network-layer failure gives us: supabase-js hands back a plain
+  // `{ message }`, and the browser's own throw carries no code, no status, and
+  // nothing to distinguish a dropped socket from a CORS rejection.
+  const msg = (reason instanceof Error ? reason.message : String(reason ?? '')).toLowerCase()
+  return TRANSIENT_MARKERS.some((marker) => msg.includes(marker))
+}
+
+// 1s, 2s, 4s, plus jitter — a batch that backed off together must not retry in
+// lockstep and rebuild the same stampede that knocked it over.
+function retryDelayMs(attempt: number): number {
+  return Math.min(2 ** attempt * 1000 + Math.random() * 500, 15_000)
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function whenVisible(timeoutMs: number): Promise<void> {
+  if (typeof document === 'undefined' || document.visibilityState !== 'hidden') return Promise.resolve()
+  return new Promise<void>((resolve) => {
+    const done = () => {
+      clearTimeout(timer)
+      document.removeEventListener('visibilitychange', onChange)
+      resolve()
+    }
+    const onChange = () => { if (document.visibilityState !== 'hidden') done() }
+    const timer = setTimeout(done, timeoutMs)
+    document.addEventListener('visibilitychange', onChange)
   })
 }
 
-// Atomic upload: resolves only after BOTH the R2 PUT and the `assets` row
-// upsert succeed. Failure surfaces as a thrown error so the caller can react.
-export async function uploadAssetToR2(assetId: string, blob: Blob): Promise<void> {
-  if (!isCloudEnabled()) return
-  const userId = useAuthStore.getState().user?.id
-  if (!userId) throw new Error('Not signed in')
+let activeUploads = 0
+const uploadQueue: Array<() => void> = []
 
+function acquireUploadSlot(): Promise<void> {
+  if (activeUploads < MAX_CONCURRENT_UPLOADS) {
+    activeUploads++
+    return Promise.resolve()
+  }
+  return new Promise<void>((resolve) => { uploadQueue.push(resolve) })
+}
+
+function releaseUploadSlot(): void {
+  const next = uploadQueue.shift()
+  // Hand the slot straight over rather than decrementing and re-incrementing —
+  // the count is unchanged because it never actually goes idle.
+  if (next) next()
+  else activeUploads--
+}
+
+// Presign + PUT the binary. Returns the R2 key the metadata row must point at.
+async function putAssetBinary(assetId: string, blob: Blob): Promise<string> {
   const { url, key } = await presign('put', assetId, blob.type, blob.size)
 
   // fetch() throws (rather than returning a non-OK Response) on CORS rejection,
@@ -89,11 +226,11 @@ export async function uploadAssetToR2(assetId: string, blob: Blob): Promise<void
   // the user can fix the bucket CORS policy directly.
   let putRes: Response
   try {
-    putRes = await withTimeout(fetch(url, {
+    putRes = await fetchWithDeadline(url, {
       method: 'PUT',
       headers: blob.type ? { 'content-type': blob.type } : {},
       body: blob,
-    }), ATTEMPT_TIMEOUT_MS)
+    }, ATTEMPT_TIMEOUT_MS)
   } catch (err) {
     const host = (() => { try { return new URL(url).host } catch { return 'r2.cloudflarestorage.com' } })()
     const origin = typeof window !== 'undefined' ? window.location.origin : '<unknown origin>'
@@ -106,13 +243,23 @@ export async function uploadAssetToR2(assetId: string, blob: Blob): Promise<void
     if (err instanceof NetworkTimeoutError) {
       throw new Error(`Upload to ${host} stalled and timed out after ${Math.round(ATTEMPT_TIMEOUT_MS / 1000)}s. Check your internet connection and try again.`)
     }
+    // A bare network failure reads identically to a CORS rejection from here, so
+    // it keeps the marker word the retry loop matches on. Only a run that has
+    // exhausted its attempts ever shows this, by which point a misconfigured
+    // bucket really is the likelier of the two.
     throw new Error(`R2 PUT to ${host} failed (${reason}). Likely a CORS misconfiguration — verify the bucket CORS policy allows ${origin} with method PUT.`)
   }
   if (!putRes.ok) {
     const text = await putRes.text().catch(() => '')
-    throw new Error(`R2 upload failed (${putRes.status}): ${text || putRes.statusText}`)
+    const detail = `R2 upload failed (${putRes.status}): ${text || putRes.statusText}`
+    throw isRetryableStatus(putRes.status) ? new TransientError(detail) : new Error(detail)
   }
+  return key
+}
 
+// Record the binary in Postgres. Until this lands the object is invisible to
+// every other device: `existingRemoteAssetIds` reads this table, not the bucket.
+async function insertAssetRow(assetId: string, userId: string, key: string, blob: Blob): Promise<void> {
   const sb = getSupabase()
   const { error } = await sb.from('assets').upsert({
     id: assetId,
@@ -123,6 +270,51 @@ export async function uploadAssetToR2(assetId: string, blob: Blob): Promise<void
   })
   if (error) {
     throw new Error(`assets row insert failed: ${error.message}`)
+  }
+}
+
+// Atomic upload: resolves only after BOTH the R2 PUT and the `assets` row
+// upsert succeed. Failure surfaces as a thrown error so the caller can react.
+//
+// Runs under a concurrency cap and retries transient network failures — see the
+// Mirror retries block above for why both are needed. The PUT is not repeated
+// once it has landed: the row insert is the half that fails most (it's a small
+// request queued behind everyone else's large ones), and re-sending tens of MB
+// to fix a missing 5-column row would make the saturation worse.
+export async function uploadAssetToR2(assetId: string, blob: Blob): Promise<void> {
+  if (!isCloudEnabled()) return
+  const userId = useAuthStore.getState().user?.id
+  if (!userId) throw new Error('Not signed in')
+
+  await acquireUploadSlot()
+  try {
+    let key: string | null = null
+    for (let attempt = 0; ; attempt++) {
+      try {
+        if (key === null) key = await putAssetBinary(assetId, blob)
+        await insertAssetRow(assetId, userId, key, blob)
+        return
+      } catch (err) {
+        const transient = isTransientNetworkFailure(err)
+        if (!transient) throw err
+        if (attempt >= MAX_UPLOAD_ATTEMPTS - 1) {
+          // Every one of these carries the browser's own wording for "the network
+          // failed", which is `TypeError: Load failed` in Safari and says nothing
+          // to the member reading the toast. Keep the raw text in the console,
+          // where it's the operator's to debug, and say what happened instead.
+          console.warn(`[r2] mirror gave up for ${assetId} after ${MAX_UPLOAD_ATTEMPTS} attempts`, err)
+          throw new Error(
+            `the connection dropped mid-upload, after ${MAX_UPLOAD_ATTEMPTS} attempts`,
+            { cause: err },
+          )
+        }
+        console.warn(`[r2] mirror attempt ${attempt + 1}/${MAX_UPLOAD_ATTEMPTS} failed for ${assetId} — retrying`, err)
+        await sleep(retryDelayMs(attempt))
+        await whenVisible(MAX_HIDDEN_WAIT_MS)
+      }
+    }
+  } finally {
+    releaseUploadSlot()
   }
 }
 
@@ -168,9 +360,11 @@ export async function downloadAssetFromR2(assetId: string): Promise<Blob | null>
   // contract for "couldn't fetch"; the caller shows the placeholder.
   const { url } = await presign('get', assetId)
   try {
-    const res = await withTimeout(fetch(url), ATTEMPT_TIMEOUT_MS)
+    const res = await fetchWithDeadline(url, {}, ATTEMPT_TIMEOUT_MS)
     if (!res.ok) return null
-    return await withTimeout(res.blob(), ATTEMPT_TIMEOUT_MS)
+    // `.blob()` carries its own budget and aborts the request when it blows it,
+    // so a CDN that answers and then stalls can't hold this open.
+    return await res.blob()
   } catch (e) {
     console.warn('[r2] asset download failed', assetId, e)
     return null
