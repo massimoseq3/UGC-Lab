@@ -25,6 +25,10 @@ interface OutputPanelProps {
   linkedProductId: string | null
   isGenerating?: boolean
   error?: string | null
+  // Identifies the RUN these takes came from (a generation, or the history row
+  // being shown). The panel scrolls back to the first take when this changes —
+  // never when the takes' text changes, which is what an in-place edit does.
+  runId?: string | null
   // Commits an inline edit of take `index` back to the persisted output state.
   onEditVariation?: (index: number, text: string) => void
 }
@@ -86,8 +90,16 @@ function splitHeaderLine(line: string): HeaderSplit {
 function splitScenes(text: string): SceneChunk[] | null {
   if (!SCENE_REGEX.test(text)) return null
   const lines = text.split('\n')
-  const chunks: SceneChunk[] = []
-  let current: SceneChunk | null = null
+  // Spans first, body second. The body is SLICED out of `text` at the end
+  // rather than accumulated line by line, so the string and the span it claims
+  // to occupy are the same characters by construction. Accumulating them
+  // separately drifted: a blank line between the header and the prose (which is
+  // how most models format a scene) contributed nothing to the string while
+  // still moving the offsets, so every span in that scene sat one character
+  // left of the text it described — and an edit then spliced over the newline
+  // and dropped the body's last character.
+  const spans: Array<{ header: string; bodyStart: number; bodyEnd: number }> = []
+  let current: { header: string; bodyStart: number; bodyEnd: number } | null = null
   // Running character offset of the current line's first character. `text` is
   // split on '\n' and rejoined with '\n', so line length + 1 is exact.
   let offset = 0
@@ -95,25 +107,25 @@ function splitScenes(text: string): SceneChunk[] | null {
     const lineStart = offset
     offset += line.length + 1
     if (SCENE_HEADER.test(line.trim())) {
-      if (current) chunks.push(current)
+      if (current) spans.push(current)
       const split = splitHeaderLine(line)
       // A header that carries its own prose ("SCENE 2 — B-ROLL DETAIL: …")
       // starts the body mid-line; a label-only header starts it on the next.
       const bodyStart = split.body ? lineStart + line.indexOf(split.body) : offset
-      current = { ...split, bodyStart, bodyEnd: bodyStart + split.body.length }
+      current = { header: split.header, bodyStart, bodyEnd: bodyStart + split.body.length }
     } else if (current) {
-      current.body += (current.body ? '\n' : '') + line
       current.bodyEnd = lineStart + line.length
     }
   }
-  if (current) chunks.push(current)
-  return chunks
+  if (current) spans.push(current)
+  return spans
     .map((c) => {
+      const raw = text.slice(c.bodyStart, Math.max(c.bodyStart, c.bodyEnd))
       // The trim has to move the span with it, or an edit would splice the
       // surrounding blank lines away along with the body.
-      const lead = c.body.length - c.body.trimStart().length
-      const body = c.body.trim()
-      return { ...c, body, bodyStart: c.bodyStart + lead, bodyEnd: c.bodyStart + lead + body.length }
+      const lead = raw.length - raw.trimStart().length
+      const body = raw.trim()
+      return { header: c.header, body, bodyStart: c.bodyStart + lead, bodyEnd: c.bodyStart + lead + body.length }
     })
     .filter((c) => c.body.length > 0)
 }
@@ -141,40 +153,63 @@ function extractIntro(text: string): string {
 // the markers and the label meant a blueprint remixed here rendered its voice
 // profile buried in the last scene's body instead of on its own card.
 const VOICE_HEADER_REGEX = /(^|\n)[=\s]*(?:MASTER\s+)?VOICE PROFILE\b[^\n]*\n?/i
+const VOICE_HEADER_GLOBAL = new RegExp(VOICE_HEADER_REGEX.source, 'gi')
 
 // Pulls the voice-profile block out of a scenes script. It can sit BEFORE the
-// first scene (legacy `extractIntro` shape) or be appended AFTER/within the last
-// scene (what the prompt actually produces). Returns the voice-profile body
-// (with its "=== ... ===" markers stripped) and the rest of the text with the
-// block removed, ready for scene-splitting.
-// `bodyStart`/`bodyEnd` are the body's span in `text`, present only for the
-// appended-header shape — the one whose boundaries are exactly known. The
-// `extractIntro` fallback deliberately reports none, so an unrecognised shape
-// renders read-only rather than risking a splice over the wrong characters.
+// first scene (a blueprint pasted out of the Ad Analyzer leads with its
+// "=== MASTER VOICE PROFILE ===" block, and a model rewriting that blueprint
+// tends to reproduce it where it found it) or be appended AFTER the last scene
+// (what our own prompt asks for). Returns the voice-profile body (with its
+// "=== ... ===" markers stripped) and the text the scenes are parsed out of.
+//
+// `rest` is either `text` itself or a PREFIX of it, never a splice: the scene
+// spans are offsets into `text`, and any cut from the middle would slide every
+// one of them. A leading block therefore isn't removed at all — it's preamble,
+// which `splitScenes` already ignores.
 function splitVoiceProfile(text: string): { body: string; rest: string; bodyStart?: number; bodyEnd?: number } {
-  const match = VOICE_HEADER_REGEX.exec(text)
+  // The appended block is the one the prompt asks for, so it wins when both
+  // shapes are present. Taking the first match unconditionally handed a
+  // remixed Ad Analyzer blueprint a "voice profile" containing every scene in
+  // the ad, and left the take itself with no scenes to render at all.
+  const lastScene = lastSceneHeaderIndex(text)
+  const headers = [...text.matchAll(VOICE_HEADER_GLOBAL)]
+  const match = headers.find((m) => m.index + m[1].length > lastScene) ?? headers[0]
   if (!match) {
-    // No appended header — fall back to the intro-based shape.
+    // No labelled block at all — fall back to the intro-based shape.
     return { body: extractIntro(text), rest: text }
   }
   const headerStart = match.index + match[1].length
-  // Everything from the header to the end is the voice-profile block; strip the
-  // header line and any standalone "===" divider lines from the body.
-  const afterHeader = text.slice(headerStart)
-  const header = VOICE_HEADER_REGEX.exec(afterHeader)
-  const regionStart = headerStart + (header ? header.index + header[0].length : 0)
-  const region = text.slice(regionStart)
+  // The block runs from its header to the next scene header, or to the end of
+  // the text when nothing follows it. Strip the header line and any standalone
+  // "===" divider lines from the body.
+  const regionStart = headerStart + (match[0].length - match[1].length)
+  const nextScene = text.slice(regionStart).search(SCENE_REGEX)
+  const appended = nextScene < 0
+  const region = appended ? text.slice(regionStart) : text.slice(regionStart, regionStart + nextScene)
   const body = region.replace(/^[=\s]+|[=\s]+$/g, '').trim()
-  const rest = text.slice(0, headerStart).replace(/\s+$/, '')
+  // Appended → the scenes are everything before it. Leading → the whole text,
+  // since the block sits in front of the first header and is dropped anyway.
+  const rest = appended ? text.slice(0, headerStart).replace(/\s+$/, '') : text
   if (body) {
     // Only the ends were stripped, so indexOf lands on the true offset — the
     // body can't begin with the `=`/whitespace that was taken off its front.
     const lead = region.indexOf(body)
     return { body, rest, bodyStart: regionStart + lead, bodyEnd: regionStart + lead + body.length }
   }
-  // The intro shape and the appended shape are mutually exclusive in practice,
-  // but prefer whichever yielded a body so both shapes work.
   return { body: extractIntro(rest), rest }
+}
+
+// Where the last "--- Scene N ---" header starts, or -1. Used to tell an
+// appended voice-profile block from one that leads the document.
+function lastSceneHeaderIndex(text: string): number {
+  let at = -1
+  let from = 0
+  for (;;) {
+    const next = text.slice(from).search(SCENE_REGEX)
+    if (next < 0) return at
+    at = from + next
+    from = at + 1
+  }
 }
 
 // A scene body is one prose paragraph with the spoken line quoted inline — the
@@ -191,17 +226,41 @@ type SceneSegment =
   | { kind: 'line'; speaker: string | null; text: string; start: number; end: number }
 
 const SPEECH_VERB_SRC = 'says?|said|adds?|continues?|whispers?|shouts?|asks?|replies'
+// A word that can never be the speaker: it means the cue is prose running into
+// the verb ("…and says:", "the sign that says") rather than someone talking.
+const NOT_A_SPEAKER_SRC = 'and|then|or|but|as|while|that|which|who'
+const SPEAKER_SRC = `(?:\\[[A-Z_]+\\]|(?!(?:${NOT_A_SPEAKER_SRC})\\b)(?:the\\s+)?[\\w'’-]+)`
 // The clause that hands off to a quote, anchored to the end of the preceding
 // prose so it can only ever eat the introduction itself. A speaker is a
 // [TOKEN], a pronoun, or a (optionally "the"-prefixed) name — never a
 // connective, which is how "…and says:" used to label the line "it over and".
+//
+// The punctuation between the cue and the quote is OPTIONAL. Our own prompts
+// ask for `[CHARACTER] says: "…"`, but a blueprint rewrite is told to keep the
+// attribution format of the source — and the Ad Analyzer transcribes what it
+// heard, so `She says, "…"` arrives just as often. Requiring the colon left
+// those lines sitting inside the direction as prose.
 const NAMED_ATTRIBUTION = new RegExp(
-  `(?<=^|[\\s,;.!?—-])((?:\\[[A-Z_]+\\]|(?!(?:and|then|or|but|as|while)\\b)(?:the\\s+)?[\\w'’-]+)\\s+(?:${SPEECH_VERB_SRC})|voice\\s*ove?r|narrator)\\s*:\\s*$`,
+  `(?<=^|[\\s,;.!?—-])(${SPEAKER_SRC}\\s+(?:${SPEECH_VERB_SRC})|voice\\s*ove?r|narrator)\\s*[:,]?\\s*$`,
   'i',
 )
 // The model sometimes folds the cue into the sentence with no subject of its
 // own ("…turns it over and says:"). Still dialogue — just nobody to label.
-const BARE_ATTRIBUTION = new RegExp(`\\b(?:${SPEECH_VERB_SRC})\\s*:\\s*$`, 'i')
+const BARE_ATTRIBUTION = new RegExp(`\\b(?:${SPEECH_VERB_SRC})\\s*[:,]?\\s*$`, 'i')
+// The screenplay shape, with a speaker label and no verb at all. Only a
+// [TOKEN] counts here: a bare word in front of a colon is shot prose
+// ("Close-up: …") far more often than it's a speaker.
+const TOKEN_ATTRIBUTION = /(?<=^|[\s,;.!?—-])(\[[A-Z_]+\])\s*:\s*$/
+// Attribution that FOLLOWS its line — `"…," [CHARACTER] says, holding it up`.
+// This is how a hook scene usually opens (the line is the first thing in the
+// ad, so it's the first thing on the page), and it was the one dialogue shape
+// that rendered as direction, which is why scene 1 of a remixed blueprint kept
+// coming out as a plain block of text while every scene under it rendered as
+// direction plus a spoken line.
+const TRAILING_ATTRIBUTION = new RegExp(
+  `^[\\s,.;:—-]*(${SPEAKER_SRC}\\s+(?:${SPEECH_VERB_SRC})|voice\\s*ove?r|narrator)\\b`,
+  'i',
+)
 const SPEECH_VERB = new RegExp(`\\s*\\b(?:${SPEECH_VERB_SRC})\\s*$`, 'i')
 // The connective left dangling on the direction once its attribution is cut.
 const TRAILING_CONNECTIVE = /[\s,;:]*\b(?:and|then|as|while)\s*$/i
@@ -216,16 +275,23 @@ function splitSpokenLines(body: string): SceneSegment[] {
     const lead = before.replace(/\s+$/, '')
     const named = NAMED_ATTRIBUTION.exec(lead)
     const bare = named ? null : BARE_ATTRIBUTION.exec(lead)
+    const token = named || bare ? null : TOKEN_ATTRIBUTION.exec(lead)
+    const cue = named ?? bare ?? token
+    const quoteEnd = match.index + match[0].length
+    // Nothing in front of it? The attribution may still follow the line.
+    const after = cue ? null : TRAILING_ATTRIBUTION.exec(body.slice(quoteEnd))
     // A quote nobody is introduced as speaking isn't dialogue — it's a scare
     // quote living inside the direction ("has a visible "wait, what?"
     // reaction"). Leaving `cursor` where it is keeps it in the prose instead of
     // promoting it to a line and cutting the sentence in half around it.
-    if (!named && !bare) continue
+    if (!cue && !after) continue
     // Peel the introduction off the direction so it doesn't trail off
-    // mid-sentence ("…leans in and [CHARACTER] says:").
-    const speaker = named ? named[1].replace(SPEECH_VERB, '').trim() || named[1].trim() : null
-    const direction = lead
-      .slice(0, (named ?? bare)!.index)
+    // mid-sentence ("…leans in and [CHARACTER] says:"). A trailing attribution
+    // is peeled off the far side instead — `cursor` skips it below — and the
+    // whole lead stays as direction.
+    const label = named?.[1] ?? token?.[1] ?? after?.[1] ?? null
+    const speaker = label ? label.replace(SPEECH_VERB, '').trim() || label.trim() : null
+    const direction = (cue ? lead.slice(0, cue.index) : lead)
       .replace(TRAILING_CONNECTIVE, '')
       .replace(/^[\s,;:]+|[\s,;:]+$/g, '')
     // Every step above only strips from the ENDS of a prefix of `before`, so
@@ -241,7 +307,7 @@ function splitSpokenLines(body: string): SceneSegment[] {
     const raw = match[1]
     const lineStart = match.index + 1 + (raw.length - raw.trimStart().length)
     segments.push({ kind: 'line', speaker, text: raw.trim(), start: lineStart, end: lineStart + raw.trim().length })
-    cursor = match.index + match[0].length
+    cursor = quoteEnd + (after ? after[0].length : 0)
   }
   const rest = body.slice(cursor)
   const tail = rest.replace(/^[\s,;:]+|[\s,;:]+$/g, '')
@@ -1116,7 +1182,7 @@ function SceneChunkCard({ chunk, onEditRange }: { chunk: SceneChunk; onEditRange
   )
 }
 
-export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, hookCount = DEFAULT_HOOK_COUNT, linkedProductId, isGenerating, error, onEditVariation }: OutputPanelProps) {
+export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, hookCount = DEFAULT_HOOK_COUNT, linkedProductId, isGenerating, error, runId, onEditVariation }: OutputPanelProps) {
   // Resolve the linked product so saved scripts get a meaningful default title
   // ("<Product> — Hook-Led Script").
   const products = useBankStore((s) => s.products)
@@ -1135,16 +1201,21 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
   const [activeTake, setActiveTake] = useState(0)
 
-  // New generation → reset to the first take and the top of the list. Keyed on
-  // the takes' *content*, not the array identity — the parent hands down a fresh
-  // array every render, so depending on the reference would reset the scroll on
-  // every unrelated re-render (including our own click handler's setState).
-  const variationsKey = variations.join('')
+  // New RUN → reset to the first take and the top of the list. Keyed on the
+  // run's identity, never on the takes' text: every block on a card is edited
+  // in place, so the text changes under us constantly, and keying on it sent a
+  // member who fixed a typo in take 3 back to the top of take 1 the moment they
+  // committed it. The array identity is no use either — the parent hands down a
+  // fresh array on every render.
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    // No run to jump to: takes restored from a persisted draft on mount (the
+    // list is at the top already), or the row being shown was just deleted from
+    // History — neither is a reason to move what the member is reading.
+    if (!runId) return
     setActiveTake(0)
     scrollRef.current?.scrollTo({ top: 0 })
-  }, [variationsKey])
+  }, [runId])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const scrollToTake = (i: number) => {
