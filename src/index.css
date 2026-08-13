@@ -657,6 +657,15 @@ textarea,
   .animate-blob-1, .animate-blob-2, .animate-blob-3 { animation: none; }
 }
 
+/* Skip rendering a subtree while it's off screen — animations inside it stop
+   ticking with it. For the generating backdrop above, which a batch puts on
+   every card of a storyboard at once: three large blurred layers per tile, each
+   re-blurred every frame because the keyframes scale them. Only ever put this
+   on a box whose size comes from its own geometry (an `absolute inset-0`
+   layer), never one sized by its content — the skip carries size containment,
+   so a content-sized box would collapse to nothing while off screen. */
+.offscreen-idle { content-visibility: auto; }
+
 /* Thin range slider — used by Voiceovers settings.
    Track: 2px hairline. Thumb: 12px white circle.
    Override iOS' 16px auto font-size since we don't use type-in here. */

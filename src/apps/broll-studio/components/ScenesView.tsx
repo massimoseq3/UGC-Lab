@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Film, AlertCircle, Plus, Images, X, Palette, Download, Video as VideoIcon, Clapperboard, Coins, Pencil, Check } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
@@ -196,14 +196,6 @@ export default function ScenesView({
     useSettingsStore((s) => s.perAppModel['broll-studio:image:text-to-image']) ??
     getDefaultModel('broll-studio', 'image', 'text-to-image')?.id
   const [batchTokens, setBatchTokens] = useState<Record<string, number>>({})
-  // Chained dialogue cards can't all fire at once — card N needs card N-1's
-  // still to exist first. So a batch splits: everything else goes in parallel,
-  // and the chained dialogue cards run as a queue, one armed each time the
-  // previous one settles. `dialogueHead` is the card currently rendering, with
-  // the image count it started at (that count is how "landed" is told apart
-  // from "hasn't started yet").
-  const [dialogueQueue, setDialogueQueue] = useState<string[]>([])
-  const dialogueHead = useRef<{ key: string; startImages: number } | null>(null)
   const [batchConfirm, setBatchConfirm] = useState<BatchRequest | null>(null)
   const [batchColumn, setBatchColumn] = useState<BatchColumn>('all')
   const [includeExisting, setIncludeExisting] = useState(false)
@@ -292,27 +284,33 @@ export default function ScenesView({
     setBatchConfirm({ keys, scope, columnar })
   }
 
+  // Every card in the run is armed in the same tick — the anchor-take cards
+  // included. They used to run as a queue instead, one armed each time the
+  // previous one's still landed, so that card N could chain from card N-1's
+  // picture. The cost of that was the whole run: `dialogueChainRefs` only ever
+  // feeds the FIRST variation of each scene, which is the anchor column, so a
+  // member scoping the batch to Option 1 (the common case — one card per line)
+  // got a run that rendered one card, waited a minute for it, then started the
+  // next. Twelve lines took twenty minutes, and eleven of the twelve cards sat
+  // showing nothing at all, which reads as a batch that never fired.
+  //
+  // So the chain is best-effort now: a card still attaches the nearest earlier
+  // anchor still that EXISTS when it fires (an earlier run's, or one generated
+  // from the card itself), and a fresh run simply has none to attach. What
+  // holds the anchor column together in a fresh run is the prompt, which
+  // already restates the same place, wardrobe, light and camera in every
+  // scene's VAR_1 — see the anchor-take clause in generateBroll's dialogue
+  // addendum. The backend stagger nobody has to think about is `submitToKie`:
+  // the POSTs drip out under kie's rate limit while every tile shows generating
+  // from the press.
   const confirmBatch = () => {
     if (!batchConfirm || batchTargets.length === 0) return
     setBatchImageOverride({ aspectRatio: effectiveBatchAspect ?? '9:16', resolution: effectiveBatchRes })
-    // Chained dialogue cards run one at a time, in scene order — each waits for
-    // the still it chains from. A dialogue card with its chain toggled off has
-    // nothing to wait for, so it joins the parallel group.
-    const chained = dialogueKeys.filter(
-      (k) => batchTargets.includes(k) && cardStates[k]?.chainLink !== false,
-    )
-    const parallel = batchTargets.filter((k) => !chained.includes(k))
-    const [firstChained, ...restChained] = chained
     setBatchTokens((prev) => {
       const next = { ...prev }
-      for (const k of parallel) next[k] = (next[k] ?? 0) + 1
-      if (firstChained) next[firstChained] = (next[firstChained] ?? 0) + 1
+      for (const k of batchTargets) next[k] = (next[k] ?? 0) + 1
       return next
     })
-    dialogueHead.current = firstChained
-      ? { key: firstChained, startImages: cardStates[firstChained]?.images.length ?? 0 }
-      : null
-    setDialogueQueue(restChained)
     setBatchConfirm(null)
   }
 
@@ -432,36 +430,11 @@ export default function ScenesView({
     setVideoConfirm(null)
   }
 
-  // Arm the next chained dialogue card once the current one has settled — an
-  // image landed, or the generation errored (in which case the next card falls
-  // back to the nearest earlier still rather than stalling the queue).
-  useEffect(() => {
-    const head = dialogueHead.current
-    if (!head || dialogueQueue.length === 0) return
-    const card = cardStates[head.key]
-    if (!card) {
-      // The session was rebuilt under us — drop the queue rather than wait on a
-      // card that no longer exists.
-      dialogueHead.current = null
-      setDialogueQueue([])
-      return
-    }
-    if (card.images.length <= head.startImages && !card.inFlightImages.some((e) => e.error)) return
-    const [next, ...rest] = dialogueQueue
-    dialogueHead.current = { key: next, startImages: cardStates[next]?.images.length ?? 0 }
-    setDialogueQueue(rest)
-    setBatchTokens((prev) => ({ ...prev, [next]: (prev[next] ?? 0) + 1 }))
-  }, [cardStates, dialogueQueue])
-
   // Rebuild card states from the current result. Carries existing state
   // forward when prompts match (same generation, re-render); drops orphaned
   // slots when a fresh Generate produces a shorter script.
   useEffect(() => {
     if (!result) return
-    // A new storyboard invalidates any chained dialogue run still in flight —
-    // its keys point at the old scene list.
-    dialogueHead.current = null
-    setDialogueQueue([])
     setCardStates((prev) => {
       const next: Record<string, CardState> = {}
       for (const scene of result.scenes) {

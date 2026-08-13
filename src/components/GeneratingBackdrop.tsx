@@ -51,7 +51,16 @@ function blob(varName: string): React.CSSProperties {
 export default function GeneratingBackdrop({ family = 'playground' }: { family?: Family }) {
   const [a, b, c] = BLOBS[family]
   return (
-    <div aria-hidden className="absolute inset-0 overflow-hidden">
+    // `offscreen-idle` is `content-visibility: auto` — the browser skips this
+    // subtree entirely while it's outside the viewport, so a tile the member
+    // can't see isn't animating. It landed against the blurred-circle version
+    // above, where it was load-bearing; with gradient blobs it's cheap
+    // insurance rather than a rescue, and it still earns its place: a batch
+    // puts one of these on every card of a storyboard at once, and not paying
+    // for three dozen off-screen animations is free. Nothing changes for a tile
+    // on screen, and the element is `absolute inset-0`, so the size containment
+    // that comes with the skip has nothing to collapse.
+    <div aria-hidden className="offscreen-idle absolute inset-0 overflow-hidden">
       {/* Frosted base — dark in dark mode, light in light mode (ink ramp flips). */}
       <div className="absolute inset-0 bg-gradient-to-br from-ink-900 to-ink-950" />
       <div className="absolute -left-1/4 -top-1/4 h-3/4 w-3/4 opacity-50 animate-blob-1" style={blob(a)} />
