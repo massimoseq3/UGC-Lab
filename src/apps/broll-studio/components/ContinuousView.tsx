@@ -1221,15 +1221,15 @@ export default function ContinuousView({
       {/* Top strip — storyboard meta + the two batch actions. Pinned to the top
           of the scroll port with its own hairline, so the batch buttons stay
           reachable however far down the storyboard the member has scrolled. */}
-      {/* Opaque, never translucent — see the note on the Line-by-Line strip:
-          a blurred bar inside the already-blurred window frame doesn't re-blur,
-          so frames ghost through it and the strip reads as unpinned. */}
+      {/* Glass — see the note on the Line-by-Line strip: the storyboard passes
+          under it blurred and saturated, with the solid fill kept as the
+          fallback wherever backdrop-filter isn't supported. */}
       {/* One row on desktop — see the note on the Line-by-Line strip: with
           `flex-wrap` alone the whole button group dropped to a second line the
           moment the meta pills and the buttons together outgrew the panel, so
           the strip's height changed with the window. The meta wraps and shrinks
           instead. */}
-      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5 md:flex-nowrap">
+      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5 supports-[backdrop-filter]:bg-surface-0/80 supports-[backdrop-filter]:backdrop-blur-xl supports-[backdrop-filter]:backdrop-saturate-150 md:flex-nowrap">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
           {/* Scene count matches the per-line storyboard's — small-caps and dim,
               the same eyebrow treatment as the pills beside it. */}
@@ -2092,7 +2092,7 @@ function FrameConceptCard({
             <img src={imageUrl} alt={label} className="absolute inset-0 h-full w-full object-cover" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent" />
             {cardState && cardState.images.length > 1 && (
-              <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-white backdrop-blur transition-opacity group-hover:opacity-0">
+              <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-white transition-opacity group-hover:opacity-0">
                 {Math.min(displayIndex, cardState.images.length - 1) + 1}/{cardState.images.length}
               </span>
             )}
@@ -2129,7 +2129,7 @@ function FrameConceptCard({
           </span>
         )}
         {errored && !inFlight && (
-          <span className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full border border-red-400/40 bg-red-500/30 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-red-100 backdrop-blur transition-opacity group-hover:opacity-0">
+          <span className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full border border-red-400/40 bg-red-500/30 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-red-100 transition-opacity group-hover:opacity-0">
             <AlertCircle className="h-2.5 w-2.5" /> Failed
           </span>
         )}
@@ -2197,7 +2197,7 @@ function FrameConceptCard({
               // text, soft accent border. It only ever sits on an empty card
               // face (no image yet), so the translucent fill stays readable;
               // buttons that overlay real media keep the black/60 chrome.
-              className="flex h-9 flex-1 items-center justify-center gap-2 rounded-full border border-broll-500/20 bg-broll-500/10 text-[12px] font-medium tracking-tight text-broll-400 backdrop-blur transition-colors hover:bg-broll-500/20"
+              className="flex h-9 flex-1 items-center justify-center gap-2 rounded-full border border-broll-500/20 bg-broll-500/10 text-[12px] font-medium tracking-tight text-broll-400 transition-colors hover:bg-broll-500/20"
             >
               <ImageIcon className="h-4 w-4" strokeWidth={1.75} />
               Generate image
@@ -2207,7 +2207,7 @@ function FrameConceptCard({
               type="button"
               onClick={(e) => { e.stopPropagation(); onSelect() }}
               title="Use this image as the keyframe"
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-broll-500/85 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-400"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-broll-500/85 text-[11px] font-semibold text-white transition-colors hover:border-broll-300/70 hover:bg-broll-400"
             >
               <Check className="h-3.5 w-3.5" />
               Use as keyframe
@@ -2323,7 +2323,7 @@ function ClipCard({
               </button>
             )}
             {clipState && clipState.videos.length > 1 && (
-              <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-white backdrop-blur transition-opacity group-hover:opacity-0">
+              <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-full bg-black/60 px-1.5 py-0.5 text-[9px] font-semibold tabular-nums text-white transition-opacity group-hover:opacity-0">
                 {Math.min(clipState.currentVideoIndex, clipState.videos.length - 1) + 1}/{clipState.videos.length}
               </span>
             )}
@@ -2352,11 +2352,11 @@ function ClipCard({
           </div>
         )}
 
-        <span className={`pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full border border-broll-500/30 bg-broll-500/15 px-2 py-0.5 text-[10px] font-medium tracking-tight text-broll-300 backdrop-blur transition-opacity ${controlsExpanded ? 'opacity-0' : ''}`}>
+        <span className={`pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full border border-broll-500/30 bg-broll-500/15 px-2 py-0.5 text-[10px] font-medium tracking-tight text-broll-300 transition-opacity ${controlsExpanded ? 'opacity-0' : ''}`}>
           Clip {sceneIndex}
         </span>
         {errored && !inFlight && (
-          <span className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full border border-red-400/40 bg-red-500/30 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-red-100 backdrop-blur transition-opacity group-hover:opacity-0">
+          <span className="pointer-events-none absolute right-2 top-2 z-10 flex items-center gap-1 rounded-full border border-red-400/40 bg-red-500/30 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-red-100 transition-opacity group-hover:opacity-0">
             <AlertCircle className="h-2.5 w-2.5" /> Failed
           </span>
         )}
@@ -2415,7 +2415,7 @@ function ClipCard({
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onOpen() }}
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white transition-colors hover:border-broll-300/70 hover:bg-broll-500"
             >
               <VideoIcon className="h-3.5 w-3.5" />
               Open

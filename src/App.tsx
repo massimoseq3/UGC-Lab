@@ -125,7 +125,24 @@ function Workspace() {
             the menu bar and the dock, desktop gradient peeking around it. App
             chrome clips at the window edge instead of ending in a hard line
             against the dock gutter. */}
-        <div className="absolute inset-x-2 bottom-[108px] top-11 overflow-hidden rounded-2xl border border-ink/10 bg-surface-0/60 shadow-2xl shadow-black/25 backdrop-blur-xl md:inset-x-3">
+        {/* NO `backdrop-blur` on this frame, deliberately (August 2026).
+            It carried `backdrop-blur-xl` and it was the most expensive thing in
+            the app for the least return. What sits behind it is `AppBackground`
+            — a smooth near-black radial gradient with ±3 levels of dither —
+            and blurring a smooth gradient gives you back the same gradient, so
+            the blur was invisible. What it cost was not: a `backdrop-filter`
+            element is a backdrop root, and a repaint ANYWHERE inside it
+            invalidates the whole backdrop. This frame contains the entire
+            workspace, so every animating pixel in every app — a dozen
+            generating tiles during a B-Roll batch especially — dragged a
+            full-viewport filter recompute behind it. That surfaced as laggy
+            generation animations, laggy zoom (a zoom re-rasters everything, the
+            backdrop included), and images going blocky, since a browser under
+            that much compositing pressure drops its raster scale. The frame is
+            a plain translucent fill now and looks the same.
+            Glass belongs on small, static chrome over real content (B-Roll's
+            pinned storyboard strips), not on a full-window container. */}
+        <div className="absolute inset-x-2 bottom-[108px] top-11 overflow-hidden rounded-2xl border border-ink/10 bg-surface-0/60 shadow-2xl shadow-black/25 md:inset-x-3">
           {/* Empty state — visible when no app is active */}
           <div
             className={`absolute inset-0 ${
@@ -154,31 +171,27 @@ function Workspace() {
                   isActive ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
                 }`}
               >
+                {/* The app fills the pane exactly — ONE scroll container, the
+                    app's own. A `min-h-[600px]` layout floor lived here for a
+                    while so a very short window (200% browser zoom) scrolled the
+                    app rather than crushing its scrolling middle. It cost more
+                    than it bought: below the floor the pane became a SECOND
+                    scroller wrapping the whole app, so every panel header and
+                    pinned strip — B-Roll's Storyboard/History toggle and its
+                    "N Scenes" batch bar especially — slid up the screen as the
+                    member scrolled the storyboard. A bar that is `sticky` inside
+                    the panel can't hold its ground against a scroller ABOVE the
+                    panel, and the two ports rubber-band against each other in
+                    between. Pinned chrome that actually stays pinned is worth
+                    more than a graceful 450px viewport. */}
                 <div className="h-full overflow-y-auto bg-transparent">
-                  {/* A floor under the app's layout height, so a SHORT window
-                      scrolls the app instead of crushing it.
-                      Every workspace app is a full-height flex column: a header,
-                      a scrolling middle, a pinned generate band. The band and
-                      the header are `shrink-0`, so when the window is shorter
-                      than the two of them the middle is what gives — and it
-                      gives all the way. Measured in Scripts at 200% browser zoom
-                      (which is a 450px-tall viewport in CSS px): the input
-                      column's scroll port came out 20px high against 606px of
-                      content, which reads as the fields being clipped away
-                      rather than as something to scroll. Below this floor the
-                      app keeps its full layout and the pane above scrolls it,
-                      which is the behaviour zooming in for a screen recording
-                      wants. Above it — every normal window — nothing changes,
-                      since `h-full` already wins. */}
-                  <div className="h-full min-h-[600px]">
-                    {Component ? (
-                      <Suspense fallback={<AppPlaceholder appId={appId} />}>
-                        <Component />
-                      </Suspense>
-                    ) : (
-                      <AppPlaceholder appId={appId} />
-                    )}
-                  </div>
+                  {Component ? (
+                    <Suspense fallback={<AppPlaceholder appId={appId} />}>
+                      <Component />
+                    </Suspense>
+                  ) : (
+                    <AppPlaceholder appId={appId} />
+                  )}
                 </div>
               </div>
             )

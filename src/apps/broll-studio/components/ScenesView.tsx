@@ -712,10 +712,14 @@ export default function ScenesView({
       {/* The strip pins to the top of the scroll port and keeps its own hairline
           so the meta + batch actions stay reachable however far down the
           storyboard the member has scrolled. Full-bleed via -mx-5 so the rule
-          runs edge to edge. Opaque on purpose (the Ad Analyzer lesson):
-          backdrop-filter doesn't re-blur inside the already-blurred window
-          frame, so a translucent strip let cards ghost through it and the bar
-          read as scrolling with the storyboard instead of pinned. */}
+          runs edge to edge, and glass rather than opaque: the storyboard passes
+          under it blurred, which is what makes it read as a fixed pane of the
+          panel instead of a card-shaped hole. It was opaque for a while on the
+          theory that a nested backdrop-filter can't re-blur inside the window
+          frame's own `backdrop-blur-xl` — it can; what actually made a
+          translucent strip read as scrolling was too little blur and no
+          saturation, so cards ghosted through it sharp. `supports-` keeps the
+          solid fill wherever the browser can't blur at all. */}
       {/* One row on desktop (`md:flex-nowrap`): four batch pills plus the meta
           add up to more than the panel at 1280 and at any real zoom level, and
           `flex-wrap` answered that by dropping the whole button group onto a
@@ -723,7 +727,7 @@ export default function ScenesView({
           on others. The meta shrinks and truncates instead; the buttons are the
           part you can't guess from a shorter label. Under md it still wraps,
           where there genuinely isn't a row's worth of width. */}
-      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5 md:flex-nowrap">
+      <div className="sticky top-0 z-20 -mx-5 mb-5 flex flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5 supports-[backdrop-filter]:bg-surface-0/80 supports-[backdrop-filter]:backdrop-blur-xl supports-[backdrop-filter]:backdrop-saturate-150 md:flex-nowrap">
         <div className="flex min-w-0 items-center gap-2">
           {/* Small-caps and dim — the count is a caption for the storyboard
               below it, so it takes the same eyebrow treatment as the style pill

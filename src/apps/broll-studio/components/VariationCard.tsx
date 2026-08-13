@@ -963,12 +963,12 @@ export default function VariationCard(props: VariationCardProps) {
             // so ink-300 is the readable tint in both. Adding light:text-ink-700
             // double-flipped it to near-white on the pale pill and the word
             // vanished in light mode.
-            <span className={`pointer-events-none absolute left-1/2 top-2 z-10 max-w-[60%] -translate-x-1/2 truncate rounded-full border border-ink/15 bg-ink/10 px-2 py-0.5 text-[10px] font-medium tracking-tight text-ink-300 backdrop-blur transition-opacity ${videoControlsExpanded ? 'opacity-0' : ''}`}>
+            <span className={`pointer-events-none absolute left-1/2 top-2 z-10 max-w-[60%] -translate-x-1/2 truncate rounded-full border border-ink/15 bg-ink/10 px-2 py-0.5 text-[10px] font-medium tracking-tight text-ink-300 transition-opacity ${videoControlsExpanded ? 'opacity-0' : ''}`}>
               Custom
             </span>
           ) : (
             <span
-              className={`pointer-events-none absolute left-1/2 top-2 z-10 max-w-[60%] -translate-x-1/2 truncate rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-tight backdrop-blur transition-opacity ${videoControlsExpanded ? 'opacity-0' : ''} ${tagChipStyle(variation.tag)}`}
+              className={`pointer-events-none absolute left-1/2 top-2 z-10 max-w-[60%] -translate-x-1/2 truncate rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-tight transition-opacity ${videoControlsExpanded ? 'opacity-0' : ''} ${tagChipStyle(variation.tag)}`}
             >
               {tagText}
             </span>
@@ -979,19 +979,19 @@ export default function VariationCard(props: VariationCardProps) {
           {/* Top-right status badges fade out on hover so the action stack
               (same corner) reads cleanly. */}
           {showVideoBadge && (
-            <span className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded-full border border-purple-400/30 bg-purple-500/30 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-purple-100 backdrop-blur transition-opacity group-hover:opacity-0">
+            <span className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded-full border border-purple-400/30 bg-purple-500/30 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-purple-100 transition-opacity group-hover:opacity-0">
               <Play className="h-2.5 w-2.5 fill-current" />
               {cardState.videos.length > 1 ? `${cardState.videos.length} videos` : 'Video'}
             </span>
           )}
           {hasFailedInFlight && !isGeneratingVideo && !isGeneratingImageInFlight && !cardState.isGeneratingImage && (
-            <span className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded-full border border-red-400/40 bg-red-500/30 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-red-100 backdrop-blur transition-opacity group-hover:opacity-0">
+            <span className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded-full border border-red-400/40 bg-red-500/30 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-red-100 transition-opacity group-hover:opacity-0">
               <AlertCircle className="h-2.5 w-2.5" />
               Failed
             </span>
           )}
           {cardState.videoStatus === 'error' && (
-            <span className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded-full border border-red-400/40 bg-red-500/30 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-red-100 backdrop-blur transition-opacity group-hover:opacity-0">
+            <span className="pointer-events-none absolute right-2 top-2 flex items-center gap-1 rounded-full border border-red-400/40 bg-red-500/30 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-red-100 transition-opacity group-hover:opacity-0">
               <AlertCircle className="h-2.5 w-2.5" />
               Video error
             </span>
@@ -1070,7 +1070,16 @@ export default function VariationCard(props: VariationCardProps) {
               live top-left now, so a video cover keeps the row at its usual
               height. Stays put while the clip plays with sound, for the same
               reason as the action stack above — deciding what to do with a take
-              is what you're doing while you watch it. */}
+              is what you're doing while you watch it.
+              Solid `bg-black/60` scrim, NO backdrop-blur — the same rule
+              `TileActionStack` follows, and it bites hardest right here. This
+              row fades its opacity in on hover, and a backdrop-filter animated
+              under an opacity transition re-samples the backdrop every frame:
+              on a card holding a real generated still that's three blurred
+              regions over a photo, and the hover visibly stuttered. An empty
+              card never showed it, because a flat card face is nothing to blur.
+              Every chip on this face that fades (the tag, the status badges)
+              dropped its blur for the same reason. */}
           <div
             className={`absolute inset-x-2 z-10 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 ${
               showImageError ? 'bottom-14' : 'bottom-2'
@@ -1080,7 +1089,7 @@ export default function VariationCard(props: VariationCardProps) {
               type="button"
               title="Open this card on the Image tab"
               onClick={(e) => { e.stopPropagation(); openDetail('image') }}
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white transition-colors hover:border-broll-300/70 hover:bg-broll-500"
             >
               <ImageIcon className="h-3.5 w-3.5" />
               Image
@@ -1089,7 +1098,7 @@ export default function VariationCard(props: VariationCardProps) {
               type="button"
               title="Open this card on the Video tab"
               onClick={(e) => { e.stopPropagation(); openDetail('video') }}
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white transition-colors hover:border-broll-300/70 hover:bg-broll-500"
             >
               <VideoIcon className="h-3.5 w-3.5" />
               Video
@@ -1098,7 +1107,7 @@ export default function VariationCard(props: VariationCardProps) {
               type="button"
               title="Open this card on the Animate tab"
               onClick={(e) => { e.stopPropagation(); openDetail('animate') }}
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white backdrop-blur transition-colors hover:border-broll-300/70 hover:bg-broll-500"
+              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white transition-colors hover:border-broll-300/70 hover:bg-broll-500"
             >
               <Film className="h-3.5 w-3.5" />
               Animate
