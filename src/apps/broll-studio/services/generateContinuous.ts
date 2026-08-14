@@ -14,7 +14,8 @@
 import type { ContinuousConcept, ContinuousFrame, ContinuousResult, ContinuousScene, ReferenceImage, VariationRefs } from '../types'
 import { useSettingsStore, resolveScriptModel } from '../../../stores/settingsStore'
 import { kieChatCompletions, LONG_CHAT_TIMEOUT_MS, type ChatMessage } from '../../../utils/kie'
-import { getChatTarget, getModel, snapVideoDurationUp, type ChatTarget } from '../../../utils/models'
+import { getChatTarget, type ChatTarget } from '../../../utils/models'
+import { autoClipSeconds } from './clipDuration'
 import { IPHONE_REALISM_SUFFIX, NO_ON_SCREEN_TEXT_SUFFIX } from './realism'
 import { extractBlock, extractNumberedBlock } from './xmlBlocks'
 import { parsePhotoPick, productPhotoDataUris, productPhotoInstruction } from './productAngles'
@@ -48,19 +49,14 @@ export const CONTINUOUS_DEFAULT_MODEL_ID = 'bytedance/seedance-1.5-pro'
 // per-frame "Add concept" button.
 export const CONCEPTS_PER_FRAME = 3
 
-// ~2.4 words/sec narration pace — same assumption as Scripts.
-const WORDS_PER_SECOND = 2.4
-
-function wordCount(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length
-}
-
-// Clip length for one scene's narration slice. These clips are quick, punchy
-// beats — floor at 3s so a five-word line still gets a real move.
+// Clip length for one scene's narration slice. The estimator itself now lives
+// in services/clipDuration, shared with Line-by-Line — the two modes cut the
+// same script into the same beats, so they had no business disagreeing about
+// how long a line takes to say. What's local is the floor: these clips are
+// quick, punchy beats, so a five-word line still gets a real move at 3s rather
+// than the 4s a talking-head card wants.
 export function sceneDuration(scriptLine: string, modelId: string): number {
-  const durations = getModel(modelId)?.videoConstraints?.durations ?? []
-  const raw = Math.max(3, Math.ceil(wordCount(scriptLine) / WORDS_PER_SECOND))
-  return durations.length > 0 ? snapVideoDurationUp(raw, durations) : raw
+  return autoClipSeconds(scriptLine, modelId, { min: 3 })
 }
 
 // ── Visual styles ──────────────────────────────────────────────

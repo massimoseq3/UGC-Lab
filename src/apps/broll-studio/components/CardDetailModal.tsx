@@ -52,6 +52,11 @@ import {
   StyleNote,
 } from './cardDetailParts'
 import { appliedStyleNote } from '../services/generateContinuous'
+import { autoClipSeconds, cardClipSeconds } from '../services/clipDuration'
+
+// Sentinel value for the duration chip's "Auto" row. Not a length, so it can't
+// collide with a model's own ladder.
+const AUTO_DURATION = 'auto'
 
 // After deleting tile #removed, shift the saved/saving index sets so they
 // still point at the right tiles (indices above the removed one slide down).
@@ -315,7 +320,13 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     if (c.aspectRatios.length > 0 && !c.aspectRatios.includes(cardState.cardVideoAspectRatio)) {
       updates.cardVideoAspectRatio = c.aspectRatios[0]
     }
-    const snappedDuration = snapVideoDuration(cardState.cardVideoDurationSeconds, c.durations)
+    // An Auto length re-derives from the line onto the new model's ladder
+    // (snapped UP — rounding a spoken line down truncates it). A length the
+    // member picked keeps the old snap-down posture: it's their number, and
+    // the only job here is to make it one this model actually offers.
+    const snappedDuration = cardState.cardVideoDurationAuto !== false
+      ? autoClipSeconds(scriptLine, videoModelId)
+      : snapVideoDuration(cardState.cardVideoDurationSeconds, c.durations)
     if (snappedDuration !== cardState.cardVideoDurationSeconds) {
       updates.cardVideoDurationSeconds = snappedDuration
     }
@@ -354,6 +365,13 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     handleCommitDraft(draft)
   }
 
+  // What this card will actually fire with — its line's own estimate while the
+  // length is Auto, the member's pick otherwise. Everything in this modal that
+  // shows or prices a duration reads THIS, never the raw field, so the chip,
+  // the credit estimates and the generation can't disagree.
+  const durationIsAuto = cardState.cardVideoDurationAuto !== false
+  const effectiveVideoDuration = cardClipSeconds(cardState, scriptLine, videoModelId)
+
   // Credits estimate strings — surfaced in the Generate buttons as "(N credits)".
   // Both price the whole run: the card's queues are parallel, so a count of 3
   // is three tasks and three bills.
@@ -363,7 +381,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   const videoCreditsFor = (n: number) => {
     if (!videoModelId) return null
     const one = estimateCredits(videoModelId, {
-      durationSeconds: cardState.cardVideoDurationSeconds,
+      durationSeconds: effectiveVideoDuration,
       resolution: cardState.cardVideoResolution,
       audio: cardState.cardVideoAudio,
     })
@@ -752,7 +770,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         ? "Greyed-out models can't animate a still — they take neither a start frame nor reference images. Pick Seedance 2.0, Gemini Omni, or another still-capable model."
                         : "Greyed-out models don't support reference image-to-video. To use these, generate still frames in the Image tab, then send them to Playground for start/end frames."}
                       costParams={{
-                        durationSeconds: cardState.cardVideoDurationSeconds,
+                        durationSeconds: effectiveVideoDuration,
                         resolution: cardState.cardVideoResolution,
                         audio: cardState.cardVideoAudio,
                       }}
@@ -835,15 +853,41 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                             )}
                           />
                         )}
+                        {/* Clip length. `Auto` leads the menu and is where a
+                            card starts: the clip has to hold this scene's
+                            line, and the line is the only thing that knows how
+                            long that takes. The trigger spells the resolved
+                            number out ("Auto · 8s") so nothing is hidden behind
+                            the word — a member comparing two cards can see why
+                            one is longer. Picking a number pins it. */}
                         {videoConstraints.durations.length > 0 && (
                           <ConstraintChip
                             grow
                             size="lg"
                             openDirection="up"
-                            options={videoConstraints.durations.map(String)}
-                            value={String(cardState.cardVideoDurationSeconds)}
-                            onChange={(v) => onUpdateState({ cardVideoDurationSeconds: Number(v) })}
-                            render={(v) => <span>{v}s</span>}
+                            options={[AUTO_DURATION, ...videoConstraints.durations.map(String)]}
+                            value={durationIsAuto ? AUTO_DURATION : String(cardState.cardVideoDurationSeconds)}
+                            onChange={(v) => onUpdateState(
+                              v === AUTO_DURATION
+                                // Keep the raw field in step with the estimate, so
+                                // anything reading the card without a line to hand
+                                // still sees the length it will fire with.
+                                ? { cardVideoDurationAuto: true, cardVideoDurationSeconds: effectiveVideoDuration }
+                                : { cardVideoDurationAuto: false, cardVideoDurationSeconds: Number(v) },
+                            )}
+                            render={(v) => (
+                              <span>{v === AUTO_DURATION ? `Auto · ${effectiveVideoDuration}s` : `${v}s`}</span>
+                            )}
+                            renderOption={(v) => (
+                              v === AUTO_DURATION ? (
+                                <span className="flex w-full items-center justify-between gap-6">
+                                  <span>Auto</span>
+                                  <span className="text-ink-500">fits the line</span>
+                                </span>
+                              ) : (
+                                <span>{v}s</span>
+                              )
+                            )}
                           />
                         )}
                         {videoConstraints.supportsAudio && (

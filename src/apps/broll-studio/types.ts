@@ -223,7 +223,11 @@ export interface InFlightVideo {
 export interface BatchVideoSettings {
   modelId: string
   resolution: string
-  durationSeconds: number
+  // One clip length for the whole run — or ABSENT for "Auto", where each card
+  // uses its own per-line estimate (the batch dialog's default). A storyboard
+  // is a dozen lines of different lengths, so one number for all of them is
+  // the flat-5s problem wearing a dialog.
+  durationSeconds?: number
 }
 
 export interface CardState {
@@ -260,6 +264,14 @@ export interface CardState {
   // Per-card video generation settings.
   cardVideoAspectRatio: string
   cardVideoDurationSeconds: number
+  // True while the clip length is the app's own per-line estimate rather than
+  // a number the member picked — see services/clipDuration. A card fires (and
+  // its modal displays) `cardClipSeconds`, which re-derives the estimate from
+  // the scene's line against whichever model is picked; the number in
+  // `cardVideoDurationSeconds` is what the card was seeded with, and is what
+  // fires once this is false. Picking a length in the duration chip sets it
+  // false; picking "Auto" there sets it back.
+  cardVideoDurationAuto?: boolean
   cardVideoResolution: string
   cardVideoAudio: boolean
   // True while the prompt-rewrite LLM call is in flight (Enhance or Regenerate).
