@@ -5,6 +5,7 @@ import GenerationProgress from '../../../components/GenerationProgress'
 import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage, BatchVideoSettings } from '../types'
 import type { Product, Model } from '../../../stores/types'
 import { createDefaultCardState } from '../cardState'
+import { cardClipSeconds } from '../services/clipDuration'
 import type { VideoHistoryItem } from '../../../stores/types'
 import { finishImageTask, resolveImageModelId } from '../services/generateBroll'
 import { getContinuousStyle } from '../services/generateContinuous'
@@ -15,7 +16,7 @@ import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { useCreditsStore } from '../../../stores/creditsStore'
-import { getDefaultModel, getModel, estimateCredits, formatCredits, snapVideoDuration, videoResolutionLabel, type ImageResolution, type Mode } from '../../../utils/models'
+import { getDefaultModel, getModel, estimateCredits, formatCredits, videoResolutionLabel, type ImageResolution, type Mode } from '../../../utils/models'
 import ModelPicker from '../../../components/ModelPicker'
 import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
@@ -60,10 +61,23 @@ interface ScenesViewProps {
 
 // Defaults for a bulk video run — deliberately the cheap tier. A batch here is
 // one clip per card (often a dozen at once) on the member's own credits, so it
-// starts at the smallest usable size and the shortest cut rather than inheriting
-// whatever each card was last left on. Both clamp to the chosen model's grid.
+// starts at the smallest usable size rather than inheriting whatever each card
+// was last left on. It clamps to the chosen model's grid.
 const BATCH_VIDEO_RESOLUTION = '480p'
-const BATCH_VIDEO_DURATION = 5
+
+// Clip length is the exception, and it defaults to AUTO: a storyboard is a
+// dozen lines of different lengths, so one number for all of them is exactly
+// the flat-5s problem the per-line estimate exists to fix — the long lines come
+// back gabbled and the short ones come back slow. Each card uses its own length
+// (its line's estimate, or whatever the member pinned in its modal) unless the
+// dialog is set to a fixed number, which is still one click away.
+const AUTO_DURATION = 'auto'
+
+// Stands in for a card that somehow has no state yet when the dialog prices the
+// run. Only reachable between a fresh storyboard landing and the card-state
+// rebuild, and only as a number to multiply — the card itself re-derives its
+// own length when it fires.
+const BATCH_VIDEO_DURATION_FALLBACK = 5
 
 // The two ways a card's still can drive a clip: as a true first frame, or as a
 // reference image (Gemini Omni's only route — it has no image-to-video mode but
@@ -328,6 +342,7 @@ export default function ScenesView({
   const [includeExistingVideos, setIncludeExistingVideos] = useState(false)
   const [batchVideoOverride, setBatchVideoOverride] = useState<BatchVideoSettings | null>(null)
   const [batchVideoResolution, setBatchVideoResolution] = useState<string | undefined>(undefined)
+  // undefined = untouched (→ Auto); a number = a length pinned for the whole run.
   const [batchVideoDuration, setBatchVideoDuration] = useState<number | undefined>(undefined)
   useCloseOnAppSwitch(!!videoConfirm, () => setVideoConfirm(null))
   useCloseOnEscape(!!videoConfirm, () => setVideoConfirm(null))
@@ -344,12 +359,27 @@ export default function ScenesView({
       : batchVideoResOptions.includes(BATCH_VIDEO_RESOLUTION)
         ? BATCH_VIDEO_RESOLUTION
         : batchVideoConstraints?.default ?? batchVideoResOptions[0] ?? '720p'
-  const effectiveVideoDuration =
+  // The length pinned for the whole run, or undefined for Auto. A pin the
+  // picked model doesn't offer falls back to Auto rather than snapping to some
+  // other number — a model swap inside the dialog shouldn't quietly re-tier a
+  // dozen clips to a length nobody chose.
+  const pinnedVideoDuration =
     batchVideoDuration && batchVideoDurationOptions.includes(batchVideoDuration)
       ? batchVideoDuration
-      : batchVideoDurationOptions.length > 0
-        ? snapVideoDuration(BATCH_VIDEO_DURATION, batchVideoDurationOptions)
-        : BATCH_VIDEO_DURATION
+      : undefined
+  // Card key → the script line that card's clip has to hold, so an Auto run can
+  // price each card at its own length.
+  const scriptLineByKey: Record<string, string> = {}
+  for (const scene of result?.scenes ?? []) {
+    for (let i = 0; i < scene.variations.length; i++) scriptLineByKey[`${scene.number}-${i}`] = scene.scriptLine
+  }
+  const clipSecondsFor = (key: string) =>
+    pinnedVideoDuration
+      ?? cardClipSeconds(
+        cardStates[key] ?? { cardVideoDurationSeconds: BATCH_VIDEO_DURATION_FALLBACK },
+        scriptLineByKey[key] ?? '',
+        batchVideoModelId,
+      )
   const hasVideo = (key: string) => (cardStates[key]?.videos.length ?? 0) > 0
   // What makes a card eligible for this run: a still to animate, or (for a
   // plain video batch) just a prompt to render from.
@@ -378,13 +408,29 @@ export default function ScenesView({
     ? videoTargets.reduce<number | null>((sum, key) => {
         if (sum === null) return null
         const credits = estimateCredits(batchVideoModelId, {
-          durationSeconds: effectiveVideoDuration,
+          durationSeconds: clipSecondsFor(key),
           resolution: effectiveVideoRes,
           audio: cardStates[key]?.cardVideoAudio ?? true,
         })
         return credits == null ? null : sum + credits
       }, 0)
     : null
+  // What the run's clip lengths actually come out as, for the Auto chip: one
+  // number when every line lands the same, a range otherwise. Every clip in the
+  // run is billed, so the spread it's paying for belongs on screen.
+  const videoTargetSeconds = videoTargets.map(clipSecondsFor)
+  const autoDurationLabel = videoTargetSeconds.length === 0
+    ? 'Auto'
+    : (() => {
+        const lo = Math.min(...videoTargetSeconds)
+        const hi = Math.max(...videoTargetSeconds)
+        return lo === hi ? `Auto · ${lo}s` : `Auto · ${lo}–${hi}s`
+      })()
+  // A single representative length for the model picker's price comparison —
+  // it ranks models against each other, so the run's average is enough.
+  const representativeSeconds = videoTargetSeconds.length > 0
+    ? Math.round(videoTargetSeconds.reduce((a, b) => a + b, 0) / videoTargetSeconds.length)
+    : pinnedVideoDuration ?? BATCH_VIDEO_DURATION_FALLBACK
   const videoOverBudget = videoBatchCredits != null && balance !== null && videoBatchCredits > balance
   // A model that takes neither a start frame nor reference images can't animate
   // a still, so every card holding one would fail at fire time — a dozen
@@ -420,7 +466,8 @@ export default function ScenesView({
     setBatchVideoOverride({
       modelId: batchVideoModelId,
       resolution: effectiveVideoRes,
-      durationSeconds: effectiveVideoDuration,
+      // Absent on an Auto run — each card then uses its own per-line length.
+      ...(pinnedVideoDuration ? { durationSeconds: pinnedVideoDuration } : {}),
     })
     setVideoTokens((prev) => {
       const next = { ...prev }
@@ -450,7 +497,7 @@ export default function ScenesView({
             existing.editablePrompt === v.prompt
             || existing.promptHistory?.includes(v.prompt)
           )
-          next[key] = matchesHistory ? existing : createDefaultCardState(v)
+          next[key] = matchesHistory ? existing : createDefaultCardState(v, scene.scriptLine)
         }
       }
       return next
@@ -1040,7 +1087,7 @@ export default function ScenesView({
               <ModelPicker
                 appId="broll-studio"
                 task="video"
-                costParams={{ durationSeconds: effectiveVideoDuration, resolution: effectiveVideoRes }}
+                costParams={{ durationSeconds: representativeSeconds, resolution: effectiveVideoRes }}
                 requireAnyModes={videoAnimateCount > 0 ? STILL_CAPABLE_MODES : undefined}
                 requireModeNote="Greyed-out models can't animate a still — they take neither a start frame nor reference images."
               />
@@ -1056,14 +1103,30 @@ export default function ScenesView({
                       render={videoResolutionLabel}
                     />
                   )}
+                  {/* Clip length, defaulting to Auto — one length per line
+                      rather than one length for the storyboard. The trigger
+                      reads back the run's real spread ("Auto · 5–10s"), since
+                      every one of those seconds is billed on the button below. */}
                   {batchVideoDurationOptions.length > 0 && (
                     <ConstraintChip
                       grow
                       openDirection="up"
-                      options={batchVideoDurationOptions.map(String)}
-                      value={String(effectiveVideoDuration)}
-                      onChange={(v) => setBatchVideoDuration(Number(v))}
-                      render={(v) => <span>{v}s</span>}
+                      options={[AUTO_DURATION, ...batchVideoDurationOptions.map(String)]}
+                      value={pinnedVideoDuration ? String(pinnedVideoDuration) : AUTO_DURATION}
+                      onChange={(v) => setBatchVideoDuration(v === AUTO_DURATION ? undefined : Number(v))}
+                      render={(v) => (
+                        <span>{v === AUTO_DURATION ? autoDurationLabel : `${v}s`}</span>
+                      )}
+                      renderOption={(v) => (
+                        v === AUTO_DURATION ? (
+                          <span className="flex w-full items-center justify-between gap-6">
+                            <span>Auto</span>
+                            <span className="text-ink-500">fits each line</span>
+                          </span>
+                        ) : (
+                          <span>{v}s</span>
+                        )
+                      )}
                     />
                   )}
                 </div>
@@ -1531,7 +1594,7 @@ function SceneSection({
       <div className={`grid grid-cols-2 gap-3 md:grid-cols-3 ${scene.variations.length >= 4 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
         {scene.variations.map((variation, i) => {
           const key = `${scene.number}-${i}`
-          const state = cardStates[key] ?? createDefaultCardState(variation)
+          const state = cardStates[key] ?? createDefaultCardState(variation, scene.scriptLine)
           return (
             <VariationCardRow
               key={variation.id}

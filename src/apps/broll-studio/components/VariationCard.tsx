@@ -16,6 +16,7 @@ import { enhanceVariationPrompt, generateNewVariation, startImageTask, finishIma
 import { attachProductAngles, productRefsForSelection } from '../services/productAngles'
 import { applyStyleToPrompt } from '../services/generateContinuous'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
+import { cardClipSeconds } from '../services/clipDuration'
 import { claimTask, releaseTask } from '../services/taskRegistry'
 import { sendClipToPlayground } from '../services/sendClipToPlayground'
 import { isPollTimeout } from '../../../utils/kie'
@@ -515,8 +516,10 @@ export default function VariationCard(props: VariationCardProps) {
     startFrameRef?: string,
     // A batch run's shared resolution/duration, standing in for the card's own.
     // The card's persisted settings are left untouched, exactly as the image
-    // batch does — the run is one-off, not a new default for the card.
-    batchSettings?: { resolution: string; durationSeconds: number },
+    // batch does — the run is one-off, not a new default for the card. An
+    // absent `durationSeconds` is the dialog's Auto length: each card keeps its
+    // own per-line estimate.
+    batchSettings?: { resolution: string; durationSeconds?: number },
   ) => {
     if (!videoModelId) {
       useAppStore.getState().addToast('No video model configured.', 'error')
@@ -574,7 +577,12 @@ export default function VariationCard(props: VariationCardProps) {
     const inFlightId = crypto.randomUUID()
     const promptText = cardState.editablePrompt
     const videoAspectRatio = cardState.cardVideoAspectRatio
-    const videoDurationSeconds = batchSettings?.durationSeconds ?? cardState.cardVideoDurationSeconds
+    // The clip has to hold this card's line: unless the run pins one length for
+    // everything, the length is derived per card (the line's own estimate while
+    // it's Auto, the member's pick otherwise) and snapped onto THIS model's
+    // ladder — the card may have been seeded against a different one.
+    const videoDurationSeconds = batchSettings?.durationSeconds
+      ?? cardClipSeconds(cardState, scriptLine, videoModelId)
     const videoResolution = batchSettings?.resolution ?? cardState.cardVideoResolution
     const videoAudio = cardState.cardVideoAudio
     const sourceBRollId = cardState.videoSourceBRollId
@@ -710,7 +718,7 @@ export default function VariationCard(props: VariationCardProps) {
   const handleAnimate = async (
     startFrameRef: string | undefined,
     videoModelId: string | undefined,
-    batchSettings?: { resolution: string; durationSeconds: number },
+    batchSettings?: { resolution: string; durationSeconds?: number },
   ) => {
     if (!startFrameRef) {
       useAppStore.getState().addToast('Generate or pick an image to animate first.', 'error')
@@ -736,7 +744,7 @@ export default function VariationCard(props: VariationCardProps) {
 
   const handleGenerateVideo = async (
     videoModelId: string | undefined,
-    batchSettings?: { resolution: string; durationSeconds: number },
+    batchSettings?: { resolution: string; durationSeconds?: number },
   ) => {
     const refs = buildCardRefs(videoModelId)
     const referenceDataUris: string[] = []

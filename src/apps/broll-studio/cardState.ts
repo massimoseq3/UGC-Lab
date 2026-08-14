@@ -2,15 +2,21 @@ import type { PromptVariation, CardState, ContinuousConcept, ContinuousScene, Co
 import { refsToToggles } from './types'
 import { getDefaultModel, getModel, snapVideoDuration, type ImageResolution } from '../../utils/models'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { autoClipSeconds } from './services/clipDuration'
 
 // Card-state factory + legacy-shape migration. Lives in its own module (not
 // inside ScenesView / RightPanel) so those component files only export
 // components — keeps React Fast Refresh working when editing the B-Roll UI.
 
+// The video model a fresh card will generate with.
+function selectedVideoModelId(): string | undefined {
+  return useSettingsStore.getState().getAppModel('broll-studio:video')
+    ?? getDefaultModel('broll-studio', 'video')?.id
+}
+
 // Constraints of the video model a fresh card will generate with.
 function selectedVideoConstraints() {
-  const modelId = useSettingsStore.getState().getAppModel('broll-studio:video')
-    ?? getDefaultModel('broll-studio', 'video')?.id
+  const modelId = selectedVideoModelId()
   return modelId ? getModel(modelId)?.videoConstraints : undefined
 }
 
@@ -25,22 +31,27 @@ function defaultVideoResolution(): string {
   return c.default ?? (c.resolutions.includes('720p') ? '720p' : c.resolutions[0] ?? '720p')
 }
 
-// Same idea for clip length: the card wants 5s, but a model that doesn't offer
-// it snaps to the nearest option at or below (Omni [4,6,8,10] → 4s). Seeding
-// here rather than leaning on the modal's snap matters because Omni's
-// buildVideoInput coerces an off-grid duration to 8s — so a card generated
-// straight from the grid, never opened, would otherwise bill double the card
-// the user opened first.
-function defaultVideoDuration(): number {
+// Clip length. When the card is a scene's variation we know the line it has to
+// hold, so the length is the line's own estimate (see services/clipDuration) —
+// a card is Auto until the member picks a number in its modal. Absent a line
+// (a hand-added card, a placeholder) it falls back to the app-wide 5s, snapped
+// to the nearest option at or below on a model that doesn't offer it (Omni
+// [4,6,8,10] → 4s). Seeding here rather than leaning on the modal's snap
+// matters because Omni's buildVideoInput coerces an off-grid duration to 8s —
+// so a card generated straight from the grid, never opened, would otherwise
+// bill double the card the user opened first.
+function defaultVideoDuration(scriptLine?: string): number {
+  if (scriptLine?.trim()) return autoClipSeconds(scriptLine, selectedVideoModelId())
   const c = selectedVideoConstraints()
   return c ? snapVideoDuration(5, c.durations) : 5
 }
 
 // Initial CardState for a freshly-mounted variation. Per-card settings
-// default to 9:16 / 1K / 5s / audio-on — same defaults the old global
-// SettingsPopover used as seed values. Video resolution and duration follow
-// the selected model's preferred tier (see the two helpers above).
-export function createDefaultCardState(variation: PromptVariation): CardState {
+// default to 9:16 / 1K / audio-on — same defaults the old global
+// SettingsPopover used as seed values. Video resolution follows the selected
+// model's preferred tier, and clip length follows the scene's own line (see
+// the two helpers above).
+export function createDefaultCardState(variation: PromptVariation, scriptLine?: string): CardState {
   const { refsCharacter, refsProduct } = refsToToggles(variation.refs ?? 'both')
   const initialPrompt = variation.prompt ?? ''
   return {
@@ -79,7 +90,12 @@ export function createDefaultCardState(variation: PromptVariation): CardState {
     cardImageAspectRatio: '9:16',
     cardImageResolution: '1K',
     cardVideoAspectRatio: '9:16',
-    cardVideoDurationSeconds: defaultVideoDuration(),
+    cardVideoDurationSeconds: defaultVideoDuration(scriptLine),
+    // Auto until the member picks a length in the card modal: the clip has to
+    // hold this scene's line, and the line is the only thing that knows how
+    // long that is. Stays true through a model swap so the estimate re-snaps
+    // onto the new model's ladder rather than keeping the old one's number.
+    cardVideoDurationAuto: true,
     cardVideoResolution: defaultVideoResolution(),
     cardVideoAudio: true,
     isPromptWorking: false,
@@ -100,6 +116,11 @@ export function createDefaultCardState(variation: PromptVariation): CardState {
     videoPrompt: null,
   }
 }
+
+// The only clip lengths the pre-Auto seeder could produce: the app-wide 5s, and
+// the 4s it snapped down to on a model whose ladder skips 5 (Gemini Omni,
+// Seedance 1.5 Pro). See the note on cardVideoDurationAuto below.
+const SEEDED_DURATIONS = [4, 5]
 
 // Backfill new fields on legacy persisted card entries so older B-Roll runs
 // keep working after this rev. Defaults match what createDefaultCardState
@@ -175,6 +196,16 @@ export function backfillCardState(card: Partial<CardState> & Record<string, unkn
     cardImageResolution: (card.cardImageResolution as ImageResolution) ?? '1K',
     cardVideoAspectRatio: (card.cardVideoAspectRatio as string) ?? '9:16',
     cardVideoDurationSeconds: (card.cardVideoDurationSeconds as number) ?? 5,
+    // Cards persisted before the flag existed all stored a number whether or
+    // not anyone chose it, so "a stored value is a real pick" — the rule the
+    // rest of the app goes by — doesn't hold here. What does hold is that the
+    // old seeder could only ever produce SEEDED_DURATIONS: anything else in
+    // this slot was typed by a member and stays theirs, and those two values
+    // are exactly the "nobody picked this" case that becomes Auto. A member
+    // who really did pick 4s or 5s loses nothing worth keeping — a short line
+    // estimates back to the same number, and a long one gets the fix.
+    cardVideoDurationAuto: (card.cardVideoDurationAuto as boolean | undefined)
+      ?? SEEDED_DURATIONS.includes((card.cardVideoDurationSeconds as number) ?? 5),
     cardVideoResolution: (card.cardVideoResolution as string) ?? '720p',
     cardVideoAudio: card.cardVideoAudio !== false,
     isPromptWorking: false,
