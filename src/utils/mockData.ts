@@ -50,6 +50,7 @@ interface Manifest {
   voices: string[]
   brolls: string[]
   styles: string[]
+  swipes: string[]
   characterHistory: string[]
   scriptHistory: string[]
   imageHistory: string[]
@@ -65,7 +66,7 @@ interface Manifest {
 }
 
 const EMPTY_MANIFEST: Manifest = {
-  products: [], models: [], scripts: [], voices: [], brolls: [], styles: [],
+  products: [], models: [], scripts: [], voices: [], brolls: [], styles: [], swipes: [],
   characterHistory: [], scriptHistory: [], imageHistory: [], brollHistory: [],
   videoHistory: [], voiceHistory: [], musicHistory: [], adAnatomyHistory: [],
   usageDays: [],
@@ -308,6 +309,63 @@ const STYLES = [
     name: 'Night Neon UGC',
     brief: 'Handheld night footage lit by whatever the city provides: magenta and cyan neon spill, wet reflective surfaces, and deep shadows that hold visible sensor noise. Highlights bloom and smear slightly, white balance shifts between sources, and focus hunts for a beat before settling. Raw, unpolished, and alive with ambient light.',
     frames: [{ from: '#a855f7', to: '#0e7490' }, { from: '#ec4899', to: '#1e1b4b' }],
+  },
+]
+
+// Swipe file (ads saved from Outliers). Two rules a seeded row has to respect,
+// both of them the real bank's: the numbers are a SNAPSHOT as saved (never a
+// live feed), and `mediaUrl` is left off — a demo row can't carry a signed CDN
+// link, and a swipe with no media link is the normal state of one a week old,
+// which is exactly the state the detail view's "Restore video" is written for.
+// One of each platform, because the two render differently: Meta publishes no
+// engagement numbers, so a Meta row shows its runtime badge and nothing else.
+const SWIPES = [
+  {
+    platform: 'tiktok' as const,
+    sourceId: '7412998311122334455',
+    postUrl: 'https://www.tiktok.com/@mayaonmain/video/7412998311122334455',
+    from: '#fb7185', to: '#7f1d1d',
+    label: 'I almost returned this',
+    authorHandle: 'mayaonmain',
+    authorName: 'Maya · skin stuff',
+    caption: 'not me gatekeeping this for 3 months 😭 #skincare #vitaminc #glowup',
+    // Already fetched before it was saved, so it rode along free — the
+    // ready-transcript path (Copy transcript, Remix without paying again).
+    transcript: "Okay so I almost returned this serum, and now I'm on my third bottle. My skin was so dull I'd cake on foundation just to look awake. Then I used this for a week and people asked if I'd been on holiday. It's 15% vitamin C, no sticky finish, zero fragrance. They're doing 20% off right now — don't sleep on it.",
+    views: 2_140_000, likes: 318_000, comments: 4_120, shares: 21_800, saves: 96_400,
+    followerCount: 84_300,
+    outlierMultiple: 25.4,
+    starred: true,
+  },
+  {
+    platform: 'tiktok' as const,
+    sourceId: '7398220114455667788',
+    postUrl: 'https://www.tiktok.com/@restedwithliam/video/7398220114455667788',
+    from: '#38bdf8', to: '#1e3a8a',
+    label: 'I thought I was bad at sleeping',
+    authorHandle: 'restedwithliam',
+    authorName: 'Liam',
+    caption: 'turns out my 4pm coffee was the whole problem. day 60 with the ring ☕️🥲 #sleep #recovery',
+    // No transcript on purpose: this is the state a card is in the moment it's
+    // saved without one, and the detail view offers to fetch it for a credit.
+    views: 486_000, likes: 41_200, comments: 1_930, shares: 3_640, saves: 12_700,
+    followerCount: 22_100,
+    outlierMultiple: 4.6,
+  },
+  {
+    platform: 'meta' as const,
+    sourceId: '1204418899321177',
+    postUrl: 'https://www.facebook.com/ads/library/?id=1204418899321177',
+    from: '#e5e7eb', to: '#475569',
+    label: 'Know why you wake up tired',
+    authorHandle: 'focusband',
+    authorName: 'FocusBand',
+    caption: 'Know why you wake up tired. 7-day battery, no subscription, clinical-grade sleep tracking. Free sizing kit with every ring.',
+    // Meta publishes no spend or reach for a commercial ad, so a Meta swipe
+    // carries its runtime and its page likes and nothing else — inventing a
+    // views figure here would seed a number the real app never produces.
+    followerCount: 128_000,
+    daysRunning: 143,
   },
 ]
 
@@ -568,6 +626,7 @@ function idSnapshot() {
     voices: s.voices.map((x) => x.id),
     brolls: s.brolls.map((x) => x.id),
     styles: s.styles.map((x) => x.id),
+    swipes: s.swipes.map((x) => x.id),
     characterHistory: s.characterHistory.map((x) => x.id),
     scriptHistory: s.scriptHistory.map((x) => x.id),
     imageHistory: s.imageHistory.map((x) => x.id),
@@ -699,6 +758,18 @@ export async function seedMockData(): Promise<void> {
       const b = BROLLS[i]
       const img = await makeImageAsset({ w: 768, h: 1365, from: b.from, to: b.to, label: `B-Roll ${i + 1}`, sub: 'broll-studio' })
       await store.addBRoll({ imageUrl: img, prompt: b.prompt, sourceApp: 'broll-studio' })
+    }
+
+    // Swipe file — ads "saved from Outliers". The cover is drawn and saved as
+    // our OWN asset, exactly as saveThumbnail does for a real save: the whole
+    // point of the row is that the picture outlives the platform's signed link.
+    for (const s of SWIPES) {
+      const { from, to, label, ...row } = s
+      const thumbRef = await makeImageAsset({
+        w: 768, h: 1365, from, to, label,
+        sub: s.platform === 'tiktok' ? `@${s.authorHandle}` : `${s.authorName} · Meta`,
+      })
+      await store.addSwipe({ ...row, thumbRef })
     }
 
     // Influencers tab — generation history (portraits + a sheet)
@@ -1198,6 +1269,7 @@ export async function removeMockData(): Promise<void> {
     for (const id of manifest.voices) await store.deleteVoice(id)
     for (const id of manifest.brolls) await store.deleteBRoll(id)
     for (const id of manifest.styles) await store.deleteStyle(id)
+    for (const id of manifest.swipes) await store.deleteSwipe(id)
     for (const id of manifest.characterHistory) await store.deleteCharacterHistory(id)
     for (const id of manifest.scriptHistory) await store.deleteScriptHistory(id)
     for (const id of manifest.imageHistory) await store.deleteImageHistory(id)
