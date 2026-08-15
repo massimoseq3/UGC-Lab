@@ -5,7 +5,7 @@ import GenerationProgress from '../../../components/GenerationProgress'
 import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage, BatchVideoSettings } from '../types'
 import type { Product, Model } from '../../../stores/types'
 import { createDefaultCardState } from '../cardState'
-import { cardClipSeconds } from '../services/clipDuration'
+import { cardClipSeconds, speaksItsLine } from '../services/clipDuration'
 import type { VideoHistoryItem } from '../../../stores/types'
 import { finishImageTask, resolveImageModelId } from '../services/generateBroll'
 import { getContinuousStyle } from '../services/generateContinuous'
@@ -16,7 +16,7 @@ import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { useCreditsStore } from '../../../stores/creditsStore'
-import { getDefaultModel, getModel, estimateCredits, formatCredits, videoResolutionLabel, type ImageResolution, type Mode } from '../../../utils/models'
+import { getDefaultModel, getModel, estimateCredits, formatCredits, snapVideoDuration, videoResolutionLabel, type ImageResolution, type Mode } from '../../../utils/models'
 import ModelPicker from '../../../components/ModelPicker'
 import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
@@ -65,12 +65,14 @@ interface ScenesViewProps {
 // was last left on. It clamps to the chosen model's grid.
 const BATCH_VIDEO_RESOLUTION = '480p'
 
-// Clip length is the exception, and it defaults to AUTO: a storyboard is a
-// dozen lines of different lengths, so one number for all of them is exactly
-// the flat-5s problem the per-line estimate exists to fix — the long lines come
-// back gabbled and the short ones come back slow. Each card uses its own length
-// (its line's estimate, or whatever the member pinned in its modal) unless the
-// dialog is set to a fixed number, which is still one click away.
+// Clip length is the exception on a WITH DIALOGUE storyboard, and there it
+// defaults to AUTO: a dozen spoken lines are a dozen different lengths, so one
+// number for all of them is exactly the flat-5s problem the per-line estimate
+// exists to fix — the long lines come back gabbled and the short ones come back
+// slow. Each card uses its own length (its line's estimate, or whatever the
+// member pinned in its modal) unless the dialog is set to a fixed number, which
+// is still one click away. A silent b-roll run never offers this row: nothing in
+// it is speaking, so there are no words for a length to follow.
 const AUTO_DURATION = 'auto'
 
 // Stands in for a card that somehow has no state yet when the dialog prices the
@@ -359,26 +361,43 @@ export default function ScenesView({
       : batchVideoResOptions.includes(BATCH_VIDEO_RESOLUTION)
         ? BATCH_VIDEO_RESOLUTION
         : batchVideoConstraints?.default ?? batchVideoResOptions[0] ?? '720p'
+  // Card key → the script line that card's clip has to hold, and whether that
+  // card SPEAKS it, so an Auto run can price each card at its own length.
+  const scriptLineByKey: Record<string, string> = {}
+  const spokenByKey: Record<string, boolean> = {}
+  for (const scene of result?.scenes ?? []) {
+    for (let i = 0; i < scene.variations.length; i++) {
+      scriptLineByKey[`${scene.number}-${i}`] = scene.scriptLine
+      spokenByKey[`${scene.number}-${i}`] = speaksItsLine(scene.variations[i])
+    }
+  }
+  // Auto is only on this menu when some card in the storyboard speaks its line —
+  // i.e. this is a With Dialogue session. A silent b-roll run has no words to
+  // fit anywhere in it, so the run pins one length exactly as it did before Auto
+  // existed. Derived from the storyboard rather than from the ticked targets, so
+  // the chip doesn't change shape as options are scoped in and out.
+  const runHasSpokenCard = Object.values(spokenByKey).some(Boolean)
+  const defaultPinnedDuration = batchVideoDurationOptions.length > 0
+    ? snapVideoDuration(BATCH_VIDEO_DURATION_FALLBACK, batchVideoDurationOptions)
+    : BATCH_VIDEO_DURATION_FALLBACK
   // The length pinned for the whole run, or undefined for Auto. A pin the
   // picked model doesn't offer falls back to Auto rather than snapping to some
   // other number — a model swap inside the dialog shouldn't quietly re-tier a
-  // dozen clips to a length nobody chose.
+  // dozen clips to a length nobody chose. With no Auto to fall back to, it
+  // lands on the flat default instead.
   const pinnedVideoDuration =
     batchVideoDuration && batchVideoDurationOptions.includes(batchVideoDuration)
       ? batchVideoDuration
-      : undefined
-  // Card key → the script line that card's clip has to hold, so an Auto run can
-  // price each card at its own length.
-  const scriptLineByKey: Record<string, string> = {}
-  for (const scene of result?.scenes ?? []) {
-    for (let i = 0; i < scene.variations.length; i++) scriptLineByKey[`${scene.number}-${i}`] = scene.scriptLine
-  }
+      : runHasSpokenCard
+        ? undefined
+        : defaultPinnedDuration
   const clipSecondsFor = (key: string) =>
     pinnedVideoDuration
       ?? cardClipSeconds(
         cardStates[key] ?? { cardVideoDurationSeconds: BATCH_VIDEO_DURATION_FALLBACK },
         scriptLineByKey[key] ?? '',
         batchVideoModelId,
+        { spoken: spokenByKey[key] ?? false },
       )
   const hasVideo = (key: string) => (cardStates[key]?.videos.length ?? 0) > 0
   // What makes a card eligible for this run: a still to animate, or (for a
@@ -1103,15 +1122,21 @@ export default function ScenesView({
                       render={videoResolutionLabel}
                     />
                   )}
-                  {/* Clip length, defaulting to Auto — one length per line
-                      rather than one length for the storyboard. The trigger
-                      reads back the run's real spread ("Auto · 5–10s"), since
-                      every one of those seconds is billed on the button below. */}
+                  {/* Clip length. On a With Dialogue storyboard it defaults to
+                      Auto — one length per spoken line rather than one length
+                      for the whole run — and the trigger reads back the run's
+                      real spread ("Auto · 5–10s"), since every one of those
+                      seconds is billed on the button below. A silent b-roll run
+                      has no words to fit, so it's the plain ladder pinned for
+                      the run, as it was before Auto existed. */}
                   {batchVideoDurationOptions.length > 0 && (
                     <ConstraintChip
                       grow
                       openDirection="up"
-                      options={[AUTO_DURATION, ...batchVideoDurationOptions.map(String)]}
+                      options={[
+                        ...(runHasSpokenCard ? [AUTO_DURATION] : []),
+                        ...batchVideoDurationOptions.map(String),
+                      ]}
                       value={pinnedVideoDuration ? String(pinnedVideoDuration) : AUTO_DURATION}
                       onChange={(v) => setBatchVideoDuration(v === AUTO_DURATION ? undefined : Number(v))}
                       render={(v) => (

@@ -1489,6 +1489,20 @@ export function snapVideoDurationUp(current: number, durations: number[]): numbe
   return above.length > 0 ? above[0] : durations[durations.length - 1]
 }
 
+// Nearest option in either direction, ties going UP. For an ESTIMATE landing on
+// a coarse ladder: rounding a 6.3s estimate up to the 8s rung buys 1.7s of dead
+// air to protect against 0.3s of overrun, and a duration ladder is coarse enough
+// (…6, 8, 10, 12…) that always rounding up runs a whole rung long most of the
+// time. Half a rung either way is the honest treatment of a number that is
+// itself approximate.
+export function snapVideoDurationNearest(current: number, durations: number[]): number {
+  if (durations.length === 0 || durations.includes(current)) return current
+  // `<=` on an ascending ladder is what sends an exact tie to the longer rung.
+  return durations.reduce((best, d) =>
+    Math.abs(d - current) <= Math.abs(best - current) ? d : best,
+  )
+}
+
 // Representative params for a model's savings headline: its default
 // resolution and a mid-catalog duration, matching what the picker rows quote.
 function representativeParams(model: ModelEntry): CostEstimateParams {

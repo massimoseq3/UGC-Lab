@@ -577,12 +577,13 @@ export default function VariationCard(props: VariationCardProps) {
     const inFlightId = crypto.randomUUID()
     const promptText = cardState.editablePrompt
     const videoAspectRatio = cardState.cardVideoAspectRatio
-    // The clip has to hold this card's line: unless the run pins one length for
-    // everything, the length is derived per card (the line's own estimate while
-    // it's Auto, the member's pick otherwise) and snapped onto THIS model's
-    // ladder — the card may have been seeded against a different one.
+    // A talking card's clip has to hold its spoken line: unless the run pins one
+    // length for everything, the length is derived per card (the line's own
+    // estimate while it's Auto, the member's pick otherwise) and snapped onto
+    // THIS model's ladder — the card may have been seeded against a different
+    // one. A silent card has no words to fit and keeps the flat default.
     const videoDurationSeconds = batchSettings?.durationSeconds
-      ?? cardClipSeconds(cardState, scriptLine, videoModelId)
+      ?? cardClipSeconds(cardState, scriptLine, videoModelId, { spoken: isDialogue })
     const videoResolution = batchSettings?.resolution ?? cardState.cardVideoResolution
     const videoAudio = cardState.cardVideoAudio
     const sourceBRollId = cardState.videoSourceBRollId

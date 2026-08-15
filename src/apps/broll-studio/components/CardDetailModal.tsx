@@ -306,6 +306,17 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageModelId])
 
+  // What this card will actually fire with — its line's own estimate while the
+  // length is Auto, the member's pick otherwise. Everything in this modal that
+  // shows or prices a duration reads THIS, never the raw field, so the chip,
+  // the credit estimates and the generation can't disagree.
+  //
+  // Auto is a DIALOGUE card's answer only: a silent b-roll card is cutaway
+  // footage under a voiceover, so it has no words to fit and keeps the flat
+  // default. The chip below doesn't offer it there.
+  const durationIsAuto = isDialogue && cardState.cardVideoDurationAuto !== false
+  const effectiveVideoDuration = cardClipSeconds(cardState, scriptLine, videoModelId, { spoken: isDialogue })
+
   // Tracks the model across effect runs so a genuine model FLIP (vs the
   // modal simply mounting) can snap resolution to the new model's preferred
   // default. On mount we only clamp invalid values — the card's persisted
@@ -321,12 +332,13 @@ export default function CardDetailModal(props: CardDetailModalProps) {
       updates.cardVideoAspectRatio = c.aspectRatios[0]
     }
     // An Auto length re-derives from the line onto the new model's ladder
-    // (snapped UP — rounding a spoken line down truncates it). A length the
-    // member picked keeps the old snap-down posture: it's their number, and
-    // the only job here is to make it one this model actually offers.
-    const snappedDuration = cardState.cardVideoDurationAuto !== false
+    // (snapped UP — rounding a spoken line down truncates it). Any other length
+    // keeps the snap-down posture: it's the member's number (or the flat
+    // default on a silent card), and the only job here is to make it one this
+    // model actually offers.
+    const snappedDuration = durationIsAuto
       ? autoClipSeconds(scriptLine, videoModelId)
-      : snapVideoDuration(cardState.cardVideoDurationSeconds, c.durations)
+      : snapVideoDuration(effectiveVideoDuration, c.durations)
     if (snappedDuration !== cardState.cardVideoDurationSeconds) {
       updates.cardVideoDurationSeconds = snappedDuration
     }
@@ -364,13 +376,6 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     // explicit Edit/Done toggle anymore — the textarea is always live.
     handleCommitDraft(draft)
   }
-
-  // What this card will actually fire with — its line's own estimate while the
-  // length is Auto, the member's pick otherwise. Everything in this modal that
-  // shows or prices a duration reads THIS, never the raw field, so the chip,
-  // the credit estimates and the generation can't disagree.
-  const durationIsAuto = cardState.cardVideoDurationAuto !== false
-  const effectiveVideoDuration = cardClipSeconds(cardState, scriptLine, videoModelId)
 
   // Credits estimate strings — surfaced in the Generate buttons as "(N credits)".
   // Both price the whole run: the card's queues are parallel, so a count of 3
@@ -853,20 +858,26 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                             )}
                           />
                         )}
-                        {/* Clip length. `Auto` leads the menu and is where a
-                            card starts: the clip has to hold this scene's
-                            line, and the line is the only thing that knows how
-                            long that takes. The trigger spells the resolved
-                            number out ("Auto · 8s") so nothing is hidden behind
-                            the word — a member comparing two cards can see why
-                            one is longer. Picking a number pins it. */}
+                        {/* Clip length. On a DIALOGUE card `Auto` leads the menu
+                            and is where the card starts: the clip has to hold
+                            this scene's spoken line, and the line is the only
+                            thing that knows how long that takes. The trigger
+                            spells the resolved number out ("Auto · 8s") so
+                            nothing is hidden behind the word — a member
+                            comparing two cards can see why one is longer.
+                            Picking a number pins it. A silent b-roll card gets
+                            the plain ladder: no words to fit, so nothing to
+                            derive a length from. */}
                         {videoConstraints.durations.length > 0 && (
                           <ConstraintChip
                             grow
                             size="lg"
                             openDirection="up"
-                            options={[AUTO_DURATION, ...videoConstraints.durations.map(String)]}
-                            value={durationIsAuto ? AUTO_DURATION : String(cardState.cardVideoDurationSeconds)}
+                            options={[
+                              ...(isDialogue ? [AUTO_DURATION] : []),
+                              ...videoConstraints.durations.map(String),
+                            ]}
+                            value={durationIsAuto ? AUTO_DURATION : String(effectiveVideoDuration)}
                             onChange={(v) => onUpdateState(
                               v === AUTO_DURATION
                                 // Keep the raw field in step with the estimate, so

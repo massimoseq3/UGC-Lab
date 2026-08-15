@@ -2,7 +2,7 @@ import type { PromptVariation, CardState, ContinuousConcept, ContinuousScene, Co
 import { refsToToggles } from './types'
 import { getDefaultModel, getModel, snapVideoDuration, type ImageResolution } from '../../utils/models'
 import { useSettingsStore } from '../../stores/settingsStore'
-import { autoClipSeconds } from './services/clipDuration'
+import { autoClipSeconds, speaksItsLine, DEFAULT_CLIP_SECONDS } from './services/clipDuration'
 
 // Card-state factory + legacy-shape migration. Lives in its own module (not
 // inside ScenesView / RightPanel) so those component files only export
@@ -31,29 +31,31 @@ function defaultVideoResolution(): string {
   return c.default ?? (c.resolutions.includes('720p') ? '720p' : c.resolutions[0] ?? '720p')
 }
 
-// Clip length. When the card is a scene's variation we know the line it has to
-// hold, so the length is the line's own estimate (see services/clipDuration) —
-// a card is Auto until the member picks a number in its modal. Absent a line
-// (a hand-added card, a placeholder) it falls back to the app-wide 5s, snapped
-// to the nearest option at or below on a model that doesn't offer it (Omni
-// [4,6,8,10] → 4s). Seeding here rather than leaning on the modal's snap
-// matters because Omni's buildVideoInput coerces an off-grid duration to 8s —
-// so a card generated straight from the grid, never opened, would otherwise
-// bill double the card the user opened first.
-function defaultVideoDuration(scriptLine?: string): number {
-  if (scriptLine?.trim()) return autoClipSeconds(scriptLine, selectedVideoModelId())
+// Clip length. When the card SPEAKS a line we know how long the words take, so
+// the length is that line's own estimate (see services/clipDuration) — a
+// dialogue card is Auto until the member picks a number in its modal. Every
+// other card (a silent B-Roll Clips variation, a hand-added option, a
+// placeholder) falls back to the app-wide 5s, snapped to the nearest option at
+// or below on a model that doesn't offer it (Omni [4,6,8,10] → 4s). Seeding
+// here rather than leaning on the modal's snap matters because Omni's
+// buildVideoInput coerces an off-grid duration to 8s — so a card generated
+// straight from the grid, never opened, would otherwise bill double the card
+// the user opened first.
+function defaultVideoDuration(spokenLine?: string): number {
+  if (spokenLine?.trim()) return autoClipSeconds(spokenLine, selectedVideoModelId())
   const c = selectedVideoConstraints()
-  return c ? snapVideoDuration(5, c.durations) : 5
+  return c ? snapVideoDuration(DEFAULT_CLIP_SECONDS, c.durations) : DEFAULT_CLIP_SECONDS
 }
 
 // Initial CardState for a freshly-mounted variation. Per-card settings
 // default to 9:16 / 1K / audio-on — same defaults the old global
 // SettingsPopover used as seed values. Video resolution follows the selected
-// model's preferred tier, and clip length follows the scene's own line (see
-// the two helpers above).
+// model's preferred tier, and clip length follows the scene's own line on a
+// card that speaks it (see the two helpers above).
 export function createDefaultCardState(variation: PromptVariation, scriptLine?: string): CardState {
   const { refsCharacter, refsProduct } = refsToToggles(variation.refs ?? 'both')
   const initialPrompt = variation.prompt ?? ''
+  const spoken = speaksItsLine(variation)
   return {
     editablePrompt: initialPrompt,
     promptHistory: [initialPrompt],
@@ -90,12 +92,13 @@ export function createDefaultCardState(variation: PromptVariation, scriptLine?: 
     cardImageAspectRatio: '9:16',
     cardImageResolution: '1K',
     cardVideoAspectRatio: '9:16',
-    cardVideoDurationSeconds: defaultVideoDuration(scriptLine),
-    // Auto until the member picks a length in the card modal: the clip has to
-    // hold this scene's line, and the line is the only thing that knows how
-    // long that is. Stays true through a model swap so the estimate re-snaps
-    // onto the new model's ladder rather than keeping the old one's number.
-    cardVideoDurationAuto: true,
+    cardVideoDurationSeconds: defaultVideoDuration(spoken ? scriptLine : undefined),
+    // Auto on a DIALOGUE card until the member picks a length in its modal: the
+    // clip has to hold this scene's spoken line, and the line is the only thing
+    // that knows how long that is. Stays true through a model swap so the
+    // estimate re-snaps onto the new model's ladder rather than keeping the old
+    // one's number. A silent card gets no Auto at all — see clipDuration.
+    cardVideoDurationAuto: spoken,
     cardVideoResolution: defaultVideoResolution(),
     cardVideoAudio: true,
     isPromptWorking: false,
@@ -201,9 +204,14 @@ export function backfillCardState(card: Partial<CardState> & Record<string, unkn
     // rest of the app goes by — doesn't hold here. What does hold is that the
     // old seeder could only ever produce SEEDED_DURATIONS: anything else in
     // this slot was typed by a member and stays theirs, and those two values
-    // are exactly the "nobody picked this" case that becomes Auto. A member
-    // who really did pick 4s or 5s loses nothing worth keeping — a short line
-    // estimates back to the same number, and a long one gets the fix.
+    // are exactly the "nobody picked this" case. A member who really did pick
+    // 4s or 5s loses nothing worth keeping — a short line estimates back to the
+    // same number, and a long one gets the fix.
+    //
+    // This resolves "did anybody pick this length", not "is this card Auto":
+    // on a silent card the flag only says whether the stored number is the
+    // member's or the default's (`silentClipSeconds`), since Auto never
+    // applies there.
     cardVideoDurationAuto: (card.cardVideoDurationAuto as boolean | undefined)
       ?? SEEDED_DURATIONS.includes((card.cardVideoDurationSeconds as number) ?? 5),
     cardVideoResolution: (card.cardVideoResolution as string) ?? '720p',
