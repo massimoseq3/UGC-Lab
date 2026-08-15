@@ -7,7 +7,7 @@
 
 import { estimateCredits, CHAT_MODEL_STRONG } from '../../../utils/models'
 
-// The analysis runs on Gemini 3.6 Flash (see analyzeAd.ts CHAT_MODEL_ID) — it
+// The analysis runs on Gemini 3.7 Flash (see analyzeAd.ts CHAT_MODEL_ID) — it
 // must track that constant, or the button quotes one model's rate for another
 // model's call.
 const CHAT_MODEL_ID = CHAT_MODEL_STRONG

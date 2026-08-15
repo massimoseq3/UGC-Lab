@@ -461,7 +461,7 @@ export function scriptModelSlot(appId: ScriptModelApp): string {
 }
 
 // Which chat model writes this app's scripts and prompts. Falls back to these
-// two apps' own registry default (Gemini 3.6 Flash, the strong tier), which
+// two apps' own registry default (Gemini 3.7 Flash, the strong tier), which
 // holds a long prompt contract better than the app-wide default the rest of
 // the surfaces run on — these two write prose a person reads and shoots.
 export function resolveScriptModel(appId: ScriptModelApp): string {
