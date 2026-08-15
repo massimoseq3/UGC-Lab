@@ -130,6 +130,10 @@ export interface ModelEntry {
   // Video-only: model accepts reference video clips (Seedance 2 family's
   // `reference_video_urls`, ≤15s total).
   supportsReferenceVideos?: boolean
+  // Video-only: how many reference video clips the model takes in ONE request.
+  // Undeclared models fall back to UNDECLARED_REFERENCE_VIDEO_CAP. Only set
+  // from a documented provider cap — Kling 3.0 Omni takes exactly one.
+  maxReferenceVideos?: number
   // Video-only: combined length cap, in seconds, for the reference audio strip
   // and (separately) the reference video strip. Undeclared models fall back to
   // UNDECLARED_REFERENCE_CLIP_SECONDS. Only set from a documented provider cap.
@@ -858,6 +862,68 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       supportsAudio: true,
     },
   },
+  // Kling 3.0 Omni (Kling O3) — Kling's multimodal flagship: native audio,
+  // consistent characters across shots, and up to 15s in one call. It ships on
+  // kie as FOUR slugs that differ only by which inputs they accept, so we
+  // expose one virtual id and pick the real slug at generate time
+  // (klingOmniRoute, read by both resolveVideoModelSlug and buildVideoInput):
+  //   kling-3.0-omni/text-to-video       prompt + aspect_ratio + duration
+  //   kling-3.0-omni/image-to-video      image_urls[] (start, optional end)
+  //   kling-3.0-omni/reference-to-video  image_urls[] (≤4 refs) and/or
+  //                                      video_urls[] (exactly 1)
+  //   kling-3.0-omni/transformation      NOT registered — it restyles a source
+  //                                      clip end to end (video input required)
+  //                                      and has no docs here yet; a source
+  //                                      clip reaches reference-to-video today.
+  //
+  // Two aspect_ratio rules come from the API and are enforced in the body
+  // builder rather than the picker, since they depend on what's attached:
+  // 'auto' is REQUIRED when both a start and an end frame are given (and
+  // unavailable for a single frame), and REQUIRED for a video-only reference
+  // (unavailable once images join the video).
+  //
+  // Pricing (kie, verified 2026-08-15 on kie.ai/kling-3-0-omni). Per-second,
+  // keyed on resolution × audio, with a third tier once a source video rides
+  // along: 720p 14 / 18 / 20 · 1080p 18 / 23 / 27 · 4k 67 flat.
+  // No `official` / `market` entry: Kling's dev pricing page publishes no rate
+  // for the Omni tiers (and none at all for the video-input one), and the
+  // neighbouring Kling 3.0 figures matching kie's is an inference, not a
+  // verified rate — so we claim no savings rather than invent one.
+  // Docs: kling-3.0-omni/{text,image,reference}-to-video on docs.kie.ai.
+  {
+    id: 'kling-3.0-omni',
+    displayName: 'Kling 3.0 Omni',
+    provider: 'Kling AI',
+    task: 'video',
+    modes: ['text-to-video', 'image-to-video', 'frames-to-video', 'reference-to-video'],
+    tags: ['recommended', 'new'],
+    supportsReferenceImages: true,
+    // The reference route documents a hard cap of 4 reference images and
+    // exactly one source video — an over-long array is a 400, not a drop.
+    maxReferenceImages: 4,
+    supportsReferenceVideos: true,
+    maxReferenceVideos: 1,
+    pricing: {
+      unit: 'per-second',
+      credits: 14,
+      priceFor: ({ durationSeconds = 5, resolution = '720p', audio = false, videoInput = false }) => {
+        const perSec =
+          resolution === '4k' ? 67 :
+          resolution === '1080p' ? (videoInput ? 27 : audio ? 23 : 18) :
+          /* 720p */              (videoInput ? 20 : audio ? 18 : 14)
+        return perSec * durationSeconds
+      },
+    },
+    videoEndpoint: 'createTask',
+    videoConstraints: {
+      // Single-shot mode takes any integer 3–15; this is the app's usual ladder.
+      durations: [3, 4, 5, 6, 8, 10, 12, 15],
+      resolutions: ['720p', '1080p', '4k'],
+      default: '720p',
+      aspectRatios: ['16:9', '9:16', '1:1'],
+      supportsAudio: true,
+    },
+  },
   // Kling 3.0 Turbo (image-to-video) — fast image-conditioned animator. Takes a
   // required image_urls[] (a single start frame in our flows) + duration +
   // resolution. No text-to-video and no aspect_ratio param: aspect inherits
@@ -1229,6 +1295,16 @@ export function referenceClipCapacitySeconds(modelId?: string): number {
   return model?.maxReferenceClipSeconds ?? UNDECLARED_REFERENCE_CLIP_SECONDS
 }
 
+// How many reference video clips a model with no declared cap takes. Three is
+// the Seedance 2 family's documented limit and was hardcoded in Playground's
+// strip until Kling 3.0 Omni, which takes exactly one.
+export const UNDECLARED_REFERENCE_VIDEO_CAP = 3
+
+export function referenceVideoCapacity(modelId?: string): number {
+  const model = modelId ? getModel(modelId) : undefined
+  return model?.maxReferenceVideos ?? UNDECLARED_REFERENCE_VIDEO_CAP
+}
+
 // Display label for a video resolution tier. Some providers name their tiers
 // by quality ('std' / 'pro' / '4K' for Kling 3.0) rather than the pixel
 // resolution they actually output. This maps those aliases to the real
@@ -1541,8 +1617,8 @@ export interface VideoGenOptions {
   motionImageUrl?: string
   motionVideoUrl?: string
   characterOrientation?: 'image' | 'video'
-  // Kling 3.0 only: allow the model to cut between multiple shots inside one
-  // generation. Off for B-Roll (one continuous take per clip).
+  // Kling 3.0 / 3.0 Omni only: allow the model to cut between multiple shots
+  // inside one generation. Off for B-Roll (one continuous take per clip).
   multiShots?: boolean
 }
 
@@ -1555,7 +1631,35 @@ export function resolveVideoModelSlug(modelId: string, opts: VideoGenOptions): s
   const hasFrame = !!(opts.firstFrameUrl || opts.lastFrameUrl || opts.imageUrl)
   if (modelId === 'wan/2-7') return hasFrame ? 'wan/2-7-image-to-video' : 'wan/2-7-text-to-video'
   if (modelId === 'minimax-h3') return `minimax-h3/${minimaxH3Route(opts)}-to-video`
+  if (modelId === 'kling-3.0-omni') return `kling-3.0-omni/${klingOmniRoute(opts)}-to-video`
   return modelId
+}
+
+// ── Kling 3.0 Omni route selection ────────────────────────────
+//
+// Omni's three registered slugs take mutually exclusive inputs: the image route
+// takes frames in `image_urls`, the reference route takes reference images and
+// a source video in `image_urls` / `video_urls`, and only the reference route
+// understands a video at all. Decided once here so the slug in the URL and the
+// body always agree.
+
+type KlingOmniRoute = 'text' | 'image' | 'reference'
+
+// Start/end frames as a flat list, in shot order.
+function klingOmniFrames(opts: VideoGenOptions): string[] {
+  const frames: string[] = []
+  const first = opts.firstFrameUrl ?? (opts.mode === 'image-to-video' ? opts.imageUrl : undefined)
+  if (first) frames.push(first)
+  if (opts.lastFrameUrl) frames.push(opts.lastFrameUrl)
+  return frames
+}
+
+function klingOmniRoute(opts: VideoGenOptions): KlingOmniRoute {
+  // Same policy as MiniMax H3: a reference wins the route and any frame rides
+  // along as a reference image, because the alternative is billing a clip that
+  // silently ignored what the member attached.
+  if (opts.referenceImageUrls?.length || opts.referenceVideoUrls?.length) return 'reference'
+  return klingOmniFrames(opts).length > 0 ? 'image' : 'text'
 }
 
 // ── MiniMax H3 route selection ────────────────────────────────
@@ -1673,6 +1777,59 @@ export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<
       duration: String(duration), // Kling expects string enum
       aspect_ratio: ar,
       multi_shots: opts.multiShots ?? false,
+    }
+  }
+
+  // ── Kling 3.0 Omni ──
+  // One virtual id, three routes (see klingOmniRoute). Each body carries only
+  // the fields its own route accepts. `customize_multi_shots` is always false —
+  // that flag switches the model onto a `multi_prompt` shot array we never
+  // send, and the API refuses it outright when both frames are provided.
+  // `prefer_multi_shots` (smart storyboarding) is the model deciding its own
+  // cuts, which is off unless the caller asks: a B-Roll clip is one take.
+  // Duration is a plain integer 3–15, clamped here because a card persisted
+  // under another model can carry an off-grid length (Seedance's 30s).
+  if (modelId === 'kling-3.0-omni') {
+    const omniDuration = Math.min(15, Math.max(3, Math.round(duration)))
+    const route = klingOmniRoute(opts)
+    const common = {
+      prompt: opts.prompt,
+      customize_multi_shots: false,
+      duration: omniDuration,
+      audio: opts.audio ?? false,
+      resolution: resolution === '1080p' ? '1080p' : resolution === '4k' || resolution === '4K' ? '4k' : '720p',
+    }
+
+    if (route === 'image') {
+      const frames = klingOmniFrames(opts)
+      return {
+        ...common,
+        prefer_multi_shots: opts.multiShots ?? false,
+        image_urls: frames,
+        // 'auto' is required with both frames and unavailable with one.
+        aspect_ratio: frames.length > 1 ? 'auto' : ar,
+      }
+    }
+
+    if (route === 'reference') {
+      // A frame that arrived beside a reference is sent AS a reference image
+      // rather than dropped; the route has no frame fields of its own.
+      const imageUrls = [...klingOmniFrames(opts), ...(opts.referenceImageUrls ?? [])].slice(0, 4)
+      const videoUrls = (opts.referenceVideoUrls ?? []).slice(0, 1)
+      return {
+        ...common,
+        ...(imageUrls.length ? { image_urls: imageUrls } : {}),
+        ...(videoUrls.length ? { video_urls: videoUrls } : {}),
+        // Mirror image of the frame rule: 'auto' is required for a video-only
+        // reference and unavailable once images join it.
+        aspect_ratio: videoUrls.length && !imageUrls.length ? 'auto' : ar,
+      }
+    }
+
+    return {
+      ...common,
+      prefer_multi_shots: opts.multiShots ?? false,
+      aspect_ratio: ar,
     }
   }
 
