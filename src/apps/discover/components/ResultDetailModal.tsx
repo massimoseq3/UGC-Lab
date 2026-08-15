@@ -23,11 +23,21 @@ interface ResultDetailModalProps {
   /** Sends the words to Scripts. Never fetches — by the time this is clickable
       the transcript is already in hand and already paid for. */
   onRemix: (result: DiscoverResult, useAi?: boolean) => Promise<void>
-  onSave: (result: DiscoverResult) => void
+  /** Omit to drop the Save button — the swipe file opens this on rows that are
+      already filed, where "Save to Swipe File" has nothing left to say. */
+  onSave?: (result: DiscoverResult) => void
   /** Saves the ad's video to the member's own disk. */
   onDownload: (result: DiscoverResult) => void
   saved?: boolean
   busy?: DiscoverAction | null
+  /**
+   * The media failed to load. Only ever fires for the swipe file: a search grid
+   * is minutes old, but a saved row's `mediaUrl` is a signed link that has long
+   * since expired, and the player erroring is the first honest evidence of it.
+   */
+  onMediaError?: () => void
+  /** Rendered over the media column — the swipe file's "restore this" prompt. */
+  mediaOverlay?: ReactNode
 }
 
 export default function ResultDetailModal({
@@ -41,6 +51,8 @@ export default function ResultDetailModal({
   onDownload,
   saved = false,
   busy = null,
+  onMediaError,
+  mediaOverlay,
 }: ResultDetailModalProps) {
   // Called above any early return — the hook order has to be stable.
   const backdrop = useBackdropClose(onClose)
@@ -65,17 +77,28 @@ export default function ResultDetailModal({
           {result.videoUrl ? (
             <video
               {...video}
+              // Keyed on the url so a restored link actually reloads: swapping
+              // `src` on a media element the browser has already failed on is
+              // not enough to make it try again.
+              key={result.videoUrl}
               src={result.videoUrl}
               poster={result.coverUrl}
+              onError={onMediaError}
               controls
               autoPlay
               className="max-h-[80dvh] w-full object-contain"
             />
           ) : result.coverUrl ? (
-            <img src={result.coverUrl} alt="" className="max-h-[80dvh] w-full object-contain" />
+            <img
+              src={result.coverUrl}
+              alt=""
+              onError={onMediaError}
+              className="max-h-[80dvh] w-full object-contain"
+            />
           ) : (
             <div className="flex h-64 items-center justify-center text-sm text-ink-600">No preview</div>
           )}
+          {mediaOverlay}
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -273,6 +296,7 @@ export default function ResultDetailModal({
             </div>
 
             <div className="mt-2 flex gap-2">
+              {onSave && (
               <button
                 type="button"
                 onClick={() => onSave(result)}
@@ -288,6 +312,7 @@ export default function ResultDetailModal({
                   : saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
                 {saved ? 'Saved to Swipe File' : 'Save to Swipe File'}
               </button>
+              )}
               <button
                 type="button"
                 onClick={() => window.open(result.postUrl, '_blank', 'noopener,noreferrer')}

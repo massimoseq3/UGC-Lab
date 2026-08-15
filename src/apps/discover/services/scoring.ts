@@ -45,10 +45,21 @@ export function scoreOutlier(
   const multiple = views / followers
   if (!Number.isFinite(multiple)) return undefined
 
-  const hit = BANDS.find((b) => multiple >= b.threshold)
-  if (!hit) return undefined
+  const band = bandFor(multiple)
+  if (!band) return undefined
 
-  return { multiple, band: hit.band }
+  return { multiple, band }
+}
+
+/**
+ * The band a multiple falls into, or undefined below 2x.
+ *
+ * Split out because the swipe file stores the multiple it snapshotted but not
+ * the band — rebuilding one from the other beats widening the persisted row for
+ * a value that is a pure function of it.
+ */
+export function bandFor(multiple: number): OutlierBand | undefined {
+  return BANDS.find((b) => multiple >= b.threshold)?.band
 }
 
 /**

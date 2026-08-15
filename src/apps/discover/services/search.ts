@@ -4,13 +4,15 @@
 import {
   searchTikTokKeyword,
   searchMetaAds,
+  fetchTikTokVideo,
+  fetchMetaAd,
   firstUrl,
   type TikTokSearchItem,
   type MetaAdItem,
   type MetaCreative,
   type MetaSnapshot,
 } from '../../../utils/scrapecreators'
-import type { DiscoverFilters, DiscoverResult, DiscoverSort } from '../types'
+import type { DiscoverFilters, DiscoverPlatform, DiscoverResult, DiscoverSort } from '../types'
 import { scoreOutlier } from './scoring'
 
 const DAY_MS = 86_400_000
@@ -22,6 +24,27 @@ export interface DiscoverPage {
 }
 
 // ── TikTok ──────────────────────────────────────────────────────
+
+/**
+ * A TikTok row's playable urls.
+ *
+ * Shared by the search normaliser and the single-video refresh below so the two
+ * can't drift on which render they prefer — a watermark burned across the frame
+ * would end up in the Ad Analyzer's vision read and in any B-Roll built off it.
+ */
+function tikTokMedia(item: TikTokSearchItem): { videoUrl?: string; coverUrl?: string } {
+  const video = item.video ?? {}
+  return {
+    videoUrl:
+      firstUrl(video.download_no_watermark_addr) ??
+      firstUrl(video.play_addr) ??
+      firstUrl(video.download_addr),
+    // origin_cover is the full-size still; `cover` is a smaller crop. Either
+    // beats nothing, and the dynamic (animated) cover is deliberately not used
+    // as the poster — it's a video file wearing an image's field name.
+    coverUrl: firstUrl(video.origin_cover) ?? firstUrl(video.cover),
+  }
+}
 
 function normaliseTikTok(item: TikTokSearchItem): DiscoverResult | null {
   const id = item.aweme_id
@@ -45,16 +68,7 @@ function normaliseTikTok(item: TikTokSearchItem): DiscoverResult | null {
     platform: 'tiktok',
     caption: item.desc ?? '',
     postUrl,
-    // origin_cover is the full-size still; `cover` is a smaller crop. Either
-    // beats nothing, and the dynamic (animated) cover is deliberately not used
-    // as the poster — it's a video file wearing an image's field name.
-    coverUrl: firstUrl(video.origin_cover) ?? firstUrl(video.cover),
-    // Prefer the clean render: a watermark burned across the frame would end up
-    // in the Ad Analyzer's vision read and in any B-Roll built off it.
-    videoUrl:
-      firstUrl(video.download_no_watermark_addr) ??
-      firstUrl(video.play_addr) ??
-      firstUrl(video.download_addr),
+    ...tikTokMedia(item),
     // `duration` is milliseconds despite the name (22874 → 22.9s).
     durationSeconds: video.duration ? Math.round(video.duration / 1000) : undefined,
     createdAt: item.create_time ? item.create_time * 1000 : 0,
@@ -189,6 +203,51 @@ function normaliseMeta(ad: MetaAdItem): DiscoverResult | null {
       platforms: ad.publisher_platform ?? [],
     },
   }
+}
+
+// ── Re-resolving expired media ──────────────────────────────────
+
+/** What a refresh can hand back. Both may be absent — the ad may be gone. */
+export interface RefreshedMedia {
+  videoUrl?: string
+  coverUrl?: string
+  creditsRemaining: number | null
+}
+
+/**
+ * Fresh, playable urls for an ad we already know the identity of. **1 credit.**
+ *
+ * This exists for the swipe file. A saved row keeps its thumbnail as our own
+ * asset, but the video is only ever a signed CDN link, and those die within
+ * hours (TikTok) or days (Meta) — so a swipe filed last week opens with a dead
+ * player and an Analyze button that can't fetch anything. Asking the platform
+ * again is the only way back to the video, since we deliberately don't store it.
+ *
+ * It returns MEDIA ONLY, never stats. A swipe is a record of what a winner
+ * looked like when you found it, so today's view count has no business
+ * overwriting the one you saved — the numbers on the row are the whole reason
+ * it's a swipe file rather than a bookmark.
+ */
+export async function refreshResultMedia(
+  apiKey: string,
+  platform: DiscoverPlatform,
+  ref: { sourceId: string; postUrl?: string },
+): Promise<RefreshedMedia> {
+  if (platform === 'meta') {
+    const { ad, creditsRemaining } = await fetchMetaAd(apiKey, ref.sourceId)
+    const slots = creativeSlots(ad?.snapshot)
+    return {
+      videoUrl: pickCreativeUrl(slots, VIDEO_URL_FIELDS),
+      coverUrl: pickCreativeUrl(slots, COVER_URL_FIELDS),
+      creditsRemaining,
+    }
+  }
+
+  const { item, creditsRemaining } = await fetchTikTokVideo(apiKey, {
+    videoId: ref.sourceId,
+    url: ref.postUrl,
+  })
+  return { ...(item ? tikTokMedia(item) : {}), creditsRemaining }
 }
 
 // ── Scoring + filtering ─────────────────────────────────────────

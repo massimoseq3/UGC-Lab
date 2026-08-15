@@ -70,7 +70,16 @@ export async function downloadResultVideo(result: DiscoverResult): Promise<File>
  * it. Fetching to a blob first is what makes the filename ours, too.
  */
 export async function saveResultVideoToDisk(result: DiscoverResult): Promise<void> {
-  const file = await downloadResultVideo(result)
+  saveVideoFileToDisk(await downloadResultVideo(result), result)
+}
+
+/**
+ * The disk-writing half, for a caller that already holds the File.
+ *
+ * The swipe file fetches through its own retry (an expired link, re-resolved)
+ * and would otherwise have to download the video a second time just to name it.
+ */
+export function saveVideoFileToDisk(file: File, result: DiscoverResult): void {
   const url = URL.createObjectURL(file)
   const a = document.createElement('a')
   a.href = url
