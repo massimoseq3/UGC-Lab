@@ -32,6 +32,7 @@ import {
   snapVideoDuration,
   officialSavingsPercent,
   referenceClipCapacitySeconds,
+  referenceVideoCapacity,
   type Task,
   type Mode,
 } from '../../../utils/models'
@@ -307,6 +308,14 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
   // Combined seconds per media strip — 15s on the Seedance 2.0 family, 30s on
   // 2.5. Read off the registry so the drop handler and both strips agree.
   const refClipSeconds = referenceClipCapacitySeconds(state.modelId)
+  // How many clips the video strip accepts — 3 on the Seedance family, exactly
+  // 1 on Kling 3.0 Omni, which takes a single source video.
+  const refVideoMax = referenceVideoCapacity(state.modelId)
+  // A source clip in the request moves several models onto a different billing
+  // tier (Omni's flat per-call rate, Kling 3.0 Omni's higher per-second one).
+  // Omni carries its clip in its own slot; every other model uses the shared
+  // reference-video strip — both count.
+  const hasVideoInput = state.refs.some((r) => r.slot === 'omni-clip' || r.slot === 'video')
   const isOmni = state.mode === 'video' && !!model?.omniInputs
   // Whether the model accepts any input at all — a text-only model shows no
   // attachment row rather than an empty one.
@@ -395,7 +404,16 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
           )
         }
         if (!model?.supportsReferenceAudio) nextRefs = nextRefs.filter((r) => r.slot !== 'audio')
-        if (!model?.supportsReferenceVideos) nextRefs = nextRefs.filter((r) => r.slot !== 'video')
+        if (!model?.supportsReferenceVideos) {
+          nextRefs = nextRefs.filter((r) => r.slot !== 'video')
+        } else {
+          // Caps differ across models (3 on Seedance, 1 on Kling Omni), so the
+          // clips past the new model's limit go with the switch — the strip
+          // stops rendering them and they'd otherwise ride along invisibly.
+          const cap = referenceVideoCapacity(state.modelId)
+          const kept = nextRefs.filter((r) => r.slot === 'video').slice(0, cap)
+          nextRefs = nextRefs.filter((r) => r.slot !== 'video' || kept.includes(r))
+        }
       }
       const changed = nextRefs.length !== state.refs.length
         || nextRefs.some((r, i) => r !== state.refs[i])
@@ -636,7 +654,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
       imageCount: state.mode === 'image' ? n : undefined,
       resolution: state.mode !== 'music' ? state.resolution : undefined,
       audio: state.mode === 'video' ? state.audio : undefined,
-      videoInput: state.mode === 'video' ? state.refs.some((r) => r.slot === 'omni-clip') : undefined,
+      videoInput: state.mode === 'video' ? hasVideoInput : undefined,
     })
     if (one === null) return null
     return state.mode === 'image' ? one : one * n
@@ -804,7 +822,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                                 kind="video"
                                 values={mediaStripValues('video')}
                                 onChange={(v) => setMediaStrip('video', v)}
-                                max={3}
+                                max={refVideoMax}
                                 maxTotalSeconds={refClipSeconds}
                                 onLimitError={(m) => addToast(m, 'error')}
                               />
@@ -1118,7 +1136,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   durationSeconds: isMotionControl ? motionDuration : state.durationSeconds,
                   resolution: state.resolution,
                   audio: state.audio,
-                  videoInput: state.refs.some((r) => r.slot === 'omni-clip'),
+                  videoInput: hasVideoInput,
                 }}
               />
             </>
