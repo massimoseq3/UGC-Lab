@@ -138,6 +138,28 @@ export interface ModelEntry {
   // and (separately) the reference video strip. Undeclared models fall back to
   // UNDECLARED_REFERENCE_CLIP_SECONDS. Only set from a documented provider cap.
   maxReferenceClipSeconds?: number
+  // Video-only: what the model does when a start/end FRAME and REFERENCE images
+  // are attached to the same generation. There is no universal answer — the
+  // three values below are three genuinely different provider designs, and a
+  // surface that guesses either drops an input silently or sends a 400:
+  //
+  //   'merged'    — one flat image array with no frame/reference distinction
+  //                 (Gemini Omni's and Grok's `image_urls`). Send everything;
+  //                 there is nothing to choose between.
+  //   'reference' — attaching a reference RE-ROUTES the request, and the frame
+  //                 rides along as a reference image (MiniMax H3 and Kling 3.0
+  //                 Omni pick their slug this way; see minimaxH3Route /
+  //                 klingOmniRoute). Both inputs reach the model, but the frame
+  //                 stops being frame one — so the member has to be told.
+  //   'exclusive' — the provider forbids the combination outright. The whole
+  //                 Seedance family documents first/last-frame and multimodal
+  //                 reference-to-video as "three mutually exclusive scenarios
+  //                 [that] cannot be used simultaneously", so ONE of the two
+  //                 groups has to be dropped and named.
+  //
+  // Undeclared + no reference-image support at all reads as 'frames-only' (see
+  // mixedImageInputPolicy) — there is no reference input to combine.
+  mixedImageInputs?: 'merged' | 'reference' | 'exclusive'
   // Gemini Omni only: model accepts persistent character ids, designed voice
   // ids, and a trimmed source video clip, under a shared 7-slot input quota.
   omniInputs?: boolean
@@ -617,13 +639,25 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //
   //   1. Length. It generates up to 30s in one call, where the rest of the
   //      catalog tops out at 15. Hence the extended duration ladder below.
-  //   2. Input shape. It has NO first_frame_url / last_frame_url — every image
-  //      arrives via `reference_image_urls` as a generic reference, not as
-  //      frame one. Same situation as Gemini Omni: no 'image-to-video' and no
-  //      'frames-to-video' mode, so B-Roll's Animate tab and Continuous grey it
-  //      out rather than silently animating from a still it can't honour. A
-  //      frame that reaches the body builder anyway rides along as a reference
-  //      image (see buildVideoInput) rather than being dropped.
+  //   2. Input shape. It is registered with NO first_frame_url /
+  //      last_frame_url — every image arrives via `reference_image_urls` as a
+  //      generic reference, not as frame one. Same situation as Gemini Omni: no
+  //      'image-to-video' and no 'frames-to-video' mode, so B-Roll's Animate tab
+  //      and Continuous grey it out rather than silently animating from a still
+  //      it can't honour. A frame that reaches the body builder anyway rides
+  //      along as a reference image (see buildVideoInput) rather than dropped —
+  //      which is why `mixedImageInputs` is 'reference' and not the 'exclusive'
+  //      the rest of the family carries.
+  //
+  //      NEEDS A LIVE CHECK (2026-08-15): docs.kie.ai/market/bytedance/
+  //      seedance-2-5 now documents first_frame_url AND last_frame_url on this
+  //      model ("last_frame_url cannot be passed alone; first_frame_url must be
+  //      provided together with it"), which contradicts the above — either the
+  //      slug gained them since it was registered in beta, or the original read
+  //      was wrong. Declaring the two frame modes would un-grey it in Continuous
+  //      and change how B-Roll animates a still on it, so it is deliberately NOT
+  //      being changed off a docs read alone: fire one frames-to-video call at
+  //      it first. Everything below is correct for the model as registered.
   //
   // Pricing (kie, beta — user-supplied 2026-08-07). kie publishes two tiers per
   // resolution and the cheaper one is NOT cheaper in practice:
@@ -650,6 +684,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['text-to-video', 'reference-to-video'],
     tags: ['recommended', 'new'],
     supportsReferenceImages: true,
+    mixedImageInputs: 'reference',
     supportsReferenceAudio: true,
     supportsReferenceVideos: true,
     // Reference audio/video are capped at 30s TOTAL each here, double the 2.0
@@ -684,6 +719,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['text-to-video', 'image-to-video', 'frames-to-video', 'reference-to-video'],
     tags: ['recommended', 'new'],
     supportsReferenceImages: true,
+    mixedImageInputs: 'exclusive',
     supportsReferenceAudio: true,
     supportsReferenceVideos: true,
     maxReferenceImages: 9,
@@ -722,6 +758,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['text-to-video', 'image-to-video', 'frames-to-video', 'reference-to-video'],
     tags: ['fast', 'cheap'],
     supportsReferenceImages: true,
+    mixedImageInputs: 'exclusive',
     supportsReferenceAudio: true,
     supportsReferenceVideos: true,
     maxReferenceImages: 9,
@@ -750,6 +787,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['text-to-video', 'image-to-video', 'frames-to-video', 'reference-to-video'],
     tags: ['new', 'cheap'],
     supportsReferenceImages: true,
+    mixedImageInputs: 'exclusive',
     supportsReferenceAudio: true,
     supportsReferenceVideos: true,
     maxReferenceImages: 9,
@@ -898,6 +936,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['text-to-video', 'image-to-video', 'frames-to-video', 'reference-to-video'],
     tags: ['recommended', 'new'],
     supportsReferenceImages: true,
+    mixedImageInputs: 'reference',
     // The reference route documents a hard cap of 4 reference images and
     // exactly one source video — an over-long array is a 400, not a drop.
     maxReferenceImages: 4,
@@ -1027,6 +1066,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['text-to-video', 'reference-to-video'],
     tags: ['recommended', 'new'],
     supportsReferenceImages: true,
+    mixedImageInputs: 'merged',
     // Images cost one slot each out of the shared 7-slot input quota, so 7 is
     // the ceiling when no characters or source clip are attached. Playground,
     // which can attach those, subtracts their slots on top of this.
@@ -1127,6 +1167,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['text-to-video', 'image-to-video', 'reference-to-video'],
     tags: ['recommended', 'new', 'cheap'],
     supportsReferenceImages: true,
+    mixedImageInputs: 'merged',
     pricing: {
       unit: 'per-second',
       credits: 4.5,
@@ -1180,6 +1221,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     modes: ['text-to-video', 'image-to-video', 'frames-to-video', 'reference-to-video'],
     tags: ['new'],
     supportsReferenceImages: true,
+    mixedImageInputs: 'reference',
     supportsReferenceAudio: true,
     supportsReferenceVideos: true,
     maxReferenceImages: 9,
@@ -1303,6 +1345,28 @@ export const UNDECLARED_REFERENCE_VIDEO_CAP = 3
 export function referenceVideoCapacity(modelId?: string): number {
   const model = modelId ? getModel(modelId) : undefined
   return model?.maxReferenceVideos ?? UNDECLARED_REFERENCE_VIDEO_CAP
+}
+
+// What happens when a start/end FRAME and REFERENCE images are attached to the
+// same video generation — see ModelEntry.mixedImageInputs for the three shapes.
+// 'frames-only' is derived rather than declared: a model with no reference-image
+// input has nothing to combine, so there is no policy to write on its entry.
+export type MixedImageInputPolicy = 'merged' | 'reference' | 'exclusive' | 'frames-only'
+
+export function mixedImageInputPolicy(modelId?: string): MixedImageInputPolicy {
+  const model = modelId ? getModel(modelId) : undefined
+  if (!model) return 'frames-only'
+  if (model.mixedImageInputs) return model.mixedImageInputs
+  // Undeclared falls to 'exclusive' rather than 'merged', because the two costs
+  // are not symmetrical: guessing 'exclusive' wrongly drops an input and says
+  // so, while guessing 'merged' wrongly sends a combination the provider
+  // rejects — a 400 on a run the member has already committed to. Declare
+  // 'merged' from a doc that says the fields coexist, never from a hunch.
+  // (Kling 3.0 Turbo lands here and it reads right: it declares reference
+  // images but only image-to-video, so a reference IS its start frame and the
+  // two genuinely can't both be sent.)
+  const takesRefs = model.supportsReferenceImages || (model.modes ?? []).includes('reference-to-video')
+  return takesRefs ? 'exclusive' : 'frames-only'
 }
 
 // Display label for a video resolution tier. Some providers name their tiers

@@ -269,7 +269,15 @@ export async function startPlaygroundVideoTask(
   } else if (input.mode === 'frames-to-video') {
     firstFrameUrl = await hosted(input.firstFrameUrl)
     lastFrameUrl = await hosted(input.lastFrameUrl)
-  } else if (input.mode === 'reference-to-video' && input.referenceImageUrls?.length) {
+  }
+  // Reference images are hosted whenever the caller passes them, NOT only in
+  // reference mode — the same rule the audio/video strips below already follow.
+  // The `else if` this replaced meant a model that takes frames AND references
+  // in one request (Gemini Omni, Grok — see mixedImageInputPolicy) had its
+  // references dropped here, one layer below the code that decided to send
+  // them. Whether the pair is legal at all is the CALLER's call, since only it
+  // knows the policy; this function's job is to host what it was handed.
+  if (input.referenceImageUrls?.length) {
     referenceImageUrls = []
     for (const r of input.referenceImageUrls) {
       const h = await hosted(r)

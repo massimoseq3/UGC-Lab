@@ -58,16 +58,37 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
   },
 
   // ── Content moderation / safety filters ──
+  //
+  // This has to sit above the 422/validation rule at the bottom, because a
+  // refused prompt usually arrives AS a validation error — and "adjust your
+  // inputs (prompt, reference images, or settings)" sends a member off to
+  // swap pictures and resolutions when the words are the problem. Each vendor
+  // words the refusal differently and only a handful said "sensitive" or
+  // "safety", so the rest fell through: ByteDance answers a Seedance rejection
+  // with `InputTextSensitiveContentDetected` or a bare "text risk not passed",
+  // Kling with "suspected of violating", Google with PROHIBITED_CONTENT.
+  // Match the vendor's own vocabulary, not ours.
+  //
+  // Kept deliberately free of loose words: bare 'blocked' catches a throttle
+  // message and bare 'explicit' catches "explicit aspect_ratio required", and
+  // either would route an unrelated failure to copy about the member's script.
   {
     test: (m) =>
       m.includes('sensitive') ||
       m.includes('moderation') ||
       m.includes('flagged') ||
       m.includes('content policy') ||
+      m.includes('content filter') ||
       m.includes('safety') ||
-      m.includes('nsfw'),
+      m.includes('nsfw') ||
+      m.includes('violat') ||
+      m.includes('prohibited') ||
+      m.includes('inappropriate') ||
+      m.includes('sexual') ||
+      m.includes('risk not passed') ||
+      m.includes('risk control'),
     message:
-      "The model's content filter flagged this request. Edit the wording of your prompt (or swap any reference images) and try again.",
+      "The model's content filter turned this down. It's the wording of the prompt or a reference image, not your account — rewrite the line and try again.",
   },
 
   // ── Auth / billing on the kie.ai key ──

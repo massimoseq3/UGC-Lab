@@ -559,12 +559,18 @@ export default function VariationCard(props: VariationCardProps) {
         )
       }
       if (effectiveMode === 'image-to-video' && firstFrameDataUri) {
-        // Animate on a model with no image-to-video mode (Gemini Omni, the
-        // default, is one). Without this the still is dropped and the clip
-        // renders from the prompt alone — a text-to-video that silently
-        // ignores the frame the user picked to animate.
+        // Animate on a model with no image-to-video mode. Without this the
+        // still is dropped and the clip renders from the prompt alone — a
+        // text-to-video that silently ignores the frame the user picked to
+        // animate.
+        //
+        // No model named in the copy: this used to send members to "Seedance
+        // 2.0 or Gemini Omni", and Gemini Omni is one of the models that CAN'T
+        // take a start frame (it has no image-to-video mode — it's how a still
+        // reaches it as a reference instead). The picker greys the ones that
+        // can't, which is a list that stays true as models come and go.
         useAppStore.getState().addToast(
-          `${model.displayName} can't animate a still — pick Seedance 2.0 or Gemini Omni in the model picker.`,
+          `${model.displayName} can't animate a still. Open the model picker — the ones that can't take a still are greyed out.`,
           'error',
         )
         return
