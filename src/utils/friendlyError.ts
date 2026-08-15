@@ -157,6 +157,20 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
       "This is taking longer than we wait for, so we stopped watching — it's likely still running on kie.ai. Check there before generating it again.",
   },
 
+  // ── Truncated model responses (TruncatedResponseError) ──
+  //
+  // Distinct from the empty/malformed rule below: the model DID answer, it just
+  // ran out of room mid-answer. That matters because the parsers downstream
+  // would otherwise accept the fragment — a cut-off storyboard renders as a
+  // short one — so this copy has to say the result is incomplete, not that
+  // something failed. Keyed on 'output token limit', which is narrower than the
+  // 'usage limit' / 'rate limit' rules above and so can't be caught by them.
+  {
+    test: (m) => m.includes('output token limit'),
+    message:
+      'The model ran out of room and stopped partway, so this result is incomplete. Try again with a shorter script or fewer scenes, or pick a different model.',
+  },
+
   // ── Empty / malformed model responses ──
   {
     test: (m) =>
