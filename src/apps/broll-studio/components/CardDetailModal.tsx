@@ -255,6 +255,14 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   // image models always accept references (image-to-image), so dim the slots
   // and show the warning solely while the Video tab is active.
   const refsUnsupportedForVideo = tab === 'video' && !videoModelSupportsRefs
+  // Where to send someone whose model can't take the refs. Deliberately names
+  // NO model: this read "Switch to Seedance 2.0 or Gemini Omni" for a year
+  // while the ref-capable list grew to most of the picker — Seedance 2.5, the
+  // 2.0 Fast/Mini pair, Grok (the app's default), MiniMax H3 and Kling 3.0
+  // Omni all take reference images — so it named two models out of eight and
+  // read as the complete list. The picker greys the ones that can't, and that
+  // list is derived from the registry, so it can't go stale.
+  const refsUnsupportedHint = `${videoModelName} doesn't accept reference images. Open the model picker — the ones that can't take them are greyed out.`
 
   // Is at least one reference image currently armed? When so, the video model
   // picker greys out models that can't take refs so the user can't pick one
@@ -609,7 +617,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         active={cardState.refsCharacter !== false}
                         onToggleActive={() => onUpdateState({ refsCharacter: cardState.refsCharacter === false })}
                         dimmed={refsUnsupportedForVideo}
-                        dimmedReason={`${videoModelName} doesn't accept reference images. Switch to Seedance 2.0 or Gemini Omni to use them.`}
+                        dimmedReason={refsUnsupportedHint}
                       />
                       <ReferenceSlotCard
                         icon={<Package className="h-4 w-4 text-gold-400 light:text-gold-600" />}
@@ -622,7 +630,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         active={cardState.refsProduct !== false}
                         onToggleActive={() => onUpdateState({ refsProduct: cardState.refsProduct === false })}
                         dimmed={refsUnsupportedForVideo}
-                        dimmedReason={`${videoModelName} doesn't accept reference images. Switch to Seedance 2.0 or Gemini Omni to use them.`}
+                        dimmedReason={refsUnsupportedHint}
                       />
                     </div>
                     {/* Which product photo this shot is built from. Only shown
@@ -649,7 +657,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                     )}
                     {hasActiveRef && refsUnsupportedForVideo && (
                       <p className="text-[11px] leading-relaxed text-gold-400/80 light:text-gold-600/80">
-                        {videoModelName} doesn't support reference images — this will generate text-to-video only. Pick Seedance 2.0 or Gemini Omni to use your character/product.
+                        {videoModelName} doesn't accept reference images, so this clip will render from the prompt alone — without your character or product. Pick a model that takes them in the picker above.
                       </p>
                     )}
                   </SectionCard>
@@ -772,8 +780,8 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                       requireMode={tab === 'animate' ? undefined : (hasActiveRef ? 'reference-to-video' : undefined)}
                       requireAnyModes={tab === 'animate' ? ['image-to-video', 'reference-to-video'] : undefined}
                       requireModeNote={tab === 'animate'
-                        ? "Greyed-out models can't animate a still — they take neither a start frame nor reference images. Pick Seedance 2.0, Gemini Omni, or another still-capable model."
-                        : "Greyed-out models don't support reference image-to-video. To use these, generate still frames in the Image tab, then send them to Playground for start/end frames."}
+                        ? "Greyed-out models can't animate a still — they take neither a start frame nor reference images."
+                        : "Greyed-out models don't accept reference images. To use one anyway, generate stills in the Image tab and animate them there instead."}
                       costParams={{
                         durationSeconds: effectiveVideoDuration,
                         resolution: cardState.cardVideoResolution,

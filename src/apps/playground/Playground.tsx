@@ -17,7 +17,7 @@ import {
 } from './service'
 import PromptPanel, { type PromptPanelState, type PromptRef } from './components/PromptPanel'
 import PlaygroundHistoryGrid from './components/PlaygroundHistoryGrid'
-import { getDefaultModel, getModel, type AspectRatio, type ImageResolution, type VideoMode } from '../../utils/models'
+import { getDefaultModel, getModel, mixedImageInputPolicy, type AspectRatio, type ImageResolution, type VideoMode } from '../../utils/models'
 import type { PlaygroundMode, InFlightGen } from './types'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 import { humanizeError } from '../../utils/friendlyError'
@@ -358,14 +358,47 @@ export default function Playground() {
     // required. Everything else infers the mode from the attached frames.
     const isMotionControl = mode === 'video' && !!getModel(state.modelId)?.motionControl
     let inferredVideoMode: VideoMode = isMotionControl ? 'motion-control' : inferVideoMode(refsSnapshot)
-    // Image-to-video-only models (e.g. Kling 3.0 Turbo) can't take a reference
-    // image, but they CAN animate it as a start frame. Downgrade
-    // reference-to-video → image-to-video so the attached image drives the clip
-    // instead of bouncing the user with an "unsupported mode" toast.
-    if (!isMotionControl && inferredVideoMode === 'reference-to-video') {
+    // Reconcile the inferred mode with what the picked model actually declares,
+    // in BOTH directions, because the pictures reach the model either way:
+    //
+    //   ref → image: an image-to-video-only model (Kling 3.0 Turbo) can't take
+    //     a reference image but CAN animate it as a start frame.
+    //   frame → ref: a frame-less model (Seedance 2.5, Gemini Omni) has no
+    //     first_frame_url/last_frame_url at all and folds every attached image
+    //     into its reference array — see the per-model branches in
+    //     buildVideoInput, which do exactly that with a stray frame.
+    //
+    // The second direction is why this exists. Attaching a start frame AND a
+    // reference image made inferVideoMode return 'image-to-video', which
+    // Seedance 2.5 doesn't declare, so the run was refused with a toast naming
+    // a limitation the model doesn't have — on a generation it would have run
+    // fine. Downgrade instead, and send the frames as references below.
+    if (!isMotionControl && mode === 'video') {
       const picked = getModel(state.modelId)
-      if (picked && !picked.modes?.includes('reference-to-video') && picked.modes?.includes('image-to-video')) {
-        inferredVideoMode = 'image-to-video'
+      const modes = picked?.modes ?? []
+      if (picked && !modes.includes(inferredVideoMode)) {
+        if (inferredVideoMode === 'reference-to-video' && modes.includes('image-to-video')) {
+          inferredVideoMode = 'image-to-video'
+        } else if (modes.includes('reference-to-video')) {
+          inferredVideoMode = 'reference-to-video'
+        } else if (inferredVideoMode === 'frames-to-video' && modes.includes('image-to-video')) {
+          // Start frame only — the end frame has nowhere to go on this model.
+          inferredVideoMode = 'image-to-video'
+        }
+      }
+      // A frame and a reference attached together, on a model that re-routes
+      // for references (MiniMax H3, Kling 3.0 Omni): take the reference route,
+      // which carries BOTH — the frame rides as a reference image. Dropping the
+      // character to keep frame-one is the worse half of that trade, and it's
+      // the one the request builders already make for themselves further down
+      // (minimaxH3Route / klingOmniRoute pick 'reference' the moment a
+      // reference is present, so this only makes the mode agree with the body).
+      if (
+        mixedImageInputPolicy(picked?.id) === 'reference' &&
+        inferredVideoMode !== 'reference-to-video' &&
+        refsSnapshot.some((r) => r.slot === 'ref')
+      ) {
+        inferredVideoMode = 'reference-to-video'
       }
     }
     if (!isMotionControl && !promptText) return
@@ -393,14 +426,68 @@ export default function Playground() {
     } else if (mode === 'video' && !isMotionControl) {
       const resolved = resolveVideoModelForMode(state.modelId, inferredVideoMode)
       if (!resolved) {
+        // Everything the model COULD do with the attached pictures has already
+        // been tried above, so reaching here means it takes no images at all.
+        // Say that, rather than naming an internal mode ("image to video") the
+        // member never picked and can't see.
         const pickedLabel = getModel(state.modelId)?.displayName ?? state.modelId
         addToast(
-          `${pickedLabel} doesn't support ${inferredVideoMode.replace(/-/g, ' ')}. Pick a different model or remove the reference frames.`,
+          `${pickedLabel} generates from the prompt only — it takes no images. Remove the attached images, or pick a model that accepts them.`,
           'error',
         )
         return
       }
       modelId = resolved
+    }
+
+    // What this run does with a frame and a reference attached together, and
+    // whether anything is left behind — decided per model, and said out loud
+    // before the credits go. Every branch here used to be one silent drop: the
+    // tile generated, the clip came back without the character in it, and
+    // nothing on screen had mentioned it.
+    const mixedPolicy = mixedImageInputPolicy(modelId)
+    const hasPlainRefs = refsSnapshot.some((r) => r.slot === 'ref')
+    const hasFrames = refsSnapshot.some((r) => r.slot === 'start' || r.slot === 'end')
+    // 'merged' models take both in one flat array and nothing is dropped, so
+    // they deliberately say nothing. 'reference' models were re-routed above and
+    // carry both too — but the start frame is a reference there, not frame one,
+    // which changes what the member gets and has to be named.
+    if (mode === 'video' && !isMotionControl && hasPlainRefs && hasFrames && mixedPolicy === 'reference') {
+      const label = getModel(modelId)?.displayName ?? modelId
+      addToast(
+        `${label} can't hold a start frame and reference images apart — everything attached is sent as a reference, so the frame guides this clip rather than opening it.`,
+        'info',
+      )
+    }
+    // 'exclusive' is the provider forbidding the combination outright (the whole
+    // Seedance family documents frames and multimodal references as mutually
+    // exclusive scenarios). Sending both is a 400, so the frames win — they're
+    // the more specific instruction, and the frame slot is a deliberate act
+    // rather than somewhere pictures land by default — and the references are
+    // dropped and named, with the way to get them honoured instead.
+    if (mode === 'video' && !isMotionControl && hasPlainRefs && mixedPolicy === 'exclusive'
+      && inferredVideoMode !== 'reference-to-video') {
+      const label = getModel(modelId)?.displayName ?? modelId
+      addToast(
+        `${label} takes either frames or reference images, not both. Rendering from the frames — clear the start frame to use your references instead.`,
+        'info',
+      )
+    }
+    // No reference input on this model at all, and an end frame with nowhere to
+    // go on an image-to-video-only one.
+    if (mode === 'video' && !isMotionControl && inferredVideoMode !== 'reference-to-video') {
+      const dropped: string[] = []
+      if (hasPlainRefs && mixedPolicy === 'frames-only') dropped.push('reference images')
+      if (inferredVideoMode === 'image-to-video' && refsSnapshot.some((r) => r.slot === 'end')) {
+        dropped.push('the end frame')
+      }
+      if (dropped.length > 0) {
+        const label = getModel(modelId)?.displayName ?? modelId
+        addToast(
+          `${label} takes only a start frame here — ${dropped.join(' and ')} won't be sent with this clip.`,
+          'info',
+        )
+      }
     }
 
     const imageParams = mode === 'image'
@@ -468,7 +555,18 @@ export default function Playground() {
         const first = refsSnapshot.find((r) => r.slot === 'start')?.url
           ?? (inferredVideoMode === 'reference-to-video' ? undefined : refsSnapshot.find((r) => r.slot === 'ref')?.url)
         const last = refsSnapshot.find((r) => r.slot === 'end')?.url
-        const references = refsSnapshot.filter((r) => r.slot === 'ref').map((r) => r.url)
+        // In reference mode the frame slots have nowhere else to go — the model
+        // either has no frame fields at all, or the mode was downgraded to this
+        // one above precisely because it hasn't. Send them AS references, in
+        // shot order ahead of the explicit ones, which is what every ref-capable
+        // model's body builder does with a stray frame.
+        const frameRefs = inferredVideoMode === 'reference-to-video'
+          ? [refsSnapshot.find((r) => r.slot === 'start')?.url, last].filter((u): u is string => !!u)
+          : []
+        const references = [
+          ...frameRefs,
+          ...refsSnapshot.filter((r) => r.slot === 'ref').map((r) => r.url),
+        ]
         const referenceAudioUrls = refsSnapshot.filter((r) => r.slot === 'audio').map((r) => r.url)
         const referenceVideoUrls = refsSnapshot.filter((r) => r.slot === 'video').map((r) => r.url)
         const omniCharacterBankIds = refsSnapshot
@@ -492,7 +590,15 @@ export default function Playground() {
           audio: videoParams!.audio,
           firstFrameUrl: inferredVideoMode === 'image-to-video' || inferredVideoMode === 'frames-to-video' ? first : undefined,
           lastFrameUrl: last,
-          referenceImageUrls: inferredVideoMode === 'reference-to-video' ? references : undefined,
+          // Reference mode carries everything. A frame mode carries the
+          // references too on a 'merged' model, whose body is one flat image
+          // array with no frame/reference distinction to violate; the other two
+          // policies must not send both (see the toasts above) — 'exclusive'
+          // because the provider rejects the pair outright, 'frames-only'
+          // because there is no field to put them in.
+          referenceImageUrls: inferredVideoMode === 'reference-to-video' || mixedPolicy === 'merged'
+            ? (references.length > 0 ? references : undefined)
+            : undefined,
           referenceAudioUrls: referenceAudioUrls.length > 0 ? referenceAudioUrls : undefined,
           referenceVideoUrls: referenceVideoUrls.length > 0 ? referenceVideoUrls : undefined,
           omniCharacterBankIds: omniCharacterBankIds.length > 0 ? omniCharacterBankIds : undefined,
