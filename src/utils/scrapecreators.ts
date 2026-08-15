@@ -187,6 +187,24 @@ interface MetaSearchResponse {
   cursor?: string
 }
 
+// The single-video detail endpoint. Documented as nesting the video under
+// `aweme_detail`; the flat fields are inherited so a trimmed response that puts
+// them at the top level still reads — the same both-shapes defence the search
+// rows need.
+interface TikTokVideoResponse extends TikTokSearchItem {
+  success?: boolean
+  credits_remaining?: number
+  aweme_detail?: TikTokSearchItem
+}
+
+// The single-ad detail endpoint. Returns the same ad shape the search does,
+// either bare or wrapped in `data`.
+interface MetaAdResponse extends MetaAdItem {
+  success?: boolean
+  credits_remaining?: number
+  data?: MetaAdItem
+}
+
 interface TranscriptResponse {
   success?: boolean
   credits_remaining?: number
@@ -342,6 +360,57 @@ export async function searchMetaAds(
   return {
     items,
     cursor: body.cursor ?? null,
+    creditsRemaining: body.credits_remaining ?? null,
+  }
+}
+
+/**
+ * One TikTok video by id, for its CURRENT media urls.
+ *
+ * Every url a search hands back is signed and expires within hours, which is
+ * fine while the grid is on screen and useless to a swipe filed last week. This
+ * is how a saved ad gets a playable link again — 1 credit, and the caller is
+ * expected to say so before spending it.
+ *
+ * Sends `video_id` AND `url` because the vendor's docs disagree with themselves
+ * about which this endpoint takes (the same hazard that made every TikTok
+ * search return nothing — see `searchTikTokKeyword`). `scFetch` drops empty
+ * params, so passing both costs nothing and survives either reading.
+ */
+export async function fetchTikTokVideo(
+  apiKey: string,
+  opts: { videoId?: string; url?: string },
+): Promise<{ item: TikTokSearchItem | null; creditsRemaining: number | null }> {
+  const body = await scFetch<TikTokVideoResponse>(apiKey, '/v2/tiktok/video', {
+    video_id: opts.videoId,
+    url: opts.url,
+  })
+
+  // Same both-shapes defence as the search rows: the detail payload nests under
+  // `aweme_detail`, but a trimmed response has been seen flat.
+  return {
+    item: body.aweme_detail ?? (body.aweme_id ? body : null),
+    creditsRemaining: body.credits_remaining ?? null,
+  }
+}
+
+/**
+ * One Meta ad by archive id, for its current media urls.
+ *
+ * Hands back the same `snapshot` shape the search endpoint does, so it feeds
+ * straight into `creativeSlots` / `pickCreativeUrl` with no second normaliser.
+ * 1 credit.
+ */
+export async function fetchMetaAd(
+  apiKey: string,
+  adArchiveId: string,
+): Promise<{ ad: MetaAdItem | null; creditsRemaining: number | null }> {
+  const body = await scFetch<MetaAdResponse>(apiKey, '/v1/facebook/adLibrary/ad', {
+    id: adArchiveId,
+  })
+
+  return {
+    ad: body.data ?? (body.ad_archive_id || body.snapshot ? body : null),
     creditsRemaining: body.credits_remaining ?? null,
   }
 }

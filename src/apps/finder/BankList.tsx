@@ -16,6 +16,7 @@ import { sortByOrder, type SortOrder } from './bankSort'
 // The swipe file is Outliers' data shown in the Bank, and its cards have to
 // read the same in both places — one formatter, not a second copy that drifts.
 import { formatCount } from '../discover/services/scoring'
+import SwipeDetail from './SwipeDetail'
 import { groupByDay, sectionLabel } from '../../utils/history'
 
 // Custom sort dropdown — replaces the native <select> so the menu is themed
@@ -501,10 +502,17 @@ function StyleCard({ item, onEdit, onDelete }: { item: StylePreset; onEdit: () =
 /**
  * One saved ad in the swipe file.
  *
- * Opens the ORIGINAL rather than an edit form: a swipe is a record of somebody
- * else's ad, not a document of yours, so there is nothing here to edit. The
- * thumbnail is our own stored asset (see SwipeItem) — every URL on the row is
- * a signed CDN link that expires, so the picture is the one part guaranteed
+ * Opens the same detail view Outliers does, never an edit form: a swipe is a
+ * record of somebody else's ad, not a document of yours, so there is nothing
+ * here to edit — but there is plenty to DO with it, and the point of filing an
+ * ad is tearing it down later. `SwipeDetail` adapts the row back into a
+ * DiscoverResult and hands it to the one `ResultDetailModal`, so Analyze Ad,
+ * Remix Transcript and the original permalink are all where they were when you
+ * saved it. It used to open the permalink straight away, which made the swipe
+ * file a bookmarks folder.
+ *
+ * The thumbnail is our own stored asset (see SwipeItem) — every URL on the row
+ * is a signed CDN link that expires, so the picture is the one part guaranteed
  * still to be there in a month.
  *
  * Shaped exactly like the Outliers card it was saved from: the picture in its
@@ -516,6 +524,7 @@ function StyleCard({ item, onEdit, onDelete }: { item: StylePreset; onEdit: () =
 function SwipeCard({ item, onDelete }: { item: SwipeItem; onDelete: () => void }) {
   const [confirm, setConfirm] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [open, setOpen] = useState(false)
   const toggleStar = useBankStore((s) => s.toggleStar)
   const url = useAssetUrl(item.thumbRef ?? '')
 
@@ -533,8 +542,9 @@ function SwipeCard({ item, onDelete }: { item: SwipeItem; onDelete: () => void }
   const hasStats = item.views != null
 
   return (
+    <>
     <div
-      onClick={() => window.open(item.postUrl, '_blank', 'noopener,noreferrer')}
+      onClick={() => setOpen(true)}
       className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.02] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-black">
@@ -603,6 +613,8 @@ function SwipeCard({ item, onDelete }: { item: SwipeItem; onDelete: () => void }
         )}
       </div>
     </div>
+    {open && <SwipeDetail item={item} onClose={() => setOpen(false)} />}
+    </>
   )
 }
 
