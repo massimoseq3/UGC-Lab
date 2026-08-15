@@ -499,10 +499,10 @@ export default function InputPanel({
           </div>
         </SectionCard>
 
-          {/* Line-by-Line delivery — "B-Roll Clips" (the default) keeps every
-              card silent, for a voiceover laid over in the edit; "With
-              Dialogue" makes all three the character speaking that line, staged
-              three different ways. It sits directly under the References card
+          {/* Line-by-Line delivery — "B-Roll Clips" keeps every card silent,
+              for a voiceover laid over in the edit; "With Dialogue" makes all
+              three the character speaking that line, staged three different
+              ways. It sits directly under the References card
               and above the Instructions box: it decides what KIND of storyboard
               the references just gathered are for, so it reads as the answer to
               the card above it rather than as a setting down in the generate
@@ -511,9 +511,11 @@ export default function InputPanel({
               band, sat at that band's bottom directly above Generate, and sat
               at the very top of the column above the References heading.)
               Continuous has no deliveries — it's narration over footage — so
-              it isn't rendered there at all. **With Dialogue leads and is the
-              default**: the character speaking the line is what most members
-              are here to make, and silent b-roll is the one you opt into. */}
+              it isn't rendered there at all. **B-Roll Clips leads the toggle,
+              With Dialogue is still the default**: the order reads left to
+              right as the plainer thing first, while the default stays on the
+              one most members are here to make. Position and default are
+              separate here on purpose — don't "fix" one to match the other. */}
           {isLineMode(mode) && (
             <SegmentedToggle<BrollDelivery>
               className="mb-2 h-12 shrink-0 !p-1"
@@ -521,8 +523,8 @@ export default function InputPanel({
               onChange={onLineDeliveryChange}
               accent="broll"
               options={[
-                { value: 'dialogue', label: 'With Dialogue' },
                 { value: 'silent', label: 'B-Roll Clips' },
+                { value: 'dialogue', label: 'With Dialogue' },
               ]}
             />
           )}

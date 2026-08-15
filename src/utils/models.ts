@@ -196,24 +196,20 @@ export const TTS_MODEL_ID = 'google/gemini-3-1-flash-tts'
 //   DEFAULT — the app-wide workhorse. Prompt-shaping, storyboards, shot logs:
 //             structured output against heavily-tuned prompts, read by another
 //             model rather than by a person.
-//   STRONG  — ~1.3x the credits. The tier for output a person reads and acts
+//   STRONG  — ~2.6x the credits. The tier for output a person reads and acts
 //             on, where a misread style family or a hedged scene prompt costs
 //             a re-shoot rather than a retry. The Ad Analyzer names this
 //             constant; Scripts and B-Roll reach the same model through their
-//             own registry default (see the `defaultFor` on the Gemini 3.7
+//             own registry default (see the `defaultFor` on the Gemini 3.6
 //             Flash entry below). Product auto-fill sat here and moved back —
 //             it feeds another model, not a reader.
-//
-//             The gap used to be ~2.6x, when this tier was Gemini 3.6 Flash.
-//             Gemini 3.7 Flash replaced it (August 2026) at half 3.6's rate
-//             and a stronger read, so the tier got cheaper without moving.
 //
 // Neither constant is what Scripts or B-Roll call any more: those two read the
 // member's own pick (see resolveScriptModel in stores/settingsStore.ts), which
 // falls back to that pair's own registry default when nothing is chosen. Every
 // OTHER chat surface still resolves through these two.
 export const CHAT_MODEL_DEFAULT = 'gemini-3-flash'
-export const CHAT_MODEL_STRONG = 'gemini-3-7-flash'
+export const CHAT_MODEL_STRONG = 'gemini-3-6-flash'
 
 // Gemini 3.1 Flash TTS bills by tokens, not characters:
 //   input text:  140 credits / 1M tokens
@@ -265,14 +261,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //
   // Order matters: Gemini 3 Flash is FIRST so it stays getDefaultModel's
   // candidates[0] fallback for any chat consumer without an explicit defaultFor.
-  // The two PICKER apps default to Gemini 3.7 Flash instead (August 2026) — the
+  // The two PICKER apps default to Gemini 3.6 Flash instead (August 2026) — the
   // strong tier, for the same reason the Ad Analyzer is pinned to it: what those
   // two write is read by a person and shot against, and it holds a long prompt
-  // contract better than the cheaper entries. It still costs a member who never
-  // opens the picker more per run than the app-wide default, which is the trade
-  // being made deliberately here — though far less than it did while the tier
-  // was Gemini 3.6 Flash, whose rate 3.7 halved. GPT 5.6 Luna is one row away
-  // for anyone who wants the cheapest run.
+  // contract better than the cheaper entries. It costs a member who never opens
+  // the picker more per run, which is the trade being made deliberately here;
+  // GPT 5.6 Luna is one row away for anyone who wants the cheap run back.
   //
   // Every prompt in this app was written and tuned against Gemini 3 Flash, and
   // the storyboard parsers expect its tag discipline. A stronger model writes
@@ -293,19 +287,16 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //   model            in cr/M   out cr/M   blended cr/1k
   //   GPT 5.6 Luna        11.2       67.2      0.0392
   //   Gemini 3 Flash        30        180      0.105
-  //   Gemini 3.7 Flash      45        225      0.135
+  //   Gemini 3.6 Flash      90        450      0.27
   //   Grok 4.5             160        480      0.32
   //   GPT 5.6 Terra        112        672      0.392
   //   Claude Sonnet 5      170        855      0.5125
   //   GPT 5.6 Sol          280       1680      0.98
   //   Claude Opus 5        400       2000      1.20
   //
-  // Gemini 3.7 Flash's row is from its own kie API doc (2026-08-15), where it
-  // replaced Gemini 3.6 Flash (90 / 450, blended 0.27) at half the rate.
-  //
   // `official` is kie's own "Official / Fal Price" column, blended the same way
-  // — which is what makes the picker's "% off" chip real (Gemini 3 Flash −70%,
-  // Gemini 3.7 Flash −85%, Claude −57.5/−60%, GPT −72%, Grok −60%).
+  // — which is what makes the picker's "% off" chip real (Gemini −70%, Claude
+  // −57.5/−60%, GPT −72%, Grok −60%).
   //
   // Cached-input and cache-write tiers exist on the OpenAI and Anthropic
   // entries and are deliberately ignored: nothing in this app reuses a prompt
@@ -331,37 +322,28 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   },
 
   {
-    id: 'gemini-3-7-flash',
-    displayName: 'Gemini 3.7 Flash',
+    id: 'gemini-3-6-flash',
+    displayName: 'Gemini 3.6 Flash',
     provider: 'Google',
     task: 'chat',
     tags: ['new'],
-    pricing: { unit: 'per-1k-tokens', credits: 0.135 },
+    pricing: { unit: 'per-1k-tokens', credits: 0.27 },
     official: chatOfficial(1.5, 7.5, KIE_PRICING),
     // CHAT_MODEL_STRONG, the Ad Analyzer's pinned model, and the unpicked
     // default in the two picker apps: it holds a long prompt contract better
     // than the cheaper entries, which is what all three of those calls are —
     // the Ad Analyzer's single JSON object, Scripts' tagged takes, B-Roll's
     // storyboard blocks. Every one of them is read by a person and shot
-    // against, so the ~1.3× on the member's own key buys the thing they'd
+    // against, so the ~2.6× on the member's own key buys the thing they'd
     // otherwise re-run to get.
-    //
-    // Replaced Gemini 3.6 Flash in this slot (August 2026): same role, same
-    // three defaults, stronger reasoning and instruction-following, at half
-    // 3.6's rate. Nothing persists a resolved default, so an unpicked slot
-    // follows this entry on its own; a member who had explicitly PICKED 3.6
-    // is dropped back to the default by getAppModel, which already discards
-    // an id the registry no longer resolves.
     defaultFor: ['ad-anatomy', 'script-architect', 'broll-studio'],
-    // OpenAI-compatible variant slug on kie.ai, verified on docs.kie.ai — the
-    // native 3.7 route is /gemini/v1/models/gemini-3-7-flash:streamGenerateContent,
-    // Google's own generateContent shape, and our transport speaks OpenAI
-    // chat/completions.
-    chatEndpoint: '/gemini-3-7-flash-openai/v1/chat/completions',
+    // OpenAI-compatible variant slug on kie.ai (native 3.6 uses Google's own
+    // generateContent shape; our transport speaks OpenAI chat/completions).
+    chatEndpoint: '/gemini-3-6-flash-openai/v1/chat/completions',
     chatRating: {
       intelligence: 4,
       blurb:
-        'The default here. A step up in writing, for a little more than the cheap ones.',
+        'The default here. A step up in writing, for a few times the credits.',
     },
   },
 
@@ -448,7 +430,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     pricing: { unit: 'per-1k-tokens', credits: 0.0392 },
     official: chatOfficial(0.2, 1.2, KIE_PRICING),
     // Held the unpicked default in Scripts and B-Roll for a stint (August 2026)
-    // and handed it back to the Gemini strong tier. Still the cheapest run in the
+    // and handed it back to Gemini 3.6 Flash. Still the cheapest run in the
     // list by a wide margin — it undercuts even Gemini 3 Flash — so it's the
     // row to reach for when a member wants volume over polish.
     chatEndpoint: '/codex/v1/responses',
@@ -1387,13 +1369,10 @@ export function listScriptModels(): ModelEntry[] {
 // 1k tokens and are chosen to separate the models we actually list rather than
 // to be a general-purpose scale:
 //   1  ≤0.05   Luna
-//   2  ≤0.15   Gemini 3 Flash, Gemini 3.7 Flash
-//   3  ≤0.45   Grok 4.5, Terra
+//   2  ≤0.15   Gemini 3 Flash
+//   3  ≤0.45   Gemini 3.6, Grok 4.5, Terra
 //   4  ≤1.00   Sonnet 5, Sol
 //   5  >1.00   Opus 5
-// The two Gemini rows share rung 2 on purpose: 0.105 against 0.135 IS the same
-// bracket, and moving the threshold to split them would sell a 1.3× gap as the
-// same jump the ladder uses for a 3× one.
 // Null when the model has no pricing — the picker then shows no glyphs rather
 // than guessing a tier.
 export function chatCostTier(modelId: string): 1 | 2 | 3 | 4 | 5 | null {
