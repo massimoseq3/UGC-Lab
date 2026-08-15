@@ -933,6 +933,10 @@ function PreviewModal({
               sourceApp="playground"
             />
           )}
+          {/* Which model made this, above the prompt it was given. The `media`
+              variant, not `chrome`: this modal is a literal black overlay in
+              both themes, like everything else in it. */}
+          <ModelPill modelId={entry.data.modelId} variant="media" className="shrink-0" />
           {prompt && (
             <div className="max-h-[18vh] w-full overflow-y-auto rounded-lg bg-white/[0.02] px-4 py-3 text-center text-[12px] leading-relaxed text-zinc-400">
               {prompt}

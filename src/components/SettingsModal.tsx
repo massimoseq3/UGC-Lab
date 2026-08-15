@@ -849,8 +849,8 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                         <span className="block text-[12px] font-medium text-ink-300">Generation info</span>
                         <span className="mt-1 block text-[11px] leading-relaxed text-ink-500">
                           Name the model on generated media — Playground's list rows and
-                          B-Roll's cards. On for everyone; this switch is yours alone and
-                          only affects this browser.
+                          preview, and B-Roll's cards. On for everyone; this switch is
+                          yours alone and only affects this browser.
                         </span>
                       </span>
                       <button
