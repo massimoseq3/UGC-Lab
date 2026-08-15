@@ -576,6 +576,54 @@ interface ChatCompletionsResponse {
   }>
 }
 
+// The model stopped because it ran out of output tokens, not because it had
+// finished. Thrown rather than returned: a truncated answer is silently
+// SALVAGEABLE downstream — B-Roll's xmlBlocks parser is deliberately tolerant
+// of a missing closing tag, so a cut-off storyboard renders as a short one with
+// no error, and the member fires paid image/video gens against scenes the
+// script never got. Every caller already has a catch, so throwing makes the
+// failure honest app-wide with no per-caller plumbing.
+//
+// The partial text rides along rather than being discarded, so a caller that
+// wants to salvage it can `catch (e) { if (e instanceof TruncatedResponseError) … }`
+// without changing kieChatCompletions' signature. Nothing does that today.
+export class TruncatedResponseError extends Error {
+  readonly partial: string
+  constructor(partial: string) {
+    super(
+      'The model hit its output token limit and stopped mid-answer, so the result is incomplete.',
+    )
+    this.name = 'TruncatedResponseError'
+    this.partial = partial
+  }
+}
+
+// Did this response body (or streamed event) report a max-tokens stop? Each
+// transport spells it differently, and the streamed and buffered shapes differ
+// again — claude puts `stop_reason` at the top level of a buffered message but
+// inside `delta` on its terminal `message_delta` event, and the Responses API
+// nests the whole object under `response` while streaming.
+function hitTokenLimit(body: unknown, transport: ChatCallTarget['transport'] = 'openai-chat'): boolean {
+  if (!body || typeof body !== 'object') return false
+  const b = body as {
+    choices?: Array<{ finish_reason?: string } | null>
+    stop_reason?: string
+    delta?: { stop_reason?: string } | string
+    incomplete_details?: { reason?: string }
+    response?: unknown
+  }
+
+  if (transport === 'claude-messages') {
+    if (b.stop_reason === 'max_tokens') return true
+    return typeof b.delta === 'object' && b.delta?.stop_reason === 'max_tokens'
+  }
+  if (transport === 'openai-responses') {
+    const r = (b.response ?? b) as { incomplete_details?: { reason?: string } }
+    return r?.incomplete_details?.reason === 'max_output_tokens'
+  }
+  return b.choices?.some((c) => c?.finish_reason === 'length') ?? false
+}
+
 // What a chat model needs to be reached. Mirrors `ChatTarget` in models.ts —
 // duplicated as a structural type rather than imported so this client stays
 // dependency-free, which is the property that keeps it easy to test in isolation.
@@ -631,8 +679,11 @@ export async function kieChatCompletions(
   const looksLikeSSE = contentType.includes('text/event-stream') || raw.startsWith('data:') || raw.includes('\ndata:')
 
   if (looksLikeSSE) {
-    const text = parseSSEContent(raw, transport)
-    if (text.length > 0) return text
+    const { content, truncated } = parseSSEContent(raw, transport)
+    // Ahead of the empty check: a run that hit the ceiling before emitting any
+    // text is still a token-limit failure, and saying so beats "empty stream".
+    if (truncated) throw new TruncatedResponseError(content)
+    if (content.length > 0) return content
     throw new Error(
       `Chat model produced empty SSE stream. First 200 chars: ${raw.slice(0, 200)}`,
     )
@@ -652,6 +703,10 @@ export async function kieChatCompletions(
       : transport === 'openai-responses'
         ? parseResponsesContent(body_)
         : (body_ as ChatCompletionsResponse).choices?.[0]?.message?.content
+
+  if (hitTokenLimit(body_, transport)) {
+    throw new TruncatedResponseError(typeof text === 'string' ? text : '')
+  }
 
   if (typeof text === 'string' && text.length > 0) return text
 
@@ -754,8 +809,12 @@ function textOf(parts: ChatContentPart[]): string {
 // Each transport names its incremental text differently. We ask the two newer
 // transports for stream:false, so their branches here are a safety net for a
 // gateway that streams anyway rather than the expected path.
-function parseSSEContent(raw: string, transport: ChatCallTarget['transport'] = 'openai-chat'): string {
+function parseSSEContent(
+  raw: string,
+  transport: ChatCallTarget['transport'] = 'openai-chat',
+): { content: string; truncated: boolean } {
   let content = ''
+  let truncated = false
   for (const rawLine of raw.split('\n')) {
     const line = rawLine.trim()
     if (!line || !line.startsWith('data:')) continue
@@ -776,6 +835,12 @@ function parseSSEContent(raw: string, transport: ChatCallTarget['transport'] = '
         response?: unknown
       }
 
+      // Checked on every event, before the per-transport branches: each
+      // transport reports its stop reason on a different event (openai-chat on
+      // the last choice, claude on message_delta, responses on the terminal
+      // response object), and hitTokenLimit knows all three.
+      if (hitTokenLimit(parsed, transport)) truncated = true
+
       if (transport === 'claude-messages') {
         const text = typeof parsed.delta === 'object' ? parsed.delta?.text : undefined
         if (typeof text === 'string') content += text
@@ -784,11 +849,17 @@ function parseSSEContent(raw: string, transport: ChatCallTarget['transport'] = '
       if (transport === 'openai-responses') {
         if (parsed.type === 'response.output_text.delta' && typeof parsed.delta === 'string') {
           content += parsed.delta
-        } else if (parsed.type === 'response.completed' && parsed.response) {
+        } else if (
+          // `response.incomplete` is the terminal event when the run stopped on
+          // max_output_tokens — same assembled shape as `completed`, so it has
+          // to be read the same way or the partial text is thrown away.
+          (parsed.type === 'response.completed' || parsed.type === 'response.incomplete') &&
+          parsed.response
+        ) {
           // Prefer the assembled response when we get one — it's complete even
           // if we joined the stream late or a delta event was malformed.
           const whole = parseResponsesContent(parsed.response)
-          if (whole.length > 0) return whole
+          if (whole.length > 0) return { content: whole, truncated }
         }
         continue
       }
@@ -801,7 +872,7 @@ function parseSSEContent(raw: string, transport: ChatCallTarget['transport'] = '
       // skip non-JSON event payloads (comments, keepalives)
     }
   }
-  return content
+  return { content, truncated }
 }
 
 // ── Veo generate (custom endpoint) ──────────────────────────────
