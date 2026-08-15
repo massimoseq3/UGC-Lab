@@ -460,10 +460,11 @@ export function scriptModelSlot(appId: ScriptModelApp): string {
   return `${appId}:chat`
 }
 
-// Which chat model writes this app's scripts and prompts. Falls back to these
-// two apps' own registry default (Gemini 3.6 Flash, the strong tier), which
-// holds a long prompt contract better than the app-wide default the rest of
-// the surfaces run on — these two write prose a person reads and shoots.
+// Which chat model writes this app's scripts and prompts. Falls back to the
+// app's OWN registry default — and the two differ (August 2026): Scripts on
+// Grok 4.6, B-Roll on Gemini 3.6 Flash. Both sit above the app-wide default the
+// rest of the surfaces run on, because both write against a long contract; how
+// far above is a per-app call, which is exactly what `defaultFor` is for.
 export function resolveScriptModel(appId: ScriptModelApp): string {
   return (
     useSettingsStore.getState().getAppModel(scriptModelSlot(appId)) ??
