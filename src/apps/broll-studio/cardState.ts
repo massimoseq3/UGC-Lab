@@ -235,20 +235,41 @@ export function backfillCardState(card: Partial<CardState> & Record<string, unkn
   }
 }
 
+// How long a persisted in-flight entry survives a reload — and there are TWO
+// answers, told apart by one field: does it still hold a kie taskId?
+//
+// WITH a taskId, the generation already happened and was already billed for,
+// and kie keeps a result for 3 days. So the entry is kept for 3 days too, and
+// every reload inside that window is another chance for the resume pass to go
+// and fetch the file. Sweeping those after 30/60 minutes is what turned "the
+// Wi-Fi died while the clip was downloading" into a clip the member paid for
+// and could never get back: the sweep ran before any resume could, so by the
+// time they looked there was nothing left to retry.
+//
+// WITHOUT one, the generation never reached kie. There is nothing to go back
+// for, so the short sweep still applies — otherwise a phantom spinner sits in
+// the gallery for days.
+const RESUMABLE_TTL_MS = 3 * 24 * 60 * 60_000
+
+function keepInFlight(entry: { startedAt?: number; taskId?: string | null }, unresumableTtlMs: number): boolean {
+  const age = Date.now() - (entry.startedAt ?? 0)
+  return age < (entry.taskId ? RESUMABLE_TTL_MS : unresumableTtlMs)
+}
+
 // Migrate the legacy single-slot pending-image fields onto the new
 // inFlightImages array, preserving any persisted entries already in the
-// new shape. Drops stale entries (>30 min) so refreshing doesn't try to
-// resume a long-dead kie task.
+// new shape. Drops stale entries so refreshing doesn't try to resume a
+// long-dead kie task — see keepInFlight for the two budgets.
 function legacyInFlightImages(card: Partial<CardState> & Record<string, unknown>): CardState['inFlightImages'] {
   const STALE_MS = 30 * 60_000
   const persisted = Array.isArray(card.inFlightImages) ? (card.inFlightImages as CardState['inFlightImages']) : []
-  const filtered = persisted.filter((e) => Date.now() - (e.startedAt ?? 0) < STALE_MS)
+  const filtered = persisted.filter((e) => keepInFlight(e, STALE_MS))
   if (filtered.length > 0) return filtered
   // Promote legacy single-slot pending into the array if it's fresh.
   const taskId = card.pendingTaskId as string | null | undefined
   const modelId = card.pendingModelId as string | null | undefined
   const startedAt = card.pendingStartedAt as number | null | undefined
-  if (taskId && modelId && startedAt && Date.now() - startedAt < STALE_MS) {
+  if (taskId && modelId && startedAt && keepInFlight({ startedAt, taskId }, STALE_MS)) {
     return [{
       id: 'legacy-image',
       taskId,
@@ -354,7 +375,7 @@ export function backfillContinuousFrameState(raw: Partial<ContinuousFrameCardSta
     currentImageIndex: typeof raw.currentImageIndex === 'number'
       ? Math.max(0, Math.min(raw.currentImageIndex, Math.max(0, images.length - 1)))
       : Math.max(0, images.length - 1),
-    inFlightImages: inFlight.filter((e) => Date.now() - (e.startedAt ?? 0) < STALE_MS),
+    inFlightImages: inFlight.filter((e) => keepInFlight(e, STALE_MS)),
     // On unless the row explicitly stored `false` — matching the fresh-card
     // default, so a legacy row that predates the field behaves like a new one
     // and a frame the user unchained stays unchained.
@@ -401,7 +422,7 @@ export function backfillContinuousClipState(raw: Partial<ContinuousClipCardState
     currentVideoIndex: typeof raw.currentVideoIndex === 'number'
       ? Math.max(0, Math.min(raw.currentVideoIndex, Math.max(0, videos.length - 1)))
       : Math.max(0, videos.length - 1),
-    inFlightVideos: inFlight.filter((e) => Date.now() - (e.startedAt ?? 0) < STALE_MS),
+    inFlightVideos: inFlight.filter((e) => keepInFlight(e, STALE_MS)),
     durationSeconds: typeof raw.durationSeconds === 'number' ? raw.durationSeconds : 5,
     resolution: (raw.resolution as string) ?? '720p',
     audio: raw.audio !== false,
@@ -414,12 +435,12 @@ function legacyInFlightVideos(card: Partial<CardState> & Record<string, unknown>
   // Quality) can render well past 30 min. Matches Playground's STALE_TASK_MS.
   const STALE_MS = 60 * 60_000
   const persisted = Array.isArray(card.inFlightVideos) ? (card.inFlightVideos as CardState['inFlightVideos']) : []
-  const filtered = persisted.filter((e) => Date.now() - (e.startedAt ?? 0) < STALE_MS)
+  const filtered = persisted.filter((e) => keepInFlight(e, STALE_MS))
   if (filtered.length > 0) return filtered
   const taskId = card.videoTaskId as string | null | undefined
   const modelId = card.videoModelId as string | null | undefined
   const startedAt = card.videoStartedAt as number | null | undefined
-  if (taskId && modelId && startedAt && Date.now() - startedAt < STALE_MS) {
+  if (taskId && modelId && startedAt && keepInFlight({ startedAt, taskId }, STALE_MS)) {
     return [{
       id: 'legacy-video',
       taskId,

@@ -522,9 +522,12 @@ export default function InputPanel({
               value={lineDelivery}
               onChange={onLineDeliveryChange}
               accent="broll"
+              // The same two glyphs the Generate button below swaps between for
+              // these deliveries, so the button reads as an echo of what's
+              // picked here rather than as a third piece of vocabulary.
               options={[
-                { value: 'silent', label: 'B-Roll Clips' },
-                { value: 'dialogue', label: 'With Dialogue' },
+                { value: 'silent', label: 'B-Roll Clips', icon: Film },
+                { value: 'dialogue', label: 'With Dialogue', icon: MessageSquareQuote },
               ]}
             />
           )}

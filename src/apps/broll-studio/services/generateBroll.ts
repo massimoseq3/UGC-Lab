@@ -328,17 +328,20 @@ export function buildBrollUserPrompt(input: BrollInput): string {
   return prompt
 }
 
-export async function generateBroll(input: BrollInput): Promise<BrollResult> {
-  const { apiKey, endpoint } = getChatEndpoint()
-
-  const withDialogue = input.delivery === 'dialogue'
+/**
+ * The storyboard call's messages. Split out from the call itself because the
+ * storyboard now runs as a resumable JOB (services/storyboardRun.ts): the same
+ * messages go to kie's task transport or, when that model has no job route, to
+ * the streaming one.
+ */
+export async function buildBrollMessages(input: BrollInput): Promise<ChatMessage[]> {
   const prompt = buildBrollUserPrompt(input)
   // The product's photos ride along as vision inputs when there's more than
   // one, so the storyboard can name the state each shot needs rather than
   // having every angle attached to every card.
   const photoUris = await productPhotoDataUris(input.productPhotos)
   const systemInstruction = brollSystemInstruction(input.delivery, photoUris.length)
-  const messages: ChatMessage[] = [
+  return [
     { role: 'system', content: [{ type: 'text', text: systemInstruction }] },
     {
       role: 'user',
@@ -348,19 +351,36 @@ export async function generateBroll(input: BrollInput): Promise<BrollResult> {
       ],
     },
   ]
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: LONG_CHAT_TIMEOUT_MS })
+}
 
+/**
+ * Everything the RESPONSE has to be read against — the delivery it was written
+ * for and the style it renders in. Deliberately a subset of `BrollInput`: it is
+ * all snapshotted on the history row at Generate, so a storyboard resumed after
+ * a page reload parses exactly as it would have before it.
+ */
+export type BrollParseContext = Pick<BrollInput, 'delivery' | 'styleId' | 'styleBrief' | 'styleName'>
+
+/**
+ * Storyboard response → result. Throws on a response with no scenes in it: the
+ * parsers are deliberately tolerant (see xmlBlocks), so an empty parse means
+ * the model answered with something that wasn't a storyboard at all, and
+ * returning it would put an empty grid on the canvas with no error anywhere.
+ */
+export function buildBrollResult(responseText: string, ctx: BrollParseContext): BrollResult {
+  const scenes = parseScenes(responseText, ctx.delivery)
+  if (scenes.length === 0) throw new Error('The storyboard came back empty. Try again.')
   // Resolve the visual style once and stamp it on the result. It's appended to
   // each card's prompt (and the realism stack toggled) at fire time — the scene
   // prompts themselves stay style-neutral, exactly like Continuous.
   return {
-    scenes: parseScenes(responseText, input.delivery),
-    style: styleBriefFor({ styleId: input.styleId, styleBrief: input.styleBrief }),
-    realism: styleUsesRealism(input.styleId, !!input.styleBrief?.trim()),
-    styleId: input.styleId,
-    styleBrief: input.styleBrief?.trim() || undefined,
-    styleName: input.styleBrief?.trim() ? input.styleName?.trim() || undefined : undefined,
-    voiceProfile: withDialogue ? extractVoiceProfile(responseText) : undefined,
+    scenes,
+    style: styleBriefFor({ styleId: ctx.styleId, styleBrief: ctx.styleBrief }),
+    realism: styleUsesRealism(ctx.styleId, !!ctx.styleBrief?.trim()),
+    styleId: ctx.styleId,
+    styleBrief: ctx.styleBrief?.trim() || undefined,
+    styleName: ctx.styleBrief?.trim() ? ctx.styleName?.trim() || undefined : undefined,
+    voiceProfile: ctx.delivery === 'dialogue' ? extractVoiceProfile(responseText) : undefined,
   }
 }
 

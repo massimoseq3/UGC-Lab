@@ -707,6 +707,11 @@ export default function VariationCard(props: VariationCardProps) {
         // double-charges credits for a clip that's still on its way.
         return
       }
+      // The entry only keeps the friendly copy, so without this the raw
+      // message — the one that says WHICH failure this was (a stalled CDN
+      // download, a blob the browser wouldn't decode, a dead connection) — is
+      // gone, and every one of those reads the same on the tile.
+      console.error('[broll] video generation failed', err)
       const msg = humanizeError(err, 'Video generation failed.')
       onUpdateStateFn((prev) => ({
         inFlightVideos: prev.inFlightVideos.map((e) =>
@@ -852,6 +857,7 @@ export default function VariationCard(props: VariationCardProps) {
       // Same rule as the generate path: a poll timeout means it's STILL
       // rendering, so leave the entry in flight rather than offering a retry.
       if (isPollTimeout(err)) return
+      console.error('[broll] video resume failed', err)
       const msg = humanizeError(err, 'Video generation failed.')
       onUpdateStateFn((prev) => ({
         inFlightVideos: prev.inFlightVideos.map((e) => (e.id === entry.id ? { ...e, error: msg } : e)),
