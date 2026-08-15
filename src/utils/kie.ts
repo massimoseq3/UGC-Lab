@@ -426,6 +426,50 @@ export function parseResult(record: TaskRecord): ParsedResult {
   }
 }
 
+// The text a CHAT model produced, pulled out of a finished task record.
+//
+// A chat call can also be run through the jobs API (createTask → recordInfo)
+// rather than the streaming transport, which is the only way one survives a
+// page reload: the taskId is persisted, so the poll can be re-attached. What
+// comes back is loose — kie sometimes hands over `resultJson` as a JSON string
+// holding the chat envelope, sometimes as a string holding the raw model text,
+// and the envelope itself has turned up in several shapes — so every shape
+// seen in the wild is tried before giving up. Returns null when none match, and
+// the caller reports the raw record (that's the only way a new shape gets
+// found).
+//
+// Shared by the Ad Analyzer's video read and B-Roll's storyboard call. Keep it
+// that way: a shape learned by one is a shape the other needs.
+export function extractChatTaskText(record: TaskRecord): string | null {
+  let envelope: unknown
+  try {
+    envelope = JSON.parse(record.resultJson || '""')
+  } catch {
+    envelope = record.resultJson
+  }
+
+  if (typeof envelope === 'string') return envelope || null
+  if (!envelope || typeof envelope !== 'object') return null
+  const obj = envelope as Record<string, unknown>
+
+  // OpenAI-shape
+  const choices = obj.choices
+  if (Array.isArray(choices) && choices[0] && typeof choices[0] === 'object') {
+    const first = choices[0] as Record<string, unknown>
+    const msg = first.message as Record<string, unknown> | undefined
+    if (msg && typeof msg.content === 'string') return msg.content
+    if (typeof first.text === 'string') return first.text
+  }
+
+  // Flatter shapes kie sometimes returns
+  if (typeof obj.content === 'string') return obj.content
+  if (typeof obj.response === 'string') return obj.response
+  if (typeof obj.output === 'string') return obj.output
+  if (typeof obj.text === 'string') return obj.text
+
+  return null
+}
+
 // Generous, because a 30s video is tens of MB on a slow line — but NOT
 // unbounded, which is what this was. This runs at the TAIL of a generation kie
 // has already finished and billed for, so a stalled CDN read meant the result

@@ -32,6 +32,7 @@ import { startImageTask, finishImageTask, resolveImageModelId } from '../service
 import { attachProductAngles, countProductAngles, productRefsForSelection } from '../services/productAngles'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
 import { claimTask, releaseTask } from '../services/taskRegistry'
+import { useReconnectTick } from '../../../hooks/useReconnectTick'
 import {
   buildContinuousPrompt,
   buildContinuousPreamble,
@@ -833,6 +834,10 @@ export default function ContinuousView({
   }
 
   // ── Refresh-resume (images + videos) ─────────────────────────
+  // Also re-run when the connection comes back: a clip kie already rendered
+  // and billed for is recoverable for 3 days, and a dropped Wi-Fi kills the
+  // download rather than the generation. See hooks/useReconnectTick.
+  const reconnectTick = useReconnectTick()
   const IMG_TTL_MS = 30 * 60 * 1000
   const VID_TTL_MS = 60 * 60 * 1000
   useEffect(() => {
@@ -975,7 +980,7 @@ export default function ContinuousView({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [reconnectTick])
 
   if (isGenerating) {
     return (

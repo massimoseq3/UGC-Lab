@@ -72,6 +72,14 @@ export async function finishVideoAssetTask(
 // decodable frames. Those all render as a silent black tile with `0:00` in the
 // controls. We hand the blob to a hidden <video>, wait for `loadedmetadata`,
 // and treat anything with a non-finite or near-zero duration as broken.
+// How long the browser gets to read metadata off a blob that is ALREADY on
+// this machine. It was 8s, which is generous for one clip and tight for the
+// case that actually matters: a batch landing together, every tile decoding at
+// once on a laptop that is also rendering the gallery. Blowing it threw away a
+// clip kie had rendered and billed for, so the budget is the cheap side of that
+// trade — a slow probe costs seconds, a false negative costs a generation.
+const PROBE_TIMEOUT_MS = 30_000
+
 async function probeVideoBlob(blob: Blob, sourceUrl: string): Promise<void> {
   const objectUrl = URL.createObjectURL(blob)
   try {
@@ -86,9 +94,9 @@ async function probeVideoBlob(blob: Blob, sourceUrl: string): Promise<void> {
       const timer = setTimeout(() => {
         cleanup()
         reject(new Error(
-          `Video metadata probe timed out after 8s. url=${sourceUrl} size=${blob.size}B type=${blob.type || '(none)'}`,
+          `Video metadata probe timed out after ${PROBE_TIMEOUT_MS / 1000}s. url=${sourceUrl} size=${blob.size}B type=${blob.type || '(none)'}`,
         ))
-      }, 8000)
+      }, PROBE_TIMEOUT_MS)
       v.onloadedmetadata = () => {
         clearTimeout(timer)
         const d = v.duration

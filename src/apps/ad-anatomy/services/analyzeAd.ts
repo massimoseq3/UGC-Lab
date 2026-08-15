@@ -3,6 +3,7 @@ import { useSettingsStore } from '../../../stores/settingsStore'
 import {
   createTask,
   pollTask,
+  extractChatTaskText,
   kieChatCompletions,
   fileToDataUri,
   CHAT_POLL_ATTEMPTS,
@@ -200,33 +201,6 @@ async function buildMessages(videoFile: File): Promise<ChatMessage[]> {
   ]
 }
 
-// kie's chat completions response can be unwrapped into a single text blob
-// through several shapes depending on whether the recordInfo route returns the
-// raw OpenAI envelope, just the message string, or just `content`. Try the
-// known shapes in turn and surface the raw envelope if none match.
-function extractTextFromResultEnvelope(envelope: unknown): string | null {
-  if (typeof envelope === 'string') return envelope
-  if (!envelope || typeof envelope !== 'object') return null
-  const obj = envelope as Record<string, unknown>
-
-  // OpenAI-shape
-  const choices = obj.choices
-  if (Array.isArray(choices) && choices[0] && typeof choices[0] === 'object') {
-    const first = choices[0] as Record<string, unknown>
-    const msg = first.message as Record<string, unknown> | undefined
-    if (msg && typeof msg.content === 'string') return msg.content
-    if (typeof first.text === 'string') return first.text
-  }
-
-  // Flatter shapes kie sometimes returns
-  if (typeof obj.content === 'string') return obj.content
-  if (typeof obj.response === 'string') return obj.response
-  if (typeof obj.output === 'string') return obj.output
-  if (typeof obj.text === 'string') return obj.text
-
-  return null
-}
-
 // The two master blocks come straight off the model and are optional, so they
 // are normalised rather than trusted. An empty brief or profile drops the block
 // entirely — it renders nothing, and a blank brief must never reach the styles
@@ -345,15 +319,9 @@ export async function pollAnalysisTask(taskId: string): Promise<AnalysisResult> 
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const record = await pollTask(apiKey, taskId, { maxPollAttempts: CHAT_POLL_ATTEMPTS })
 
-  // Parse resultJson — kie sometimes returns it as a JSON string holding the
-  // chat envelope, sometimes as a string holding the raw model text.
-  let envelope: unknown
-  try {
-    envelope = JSON.parse(record.resultJson || '""')
-  } catch {
-    envelope = record.resultJson
-  }
-  const text = extractTextFromResultEnvelope(envelope)
+  // Shared with B-Roll's storyboard call — kie's chat result comes back in
+  // several shapes and both surfaces have to read all of them.
+  const text = extractChatTaskText(record)
   if (!text) {
     throw new Error(
       `Analysis task ${taskId} succeeded but no text could be extracted. Raw resultJson: ${record.resultJson?.slice(0, 400)}`,

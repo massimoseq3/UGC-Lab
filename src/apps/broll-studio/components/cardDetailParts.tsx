@@ -107,8 +107,11 @@ export interface ModalGalleryProps {
 type ModalEntry =
   | { kind: 'image'; idx: number; createdAt: number; imageUrl: string; prompt: string; modelId?: string }
   | { kind: 'video'; idx: number; createdAt: number; videoUrl: string; aspectRatio: string; prompt: string; modelId?: string }
-  | { kind: 'in-flight-image'; id: string; createdAt: number; prompt: string; aspectRatio: string; modelId?: string | null; error?: string | null }
-  | { kind: 'in-flight-video'; id: string; createdAt: number; prompt: string; mode: 'animating' | 'rendering'; aspectRatio: string; modelId?: string | null; error?: string | null }
+  // `resumable` — the entry still holds a kie taskId, so a failure here is a
+  // result we lost rather than a generation that didn't happen. It decides
+  // everything the failed tile says and does (see FailedTile).
+  | { kind: 'in-flight-image'; id: string; createdAt: number; prompt: string; aspectRatio: string; modelId?: string | null; error?: string | null; resumable?: boolean }
+  | { kind: 'in-flight-video'; id: string; createdAt: number; prompt: string; mode: 'animating' | 'rendering'; aspectRatio: string; modelId?: string | null; error?: string | null; resumable?: boolean }
 
 // An in-flight entry carries an `error` once its generation failed; that's the
 // signal to render it as a Failed tile (retry/dismiss) instead of a spinner.
@@ -144,7 +147,8 @@ export function ModalGallery({
   // Unified per-card output stream, newest-first.
   const entries: ModalEntry[] = []
   for (const entry of cardState.inFlightImages) {
-    entries.push({ kind: 'in-flight-image', id: entry.id, createdAt: entry.startedAt, prompt: entry.prompt, aspectRatio: entry.aspectRatio, modelId: entry.modelId, error: entry.error })
+    // Same two fields resumeInFlightImage needs to re-enter the finish half.
+    entries.push({ kind: 'in-flight-image', id: entry.id, createdAt: entry.startedAt, prompt: entry.prompt, aspectRatio: entry.aspectRatio, modelId: entry.modelId, error: entry.error, resumable: !!(entry.taskId && entry.modelId) })
   }
   for (const entry of cardState.inFlightVideos) {
     entries.push({
@@ -156,6 +160,7 @@ export function ModalGallery({
       aspectRatio: entry.aspectRatio,
       modelId: entry.modelId,
       error: entry.error,
+      resumable: !!entry.taskId,
     })
   }
   cardState.images.forEach((img, idx) => {
@@ -638,8 +643,147 @@ export function ModalVideoPlayer({
   )
 }
 
-// A failed generation tile — replaces the perpetual spinner once an in-flight
-// entry carries an `error`. Retry re-fires the same gen; Dismiss drops it.
+// ─── A generation that didn't land ───────────────────────────────────────
+//
+// Two states wear this, and one field tells them apart: does the entry still
+// hold a kie taskId?
+//
+//   RESUMABLE — kie RAN it, and billed for it, and we lost the result on the
+//   way in: the download stalled, this browser couldn't decode the blob, the
+//   Wi-Fi dropped between kie finishing and the file landing. Retry re-enters
+//   the FINISH half only (poll → download → save), so it costs nothing, and
+//   kie keeps a result for 3 days. That isn't a failure, it's an unfinished
+//   generation — so it doesn't wear the red alarm, it says outright that
+//   retrying is free, and DISMISS TAKES TWO CLICKS, because dismissing is the
+//   one move that really does throw a paid clip away.
+//
+//   DEAD — the generation never reached kie. Nothing was charged, Retry fires
+//   a fresh one, and Dismiss costs nothing, so it stays one click.
+//
+// Shared with the Continuous frame/clip modals (InFlightFailureRow below) —
+// the same entry can fail in either place and must read the same.
+
+const RESUMABLE_PROMISE = 'Retry is free — kie.ai already made this one.'
+
+// Retry + Dismiss, with the two-click arming a resumable entry needs. Reverts
+// after 3s, exactly like TileDeleteButton — the app's one destructive idiom.
+function FailureActions({
+  resumable,
+  onRetry,
+  onDismiss,
+  compact = false,
+}: {
+  resumable: boolean
+  onRetry: () => void
+  onDismiss: () => void
+  compact?: boolean
+}) {
+  const [armed, setArmed] = useState(false)
+  useEffect(() => {
+    if (!armed) return
+    const t = setTimeout(() => setArmed(false), 3000)
+    return () => clearTimeout(t)
+  }, [armed])
+
+  const handleDismiss = () => {
+    if (resumable && !armed) {
+      setArmed(true)
+      return
+    }
+    onDismiss()
+  }
+  const dismissTitle = resumable
+    ? (armed ? 'Discard the clip kie.ai is holding' : 'Discard — kie.ai is holding this one for 3 days')
+    : 'Dismiss'
+
+  if (compact) {
+    return (
+      <>
+        <button
+          type="button"
+          title={resumable ? 'Retry — free, picks up the finished file' : 'Retry'}
+          onClick={onRetry}
+          className="shrink-0 rounded-full p-1 text-ink-400 transition-colors hover:bg-ink/10 hover:text-ink-200"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          title={dismissTitle}
+          onClick={handleDismiss}
+          className={`shrink-0 rounded-full transition-colors ${
+            armed
+              ? 'bg-red-500/20 px-2 py-0.5 text-[10px] font-medium text-red-200 light:text-red-800'
+              : 'p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200'
+          }`}
+        >
+          {armed ? 'Discard?' : <X className="h-3.5 w-3.5" />}
+        </button>
+      </>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        type="button"
+        title={resumable ? 'Picks up the file kie.ai already made — no new generation' : undefined}
+        onClick={onRetry}
+        className="flex items-center gap-1 rounded-full border border-white/15 bg-broll-500 px-2.5 py-1 text-[10px] font-medium text-white transition-colors hover:bg-broll-400"
+      >
+        <RefreshCw className="h-3 w-3" />
+        Retry
+      </button>
+      <button
+        type="button"
+        title={dismissTitle}
+        onClick={handleDismiss}
+        className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-medium transition-colors ${
+          armed
+            ? 'border-red-500/40 bg-red-500/20 text-red-200 light:text-red-800'
+            : 'border-ink/10 bg-ink/[0.04] text-ink-300 hover:bg-ink/[0.08]'
+        }`}
+      >
+        {armed ? 'Discard?' : <><X className="h-3 w-3" />Dismiss</>}
+      </button>
+    </div>
+  )
+}
+
+// The compact row form, for the Continuous frame/clip modals (three
+// hand-rolled copies of it before this).
+export function InFlightFailureRow({
+  error,
+  resumable,
+  onRetry,
+  onDismiss,
+}: {
+  error?: string | null
+  resumable: boolean
+  onRetry: () => void
+  onDismiss: () => void
+}) {
+  return (
+    <div
+      className={`flex items-start gap-2 rounded-xl border px-3 py-2 ${
+        resumable ? 'border-amber-500/25 bg-amber-500/10' : 'border-red-500/20 bg-red-500/10'
+      }`}
+    >
+      <AlertCircle
+        className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${resumable ? 'text-amber-400 light:text-amber-700' : 'text-red-400 light:text-red-600'}`}
+      />
+      <div className="min-w-0 flex-1">
+        <p className={`text-[11px] leading-relaxed ${resumable ? 'text-amber-200 light:text-amber-800' : 'text-red-300 light:text-red-700'}`}>
+          {error}
+        </p>
+        {resumable && <p className="mt-0.5 text-[10px] leading-relaxed text-ink-400">{RESUMABLE_PROMISE}</p>}
+      </div>
+      <FailureActions compact resumable={resumable} onRetry={onRetry} onDismiss={onDismiss} />
+    </div>
+  )
+}
+
+// The tile form, for the per-card modal gallery.
 function FailedTile({
   entry,
   onRetry,
@@ -650,35 +794,30 @@ function FailedTile({
   onDismiss: () => void
 }) {
   if (entry.kind !== 'in-flight-image' && entry.kind !== 'in-flight-video') return null
+  const resumable = !!entry.resumable
   return (
     <div
-      className="relative overflow-hidden rounded-lg border border-red-500/40 bg-gradient-to-br from-red-500/[0.1] to-ink-950"
+      className={`relative overflow-hidden rounded-lg border ${
+        resumable
+          ? 'border-amber-500/40 bg-gradient-to-br from-amber-500/[0.1] to-ink-950'
+          : 'border-red-500/40 bg-gradient-to-br from-red-500/[0.1] to-ink-950'
+      }`}
       style={aspectStyle(entry.aspectRatio)}
     >
-      <div className="absolute left-1.5 top-1.5 rounded-full bg-red-500/30 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-red-100 light:text-red-900 backdrop-blur">
-        Failed
+      <div
+        className={`absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider backdrop-blur ${
+          resumable ? 'bg-amber-500/30 text-amber-100 light:text-amber-900' : 'bg-red-500/30 text-red-100 light:text-red-900'
+        }`}
+      >
+        {resumable ? 'Not saved' : 'Failed'}
       </div>
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center">
-        <AlertCircle className="h-5 w-5 text-red-300 light:text-red-700" />
-        <p className="line-clamp-3 text-[10px] leading-relaxed text-red-200 light:text-red-800">{entry.error}</p>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={onRetry}
-            className="flex items-center gap-1 rounded-full border border-white/15 bg-broll-500 px-2.5 py-1 text-[10px] font-medium text-white transition-colors hover:bg-broll-400"
-          >
-            <RefreshCw className="h-3 w-3" />
-            Retry
-          </button>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="flex items-center gap-1 rounded-full border border-ink/10 bg-ink/[0.04] px-2.5 py-1 text-[10px] font-medium text-ink-300 transition-colors hover:bg-ink/[0.08]"
-          >
-            <X className="h-3 w-3" />
-            Dismiss
-          </button>
-        </div>
+        <AlertCircle className={`h-5 w-5 ${resumable ? 'text-amber-300 light:text-amber-700' : 'text-red-300 light:text-red-700'}`} />
+        <p className={`line-clamp-3 text-[10px] leading-relaxed ${resumable ? 'text-amber-200 light:text-amber-800' : 'text-red-200 light:text-red-800'}`}>
+          {entry.error}
+        </p>
+        {resumable && <p className="text-[10px] leading-relaxed text-ink-300">{RESUMABLE_PROMISE}</p>}
+        <FailureActions resumable={resumable} onRetry={onRetry} onDismiss={onDismiss} />
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2 pb-1.5 pt-6">
         <p className="line-clamp-1 text-[10px] text-zinc-400">{entry.prompt}</p>

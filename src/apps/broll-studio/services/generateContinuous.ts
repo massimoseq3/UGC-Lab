@@ -633,11 +633,15 @@ export function parseContinuousResult(responseText: string, input: ContinuousInp
 
 // ── Entry points ───────────────────────────────────────────────
 
-export async function generateContinuous(input: ContinuousInput): Promise<ContinuousResult> {
-  const apiKey = useSettingsStore.getState().getKieApiKey()
-  const endpoint = chatTarget()
+/**
+ * The keyframe-chain storyboard call's messages. Split out from the call for
+ * the same reason as Line-by-Line's (see buildBrollMessages): the storyboard
+ * runs as a resumable job now, and the transport is chosen in one place —
+ * services/storyboardRun.ts.
+ */
+export async function buildContinuousMessages(input: ContinuousInput): Promise<ChatMessage[]> {
   const photoUris = await productPhotoDataUris(input.productPhotos)
-  const messages: ChatMessage[] = [
+  return [
     { role: 'system', content: [{ type: 'text', text: continuousSystemInstruction(photoUris.length) }] },
     {
       role: 'user',
@@ -647,10 +651,6 @@ export async function generateContinuous(input: ContinuousInput): Promise<Contin
       ],
     },
   ]
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: LONG_CHAT_TIMEOUT_MS })
-  const result = parseContinuousResult(responseText, input)
-  if (!result) throw new Error('The storyboard came back empty. Try again.')
-  return result
 }
 
 // Shared context for the per-frame prompt tools (Add concept / Enhance /

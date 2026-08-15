@@ -171,6 +171,18 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
       "Your result finished, but downloading it timed out. Retry — it picks up the finished file rather than generating it again, so it costs no extra credits.",
   },
   {
+    // The clip arrived and the BROWSER couldn't open it: the metadata probe in
+    // videoTask.ts timed out, or the <video> element rejected the blob. Both
+    // happen on this machine, after kie has rendered and billed — most often
+    // when a whole batch lands at once and every tile is decoding — and both
+    // used to fall through to the poll-timeout rule below, which sent members
+    // off to kie.ai to look for a task that had already finished. Retrying is
+    // free (it re-fetches the finished file), which is the whole message here.
+    test: (m) => m.includes('metadata probe timed out') || m.includes('rejected the downloaded video'),
+    message:
+      "The clip downloaded but this browser couldn't open it. Retry — it picks the finished file up again and costs no extra credits.",
+  },
+  {
     // PollTimeoutError on a healthy connection — the task is very likely still
     // rendering on kie.ai, and regenerating pays for it twice.
     test: (m) => m.includes('timed out') || m.includes('timeout'),

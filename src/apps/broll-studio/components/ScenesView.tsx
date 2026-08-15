@@ -11,6 +11,7 @@ import { finishImageTask, resolveImageModelId } from '../services/generateBroll'
 import { getContinuousStyle } from '../services/generateContinuous'
 import { finishVideoTask } from '../services/generateVideo'
 import { claimTask, releaseTask } from '../services/taskRegistry'
+import { useReconnectTick } from '../../../hooks/useReconnectTick'
 import { isPollTimeout } from '../../../utils/kie'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
@@ -528,6 +529,13 @@ export default function ScenesView({
   // Entries older than 30 min — or in-flight entries that never received a
   // taskId (refresh during createTask) — are evicted with an error chip so the
   // gallery doesn't stay stuck on a phantom spinner.
+  //
+  // It runs again whenever the connection comes back, because that is the
+  // other way a paid-for clip goes missing: kie renders it, the download dies
+  // with the Wi-Fi, and the entry sits on a Failed tile. Entries that already
+  // errored are walked too (they keep their taskId), and `claimTask` stops an
+  // extra pass from double-polling anything a live promise still owns.
+  const reconnectTick = useReconnectTick()
   const INFLIGHT_TTL_MS = 30 * 60 * 1000
   useEffect(() => {
     const now = Date.now()
@@ -700,7 +708,7 @@ export default function ScenesView({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [reconnectTick])
 
   if (isGenerating) {
     return (

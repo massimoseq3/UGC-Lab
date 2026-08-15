@@ -6,9 +6,18 @@ import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
 import type { AdBlueprintPayload, Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
 import { isLineMode, sanitizeBrollMode, type BrollResult, type PromptVariation, type ReferenceImage, type VariationTag, type VariationRefs, type CardState, type BrollMode, type BrollDelivery, type ContinuousResult, type ContinuousConcept, type ContinuousSelection, type ContinuousFrameCardState, type ContinuousClipCardState } from './types'
-import { generateBroll } from './services/generateBroll'
 import { productPhotosOf } from './services/productAngles'
-import { generateContinuous, buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, styleBriefFor, styleUsesRealism, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
+import { buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, styleBriefFor, styleUsesRealism, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
+import {
+  startStoryboard,
+  resumeStoryboard,
+  onStoryboardSettled,
+  isStoryboardStranded,
+  strandStoryboard,
+  STORYBOARD_TTL_MS,
+  type StoryboardRequest,
+  type StoryboardOutcome,
+} from './services/storyboardRun'
 import InputPanel from './components/InputPanel'
 import ImportPromptsModal from './components/ImportPromptsModal'
 import type { ImportContext, ImportParsed } from './services/importPrompts'
@@ -315,7 +324,30 @@ export default function BrollStudio() {
   const continuousModelId =
     useSettingsStore((s) => s.perAppModel['broll-studio:continuous:video']) ?? CONTINUOUS_DEFAULT_MODEL_ID
 
-  const [isGenerating, setIsGenerating] = useState(false)
+  // The storyboard this workspace is waiting on. Persisted, because the run
+  // outlives the page: the call goes through kie's task transport where the
+  // picked writer model has one, so a reload re-attaches to it (see
+  // services/storyboardRun.ts) instead of losing a call already billed for.
+  // The row itself carries the state — this is only which row is OURS.
+  const [pendingStoryboardId, setPendingStoryboardId] = usePersistedState<string>(
+    `${baseKey}:pendingStoryboard`,
+    '',
+  )
+  const pendingStoryboardRow = useBankStore((s) => s.brollHistory.find((r) => r.id === pendingStoryboardId))
+  const pendingIdRef = useRef(pendingStoryboardId)
+  useEffect(() => { pendingIdRef.current = pendingStoryboardId }, [pendingStoryboardId])
+  // Writing the prompts, whether this page fired the call or inherited it. An
+  // errored row stops counting immediately; the row is written before the id is
+  // set, so an id with no row yet is the tick between the two.
+  const isGenerating = !!pendingStoryboardId && pendingStoryboardRow?.storyboardStatus !== 'error'
+  // Deleting the row mid-write cancels it — nothing left to wait for.
+  useEffect(() => {
+    if (pendingStoryboardId && !pendingStoryboardRow) setPendingStoryboardId('')
+  }, [pendingStoryboardId, pendingStoryboardRow, setPendingStoryboardId])
+  // Guards the microtask between the click and the row landing, so a double
+  // click can't fire two storyboards. Never disables the button (app rule).
+  const startingStoryboardRef = useRef(false)
+
   // Phone-only: which of the two panes is on screen (ignored from md up).
   const [pane, setPane] = useState<'input' | 'output'>('input')
   const [error, setError] = useState<string | null>(null)
@@ -697,6 +729,138 @@ export default function BrollStudio() {
     ...(productRef ? [productRef] : []),
   ]
 
+  // ── The storyboard call, as a job ──────────────────────────────────────
+  // It writes its history row FIRST and hands the run to storyboardRun.ts, so
+  // the session is visible in History from the press (like every other
+  // generation surface in the app) and survives a reload where the picked
+  // writer model has a kie job route.
+
+  // The row for a storyboard that hasn't been written yet. It carries
+  // everything the RESPONSE is parsed against — delivery, style, and the video
+  // model whose ladder scene lengths snap to — as well as the identity fields
+  // the card shows, so it reads right while it writes and parses right even if
+  // it lands after a reload, when the panel may have moved on.
+  const buildPendingRow = (id: string, rowMode: BrollMode): BrollHistoryItem => ({
+    id,
+    createdAt: Date.now(),
+    inputSummary: buildInputSummary(selectedProduct?.productName, scriptText),
+    productId: selectedProductId ?? undefined,
+    modelId: selectedModelId ?? undefined,
+    scriptId: selectedScriptId ?? undefined,
+    scriptText: scriptText || undefined,
+    context: additionalContext || undefined,
+    styleId: resolvedStyleId || undefined,
+    styleBrief: continuousStyleBrief ?? undefined,
+    styleName: continuousStyleName ?? undefined,
+    result: { scenes: [] },
+    cardStates: {},
+    mode: rowMode,
+    lineDelivery: rowMode === 'line' ? lineDelivery : undefined,
+    continuousStyleId: rowMode === 'continuous' ? resolvedStyleId : undefined,
+    continuousModelId: rowMode === 'continuous' ? continuousModelId : undefined,
+    storyboardStatus: 'writing',
+  })
+
+  // Write the row, then fire the call — in that order, so the taskId has
+  // somewhere to land the moment kie hands one back.
+  //
+  // The workspace is deliberately NOT touched here. The old storyboard stays on
+  // the canvas until a new one exists, which is the same commit discipline the
+  // awaited version had: rotating the session up front left a failed call
+  // showing the previous scenes stripped of every image. `adoptStoryboard`
+  // swaps it over on success.
+  const launchStoryboard = async (rowMode: BrollMode, req: StoryboardRequest) => {
+    // Checked before the row is written: a missing key is a failure we can see
+    // coming, and it has no business leaving a dead session in History.
+    if (!useSettingsStore.getState().kieApiKey) {
+      const msg = 'Add your kie.ai key in Settings to generate a storyboard.'
+      setError(msg)
+      useAppStore.getState().addToast(msg, 'info')
+      return
+    }
+    const rowId = newSessionId()
+    await upsertBrollHistory(buildPendingRow(rowId, rowMode))
+    setPendingStoryboardId(rowId)
+    startStoryboard(rowId, req)
+  }
+
+  // Where a finished storyboard lands in the workspace — ONE path, whether the
+  // call finished in this page load or was resumed after a reload. Everything
+  // is read off the row rather than the panel: the row stamped the delivery and
+  // style at Generate, and either may have been changed while it wrote.
+  const adoptStoryboard = (row: BrollHistoryItem) => {
+    const rowMode = brollHistoryMode(row)
+    setSessionId(row.id)
+    setSessionMode(rowMode)
+    setMode(rowMode)
+    setSessionStyleId(row.styleId ?? '')
+    setSessionStyleBrief(row.styleBrief ?? null)
+    setSessionStyleName(row.styleName ?? null)
+    if (rowMode === 'continuous') {
+      setContinuousFrameStates({})
+      setContinuousClipStates({})
+      setContinuousSelections({})
+      setContinuousResult((row.continuousResult as ContinuousResult | undefined) ?? null)
+      useAppStore.getState().addToast('Storyboard ready — pick a keyframe per frame, then animate', 'success')
+      return
+    }
+    const delivery = row.lineDelivery ?? 'silent'
+    setSessionDelivery(delivery)
+    setCardStates({})
+    setResult((row.result as BrollResult | null) ?? null)
+    useAppStore.getState().addToast(
+      delivery === 'dialogue' ? 'Dialogue scenes ready' : 'B-roll scenes ready',
+      'success',
+    )
+  }
+
+  const handleStoryboardSettled = (rowId: string, outcome: StoryboardOutcome) => {
+    // Somebody else's row (another tab, or one this workspace already handed
+    // over) — the row itself carries its own state either way.
+    if (rowId !== pendingIdRef.current) return
+    setPendingStoryboardId('')
+    if (outcome.ok) {
+      const row = useBankStore.getState().brollHistory.find((r) => r.id === rowId)
+      if (row) adoptStoryboard(row)
+      return
+    }
+    // A null message means the row was deleted while it wrote — that's the
+    // member cancelling, and there's nothing to tell them.
+    if (!outcome.error) return
+    setError(outcome.error)
+    useAppStore.getState().addToast(outcome.error, 'error')
+  }
+
+  // One subscription for the app's whole lifetime, routed through a ref: the
+  // job that settles may have been started by a previous page load, and the
+  // handler closes over state that changes every render.
+  const settledRef = useRef(handleStoryboardSettled)
+  useEffect(() => { settledRef.current = handleStoryboardSettled })
+  useEffect(() => onStoryboardSettled((rowId, outcome) => settledRef.current(rowId, outcome)), [])
+
+  // Storyboards left 'writing' by a previous page load: re-attach kie's task
+  // where there is one, and strand the rest rather than leaving a row pulsing
+  // for a call that died with its page. Both helpers consult the live job
+  // registry, so a StrictMode double-mount can't strand a run it just started.
+  useEffect(() => {
+    const now = Date.now()
+    for (const row of useBankStore.getState().brollHistory) {
+      if (row.storyboardStatus !== 'writing') continue
+      if (resumeStoryboard(row)) continue
+      if (!isStoryboardStranded(row, now)) continue
+      // A row synced from another browser may still be writing over there, so
+      // only its age can condemn it. Our own we know is dead.
+      const mine = row.id === pendingIdRef.current
+      if (!mine && now - (row.updatedAt ?? row.createdAt) <= STORYBOARD_TTL_MS) continue
+      void strandStoryboard(
+        row.id,
+        mine
+          ? 'The page reloaded before kie picked the storyboard up, so it never ran. Generate it again.'
+          : 'This storyboard never finished writing. Generate it again.',
+      )
+    }
+  }, [])
+
   const handleGenerateContinuous = async (script: string) => {
     // No kie.ai key yet → show the sample storyboard so the member sees what
     // Continuous mode produces before wiring billing.
@@ -712,8 +876,9 @@ export default function BrollStudio() {
       return
     }
     setError(null)
-    try {
-      const res = await generateContinuous({
+    await launchStoryboard('continuous', {
+      mode: 'continuous',
+      input: {
         scriptText: script,
         styleId: resolvedStyleId,
         styleBrief: continuousStyleBrief ?? undefined,
@@ -723,22 +888,8 @@ export default function BrollStudio() {
         additionalContext,
         productPhotos: productPhotoRefs,
         sceneStaging,
-      })
-      // Same commit discipline as the other modes: only rotate the session
-      // once a storyboard actually landed.
-      setSessionId(newSessionId())
-      setSessionMode('continuous')
-      stampSessionStyle()
-      setContinuousFrameStates({})
-      setContinuousClipStates({})
-      setContinuousSelections({})
-      setContinuousResult(res)
-      useAppStore.getState().addToast('Storyboard ready — pick a keyframe per frame, then animate', 'success')
-    } catch (err) {
-      const msg = humanizeError(err, 'Storyboard generation failed. Check your API key and try again.')
-      setError(msg)
-      useAppStore.getState().addToast(msg, 'error')
-    }
+      },
+    })
   }
 
   // Style references → one vision call → a style paragraph that outranks the
@@ -949,8 +1100,9 @@ export default function BrollStudio() {
 
   const handleGenerateLine = async (script: string) => {
     setError(null)
-    try {
-      const res = await generateBroll({
+    await launchStoryboard('line', {
+      mode: 'line',
+      input: {
         productId: selectedProduct?.id ?? null,
         modelId: selectedModel?.id ?? null,
         scriptId: selectedScript?.id ?? null,
@@ -965,27 +1117,8 @@ export default function BrollStudio() {
         styleName: continuousStyleName ?? undefined,
         delivery: lineDelivery,
         sceneStaging,
-      })
-      // Only now that we have scenes do we start a fresh session: rotating the
-      // id and clearing cardStates up-front meant a failed call left the old
-      // scenes on screen stripped of every image (and wrote a new history row
-      // holding the old result with no card states). Batched into one commit,
-      // so the rebuild effect sees the new result against empty cards.
-      setSessionId(newSessionId())
-      setSessionMode('line')
-      setSessionDelivery(lineDelivery)
-      stampSessionStyle()
-      setCardStates({})
-      setResult(res)
-      useAppStore.getState().addToast(
-        lineDelivery === 'dialogue' ? 'Dialogue scenes ready' : 'B-roll scenes ready',
-        'success',
-      )
-    } catch (err) {
-      const msg = humanizeError(err, 'B-Roll generation failed. Check your API key and try again.')
-      setError(msg)
-      useAppStore.getState().addToast(msg, 'error')
-    }
+      },
+    })
   }
 
   // The one Generate: storyboard the script in whichever mode is active.
@@ -998,18 +1131,15 @@ export default function BrollStudio() {
   // compare what came back. Bring a script; the Ad Format row keeps its real
   // job, which is deciding how the ad gets SHOT.
   const handleGenerate = async () => {
-    if (isGenerating) return
+    if (isGenerating || startingStoryboardRef.current) return
     const script = scriptText.trim()
     if (!script) return
     // On a phone only one pane is on screen — follow the run to the storyboard.
     setPane('output')
-    setIsGenerating(true)
-    try {
-      if (mode === 'continuous') await handleGenerateContinuous(script)
-      else await handleGenerateLine(script)
-    } finally {
-      setIsGenerating(false)
-    }
+    startingStoryboardRef.current = true
+    if (mode === 'continuous') await handleGenerateContinuous(script)
+    else await handleGenerateLine(script)
+    startingStoryboardRef.current = false
   }
 
   // Adopt a restored row's video model. These keys are the user's persistent
@@ -1030,6 +1160,10 @@ export default function BrollStudio() {
   // asset:// refs (IndexedDB / R2). Sets sessionId so further edits update
   // the same history row instead of forking a new one.
   const handleSelectHistory = (item: BrollHistoryItem) => {
+    // A row that is still writing its storyboard — or died trying — holds
+    // nothing to restore, and loading it would empty the workspace. The card
+    // isn't clickable either; this is the guard behind it.
+    if (item.storyboardStatus) return
     setSessionId(item.id)
     setSelectedProductId(item.productId ?? null)
     setSelectedModelId(item.modelId ?? null)

@@ -108,7 +108,16 @@ const ACTIVITY_TTL_MS = 30 * 60 * 1000
 interface InFlightish { startedAt?: number; error?: string | null }
 interface CardStateish { inFlightImages?: InFlightish[]; inFlightVideos?: InFlightish[] }
 
-interface RowActivity { images: number; videos: number; generating: number; failed: number }
+interface RowActivity {
+  images: number
+  videos: number
+  generating: number
+  failed: number
+  // The storyboard call itself is in flight — the row exists before there is
+  // anything in it, so this is the one kind of activity a row can report with
+  // no cards to tally.
+  writing: boolean
+}
 
 function tallyStates(states: Record<string, CardStateish> | undefined, now: number, out: RowActivity) {
   if (!states) return
@@ -131,7 +140,14 @@ function tallyStates(states: Record<string, CardStateish> | undefined, now: numb
 // Counts across every mode's card states — a row is one session, and a session
 // can hold work in more than one mode.
 function rowActivity(item: BrollHistoryItem, now: number): RowActivity {
-  const out: RowActivity = { images: 0, videos: 0, generating: 0, failed: 0 }
+  const out: RowActivity = { images: 0, videos: 0, generating: 0, failed: 0, writing: false }
+  // The storyboard is written before the session has a single card, so this
+  // reads off the row's own state rather than off any card queue. Same TTL:
+  // a row left writing by a browser that closed must not pulse forever.
+  if (item.storyboardStatus === 'writing' && now - (item.updatedAt ?? item.createdAt) <= ACTIVITY_TTL_MS) {
+    out.writing = true
+    out.generating += 1
+  }
   tallyStates(item.cardStates as Record<string, CardStateish> | undefined, now, out)
   tallyStates(item.continuousFrameStates as Record<string, CardStateish> | undefined, now, out)
   tallyStates(item.continuousClipStates as Record<string, CardStateish> | undefined, now, out)
@@ -141,6 +157,8 @@ function rowActivity(item: BrollHistoryItem, now: number): RowActivity {
 // Name what's actually rendering — a Continuous session mid-keyframe-chain is
 // making images, not clips.
 function activityLabel(a: RowActivity): string {
+  // The prompts come before any of it, so it wins the line when both are true.
+  if (a.writing) return 'Writing storyboard…'
   const noun = a.videos === 0 ? 'image' : a.images === 0 ? 'clip' : 'output'
   return `Generating ${a.generating} ${noun}${a.generating === 1 ? '' : 's'}…`
 }
@@ -522,11 +540,18 @@ function HistoryCard({
   const styleLabel = historyStyleLabel(item, mode)
   const generating = activity?.generating ?? 0
   const failed = activity?.failed ?? 0
+  // A row whose storyboard is still being written — or whose writing failed —
+  // holds nothing to restore, so it isn't clickable. It's here to be watched,
+  // and (when it failed) to say what happened and be deleted.
+  const storyboardFailed = item.storyboardStatus === 'error'
+  const openable = !item.storyboardStatus
 
   return (
     <div
-      onClick={onSelect}
-      className={`group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border text-left transition-all ${
+      onClick={openable ? onSelect : undefined}
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border text-left transition-all ${
+        openable ? 'cursor-pointer' : 'cursor-default'
+      } ${
         isActive
           ? 'border-broll-500/50 bg-broll-500/[0.08] ring-1 ring-broll-500/40'
           : 'border-ink/5 bg-ink/[0.03] hover:-translate-y-px hover:border-ink/15 hover:bg-ink/[0.05]'
@@ -545,9 +570,13 @@ function HistoryCard({
         </span>
 
         <div className="absolute inset-x-2.5 bottom-2.5 flex items-center gap-1.5 overflow-hidden">
-          <span className="shrink-0 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white">
-            {count} {countLabel}
-          </span>
+          {/* A session being written has no scenes yet — "0 scenes" reads as a
+              broken storyboard rather than an unfinished one. */}
+          {count > 0 && (
+            <span className="shrink-0 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white">
+              {count} {countLabel}
+            </span>
+          )}
           {styleLabel && (
             <span className="min-w-0 truncate rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-medium text-white/80">
               {styleLabel}
@@ -564,6 +593,16 @@ function HistoryCard({
 
       <div className="flex min-h-0 flex-col gap-1 px-3 py-2.5">
         <p className="line-clamp-2 text-[13px] font-medium leading-snug text-ink-100">{title}</p>
+        {/* The storyboard call died — say why, on the row it died on. Nothing
+            was generated, so there's no media line to keep. */}
+        {storyboardFailed && (
+          <p
+            className="line-clamp-2 text-[11px] leading-snug text-red-400 light:text-red-600"
+            title={item.storyboardError}
+          >
+            {item.storyboardError || 'Storyboard failed.'}
+          </p>
+        )}
         <div className="flex items-center gap-1.5 overflow-hidden text-[11px] text-ink-500">
           {/* While a session has work in flight, the live count replaces the
               media tally — that's the answer the member is looking for when they

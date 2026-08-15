@@ -388,6 +388,20 @@ export interface BrollHistoryItem {
   continuousSelections?: Record<string, unknown>
   continuousStyleId?: string
   continuousModelId?: string
+  // The storyboard-writing call itself, as a row state — the row is written
+  // BEFORE the call so History can show the session rendering, exactly like the
+  // Ad Analyzer's 'analyzing' row. Absent means the storyboard is written,
+  // which is every legacy row and every finished session.
+  //   'writing' — the chat call is in flight (or was, when this browser died).
+  //   'error'   — it failed, and nobody was watching to be told.
+  storyboardStatus?: 'writing' | 'error'
+  // kie task id for the storyboard call, when it went through the task
+  // transport. This is what lets a reload re-attach the poll instead of losing
+  // a call the member already paid for; a run that fell back to streaming has
+  // none and can't be resumed.
+  storyboardTaskId?: string
+  // Friendly copy for a 'error' row. Raw messages stay in the console.
+  storyboardError?: string
 }
 
 // One analysis in the Ad Analyzer. Pushed before the request starts so the

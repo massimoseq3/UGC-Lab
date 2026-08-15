@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  X, Image as ImageIcon, Video as VideoIcon, Film, AlertCircle, Coins, Volume2, VolumeX, UserRound, Package, Link2, Download, Bookmark, Check, RefreshCw, Trash2, Copy, ArrowDown, ChevronRight, Star, Layers, Images,
+  X, Image as ImageIcon, Video as VideoIcon, Film, Coins, Volume2, VolumeX, UserRound, Package, Link2, Download, Bookmark, Check, Trash2, Copy, ArrowDown, ChevronRight, Star, Layers, Images,
 } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import SectionCard, { SectionLabel, StatusDot } from '../../../components/SectionCard'
@@ -17,7 +17,7 @@ import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
 import ExpandTextModal from '../../../components/ExpandableText'
 import PromptToolbar from '../../../components/PromptToolbar'
-import { ReferenceSlotCard, ExtraRefsRow, ProductPhotoRow, PendingMediaTile, ModalVideoPlayer, StyleNote } from './cardDetailParts'
+import { ReferenceSlotCard, ExtraRefsRow, ProductPhotoRow, PendingMediaTile, ModalVideoPlayer, StyleNote, InFlightFailureRow } from './cardDetailParts'
 import { ExpandVideoButton } from '../../../components/VideoLightbox'
 import type { ContinuousFrameCardState, ContinuousClipCardState, GeneratedVideo, ReferenceImage } from '../types'
 import type { Product, Model } from '../../../stores/types'
@@ -681,12 +681,13 @@ export function ContinuousFrameModal({
               ) : (
                 <div className="flex flex-col gap-3">
                   {cardState.inFlightImages.filter((e) => e.error).map((entry) => (
-                    <div key={entry.id} className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2">
-                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400 light:text-red-600" />
-                      <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-red-300 light:text-red-700">{entry.error}</p>
-                      <button type="button" title="Retry" onClick={() => onRetryInFlight(entry.id)} className="shrink-0 rounded-full p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200"><RefreshCw className="h-3.5 w-3.5" /></button>
-                      <button type="button" title="Dismiss" onClick={() => onDismissInFlight(entry.id)} className="shrink-0 rounded-full p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200"><X className="h-3.5 w-3.5" /></button>
-                    </div>
+                    <InFlightFailureRow
+                      key={entry.id}
+                      error={entry.error}
+                      resumable={!!(entry.taskId && entry.modelId)}
+                      onRetry={() => onRetryInFlight(entry.id)}
+                      onDismiss={() => onDismissInFlight(entry.id)}
+                    />
                   ))}
                   <div className="grid grid-cols-2 gap-3">
                     {cardState.inFlightImages.filter((e) => !e.error).map((entry) => (
@@ -721,12 +722,13 @@ export function ContinuousFrameModal({
               ) : (
                 <div className="flex flex-col gap-3">
                   {cardState.inFlightVideos.filter((e) => e.error).map((entry) => (
-                    <div key={entry.id} className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2">
-                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400 light:text-red-600" />
-                      <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-red-300 light:text-red-700">{entry.error}</p>
-                      <button type="button" title="Retry" onClick={() => onRetryVideoInFlight(entry.id)} className="shrink-0 rounded-full p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200"><RefreshCw className="h-3.5 w-3.5" /></button>
-                      <button type="button" title="Dismiss" onClick={() => onDismissVideoInFlight(entry.id)} className="shrink-0 rounded-full p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200"><X className="h-3.5 w-3.5" /></button>
-                    </div>
+                    <InFlightFailureRow
+                      key={entry.id}
+                      error={entry.error}
+                      resumable={!!entry.taskId}
+                      onRetry={() => onRetryVideoInFlight(entry.id)}
+                      onDismiss={() => onDismissVideoInFlight(entry.id)}
+                    />
                   ))}
                   <div className="grid grid-cols-2 gap-3">
                     {cardState.inFlightVideos.filter((e) => !e.error).map((entry) => (
@@ -1207,12 +1209,13 @@ export function ContinuousClipModal({
             ) : (
               <div className="flex flex-col gap-3">
                 {cardState.inFlightVideos.filter((e) => e.error).map((entry) => (
-                  <div key={entry.id} className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2">
-                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400 light:text-red-600" />
-                    <p className="min-w-0 flex-1 text-[11px] leading-relaxed text-red-300 light:text-red-700">{entry.error}</p>
-                    <button type="button" title="Retry" onClick={() => onRetryInFlight(entry.id)} className="shrink-0 rounded-full p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200"><RefreshCw className="h-3.5 w-3.5" /></button>
-                    <button type="button" title="Dismiss" onClick={() => onDismissInFlight(entry.id)} className="shrink-0 rounded-full p-1 text-ink-400 hover:bg-ink/10 hover:text-ink-200"><X className="h-3.5 w-3.5" /></button>
-                  </div>
+                  <InFlightFailureRow
+                    key={entry.id}
+                    error={entry.error}
+                    resumable={!!entry.taskId}
+                    onRetry={() => onRetryInFlight(entry.id)}
+                    onDismiss={() => onDismissInFlight(entry.id)}
+                  />
                 ))}
                 <div className="grid grid-cols-2 gap-3">
                   {cardState.inFlightVideos.filter((e) => !e.error).map((entry) => (
