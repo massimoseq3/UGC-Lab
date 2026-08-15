@@ -283,12 +283,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //
   // Order matters: Gemini 3 Flash is FIRST so it stays getDefaultModel's
   // candidates[0] fallback for any chat consumer without an explicit defaultFor.
-  // The two PICKER apps default to Gemini 3.6 Flash instead (August 2026) — the
-  // strong tier, for the same reason the Ad Analyzer is pinned to it: what those
-  // two write is read by a person and shot against, and it holds a long prompt
-  // contract better than the cheaper entries. It costs a member who never opens
-  // the picker more per run, which is the trade being made deliberately here;
-  // GPT 5.6 Luna is one row away for anyone who wants the cheap run back.
+  // The two PICKER apps default to Grok 4.6 instead (August 2026, taking the
+  // slot from Gemini 3.6 Flash) — what those two write is read by a person and
+  // shot against, and it holds a long prompt contract better than the cheaper
+  // entries. It costs a member who never opens the picker more per run, which
+  // is the trade being made deliberately here; GPT 5.6 Luna is one row away for
+  // anyone who wants the cheap run back.
   //
   // Every prompt in this app was written and tuned against Gemini 3 Flash, and
   // the storyboard parsers expect its tag discipline. A stronger model writes
@@ -296,7 +296,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // parsers (services/xmlBlocks.ts) tolerant — that matters more now that the
   // two apps with the strictest output contracts run on a different model.
   //
-  // PRICING — all eight verified against kie.ai/pricing on 2026-07-31, which
+  // PRICING — verified against kie.ai/pricing on 2026-07-31 (Grok 4.6 on
+  // 2026-08-15), which
   // lists chat models as separate input and output rows in credits per MILLION
   // tokens. `pricing.credits` here is per THOUSAND and blends the two 50/50 —
   // the same convention the original Gemini entries used, now carried to full
@@ -311,6 +312,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //   Gemini 3 Flash        30        180      0.105
   //   Gemini 3.6 Flash      90        450      0.27
   //   Grok 4.5             160        480      0.32
+  //   Grok 4.6             160        480      0.32
   //   GPT 5.6 Terra        112        672      0.392
   //   Claude Sonnet 5      170        855      0.5125
   //   GPT 5.6 Sol          280       1680      0.98
@@ -351,21 +353,21 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     tags: ['new'],
     pricing: { unit: 'per-1k-tokens', credits: 0.27 },
     official: chatOfficial(1.5, 7.5, KIE_PRICING),
-    // CHAT_MODEL_STRONG, the Ad Analyzer's pinned model, and the unpicked
-    // default in the two picker apps: it holds a long prompt contract better
-    // than the cheaper entries, which is what all three of those calls are —
-    // the Ad Analyzer's single JSON object, Scripts' tagged takes, B-Roll's
-    // storyboard blocks. Every one of them is read by a person and shot
-    // against, so the ~2.6× on the member's own key buys the thing they'd
-    // otherwise re-run to get.
-    defaultFor: ['ad-anatomy', 'script-architect', 'broll-studio'],
+    // CHAT_MODEL_STRONG, and the Ad Analyzer's pinned model: it holds a long
+    // prompt contract better than the cheaper entries, which is what that
+    // call is — one JSON object read by a person and shot against, so the
+    // ~2.6× on the member's own key buys the thing they'd otherwise re-run to
+    // get. It is also the only chat surface that sends a whole VIDEO inline,
+    // which is why the picker default moving to Grok 4.6 left this one here.
+    // It held the unpicked default in Scripts and B-Roll until August 2026.
+    defaultFor: ['ad-anatomy'],
     // OpenAI-compatible variant slug on kie.ai (native 3.6 uses Google's own
     // generateContent shape; our transport speaks OpenAI chat/completions).
     chatEndpoint: '/gemini-3-6-flash-openai/v1/chat/completions',
     chatRating: {
       intelligence: 4,
       blurb:
-        'The default here. A step up in writing, for a few times the credits.',
+        'A step up on Gemini 3 Flash, for a few times the credits.',
     },
   },
 
@@ -466,11 +468,41 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   },
 
   {
+    id: 'grok-4-6',
+    displayName: 'Grok 4.6',
+    provider: 'xAI',
+    task: 'chat',
+    tags: ['recommended', 'new'],
+    // Identical rate card to Grok 4.5 — 160 in / 480 out credits per million,
+    // against xAI's own $2 / $6 (kie.ai/pricing, verified 2026-08-15). Same
+    // blend, so it lands on the same cost tier as the model it replaces at
+    // the top of the two pickers: no member pays more for the default moving.
+    pricing: { unit: 'per-1k-tokens', credits: 0.32 },
+    official: chatOfficial(2, 6, KIE_PRICING),
+    // The unpicked default in Scripts and B-Roll (August 2026), taking the slot
+    // from Gemini 3.6 Flash. Those two write prose a person reads and shoots
+    // against, and this is the strongest writer in the list that isn't priced
+    // like Opus. It is deliberately NOT wired to CHAT_MODEL_STRONG: that
+    // constant's one consumer is the Ad Analyzer, whose call sends a whole
+    // VIDEO inline, and the Responses API this transport speaks declares
+    // input_text / input_image only. Gemini 3.6 Flash keeps that surface.
+    defaultFor: ['script-architect', 'broll-studio'],
+    chatEndpoint: '/grok/v1/responses',
+    chatTransport: 'openai-responses',
+    chatSlug: 'grok-4-6',
+    chatRating: {
+      intelligence: 5,
+      blurb:
+        'The default here. Strongest writer at a mid-range price.',
+    },
+  },
+
+  {
     id: 'grok-4-5',
     displayName: 'Grok 4.5',
     provider: 'xAI',
     task: 'chat',
-    tags: ['new'],
+    tags: [],
     pricing: { unit: 'per-1k-tokens', credits: 0.32 },
     official: chatOfficial(2, 6, KIE_PRICING),
     chatEndpoint: '/grok/v1/responses',
@@ -1434,7 +1466,7 @@ export function listScriptModels(): ModelEntry[] {
 // to be a general-purpose scale:
 //   1  ≤0.05   Luna
 //   2  ≤0.15   Gemini 3 Flash
-//   3  ≤0.45   Gemini 3.6, Grok 4.5, Terra
+//   3  ≤0.45   Gemini 3.6, Grok 4.5, Grok 4.6, Terra
 //   4  ≤1.00   Sonnet 5, Sol
 //   5  >1.00   Opus 5
 // Null when the model has no pricing — the picker then shows no glyphs rather
