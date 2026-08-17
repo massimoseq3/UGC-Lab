@@ -378,7 +378,15 @@ export default function InputPanel({
   const productSection = (
     <div>
       {selectedProduct ? (
-        <div>
+        /* One container, two sections. Picking the product and editing its
+           details for this script are the same subject, and as two separate
+           pills they read as unrelated controls stacked by accident. They
+           share the card's border and tint now, split by an inset dashed
+           rule; each half keeps its own hover so it's still obvious which
+           one you're about to press. */
+        <div
+          className={`overflow-hidden border border-gold-500/25 bg-gold-500/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-inset ring-gold-500/10 ${editableContext ? 'rounded-2xl' : 'rounded-full'}`}
+        >
           {/* Whole-card-clickable — hitting any part of the populated
               product card opens the picker. The refresh icon is a hover
               affordance only. Sized to match the B-Roll reference pills. */}
@@ -387,7 +395,7 @@ export default function InputPanel({
             tabIndex={0}
             onClick={() => setProductPickerOpen(true)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProductPickerOpen(true) } }}
-            className="group flex w-full cursor-pointer items-center gap-2.5 rounded-full border border-gold-500/25 bg-gold-500/[0.06] px-4 py-2.5 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-inset ring-gold-500/10 transition-colors hover:bg-gold-500/10"
+            className={`group flex w-full cursor-pointer items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-gold-500/10 ${editableContext ? 'rounded-t-2xl' : 'rounded-full'}`}
           >
             <StatusDot filled />
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gold-500/15">
@@ -420,17 +428,22 @@ export default function InputPanel({
           </div>
 
           {editableContext && (
-            <button
-              type="button"
-              onClick={() => setDetailsOpen(true)}
-              className="mt-1.5 flex w-full items-center justify-between gap-2 rounded-full border border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-left transition-colors hover:border-ink/20 hover:bg-ink/[0.04]"
-            >
-              <div className="flex items-center gap-2">
-                <PenLine className="h-3.5 w-3.5 text-scripts-text" strokeWidth={1.75} />
-                <span className="text-[12px] font-medium text-ink-200">Edit product details for this script</span>
-              </div>
-              <ChevronRight className="h-4 w-4 text-ink-400" strokeWidth={2} />
-            </button>
+            <>
+              {/* Inset, so the rule reads as a seam inside one card rather
+                  than a cut between two. */}
+              <div className="mx-4 border-t border-dashed border-gold-500/40" />
+              <button
+                type="button"
+                onClick={() => setDetailsOpen(true)}
+                className="flex w-full items-center justify-between gap-2 rounded-b-2xl px-4 py-2.5 text-left transition-colors hover:bg-gold-500/10"
+              >
+                <div className="flex items-center gap-2">
+                  <PenLine className="h-3.5 w-3.5 text-scripts-text" strokeWidth={1.75} />
+                  <span className="text-[12px] font-medium text-ink-200">Edit product details for this script</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-ink-400" strokeWidth={2} />
+              </button>
+            </>
           )}
         </div>
       ) : (
@@ -917,10 +930,14 @@ export default function InputPanel({
           )}
           {showCount && <div className="flex min-w-0 flex-1">{countChip}</div>}
         </div>
+        {/* `disabled:hover:bg-scripts-500` — a disabled button must not answer
+            the pointer. `:hover` still matches one, so the blocker state
+            ("Paste a script to remix") repainted under the cursor and read as
+            clickable. */}
         <button
           onClick={() => onGenerate(editableContext)}
           disabled={!canGenerate || isGenerating}
-          className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-scripts-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-scripts-400 disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-scripts-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-scripts-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-scripts-500"
         >
           {isGenerating ? (
             <>

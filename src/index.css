@@ -96,7 +96,15 @@
   --color-scripts-100: color-mix(in oklab, #24365A 25%, white);
   --color-scripts-200: color-mix(in oklab, #24365A 40%, white);
   --color-scripts-300: color-mix(in oklab, #24365A 60%, white);
-  --color-scripts-400: color-mix(in oklab, #24365A 80%, white);
+  /* 400 is the HOVER STEP for a filled 500 button, app-wide, so it has to be a
+     step lighter than THIS block's 500 — and this is the one family whose dark
+     500 was lifted off the brand hex. Mixed from #24365A like its siblings it
+     came out duller and darker than the button it sits on, so hovering Generate
+     visibly greyed it out, which reads as "this just went disabled". Mixed from
+     the lifted 500 (the same 80%-plus-white step every other accent's 400 is)
+     it lightens like the rest of the app. 100–300 stay on the brand hex —
+     they're text tints on dark and they read correctly there. */
+  --color-scripts-400: color-mix(in oklab, #4C6FBF 80%, white);
   --color-scripts-500: #4C6FBF;
   --color-scripts-600: color-mix(in oklab, #24365A 85%, black);
   /* Active accent label/icon (mode + length toggles, chosen Style card, and
