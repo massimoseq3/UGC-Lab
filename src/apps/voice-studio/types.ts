@@ -122,7 +122,7 @@ export interface VoiceSettings {
   gender?: Gender
   // Gemini 3.1 Flash TTS delivery parameters:
   style: string              // overall delivery style ('Natural' = neutral)
-  pace: string               // 'Slow' | 'Natural' | 'Fast'
+  pace: string               // one of VOICE_PACES
   accent: string             // 'Neutral' | 'American' | …
   temperature: number        // 0–2 — variation in delivery (1 = default)
   scene: string              // optional scene description (empty = unused)
@@ -134,15 +134,21 @@ export interface VoiceSettings {
   presetLabel?: string
 }
 
+// The Tone / Context box ships pre-filled rather than empty. It's optional, but
+// left blank the model picks its own register, and the read that suits a UGC ad
+// is a person talking to a friend — so the default says so, and stays editable.
+export const DEFAULT_SAMPLE_CONTEXT = 'Creator talks at a normal tempo.'
+
 export const DEFAULT_VOICE_SETTINGS: Omit<VoiceSettings, 'voiceId' | 'voiceName' | 'gender'> = {
-  // 'Vocal Smile' = warm, engaged, natural — the best default for UGC ads
-  // (kie's own default is the flat 'Deadpan', which reads wrong for ads).
-  style: 'Vocal Smile',
-  pace: 'Natural',
+  // 'Empathetic' = the read that lands for UGC ads — a person who means it,
+  // talking to you. (kie's own default is the flat 'Deadpan', which reads
+  // wrong for ads; 'Vocal Smile' held this slot before it.)
+  style: 'Empathetic',
+  pace: 'Rapid Fire',
   accent: 'Neutral',
   temperature: 1,
   scene: '',
-  sampleContext: '',
+  sampleContext: DEFAULT_SAMPLE_CONTEXT,
   // Explicitly undefined so "Reset values" (which spreads this object over the
   // live settings) also drops a loaded preset's stamp.
   presetId: undefined,

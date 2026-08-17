@@ -1,4 +1,4 @@
-import { ChevronRight, Mic, RotateCcw, X, SlidersHorizontal } from 'lucide-react'
+import { Bookmark, ChevronRight, Mic, RotateCcw, X, SlidersHorizontal } from 'lucide-react'
 import type { VoiceSettings } from '../types'
 import { DEFAULT_VOICE_SETTINGS, getVoiceById, VOICE_STYLES, VOICE_PACES, VOICE_ACCENTS } from '../types'
 import { seedColor } from './seedColor'
@@ -38,13 +38,34 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="flex flex-col gap-3 px-5 pb-6 pt-2">
-        {/* Who is speaking. The voice row leads and the preset row sits under
-            it: a preset is a shortcut TO a voice, and it was reading as the
-            first decision when it's a convenience on the way to the second.
-            The card takes no dots — every control in it always holds a value,
-            and a permanent row of green dots is decoration that teaches you to
-            stop reading them. */}
-        <SectionCard icon={Mic} title="Voice">
+        {/* Who is speaking. The card holds one control on purpose — the header
+            is what carries the preset pill, and a preset writes every setting
+            in this panel, so it needs a home above the first of them rather
+            than a row of its own competing with the voice. No dots: the voice
+            always holds a value, and a lone permanent green dot is decoration
+            that teaches you to stop reading them. */}
+        <SectionCard
+          icon={Mic}
+          title="Voice"
+          left={
+            /* Preset — Influencers' `PresetPillButton` shape, on the header of
+               the card whose contents it fills, rather than the full-width row
+               it used to be under the voice. Same reasoning as that panel's:
+               a preset isn't a setting of its own, it's a shortcut that writes
+               the settings below, so it belongs on the group's header beside
+               the name of what it loads. It also stops the card reading as two
+               equally-weighted picker rows when only one of them picks the
+               voice. On the LEFT gutter: it's the shortcut you take before
+               picking a voice by hand, so it sits ahead of the title rather
+               than after it — and it mirrors Delivery's Reset, which is a
+               header action of the other kind and keeps the right. */
+            <PresetPill
+              label={settings.presetLabel}
+              onOpen={onOpenPresetPicker}
+              onClear={() => onSettingsChange({ ...settings, presetId: undefined, presetLabel: undefined })}
+            />
+          }
+        >
           {/* Voice — clickable, slides into picker. Its name is the row itself,
               so the small-caps label above it is gone with the card title. */}
           <button
@@ -65,17 +86,6 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
             </div>
             <ChevronRight className="h-4 w-4 shrink-0 text-ink-400" />
           </button>
-
-          {/* Preset — loads a saved voice from the bank in one click (voice,
-              delivery params, scene and tone all together). Scrolls with the
-              rest of the column: pinning it over the scroll (the Influencers
-              controls pattern) was tried and reverted — it's one row among the
-              settings here, not a header. */}
-          <PresetRow
-            label={settings.presetLabel}
-            onOpen={onOpenPresetPicker}
-            onClear={() => onSettingsChange({ ...settings, presetId: undefined, presetLabel: undefined })}
-          />
         </SectionCard>
 
         {/* How it's said. Reset rides on this card's header rather than at the
@@ -156,10 +166,16 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
   )
 }
 
-// Saved-preset row. Dashed and muted until a preset is loaded, then tinted with
-// the app accent + an X. Clearing drops the stamp only — the values it loaded
-// stay put, because they're the settings the user is about to generate with.
-function PresetRow({
+// Saved-preset pill, on the Voice card's header. Influencers' `PresetPillButton`
+// shape — dashed accent ring, glyph, chevron — so the two panels' preset
+// affordances read as the same control. Once a preset is loaded it fills in and
+// names it, with an X to detach; clearing drops the stamp only, because the
+// values it loaded are the settings the member is about to generate with.
+//
+// The label is capped and truncates: this sits in one gutter of the card
+// header's 3-column grid, and a long bank name would otherwise squeeze the
+// word it's sitting next to.
+function PresetPill({
   label,
   onOpen,
   onClear,
@@ -173,43 +189,35 @@ function PresetRow({
       <button
         type="button"
         onClick={onOpen}
-        className="group flex w-full items-center gap-3 rounded-full border border-dashed border-ink/10 bg-ink/[0.015] px-3.5 py-2.5 text-left transition-colors hover:border-ink/20 hover:bg-ink/[0.03]"
+        title="Load a saved voice preset from the bank"
+        className="flex min-w-0 items-center gap-1 rounded-full border border-dashed border-voice-500/30 bg-voice-500/10 px-2.5 py-1 text-[12px] font-medium text-voice-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors hover:bg-voice-500/15"
       >
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-voice-500/10 text-voice-300/80 transition-colors group-hover:bg-voice-500/15 group-hover:text-voice-300">
-          <Mic className="h-4 w-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-medium text-ink-200">Preset</div>
-          <div className="truncate text-[11px] text-ink-400">Load a saved voice from the bank</div>
-        </div>
-        <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
+        <Bookmark className="h-3 w-3 shrink-0" />
+        Presets
+        <ChevronRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
       </button>
     )
   }
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen() } }}
-      className="flex w-full cursor-pointer items-center gap-3 rounded-full border border-voice-500/25 bg-voice-500/[0.06] px-3.5 py-2.5 text-left transition-colors hover:bg-voice-500/10"
-    >
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-voice-500/15 text-voice-300">
-        <Mic className="h-4 w-4" />
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium text-ink-100">{label}</div>
-        <div className="truncate text-[11px] text-ink-500">Preset</div>
-      </div>
+    <div className="flex min-w-0 items-center gap-1 rounded-full border border-voice-500/30 bg-voice-500/15 py-1 pl-2.5 pr-1 text-[12px] font-medium text-voice-300">
       <button
         type="button"
-        onClick={(e) => { e.stopPropagation(); onClear() }}
+        onClick={onOpen}
+        title={`Preset: ${label} — click to load a different one`}
+        className="flex min-w-0 items-center gap-1 transition-colors hover:text-voice-200"
+      >
+        <Bookmark className="h-3 w-3 shrink-0" />
+        <span className="max-w-[110px] truncate">{label}</span>
+      </button>
+      <button
+        type="button"
+        onClick={onClear}
         title="Detach preset — the settings it loaded stay as they are"
         aria-label="Detach preset"
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-voice-300/70 transition-colors hover:bg-ink/10 hover:text-red-400 light:hover:text-red-600"
       >
-        <X className="h-3.5 w-3.5" />
+        <X className="h-3 w-3" />
       </button>
     </div>
   )

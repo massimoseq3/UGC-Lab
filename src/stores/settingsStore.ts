@@ -91,6 +91,49 @@ const MODEL_MIGRATIONS: Array<{ name: string; apply: (m: Record<string, string>)
     },
   },
   {
+    // Voiceovers' delivery defaults changed: style Vocal Smile → Empathetic,
+    // pace Natural → Rapid Fire, and the Tone / Context box now ships
+    // pre-filled instead of empty. None of the three reaches
+    // an existing browser on its own — the panel's settings are a persisted
+    // blob, so DEFAULT_VOICE_SETTINGS only applies to a slot that has never
+    // been written, which after a single visit to the tab is nobody.
+    //
+    // Targeted at the OLD defaults exactly, the same by-value rule the model
+    // migrations above follow: a member who picked The Drift keeps it, and a
+    // tone line someone actually typed is never touched. The cost is that
+    // someone who deliberately re-picked Natural, or deliberately emptied the
+    // tone box, is indistinguishable from someone who never touched either and
+    // moves with them — once, and both are one edit away from back.
+    //
+    // It can't live in `sanitizeVoiceSettings`: coercing an empty tone box to
+    // the default on every read would make the field impossible to clear.
+    name: '2026-08-voice-studio-delivery-defaults',
+    apply: () => {
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (!key || !key.endsWith(':voice-studio:settings')) continue
+          const raw = localStorage.getItem(key)
+          if (!raw) continue
+          const parsed = JSON.parse(raw)
+          if (!parsed || typeof parsed !== 'object') continue
+          // A loaded preset is skipped whole: its pace and tone came from a
+          // saved row on purpose, and rewriting either would leave the panel
+          // naming a preset the settings no longer hold.
+          if (parsed.presetId) continue
+          let changed = false
+          if (parsed.style === 'Vocal Smile') { parsed.style = 'Empathetic'; changed = true }
+          if (parsed.pace === 'Natural') { parsed.pace = 'Rapid Fire'; changed = true }
+          // Literal, not DEFAULT_SAMPLE_CONTEXT: a migration records what was
+          // written on one date, so a later edit to the default must not
+          // retroactively change what this one puts in members' boxes.
+          if (!parsed.sampleContext) { parsed.sampleContext = 'Creator talks at a normal tempo.'; changed = true }
+          if (changed) localStorage.setItem(key, JSON.stringify(parsed))
+        }
+      } catch { /* ignore */ }
+    },
+  },
+  {
     // Suno V5 removed from the registry; V5.5 is the only music model left.
     // Same two repairs as the Veo removal below: getAppModel already drops an
     // id that no longer resolves, but Playground ALSO snapshots modelId inside

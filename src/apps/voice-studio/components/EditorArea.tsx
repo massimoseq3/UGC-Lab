@@ -193,8 +193,7 @@ export default function EditorArea({
           than a fixed bar over the window. It used to be `fixed`, which is what
           laid the character count across the Generate button on a phone. */}
       <div className={`flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-ink/5 px-5 py-3 ${isGenerating ? 'md:mt-0' : 'md:mt-4'}`}>
-        {/* Left — generate, then the model chip beside it. The model indicator
-            lives here (not in the settings panel) since there's only one model. */}
+        {/* Left — the count and the button that spends it, nothing else. */}
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {/* How many voiceovers one press makes, then the button that makes
               them — a count reads as a setting on the way to Generate, so it
@@ -232,17 +231,24 @@ export default function EditorArea({
               )}
             </button>
           </div>
-          <div className="hidden items-center rounded-full border border-ink/10 px-3.5 py-1.5 text-xs font-medium text-ink-400 md:flex">
-            {MODEL_NAME}
-          </div>
         </div>
 
-        {/* Right — character count. The word "characters" is desktop-only: on a
-            phone it wrapped to a second line beside the button. */}
-        <div className={`shrink-0 text-sm tabular-nums ${overLimit ? 'text-red-400 light:text-red-600' : 'text-ink-400'}`}>
-          <span className={overLimit ? 'text-red-300 light:text-red-700' : 'text-ink-200'}>{charCount.toLocaleString()}</span>
-          <span className="text-ink-500"> / {MAX_CHARACTERS.toLocaleString()}</span>
-          <span className="hidden text-ink-500 md:inline"> characters</span>
+        {/* Right — character count, with the model name stacked under it. The
+            model used to be a bordered pill beside Generate, which cost a whole
+            slot in the button's own row to say something that never changes
+            (there is one TTS model). Stacked here it reads as the fine print
+            under the count, the same way a resolution pill sits beside a model
+            elsewhere — and the footer keeps one row on a laptop instead of
+            wrapping. The word "characters" and the model line are both
+            desktop-only: on a phone either one wraps to a second line beside
+            the button. */}
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          <div className={`text-sm tabular-nums ${overLimit ? 'text-red-400 light:text-red-600' : 'text-ink-400'}`}>
+            <span className={overLimit ? 'text-red-300 light:text-red-700' : 'text-ink-200'}>{charCount.toLocaleString()}</span>
+            <span className="text-ink-500"> / {MAX_CHARACTERS.toLocaleString()}</span>
+            <span className="hidden text-ink-500 md:inline"> characters</span>
+          </div>
+          <div className="hidden text-[11px] font-medium text-ink-500 md:block">{MODEL_NAME}</div>
         </div>
       </div>
     </div>
