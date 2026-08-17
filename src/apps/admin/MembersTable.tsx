@@ -5,15 +5,25 @@ import { getSupabase } from '../../lib/supabase'
 import useCloseOnEscape from '../../hooks/useCloseOnEscape'
 import { deleteMember } from './deleteMember'
 import { QUERY_TIMEOUT_MS, readyAdminSession, withTimeout } from './adminQuery'
+import { formatDuration } from '../../utils/usage'
+import AppGlyph from './AppGlyph'
+import { appName } from './appDisplay'
 import {
-  useMembers, memberName, formatBytes, formatDate, formatRelative,
+  useMembers, memberName, memberTopApp, totalSeconds, formatBytes, formatDate, formatRelative,
   daysSinceActive, isInactive, isActivated, INACTIVE_DAYS,
   type MemberRow,
 } from './useMembers'
 
-type SortKey = 'name' | 'email' | 'created_at' | 'last_active_at' | 'total_bytes' | 'assets_last_7d'
+type SortKey = 'name' | 'email' | 'created_at' | 'last_active_at' | 'total_bytes' | 'assets_last_7d' | 'time_30d'
 type SortDir = 'asc' | 'desc'
 type StatusFilter = 'all' | 'active' | 'inactive' | 'unactivated' | 'disabled'
+
+// The app's display name, or an em-dash when nothing has been recorded for the
+// member yet. App tracking only started reporting recently, so a blank here
+// means "no data", never "opened nothing".
+function appLabel(appId: string | undefined): string {
+  return appId ? appName(appId) : '—'
+}
 
 // One CSV field: quote-wrap and escape embedded quotes when needed.
 function csvCell(v: string | number): string {
@@ -26,6 +36,7 @@ function downloadMembersCsv(rows: MemberRow[]) {
     'Name', 'Email', 'Status', 'Admin', 'Joined', 'Last active', 'Days inactive',
     'Storage bytes', 'Assets', 'Products', 'Characters', 'Scripts', 'Voices',
     'B-rolls', 'Voiceovers', 'Videos', 'Assets last 7d',
+    'Top app 30d', 'Minutes 30d', 'Minutes all time',
   ]
   const lines = rows.map((r) => [
     memberName(r) || '—',
@@ -39,6 +50,10 @@ function downloadMembersCsv(rows: MemberRow[]) {
     r.asset_count,
     r.products, r.models, r.scripts, r.voices, r.brolls, r.voice_history, r.video_history,
     r.assets_last_7d,
+    // Raw minutes, not "2h 14m": a CSV is opened in a spreadsheet and summed.
+    appLabel(memberTopApp(r, '30d')?.appId),
+    Math.round(totalSeconds(r, '30d') / 60),
+    Math.round(totalSeconds(r, 'all') / 60),
   ].map(csvCell).join(','))
 
   const csv = [header.join(','), ...lines].join('\n')
@@ -127,6 +142,9 @@ export default function MembersTable() {
           break
         case 'created_at':
           cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          break
+        case 'time_30d':
+          cmp = totalSeconds(a, '30d') - totalSeconds(b, '30d')
           break
         case 'last_active_at': {
           const av = a.last_active_at ? new Date(a.last_active_at).getTime() : new Date(a.created_at).getTime()
@@ -324,6 +342,7 @@ export default function MembersTable() {
               <SortableTh label="Last active" k="last_active_at" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <SortableTh label="Storage" k="total_bytes" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <SortableTh label="7-day activity" k="assets_last_7d" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <SortableTh label="Top app / 30d" k="time_30d" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <th className="px-3 py-2 text-left font-medium">Status</th>
               <th className="px-3 py-2 text-right font-medium"></th>
             </tr>
@@ -331,7 +350,7 @@ export default function MembersTable() {
           <tbody className="divide-y divide-ink/5">
             {sortedRows.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-3 py-6 text-center text-[12px] text-ink-500">
+                <td colSpan={10} className="px-3 py-6 text-center text-[12px] text-ink-500">
                   No members match this filter.
                 </td>
               </tr>
@@ -375,6 +394,9 @@ export default function MembersTable() {
                   ) : (
                     <span className="text-ink-600">0</span>
                   )}
+                </td>
+                <td className="px-3 py-2 align-top">
+                  <TopAppCell row={r} />
                 </td>
                 <td className="px-3 py-2 align-top">
                   {r.disabled_at ? (
@@ -540,6 +562,24 @@ function DeleteMembersModal({
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Where this member spends their time, over the last 30 days. Two readings in
+// one cell: the tool itself, and the total under it — a member whose top app is
+// B-Roll at 12 minutes is a very different member from one at nine hours.
+function TopAppCell({ row }: { row: MemberRow }) {
+  const top = memberTopApp(row, '30d')
+  const total = totalSeconds(row, '30d')
+  if (!top) return <span className="text-ink-600">—</span>
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-ink-200">
+        <AppGlyph appId={top.appId} className="h-3 w-3 shrink-0" />
+        <span className="truncate">{appLabel(top.appId)}</span>
+      </div>
+      <div className="mt-0.5 text-[10px] text-ink-500">{formatDuration(total)} total</div>
     </div>
   )
 }

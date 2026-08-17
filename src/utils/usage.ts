@@ -2,7 +2,7 @@
 // and the streak/savings roll-up computed from `usageDays` (see UsageDay in
 // stores/types.ts). The ledger itself is written by bankStore.recordUsage.
 
-import type { UsageDay, UsageKind } from '../stores/types'
+import type { AppUsageStat, UsageDay, UsageKind } from '../stores/types'
 
 const DAY_MS = 86_400_000
 
@@ -72,6 +72,49 @@ export interface UsageMetrics {
   /** Rolling last-7-days slice (including today) — the "this week" deltas. */
   minutesSavedLast7d: number
   usdSavedLast7d: number
+}
+
+/**
+ * Attention time as a compact figure: "3h 12m", "48m", "40s". Never a decimal
+ * hour — these are read down a column of apps and compared to each other, and
+ * "0.8h" makes that a sum you have to do in your head.
+ */
+export function formatDuration(seconds: number): string {
+  if (seconds <= 0) return '0m'
+  if (seconds < 60) return `${Math.round(seconds)}s`
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`
+}
+
+/** Sum per-app attention stats across day rows, oldest-first order irrelevant. */
+export function totalAppUsage(days: UsageDay[]): Record<string, AppUsageStat> {
+  const out: Record<string, AppUsageStat> = {}
+  for (const day of days) {
+    for (const [appId, stat] of Object.entries(day.apps ?? {})) {
+      const current = out[appId] ?? { seconds: 0, opens: 0 }
+      out[appId] = { seconds: current.seconds + stat.seconds, opens: current.opens + stat.opens }
+    }
+  }
+  return out
+}
+
+/**
+ * The app someone spends the most time in, or null when there's no time at all.
+ * Ties break on the app id so the answer is stable between renders rather than
+ * flipping with object key order.
+ */
+export function topApp(usage: Record<string, AppUsageStat>): { appId: string; seconds: number } | null {
+  let best: { appId: string; seconds: number } | null = null
+  for (const [appId, stat] of Object.entries(usage)) {
+    if (stat.seconds <= 0) continue
+    if (!best || stat.seconds > best.seconds || (stat.seconds === best.seconds && appId < best.appId)) {
+      best = { appId, seconds: stat.seconds }
+    }
+  }
+  return best
 }
 
 function dayTotal(day: UsageDay): number {
