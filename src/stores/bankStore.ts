@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, SwipeItem, VoiceHistoryItem, VideoHistoryItem, ImageHistoryItem, MusicHistoryItem, ScriptHistoryItem, BrollHistoryItem, CharacterHistoryItem, AdAnatomyHistoryItem, UsageDay, UsageKind } from './types'
+import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, SwipeItem, VoiceHistoryItem, VideoHistoryItem, ImageHistoryItem, MusicHistoryItem, ScriptHistoryItem, BrollHistoryItem, CharacterHistoryItem, AdAnatomyHistoryItem, AppUsageStat, UsageDay, UsageKind } from './types'
 import { isAssetRef, assetIdFromRef, deleteAsset, saveFromDataUrl } from '../utils/assetStore'
 import { useAuthStore } from './authStore'
 import { isCloudEnabled } from '../lib/supabase'
@@ -37,6 +37,9 @@ interface BankState {
   // every successful generation (the add*History actions call this). Feeds
   // the Dashboard's savings + streak metrics. Never decremented.
   recordUsage: (event: UsageEvent) => void
+  // Per-app attention time + opens, buffered by utils/appUsageTracker and
+  // folded into the same day row. Accumulate-only like the counts above.
+  recordAppUsage: (batch: Record<string, AppUsageStat>) => void
   // Demo-seeding only (utils/mockData). Adds whole day rows, skipping any day
   // that already has one — so seeded activity can never merge into, and then
   // take down with it, a day of the member's real generations. Returns the ids
@@ -184,6 +187,29 @@ export function foldUsageEvent(days: UsageDay[], event: UsageEvent): { days: Usa
         officialUsd: existing.officialUsd + officialUsd,
       }
     : { id, counts: { [event.kind]: 1 }, credits, officialUsd, createdAt: at }
+  return { days: existing ? days.map((d) => (d.id === id ? row : d)) : [...days, row], row }
+}
+
+// Fold a batch of buffered app time into a day-row array (pure, same shape as
+// foldUsageEvent above). A day that has app time but no generations gets a row
+// with empty `counts` — deliberate, and harmless: every reader of the ledger
+// that measures output (streaks, savings, the heatmap) tests the counts, so a
+// browse-only day contributes to the app breakdown and to nothing else.
+export function foldAppUsage(
+  days: UsageDay[],
+  batch: Record<string, AppUsageStat>,
+  at: number = Date.now(),
+): { days: UsageDay[]; row: UsageDay } {
+  const id = usageDayId(at)
+  const existing = days.find((d) => d.id === id)
+  const apps: Record<string, AppUsageStat> = { ...(existing?.apps ?? {}) }
+  for (const [appId, stat] of Object.entries(batch)) {
+    const current = apps[appId] ?? { seconds: 0, opens: 0 }
+    apps[appId] = { seconds: current.seconds + stat.seconds, opens: current.opens + stat.opens }
+  }
+  const row: UsageDay = existing
+    ? { ...existing, apps }
+    : { id, counts: {}, credits: 0, officialUsd: 0, createdAt: at, apps }
   return { days: existing ? days.map((d) => (d.id === id ? row : d)) : [...days, row], row }
 }
 
@@ -492,6 +518,19 @@ export const useBankStore = create<BankState>((set, get) => ({
     let row: UsageDay | null = null
     set((state) => {
       const folded = foldUsageEvent(state.usageDays, event)
+      row = folded.row
+      const next = { usageDays: folded.days }
+      saveToStorage({ ...state, ...next })
+      return next
+    })
+    if (row) pushRow('usageDays', row)
+  },
+
+  recordAppUsage: (batch) => {
+    if (usageRecordingSuppressed) return
+    let row: UsageDay | null = null
+    set((state) => {
+      const folded = foldAppUsage(state.usageDays, batch)
       row = folded.row
       const next = { usageDays: folded.days }
       saveToStorage({ ...state, ...next })
@@ -1333,7 +1372,12 @@ export function backfillUsageLedger(): void {
   } catch { return }
 
   const s = useBankStore.getState()
-  if (s.usageDays.length > 0) {
+  // "The ledger has rows" stopped meaning "the ledger has been filled" once app
+  // tracking started writing a row for a day spent browsing with nothing
+  // generated. Guard on real generation counts instead, or a member who opens
+  // the app before the first hydrate completes gets their whole generation
+  // history skipped by a row that holds a couple of minutes in Outliers.
+  if (s.usageDays.some((d) => Object.values(d.counts).some((n) => (n ?? 0) > 0))) {
     try { localStorage.setItem(flag, '1') } catch { /* ignore */ }
     return
   }
@@ -1385,17 +1429,25 @@ export function backfillUsageLedger(): void {
     if (h.status === 'complete') events.push({ kind: 'analysis', at: h.createdAt })
   }
 
-  let days: UsageDay[] = []
-  for (const event of events) days = foldUsageEvent(days, event).days
+  // Fold ONTO the existing rows rather than replacing the array: an app-usage
+  // row for today may already be there, and it holds the only copy of that
+  // time. Only the days the backfill actually touched are pushed.
+  let days: UsageDay[] = s.usageDays
+  const touched = new Set<string>()
+  for (const event of events) {
+    const folded = foldUsageEvent(days, event)
+    days = folded.days
+    touched.add(folded.row.id)
+  }
 
-  if (days.length > 0) {
+  if (touched.size > 0) {
     useBankStore.setState((state) => {
       const next = { usageDays: days }
       saveToStorage({ ...state, ...next })
       return next
     })
-    for (const row of days) pushRow('usageDays', row)
-    console.log(`[bankStore] usage ledger backfilled: ${events.length} generation(s) across ${days.length} day(s)`)
+    for (const row of days) if (touched.has(row.id)) pushRow('usageDays', row)
+    console.log(`[bankStore] usage ledger backfilled: ${events.length} generation(s) across ${touched.size} day(s)`)
   }
   try { localStorage.setItem(flag, '1') } catch { /* ignore */ }
 }

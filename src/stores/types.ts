@@ -452,12 +452,40 @@ export type UsageKind = 'image' | 'video' | 'voice' | 'music' | 'script' | 'char
 // that day; `officialUsd` is what the same generations would have cost on the
 // providers' own APIs (equal to the kie cost when a model has no verified
 // official rate — unknown savings count as zero, never invented).
+// Attention time in one app on one day. `seconds` is measured, not wall-clock:
+// it only accrues while the tab is visible AND the member has touched something
+// recently (see utils/appUsageTracker.ts), so a workspace left open overnight
+// contributes nothing. `opens` counts dock switches INTO the app.
+export interface AppUsageStat {
+  seconds: number
+  opens: number
+}
+
+// One day of generation activity — the Dashboard's usage ledger. Rows are
+// keyed by LOCAL calendar day ('2026-07-09') and only ever accumulate:
+// deleting/clearing history never subtracts from the ledger, so streaks and
+// savings survive history housekeeping. `credits` is the estimated kie spend
+// that day; `officialUsd` is what the same generations would have cost on the
+// providers' own APIs (equal to the kie cost when a model has no verified
+// official rate — unknown savings count as zero, never invented).
+//
+// `apps` is per-app attention time, keyed by the app ids in utils/constants.ts.
+// It rides this row rather than a bank of its own because it answers the same
+// question ("what happened on this day"), and because `usage_days` already has
+// the composite PK, the cloud-sync wiring and the admin-read RLS policy that
+// the admin App usage panels read through. It is OPTIONAL: every row written
+// before app tracking shipped has none, and a day can carry app time with no
+// generations at all (someone spent an hour in Outliers and generated nothing —
+// which is exactly the blind spot this exists to fill). Everything that reads
+// the ledger for streaks, savings or the heatmap keys off `counts`, so a
+// browse-only row is correctly invisible to all of them.
 export interface UsageDay {
   id: string
   counts: Partial<Record<UsageKind, number>>
   credits: number
   officialUsd: number
   createdAt: number
+  apps?: Record<string, AppUsageStat>
 }
 
 // Anything the bank picker can hand back. Declared once here because the same

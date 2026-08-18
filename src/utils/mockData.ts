@@ -10,7 +10,7 @@
 // Every created row's id is recorded in a localStorage manifest so the same
 // control can cleanly remove the demo data afterwards.
 
-import { useBankStore, setUsageRecordingSuppressed, foldUsageEvent, type UsageEvent } from '../stores/bankStore'
+import { useBankStore, setUsageRecordingSuppressed, foldUsageEvent, foldAppUsage, type UsageEvent } from '../stores/bankStore'
 import { useAppStore } from '../stores/appStore'
 import { saveAsset } from './assetStore'
 import { getContinuousStyle } from './visualStyle'
@@ -23,6 +23,7 @@ import type {
   VoiceHistoryItem,
   MusicHistoryItem,
   AdAnatomyHistoryItem,
+  AppUsageStat,
   UsageDay,
 } from '../stores/types'
 
@@ -1233,6 +1234,24 @@ function seedUsageLedger(): string[] {
     { kind: 'analysis' },
   ]
 
+  // Minutes in each app per unit of that day's generation count, in roughly the
+  // proportions a working session takes: B-Roll and Playground hold someone the
+  // longest, the Bank and Edit are places you pass through. Outliers is here on
+  // purpose — it's the app that produces no generations at all, so seeded time
+  // is the only thing that makes the admin App usage panel legible in a demo.
+  const MINUTES_PER_UNIT: Record<string, number> = {
+    'broll-studio': 4.5,
+    'playground': 3,
+    'script-architect': 2.5,
+    'discover': 2,
+    'character-studio': 1.5,
+    'voice-studio': 1.2,
+    'ad-anatomy': 1,
+    'finder': 0.8,
+    'dashboard': 0.4,
+    'edit-studio': 0.3,
+  }
+
   const now = new Date()
   let days: UsageDay[] = []
   // 63 days back through today. The current day gets activity too, so the
@@ -1247,6 +1266,17 @@ function seedUsageLedger(): string[] {
       const stamp = new Date(at)
       stamp.setHours(9 + (i % 9), (i * 17) % 60, 0, 0)
       days = foldUsageEvent(days, { ...MIX[i % MIX.length], at: stamp.getTime() }).days
+    }
+    if (count > 0) {
+      // Folded through the real foldAppUsage, and quantised to the tracker's own
+      // 15s sample so a seeded figure can't be a shape the live app never
+      // produces. Opens scale with the day, one per ~6 minutes in an app.
+      const batch: Record<string, AppUsageStat> = {}
+      for (const [appId, perUnit] of Object.entries(MINUTES_PER_UNIT)) {
+        const seconds = Math.round((perUnit * count * 60) / 15) * 15
+        if (seconds > 0) batch[appId] = { seconds, opens: Math.max(1, Math.round(seconds / 360)) }
+      }
+      days = foldAppUsage(days, batch, at.getTime()).days
     }
   }
   return useBankStore.getState().addUsageDays(days)

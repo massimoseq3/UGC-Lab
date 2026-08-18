@@ -1,8 +1,17 @@
 import { useEffect } from 'react'
 import { create } from 'zustand'
-import { getSupabase } from '../../lib/supabase'
+import { getSupabase, selectAllRows } from '../../lib/supabase'
 import { useAuthStore } from '../../stores/authStore'
+import { topApp } from '../../utils/usage'
 import { QUERY_TIMEOUT_MS, readyAdminSession, reasonOf, withTimeout } from './adminQuery'
+
+// One member's attention time in one app, all-time and over the last 30 days.
+export interface AppUsage {
+  seconds: number
+  opens: number
+  seconds30d: number
+  opens30d: number
+}
 
 export interface MemberRow {
   id: string
@@ -25,6 +34,10 @@ export interface MemberRow {
   voice_history: number
   video_history: number
   assets_last_7d: number
+  // Per-app attention time, keyed by the app ids in utils/constants.ts. Empty
+  // for a member who hasn't been back since app tracking shipped — which is why
+  // every surface reading it distinguishes "no time" from "no data".
+  app_usage: Record<string, AppUsage>
 }
 
 // Members past this many days since last activity are flagged as churn risk.
@@ -60,6 +73,25 @@ export function isInactive(r: MemberRow): boolean {
 // so 0 means a signup that never created a single asset (never activated).
 export function isActivated(r: MemberRow): boolean {
   return r.asset_count > 0
+}
+
+/** Total attention seconds across every app, all-time or the last 30 days. */
+export function totalSeconds(r: MemberRow, window: 'all' | '30d' = 'all'): number {
+  let sum = 0
+  for (const u of Object.values(r.app_usage)) sum += window === 'all' ? u.seconds : u.seconds30d
+  return sum
+}
+
+/**
+ * The app this member spends the most time in, or null when nothing is
+ * recorded. Reuses the Dashboard's own tie-break so admin and member views can
+ * never disagree about who the top app is.
+ */
+export function memberTopApp(r: MemberRow, window: 'all' | '30d' = 'all'): { appId: string; seconds: number } | null {
+  const flat = Object.fromEntries(
+    Object.entries(r.app_usage).map(([id, u]) => [id, { seconds: window === 'all' ? u.seconds : u.seconds30d, opens: 0 }]),
+  )
+  return topApp(flat)
 }
 
 export function formatBytes(n: number): string {
@@ -104,6 +136,7 @@ interface DirectoryState {
   profilesError: string | null
   storageWarning: string | null
   activityWarning: string | null
+  appUsageWarning: string | null
   load: (opts?: { force?: boolean; userId?: string | null }) => Promise<void>
 }
 
@@ -121,13 +154,14 @@ async function fetchDirectory(set: Setter, hadRows: boolean): Promise<void> {
     profilesError: null,
     storageWarning: null,
     activityWarning: null,
+    appUsageWarning: null,
   })
   const slowTimer = setTimeout(() => set({ slowHint: true }), 3000)
 
   try {
     await readyAdminSession()
     const sb = getSupabase()
-    const [profilesRes, storageRes, activityRes] = await Promise.allSettled([
+    const [profilesRes, storageRes, activityRes, appUsageRes] = await Promise.allSettled([
       withTimeout(
         (signal) => sb.from('profiles')
           .select('id, email, display_name, first_name, last_name, is_admin, disabled_at, created_at, last_active_at')
@@ -146,6 +180,18 @@ async function fetchDirectory(set: Setter, hadRows: boolean): Promise<void> {
           .abortSignal(signal),
         QUERY_TIMEOUT_MS,
         'activity view',
+      ),
+      // Paged, unlike the two views above: this one returns a row per member
+      // PER APP, so a community of 100 crosses PostgREST's default 1000-row
+      // response cap — and a silently truncated read here would report a real
+      // member as having never opened anything.
+      withTimeout(
+        (signal) => selectAllRows<AppUsageViewRow>((from, to) => sb.from('member_app_usage')
+          .select('user_id, app_id, seconds_total, opens_total, seconds_30d, opens_30d', { count: 'exact' })
+          .range(from, to)
+          .abortSignal(signal)),
+        QUERY_TIMEOUT_MS,
+        'app usage view',
       ),
     ])
 
@@ -179,6 +225,20 @@ async function fetchDirectory(set: Setter, hadRows: boolean): Promise<void> {
       set({ activityWarning: `Activity counts unavailable (${reasonOf(activityRes)}). Did you run 0002_member_activity.sql?` })
     }
 
+    const appUsageMap = new Map<string, Record<string, AppUsage>>()
+    if (appUsageRes.status === 'fulfilled' && !appUsageRes.value.error) {
+      for (const u of appUsageRes.value.data) {
+        const forUser = appUsageMap.get(u.user_id) ?? {}
+        forUser[u.app_id] = {
+          seconds: Number(u.seconds_total), opens: Number(u.opens_total),
+          seconds30d: Number(u.seconds_30d), opens30d: Number(u.opens_30d),
+        }
+        appUsageMap.set(u.user_id, forUser)
+      }
+    } else {
+      set({ appUsageWarning: `App usage unavailable (${reasonOf(appUsageRes)}). Did you run 0022_member_app_usage.sql?` })
+    }
+
     const merged: MemberRow[] = (profilesRes.value.data ?? []).map((p) => {
       const s = storageMap.get(p.id)
       const a = activityMap.get(p.id)
@@ -194,6 +254,7 @@ async function fetchDirectory(set: Setter, hadRows: boolean): Promise<void> {
         voice_history: a?.voice_history ?? 0,
         video_history: a?.video_history ?? 0,
         assets_last_7d: a?.assets_last_7d ?? 0,
+        app_usage: appUsageMap.get(p.id) ?? {},
       }
     })
     set({ rows: merged, loadedAt: Date.now() })
@@ -209,6 +270,17 @@ type ActivityRow = {
   user_id: string
   products: number; models: number; scripts: number; voices: number
   brolls: number; voice_history: number; video_history: number; assets_last_7d: number
+}
+
+// One row of member_app_usage (0022): a member × app pair. Postgres bigints
+// arrive as strings through PostgREST, hence the Number() at every read site.
+type AppUsageViewRow = {
+  user_id: string
+  app_id: string
+  seconds_total: number
+  opens_total: number
+  seconds_30d: number
+  opens_30d: number
 }
 
 // The member directory: profiles joined with the member_storage and
@@ -229,6 +301,7 @@ export const useMemberDirectory = create<DirectoryState>((set, get) => ({
   profilesError: null,
   storageWarning: null,
   activityWarning: null,
+  appUsageWarning: null,
 
   load: async ({ force = false, userId = null } = {}) => {
     if (inflight) return inflight
@@ -266,6 +339,7 @@ export interface UseMembersResult {
   profilesError: string | null
   storageWarning: string | null
   activityWarning: string | null
+  appUsageWarning: string | null
   reload: () => Promise<void>
 }
 
@@ -287,6 +361,7 @@ export function useMembers(): UseMembersResult {
     profilesError: state.profilesError,
     storageWarning: state.storageWarning,
     activityWarning: state.activityWarning,
+    appUsageWarning: state.appUsageWarning,
     reload: () => load({ force: true, userId }),
   }
 }

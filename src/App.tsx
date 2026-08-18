@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 import AppLogo from './components/AppLogo'
@@ -15,6 +15,7 @@ import LegalAcceptModal from './components/LegalAcceptModal'
 import { useAppStore } from './stores/appStore'
 import { useAuthStore } from './stores/authStore'
 import { getAppConfig } from './utils/constants'
+import { startAppUsageTracking, stopAppUsageTracking } from './utils/appUsageTracker'
 
 // Apps are code-split: each chunk loads on first activation, not at startup.
 // They stay mounted after first open (see runningApps below), so switching
@@ -109,6 +110,16 @@ function Workspace() {
   const activeApp = useAppStore((s) => s.activeApp)
   const runningApps = useAppStore((s) => s.runningApps)
   const userId = useAuthStore((s) => s.user?.id)
+
+  // Per-app attention tracking runs for the life of the workspace. The `key`
+  // below already remounts this on a user change, so start/stop lands exactly
+  // on the session boundary — and stop DISCARDS its buffer on purpose, so one
+  // member's minutes can't land in the next member's ledger on a shared
+  // browser (see appUsageTracker).
+  useEffect(() => {
+    startAppUsageTracking()
+    return stopAppUsageTracking
+  }, [])
 
   return (
     // h-dvh (not h-screen): 100vh overflows behind mobile browser URL bars,

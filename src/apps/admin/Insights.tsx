@@ -1,7 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { RefreshCw, Users, UserCheck, Clock, Ban, HardDrive, Sparkles, TrendingUp, TrendingDown, UserPlus, AlertTriangle } from 'lucide-react'
 import Spinner from '../../components/Spinner'
-import { useMembers, formatBytes, formatRelative, memberName, isInactive, isActivated, type MemberRow } from './useMembers'
+import { APP_REGISTRY } from '../../utils/constants'
+import { formatDuration } from '../../utils/usage'
+import AppGlyph from './AppGlyph'
+import { appName, appTint } from './appDisplay'
+import { useMembers, formatBytes, formatRelative, memberName, memberTopApp, totalSeconds, isInactive, isActivated, type MemberRow } from './useMembers'
 
 const DAY = 24 * 60 * 60_000
 
@@ -14,6 +18,15 @@ function withinDays(s: string | null, lo: number, hi: number, now: number): bool
   return age >= lo * DAY && age < hi * DAY
 }
 
+// Every app that can record time, in dock order — Admin excluded, since an
+// operator's own time in the admin panel isn't community usage. The list is
+// rendered WHOLE, including apps sitting at zero: "Outliers · 0m" is the
+// answer to "is anyone using Outliers", and an app merely missing from the
+// chart is not.
+const TRACKED_APPS = APP_REGISTRY.filter((a) => a.category !== 'admin')
+
+type UsageWindow = 'all' | '30d'
+
 // Per-bank accent hexes (mirror of BANK_CONFIG, plus a videos tint).
 const BANK_BARS: Array<{ key: keyof MemberRow; label: string; color: string }> = [
   { key: 'products', label: 'Products', color: '#f59e0b' },
@@ -25,7 +38,8 @@ const BANK_BARS: Array<{ key: keyof MemberRow; label: string; color: string }> =
 ]
 
 export default function Insights() {
-  const { rows, fetchedAt, loading, refreshing, slowHint, profilesError, reload } = useMembers()
+  const { rows, fetchedAt, loading, refreshing, slowHint, profilesError, appUsageWarning, reload } = useMembers()
+  const [usageWindow, setUsageWindow] = useState<UsageWindow>('30d')
 
   const stats = useMemo(() => {
     let active = 0, inactive = 0, disabled = 0, bytes = 0, gens7d = 0
@@ -85,6 +99,49 @@ export default function Insights() {
     [rows],
   )
 
+  // Community-wide time and opens per app, for the selected window. Every
+  // tracked app appears, zeroes included, sorted by time so the answer to
+  // "what do they actually use" is the reading order.
+  const appUsage = useMemo(() => {
+    const totals = new Map<string, { seconds: number; opens: number; members: number }>()
+    for (const app of TRACKED_APPS) totals.set(app.id, { seconds: 0, opens: 0, members: 0 })
+    for (const r of rows) {
+      for (const [appId, u] of Object.entries(r.app_usage)) {
+        const t = totals.get(appId)
+        if (!t) continue // an app that has since been removed from the registry
+        const seconds = usageWindow === 'all' ? u.seconds : u.seconds30d
+        const opens = usageWindow === 'all' ? u.opens : u.opens30d
+        totals.set(appId, {
+          seconds: t.seconds + seconds,
+          opens: t.opens + opens,
+          members: t.members + (seconds > 0 ? 1 : 0),
+        })
+      }
+    }
+    return [...totals.entries()]
+      .map(([appId, t]) => ({ appId, ...t }))
+      .sort((a, b) => b.seconds - a.seconds)
+  }, [rows, usageWindow])
+
+  // How much of the picture we actually have: nothing was recorded before app
+  // tracking shipped, so a small number here means "early days", not "nobody
+  // is using it". Said out loud under the chart rather than left to be guessed.
+  const usageCoverage = useMemo(() => {
+    const tracked = rows.filter((r) => totalSeconds(r, usageWindow) > 0).length
+    const seconds = appUsage.reduce((s, a) => s + a.seconds, 0)
+    return { tracked, seconds }
+  }, [rows, appUsage, usageWindow])
+
+  // Who lives where: one line per member with recorded time, their top tool
+  // and how much of their time went to it. Ranked by total time.
+  const perMember = useMemo(
+    () => rows
+      .map((r) => ({ row: r, total: totalSeconds(r, usageWindow), top: memberTopApp(r, usageWindow) }))
+      .filter((m) => m.total > 0)
+      .sort((a, b) => b.total - a.total),
+    [rows, usageWindow],
+  )
+
   // Signup/churn momentum: this 7-day window vs the previous one.
   const growth = useMemo(() => {
     const newThisWeek = rows.filter((r) => withinDays(r.created_at, 0, 7, fetchedAt)).length
@@ -122,6 +179,13 @@ export default function Insights() {
           Refresh failed — showing the last loaded numbers. {profilesError}
         </div>
       )}
+      {appUsageWarning && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5 text-[11px] text-amber-200 light:text-amber-800">
+          <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+          <span>{appUsageWarning}</span>
+        </div>
+      )}
+
       <div className="flex items-center justify-end">
         <button onClick={reload} className="flex items-center gap-1.5 rounded-md border border-ink/10 px-2.5 py-1 text-[11px] text-ink-300 transition-colors hover:bg-ink/[0.05]">
           <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
@@ -138,6 +202,27 @@ export default function Insights() {
       </div>
 
       <GrowthStrip growth={growth} />
+
+      {/* App usage sits directly under the headline strip, above the funnel:
+          it's the question the panel gets opened to answer, and every panel
+          below it measures output rather than use. */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {/* No hint on this one: the toggle already occupies the header's right
+            side, and the caveat that matters ("this is attention time, not
+            tabs left open") is said in full under the chart rather than
+            truncated into a half-width header. */}
+        <Panel title="Time per app" action={<WindowToggle value={usageWindow} onChange={setUsageWindow} />}>
+          <AppUsageBars items={appUsage} />
+          <p className="pt-2.5 text-[10px] text-ink-600">
+            {usageCoverage.seconds > 0
+              ? `${formatDuration(usageCoverage.seconds)} across ${usageCoverage.tracked} member${usageCoverage.tracked === 1 ? '' : 's'}. Time is only counted while the tab is open and someone is interacting.`
+              : 'Nothing recorded yet. Usage is measured from the moment app tracking shipped — earlier sessions left no trace.'}
+          </p>
+        </Panel>
+        <Panel title="Top tool per member" hint="where each member spends most of their time">
+          <PerMemberUsage items={perMember} />
+        </Panel>
+      </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Panel title="Activation funnel" hint="joined → created → active">
@@ -275,14 +360,115 @@ function StatCard({ icon: Icon, label, value, accent }: { icon: typeof Users; la
   )
 }
 
-function Panel({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function Panel({ title, hint, action, children }: { title: string; hint?: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-4">
-      <div className="mb-3 flex items-baseline justify-between">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-[13px] font-medium text-ink-200">{title}</h3>
-        {hint && <span className="text-[10px] text-ink-600">{hint}</span>}
+        <div className="flex min-w-0 items-center gap-2">
+          {hint && <span className="truncate text-[10px] text-ink-600">{hint}</span>}
+          {action}
+        </div>
       </div>
       {children}
+    </div>
+  )
+}
+
+// 30 days / all time, for the two app-usage panels. Both read the same state,
+// so a comparison between them is always over the same window.
+function WindowToggle({ value, onChange }: { value: UsageWindow; onChange: (v: UsageWindow) => void }) {
+  const options: Array<[UsageWindow, string]> = [['30d', '30 days'], ['all', 'All time']]
+  return (
+    <div className="flex shrink-0 items-center gap-0.5 rounded-full border border-ink/10 p-0.5">
+      {options.map(([v, label]) => (
+        <button
+          key={v}
+          onClick={() => onChange(v)}
+          className={`rounded-full px-2.5 py-0.5 text-[10px] transition-colors ${
+            value === v ? 'bg-ink/10 text-ink-100' : 'text-ink-500 hover:text-ink-300'
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// Time per app, with the open count under it. The pair is the point: heavy
+// opens against little time is a tool people keep bouncing out of, which reads
+// very differently from one they never open at all.
+function AppUsageBars({ items }: { items: Array<{ appId: string; seconds: number; opens: number; members: number }> }) {
+  const max = Math.max(1, ...items.map((i) => i.seconds))
+  return (
+    <div className="space-y-2">
+      {items.map((it) => {
+        const tint = appTint(it.appId)
+        return (
+          <div
+            key={it.appId}
+            className="flex items-center gap-2"
+            title={`${appName(it.appId)} — ${it.members} member${it.members === 1 ? '' : 's'}`}
+          >
+            <div className="flex w-24 shrink-0 items-center gap-1.5 text-[11px] text-ink-400">
+              <AppGlyph appId={it.appId} className="h-3 w-3 shrink-0" />
+              <span className="truncate">{appName(it.appId)}</span>
+            </div>
+            <div className="h-4 flex-1 overflow-hidden rounded-full bg-ink/[0.06]">
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${(it.seconds / max) * 100}%`, backgroundColor: tint, minWidth: it.seconds > 0 ? 4 : 0 }}
+              />
+            </div>
+            <div className="w-[70px] shrink-0 text-right">
+              <div className={`text-[11px] tabular-nums ${it.seconds > 0 ? 'text-ink-300' : 'text-ink-600'}`}>
+                {formatDuration(it.seconds)}
+              </div>
+              <div className="text-[10px] tabular-nums text-ink-600">{it.opens} open{it.opens === 1 ? '' : 's'}</div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// One line per member with recorded time: their busiest tool and what share of
+// their time it took. Scrolls rather than slicing to a top N — "which of my
+// members lives in Scripts" is a question about all of them.
+function PerMemberUsage({
+  items,
+}: {
+  items: Array<{ row: MemberRow; total: number; top: { appId: string; seconds: number } | null }>
+}) {
+  if (items.length === 0) {
+    return <p className="py-6 text-center text-[12px] text-ink-500">No app usage recorded yet.</p>
+  }
+  return (
+    <div className="max-h-[232px] space-y-2 overflow-y-auto pr-1">
+      {items.map(({ row, total, top }) => {
+        const share = top && total > 0 ? Math.round((top.seconds / total) * 100) : 0
+        return (
+          <div key={row.id} className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[12px] text-ink-200">{memberName(row) || row.email}</div>
+              {top && (
+                <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-ink-500">
+                  {/* Only the glyph carries the app colour. Several dock accents
+                      (Outliers' gold, Bank's zinc) fail as text on one theme or
+                      the other, and a legend that's readable in dark and washed
+                      out in light is worse than no colour at all. */}
+                  <AppGlyph appId={top.appId} className="h-2.5 w-2.5 shrink-0" />
+                  <span className="truncate text-ink-400">{appName(top.appId)}</span>
+                  <span className="shrink-0">· {share}% of their time</span>
+                </div>
+              )}
+            </div>
+            <div className="shrink-0 text-right text-[11px] tabular-nums text-ink-300">{formatDuration(total)}</div>
+          </div>
+        )
+      })}
     </div>
   )
 }
