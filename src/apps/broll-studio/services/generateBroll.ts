@@ -11,7 +11,7 @@ import { getDefaultModel, getChatTarget, buildImageInput, getModel, type ChatTar
 import { isAssetRef, getAsBase64 } from '../../../utils/assetStore'
 import { finishImageAssetTask } from '../../../utils/imageTask'
 import { useBankStore } from '../../../stores/bankStore'
-import { withIphoneRealism, withNoOnScreenText } from './realism'
+import { withIphoneRealism, withNoOnScreenText, withSingleFrame } from './realism'
 import { countProductAngles, parsePhotoPick, productPhotoDataUris, productPhotoInstruction } from './productAngles'
 import { extractBlock, extractNumberedBlock } from './xmlBlocks'
 import { styleBriefFor, styleUsesRealism } from './generateContinuous'
@@ -82,7 +82,11 @@ const MAX_PARSED_VARIATIONS = 4
 // format and the "With Dialogue" talking-card format can build on it.
 const PROMPT_FORMAT_CORE = `Every prompt is ONE flowing paragraph. There is NO word limit and no target length — write as long as it takes to see the shot through, and never drop a detail to keep it short. Vagueness is the only failure; length is not. Plain, concrete, readable — no labels, no field names, no line breaks, no "Style:" trailer.
 
-Write it like you're describing a clip you already filmed: what's in frame, what the character physically does (the exact gesture, gaze, micro-expression), where the light comes from, and — only when it matters — where the camera sits, always as a position ("framed from chest height an arm's length away", "from directly above"), never as a device.`
+ONE FRAME, ONE ACTION. What you are writing is a SINGLE STILL FRAME — one instant of one continuous action, the frame a video model is then handed and animates forward from. Describe the picture as it stands at that instant and nothing else: the hands where they are right now, the gesture part-way through, the expression halfway to landing. NEVER a sequence of beats. The moment a prompt says "then", "after which", "before finally", or chains two acts together — the drawer slides open AND the hand sweeps it out AND the drawer knocks shut — an image model draws all of them at once: a strip of stacked panels, a split screen, or one impossible frame with three pairs of hands in it. Pick the single strongest instant of the beat and write only that one.
+
+Length is spent on DETAIL, never on more events. The exact prop, the exact grip, the exact muscle in the face, the material, the light, the texture — a prompt can run as long as it likes describing ONE moment. If a prompt could describe two different shots, add specificity; never add another moment.
+
+Write it like you're describing a still you're looking at right now: what's in frame, what the character is physically doing at this exact instant (the exact gesture, gaze, micro-expression), where the light comes from, and — only when it matters — where the camera sits, always as a position ("framed from chest height an arm's length away", "from directly above"), never as a device.`
 
 const PROMPT_FORMAT = `${PROMPT_FORMAT_CORE} You may end with the natural sound of the moment (a dry crunch, a wrapper crinkle, room tone) — never dialogue, never music.
 
@@ -94,7 +98,7 @@ const PROMPT_FORMAT_DIALOGUE = `${PROMPT_FORMAT_CORE} The character SPEAKS the s
 
 THE QUOTED LINE IS HEARD, NEVER SEEN. It is what comes out of their mouth, not something written anywhere in the picture — no captions, no subtitles, no text overlay, no words on a wall, a screen, a sign, or a label. Never describe how the line appears on screen, and never ask for it to be shown, displayed, titled, or captioned. Real captions are added later in the edit.
 
-Say where they are and what they're doing while they talk. It's the same person and the same ad throughout, but not the same chair: a dialogue shot can happen anywhere their life plausibly takes them, and the interesting ones happen mid-something.`
+Say where they are and what they're doing while they talk — ONE ongoing activity caught mid-way, not a list of things they get through. It's the same person and the same ad throughout, but not the same chair: a dialogue shot can happen anywhere their life plausibly takes them, and the interesting ones happen mid-something.`
 
 const SYSTEM_INSTRUCTION = `# ROLE
 
@@ -175,7 +179,7 @@ The ONE exception: a PROOF shot may show a screen as the deliberate subject bein
 
 6. THE AFTER, NOT THE BEFORE — the character always already has the result the product promises. They are the testimonial, not the case study. (Comedy exception: a LITERAL metaphor shot like the cardboard bite may show the old pain being acted out — but never the character's actual body/skin/hair in a "before" state.)
 
-7. CONSTANT MOTION — every prompt names a movement: a bite mid-chew, a toss mid-air, a hand dragging, the frame drifting. No frozen poses, no still-life.
+7. ONE MOTION, CAUGHT MID-WAY — every prompt names exactly ONE movement and catches it in progress: a bite mid-chew, a toss mid-air, a hand dragging. Not a frozen pose or a still-life — and not a chain either. One move, one instant of it, with the rest of it still to play out once the clip animates. A second action is a second shot, and a second shot belongs to another variation or another line.
 
 8. CROSS-SCENE CONSISTENCY — one ad: same wardrobe, same home, same time of day across scenes unless the script demands a change. The product reference image is the source of truth — never invent packaging.
 
@@ -184,23 +188,26 @@ The ONE exception: a PROOF shot may show a screen as the deliberate subject bein
 1. Could someone watching this shot guess the line it belongs to? If not, the idea isn't visual enough — find the image inside the line and rewrite.
 2. Could any two of these be filmed in the same room, in the same minute, with the same prop? Then they are one idea — replace one. Sharing a tag is fine; sharing a picture is not. With only three slots there is no room for a filler, so a weak idea is replaced rather than kept for the lens it covers.
 3. If the line has a metaphor or vivid image, does one variation make it literal?
-4. Is every prompt ONE readable paragraph — no labels, no device named, silent?
-5. Does product visibility match the rule exactly?
+4. Read each prompt back and COUNT THE MOMENTS. One action, caught at one instant? Or two or three strung together with "then" and "and"? If it's more than one, the image model draws all of them side by side — keep the strongest instant and delete the rest.
+5. Is every prompt ONE readable paragraph — no labels, no device named, silent?
+6. Does product visibility match the rule exactly?
 
 # REFERENCE EXAMPLE
 
 Line: "I spent years eating protein bars that tasted like actual cardboard before I realized I didn't have to."
 
 > <TAG>ACTION</TAG> <LABEL>CARDBOARD BITE</LABEL>
-> The character stands at their kitchen counter holding a torn strip of corrugated cardboard like a snack bar, peels an imaginary wrapper, and takes a slow deadpan bite — chewing with dead eyes and a tiny resigned nod, a crumb of cardboard dropping to the counter. Framed from chest height across the counter, morning window light from the left. The only sound is the dry papery crunch.
+> The character stands at their kitchen counter with a torn strip of corrugated cardboard held like a snack bar, teeth sunk an inch into one torn corner and jaw working slowly sideways through the fibres, eyes flat and half-lidded, one crumb of brown board clinging to their lower lip. Framed from chest height across the counter, morning window light from the left. The only sound is the dry papery crunch.
 
 > <TAG>TRANSITION</TAG> <LABEL>BARS HIT THE BIN</LABEL>
-> A drawer slides open to reveal a graveyard of half-eaten, stale protein bars in dull wrappers; the character's hand sweeps the whole pile into a kitchen bin in one motion and the drawer knocks shut. Framed from just above the drawer, close enough to read the sad crumbs. Wrappers crinkle and thud into the bin.
+> An open kitchen drawer packed with a graveyard of half-eaten, stale protein bars in dull, crumpled wrappers, the character's flat hand caught mid-sweep across it — the first three bars already tipping over the front edge into the open bin below, the rest still piled where they lay, crumbs skidding ahead of their fingers. Framed from just above the drawer, close enough to read the sad crumbs. Wrappers crinkle under the drag of the hand.
 
 > <TAG>ACTION</TAG> <LABEL>WASHING IT DOWN</LABEL>
-> At a cluttered desk mid-afternoon, the character works a dry mouthful of a chalky bar in a plain unmarked grey wrapper — no logo, no text — then grabs a cold mug of coffee and forces the swallow down with a hard blink and a small shudder, going straight back to the screen. Framed from across the desk at eye height, flat overcast light from the window behind the monitor. A dull swallow and the mug knocking back onto the desk.
+> At a cluttered desk mid-afternoon, the character tips a cold mug of coffee against their lips to force down a dry mouthful, cheeks still packed, eyes screwed half shut and brows pulled together mid-swallow, the half-eaten chalky bar in a plain unmarked grey wrapper — no logo, no text — still gripped in their other hand at the edge of the keyboard. Framed from across the desk at eye height, flat overcast light from the window behind the monitor. A dull swallow under the flat hum of the room.
 
 Three different pictures. The first and third share the ACTION lens and that is fine — different room, different object, different act, so neither could be filmed as the other. A second angle on the cardboard bite would NOT be fine. Note the desk bar is an unbranded stand-in: this line attacks the category, so VISIBILITY is no and the bad bar can never be the advertised product.
+
+Note the SHAPE of all three: each one is a single frozen instant of a single action — mid-bite, mid-sweep, mid-swallow — described in heavy detail, with the rest of the move still ahead of it. None of them narrates a sequence, and none of them could be drawn as more than one picture. That is the shape every prompt takes.
 
 # OUTPUT FORMAT (STRICT)
 
@@ -214,7 +221,7 @@ Wrap every scene in this exact XML envelope. Do not include any text outside the
 <TAG>ACTION|EMOTIONAL|PRODUCT|POV|ENVIRONMENT|TRANSITION|PROOF</TAG>
 <LABEL>short descriptive shot label, e.g. COUNTER REACTION</LABEL>
 <REFS>character|product|both|none</REFS>
-<PROMPT>one flowing paragraph matching the chosen lens. Silent b-roll — no speech anywhere</PROMPT>
+<PROMPT>one flowing paragraph matching the chosen lens — ONE instant of ONE action, described in full detail. Silent b-roll — no speech anywhere</PROMPT>
 </VAR_1>
 <VAR_2>
 <TAG>the lens this idea turned out to be — may repeat an earlier VAR's tag when the picture is genuinely different</TAG>
@@ -724,10 +731,12 @@ export async function startImageTask(
   // Scope the references to identity/appearance only so the model builds a
   // fresh composition from the prompt instead of inheriting the reference's
   // framing, pose, and background. Phrased by which refs are actually attached.
-  // The realism stack is style-dependent; the no-text guarantee is not — a
-  // still must never carry its own dialogue line as a burned-in caption,
-  // whatever look it's rendered in.
-  const scenePrompt = withNoOnScreenText(opts?.noRealism ? prompt.trim() : withIphoneRealism(prompt))
+  // The realism stack is style-dependent; the no-text and single-frame
+  // guarantees are not — a still must never carry its own dialogue line as a
+  // burned-in caption, and it is one frame in any look it's rendered in.
+  const scenePrompt = withSingleFrame(
+    withNoOnScreenText(opts?.noRealism ? prompt.trim() : withIphoneRealism(prompt)),
+  )
   const preamble = opts?.inheritReference ? buildStaticReferencePreamble : buildReferencePreamble
   const preambleText = opts?.preambleOverride ?? (inputUrls.length > 0 ? preamble(referenceImages!) : '')
   const finalPrompt = inputUrls.length > 0 && preambleText
@@ -819,7 +828,7 @@ Rules:
 3. UGC realism — looks filmed at home: natural light, lived-in rooms, handheld drift. Nothing commercial, cinematic, or studio-lit. No captions or on-screen text.
 4. DO NOT mention aspect ratio, resolution, or framing dimensions in numbers — those are set separately.
 5. The character looks like the after-state, never the before.
-6. Name a movement — no frozen poses, no still-life.
+6. Name exactly ONE movement and catch it part-way through — no frozen poses, no still-life, and no chain of beats. This is one still frame that a video model animates forward from, so a prompt with two actions in it comes back as a split screen or a strip of panels. Add detail, never another moment.
 7. THE CAMERA IS A VIEWPOINT, NOT A PROP. Never name the filming device — no "phone", "iPhone", "front camera", "tripod", "ring light"; never in a hand, on a table, or in a reflection; never a mirror selfie. When the camera position matters, state it as a position: "framed from chest height an arm's length away". Only a PROOF shot may show a screen, as the subject being looked at.
 
 Respond with ONLY this envelope. No markdown, no commentary, nothing outside the tags:
@@ -892,7 +901,7 @@ Rules:
 - Return ONE flowing paragraph with NO word limit — as long as the shot needs. No labels, no field names, no line breaks, no "Style:" trailer. If the draft is a labelled multi-line block (SETTING: / CAMERA: / ...), that is exactly what you are here to fix: fold it into one readable paragraph, keeping the idea.
 - SHOW, DON'T TELL — the shot must visualize what the script line says, so a viewer could guess the line from the footage. Sharpen the draft's idea toward that; if it's a person passively existing, give them the line's image to act out.
 - Be specific — the exact prop, the exact gesture, the exact micro-expression, the real light source.
-- Enhance means ADD DETAIL, not rephrase: the prompt comes back richer than it went in, never shorter than the draft.
+- Enhance means ADD DETAIL, not rephrase: the prompt comes back richer than it went in, never shorter than the draft. Detail means the prop, the grip, the material, the light, the exact muscle in the face — NEVER another moment. The rewrite still describes ONE instant of ONE action, and if the draft strings several beats together ("... then ... and then ..."), collapsing it to its single strongest instant is part of the job.
 - Never "he/him/she/her/subject" — use "the character" or "they/them/their".
 - DO NOT mention aspect ratio, resolution, or framing in numbers.
 - UGC realism — filmed-at-home natural light and handheld feel; nothing commercial or studio-lit; no captions or on-screen text.
