@@ -324,13 +324,19 @@ export default function VaultBrowser({
 
           The wrapper still scrolls on a phone: seven segments are wider than
           375px, and a segmented control can't wrap. */}
-      {/* Folders get the whole row. Sharing it with the filters was tried and
-          reverted: the two need ~1310px to sit together un-scrolled, so on
-          anything narrower the toggle had to scroll and the last folders sat
-          off screen behind a swipe. A row of chrome is cheaper than a folder
-          you can't see. The strip still scrolls on a phone, where nothing
-          could have fitted anyway. */}
-      <div className="scrollbar-hide flex shrink-0 items-center overflow-x-auto border-b border-ink/5 px-4 py-2.5">
+      {/* Folders and filters share ONE panel: `flex-wrap` + `justify-between`,
+          so the filters ride the right edge while both fit and tuck onto their
+          own line underneath when they don't. Wrapping is what makes that
+          safe — flexbox lays each item out at its natural width and moves the
+          second one down rather than squeezing either, so nothing is ever
+          truncated and no folder ends up hidden behind a horizontal scroll.
+          They need ~1310px to sit together (758 of toggle against 511 of
+          filters), so a 15"-and-up display gets one line and anything
+          narrower gets two, with the hairline still only under the pair. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-ink/5 px-4 py-2.5">
+        {/* max-w-full + its own scroll is the phone case only, where the
+            toggle alone is wider than the screen. */}
+        <div className="scrollbar-hide flex max-w-full items-center overflow-x-auto">
         <SegmentedToggle
           options={[
             { value: '', label: 'All', badge: folderScope.length },
@@ -346,11 +352,12 @@ export default function VaultBrowser({
           fitContent
           dense
         />
-      </div>
+        </div>
 
-      {/* Sort / Hook / Starred, on their own row under the folders. Same 36px
-          as the toggles above, so the three bands read as one stack. */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink/5 px-4 py-2.5">
+        {/* Sort / Hook / Starred. `shrink-0` on the group so it wraps as a
+            unit rather than the dropdowns squeezing; `flex-wrap` inside it for
+            the phone, where even the group is wider than the screen. */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
         <FilterSelect
           dense
           label="Sort"
@@ -386,11 +393,12 @@ export default function VaultBrowser({
           {starIds.length > 0 && <span className="tabular-nums opacity-60">{starIds.length}</span>}
         </button>
 
-        <span className="ml-auto shrink-0 text-[11px] tabular-nums text-ink-600">
+        <span className="shrink-0 pl-1 text-[11px] tabular-nums text-ink-600">
           {matches.length === folderTotal
             ? `${folderTotal} hooks`
             : `${matches.length} of ${folderTotal}`}
         </span>
+        </div>
       </div>
 
       {matches.length === 0 ? (
