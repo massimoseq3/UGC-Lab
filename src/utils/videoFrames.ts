@@ -69,3 +69,45 @@ export function extractVideoFrame(src: string, position: FramePosition): Promise
     })
   })
 }
+
+// Grabs the frame a <video> is showing RIGHT NOW, straight off the live
+// element on screen. `extractVideoFrame` above loads its own hidden video and
+// seeks to a fixed position; this one needs no second decode and returns
+// exactly the frame the member is looking at — which is the whole point when
+// they scrubbed to that moment themselves. Full natural resolution (so it
+// beats the screenshot it replaces), PNG to stay lossless.
+//
+// The source has to be same-origin or CORS-clean, same as any canvas read.
+export function captureFrameFromElement(video: HTMLVideoElement): Promise<Blob> {
+  const w = video.videoWidth
+  const h = video.videoHeight
+  if (!w || !h) return Promise.reject(new Error('Video had no dimensions'))
+  // HAVE_CURRENT_DATA. Below this the element has no painted frame yet and the
+  // canvas comes back blank rather than throwing.
+  if (video.readyState < 2) return Promise.reject(new Error('No frame decoded yet'))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return Promise.reject(new Error('Canvas 2D context unavailable'))
+  ctx.drawImage(video, 0, 0, w, h)
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob || blob.size === 0) reject(new Error('Empty frame blob'))
+      else resolve(blob)
+    }, 'image/png')
+  })
+}
+
+// `00m04s20` — minutes, seconds and hundredths, safe in a filename and
+// precise enough to tell two grabs from the same ad apart.
+export function frameTimeStamp(seconds: number): string {
+  const t = Number.isFinite(seconds) && seconds > 0 ? seconds : 0
+  const mm = String(Math.floor(t / 60)).padStart(2, '0')
+  const ss = String(Math.floor(t % 60)).padStart(2, '0')
+  // Rounded, not floored: 1.4s arrives as 1.39999… and floors to `s39`.
+  const cs = String(Math.min(99, Math.round((t % 1) * 100))).padStart(2, '0')
+  return `${mm}m${ss}s${cs}`
+}

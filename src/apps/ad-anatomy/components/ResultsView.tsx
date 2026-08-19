@@ -13,6 +13,7 @@ import {
   AudioLines,
   Quote,
   Type,
+  Camera,
 } from 'lucide-react'
 import type {
   AnalysisResult,
@@ -27,6 +28,9 @@ import { useBankStore } from '../../../stores/bankStore'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import { useExclusiveVideo } from '../../../hooks/useInlineVideo'
 import { rangeDurationLabel } from '../../../utils/timecode'
+import { captureFrameFromElement, frameTimeStamp } from '../../../utils/videoFrames'
+import { downloadImage } from '../../../utils/downloadImage'
+import Spinner from '../../../components/Spinner'
 
 interface ResultsViewProps {
   result: AnalysisResult
@@ -36,6 +40,9 @@ interface ResultsViewProps {
   // only the saved first-frame still.
   restoredThumbUrl?: string | null
   fileName: string
+  // Legacy rows predate the field; a missing kind is a video, which is what
+  // every analysis was when they were written.
+  mediaKind?: 'video' | 'image'
 }
 
 // Pull a 3-6 word descriptor out of the file name if the LLM didn't return
@@ -672,15 +679,90 @@ function ScriptActionRow({ onSave, onSend, sendLabel }: { onSave: () => void; on
   )
 }
 
+/* ─── Frame grab ─── */
+// Hands over the frame the player is showing right now, at the ad's own full
+// resolution. The native controls ARE the scrubber — the member parks the
+// playhead on the moment they want and presses this — so there's no second
+// timeline to build, and what lands on disk is the source frame rather than a
+// cropped screenshot of the app window.
+//
+// Module scope on purpose: a try/finally inside a component makes the React
+// Compiler skip that component entirely (see the root CLAUDE.md).
+async function grabFrameToDisk(video: HTMLVideoElement, fileName: string): Promise<boolean> {
+  let url: string | null = null
+  try {
+    const blob = await captureFrameFromElement(video)
+    url = URL.createObjectURL(blob)
+    const stem = fileName.replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '-').replace(/^-+|-+$/g, '') || 'ad'
+    await downloadImage(url, `${stem}-frame-${frameTimeStamp(video.currentTime)}`, 'png')
+    return true
+  } catch {
+    return false
+  } finally {
+    if (url) URL.revokeObjectURL(url)
+  }
+}
+
+function FrameGrabButton({
+  videoRef,
+  fileName,
+}: {
+  videoRef: React.RefObject<HTMLVideoElement | null>
+  fileName: string
+}) {
+  const addToast = useAppStore((s) => s.addToast)
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
+
+  async function handleGrab() {
+    const video = videoRef.current
+    if (!video || busy) return
+    // Mid-playback the grab would race the click for whichever frame happened
+    // to be up; pausing makes the file match what's on screen.
+    video.pause()
+    setBusy(true)
+    const ok = await grabFrameToDisk(video, fileName)
+    setBusy(false)
+    if (!ok) {
+      addToast('Could not grab that frame — let the ad finish loading, then try again.', 'error')
+      return
+    }
+    setDone(true)
+    window.setTimeout(() => setDone(false), 2000)
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleGrab}
+      disabled={busy}
+      title="Download the frame showing now — scrub the player to pick your moment"
+      className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-[#FF5257]/20 bg-[#FF5257]/10 px-4 py-2 text-[12px] font-medium text-[#FF5257] transition-colors hover:bg-[#FF5257]/20 disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {busy ? (
+        <Spinner className="h-3.5 w-3.5" />
+      ) : done ? (
+        <Check className="h-3.5 w-3.5" />
+      ) : (
+        <Camera className="h-3.5 w-3.5" />
+      )}
+      <span>{done ? 'Frame downloaded' : 'Download this frame'}</span>
+    </button>
+  )
+}
+
 /* ─── Section jump toggle ─── */
 type SectionKey = 'breakdown' | 'transcript' | 'scenes'
 
 /* ─── Main ResultsView ─── */
-export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileName }: ResultsViewProps) {
+export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileName, mediaKind = 'video' }: ResultsViewProps) {
   // Hide the left media column entirely when neither a video nor a saved
   // still is available (e.g. restored from a history row whose thumbnail
   // capture had failed). Results panels then take the full width.
   const hasMedia = !!videoSrc || !!restoredThumbUrl
+  // An image ad is a still: it plays in no player, and there's no frame to
+  // pick out of it that isn't the file the member already has.
+  const isVideo = mediaKind !== 'image'
   // Native controls, but the same app-wide rule: one clip plays at a time.
   const sourceVideo = useExclusiveVideo()
 
@@ -730,21 +812,27 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
               black bars. The flex parent centers it within whatever vertical
               space is left after the caption / filename. */}
           <div className="flex flex-1 min-h-0 w-full items-center justify-center">
-            {videoSrc ? (
+            {videoSrc && isVideo ? (
               <video
                 {...sourceVideo}
                 src={videoSrc}
                 className="block max-h-full max-w-full rounded-xl border border-ink/10 transition-all hover:-translate-y-px card-soft-shadow"
                 controls
               />
-            ) : restoredThumbUrl ? (
+            ) : videoSrc || restoredThumbUrl ? (
               <img
-                src={restoredThumbUrl}
-                alt="First frame of the analyzed ad"
+                src={videoSrc ?? restoredThumbUrl ?? ''}
+                alt={videoSrc ? 'The analyzed ad' : 'First frame of the analyzed ad'}
                 className="block max-h-full max-w-full rounded-xl border border-ink/10 transition-all hover:-translate-y-px card-soft-shadow"
               />
             ) : null}
           </div>
+
+          {/* Scrub to a moment in the player above, then take that exact frame
+              at the ad's own resolution instead of screenshotting the app. */}
+          {videoSrc && isVideo && (
+            <FrameGrabButton videoRef={sourceVideo.ref} fileName={fileName} />
+          )}
           {/* When the live source is gone, make it explicit that this is the
               saved still — not a broken or missing video. */}
           {!videoSrc && restoredThumbUrl && (
