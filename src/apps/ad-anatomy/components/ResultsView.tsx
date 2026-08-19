@@ -737,14 +737,14 @@ function FrameGrabButton({
       onClick={handleGrab}
       disabled={busy}
       title="Download the frame showing now — scrub the player to pick your moment"
-      className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-[#FF5257]/20 bg-[#FF5257]/10 px-4 py-2 text-[12px] font-medium text-[#FF5257] transition-colors hover:bg-[#FF5257]/20 disabled:cursor-not-allowed disabled:opacity-60"
+      className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-[#FF5257]/20 bg-[#FF5257]/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-[#FF5257] transition-colors hover:bg-[#FF5257]/20 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {busy ? (
-        <Spinner className="h-3.5 w-3.5" />
+        <Spinner className="h-4 w-4" />
       ) : done ? (
-        <Check className="h-3.5 w-3.5" />
+        <Check className="h-4 w-4" strokeWidth={1.75} />
       ) : (
-        <Camera className="h-3.5 w-3.5" />
+        <Camera className="h-4 w-4" strokeWidth={1.75} />
       )}
       <span>{done ? 'Frame downloaded' : 'Download this frame'}</span>
     </button>
@@ -812,54 +812,65 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
       {hasMedia && (
         // max-h on phones: a portrait video would otherwise fill the whole
         // stacked column and leave no room for the scorecard below.
-        <div className="flex max-h-[38dvh] md:order-2 md:h-full md:max-h-none w-full md:w-1/3 shrink-0 flex-col gap-4 border-b md:border-b-0 md:border-l border-ink/5 p-4 md:p-5 min-h-0">
-          {/* Media sizes to its own aspect ratio so there are no letterbox
-              black bars. The flex parent centers it within whatever vertical
-              space is left after the caption / filename. */}
-          <div className="flex flex-1 min-h-0 w-full items-center justify-center">
-            {videoSrc && isVideo ? (
-              <video
-                {...sourceVideo}
-                src={videoSrc}
-                className="block max-h-full max-w-full rounded-xl border border-ink/10 transition-all hover:-translate-y-px card-soft-shadow"
-                controls
-              />
-            ) : videoSrc || restoredThumbUrl ? (
-              <img
-                src={videoSrc ?? restoredThumbUrl ?? ''}
-                alt={videoSrc ? 'The analyzed ad' : 'First frame of the analyzed ad'}
-                className="block max-h-full max-w-full rounded-xl border border-ink/10 transition-all hover:-translate-y-px card-soft-shadow"
-              />
-            ) : null}
+        <div className="flex max-h-[38dvh] md:order-2 md:h-full md:max-h-none w-full md:w-1/3 shrink-0 flex-col border-b md:border-b-0 md:border-l border-ink/5 min-h-0">
+          {/* The file's own header band, at the shared h-[57px] panel-header
+              height with the same hairline under it, so the line the rail and
+              the results column already draw carries straight across all three
+              panels instead of stopping two thirds of the way over. The pill
+              used to sit at the FOOT of this column, which is what left the
+              gap. */}
+          <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-4 md:px-5">
+            <div className="flex min-w-0 items-center gap-2 rounded-full bg-ink/[0.03] px-3.5 py-2">
+              <Film className="h-3.5 w-3.5 shrink-0 text-ink-600" />
+              <span className="truncate text-xs text-ink-500">{fileName}</span>
+            </div>
           </div>
 
-          {/* Scrub to a moment in the player above, then take that exact frame
-              at the ad's own resolution instead of screenshotting the app. */}
-          {videoSrc && isVideo && (
-            <FrameGrabButton videoRef={sourceVideo.ref} fileName={fileName} />
-          )}
-          {/* When the live source is gone, make it explicit that this is the
-              saved still — not a broken or missing video. */}
-          {!videoSrc && restoredThumbUrl && (
-            <p className="-mt-2 shrink-0 text-center text-[11px] italic text-ink-500">
-              Still frame — source ad not retained
-            </p>
-          )}
-          <div className="flex shrink-0 items-center gap-2 rounded-full bg-ink/[0.03] px-3.5 py-2 min-w-0">
-            <Film className="h-3.5 w-3.5 shrink-0 text-ink-600" />
-            <span className="truncate text-xs text-ink-500">{fileName}</span>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-5">
+            {/* Media sizes to its own aspect ratio so there are no letterbox
+                black bars. The flex parent centers it within whatever vertical
+                space is left after the frame-grab button. */}
+            <div className="flex flex-1 min-h-0 w-full items-center justify-center">
+              {videoSrc && isVideo ? (
+                <video
+                  {...sourceVideo}
+                  src={videoSrc}
+                  className="block max-h-full max-w-full rounded-xl border border-ink/10 transition-all hover:-translate-y-px card-soft-shadow"
+                  controls
+                />
+              ) : videoSrc || restoredThumbUrl ? (
+                <img
+                  src={videoSrc ?? restoredThumbUrl ?? ''}
+                  alt={videoSrc ? 'The analyzed ad' : 'First frame of the analyzed ad'}
+                  className="block max-h-full max-w-full rounded-xl border border-ink/10 transition-all hover:-translate-y-px card-soft-shadow"
+                />
+              ) : null}
+            </div>
+
+            {/* Scrub to a moment in the player above, then take that exact frame
+                at the ad's own resolution instead of screenshotting the app. */}
+            {videoSrc && isVideo && (
+              <FrameGrabButton videoRef={sourceVideo.ref} fileName={fileName} />
+            )}
+            {/* When the live source is gone, make it explicit that this is the
+                saved still — not a broken or missing video. */}
+            {!videoSrc && restoredThumbUrl && (
+              <p className="-mt-2 shrink-0 text-center text-[11px] italic text-ink-500">
+                Still frame — source ad not retained
+              </p>
+            )}
           </div>
         </div>
       )}
 
-      {/* The read — scrollable results with a sticky section-jump toggle.
-          min-h-0: in the phones' stacked column the scroller must be allowed
-          to shrink below its content, or it clips instead of scrolling. */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto md:order-1">
-        {/* Opaque, not a tinted blur: the results column has no background of
-            its own, so a translucent bar let the cards scroll visibly through
-            it and the whole strip read as unpinned rather than sticky. */}
-        <div className="sticky top-0 z-10 flex h-[57px] shrink-0 items-center border-b border-ink/5 bg-surface-0 px-5">
+      {/* The read — the section-jump toggle above its own scroll port.
+          The bar is a SIBLING of the scroller, not `sticky` inside it: it was
+          pinned at top-0 from the first pixel and never scrolled away, so
+          sticky bought nothing but the chance to come loose from the edge on
+          the way back up a long read (the app-wide rule in the root
+          CLAUDE.md). Outside the scroller it can't move by construction. */}
+      <div className="flex min-h-0 flex-1 flex-col md:order-1">
+        <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 bg-surface-0 px-5">
           <SegmentedToggle<SectionKey>
             className="h-10 !p-1"
             value={active}
@@ -872,25 +883,29 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
           />
         </div>
 
-        <div className="flex flex-col gap-5 p-5">
-          {/* When the media column is hidden, surface the filename so there's
-              still an anchor with no media. */}
-          {!hasMedia && (
-            <div className="flex items-center gap-3 rounded-xl border border-ink/5 bg-ink/[0.02] px-4 py-3">
-              <div className="flex min-w-0 items-center gap-2">
-                <Film className="h-3.5 w-3.5 shrink-0 text-ink-600" />
-                <span className="truncate text-xs text-ink-500">{fileName || 'Untitled analysis'}</span>
+        {/* min-h-0: in the phones' stacked column the scroller must be allowed
+            to shrink below its content, or it clips instead of scrolling. */}
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex flex-col gap-5 p-5">
+            {/* When the media column is hidden, surface the filename so there's
+                still an anchor with no media. */}
+            {!hasMedia && (
+              <div className="flex items-center gap-3 rounded-xl border border-ink/5 bg-ink/[0.02] px-4 py-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Film className="h-3.5 w-3.5 shrink-0 text-ink-600" />
+                  <span className="truncate text-xs text-ink-500">{fileName || 'Untitled analysis'}</span>
+                </div>
               </div>
+            )}
+            <div ref={breakdownRef} data-section="breakdown" className="scroll-mt-5">
+              <BreakdownSection result={result} />
             </div>
-          )}
-          <div ref={breakdownRef} data-section="breakdown" className="scroll-mt-20">
-            <BreakdownSection result={result} />
-          </div>
-          <div ref={transcriptRef} data-section="transcript" className="scroll-mt-20">
-            <TranscriptSection result={result} fileName={fileName} />
-          </div>
-          <div ref={scenesRef} data-section="scenes" className="scroll-mt-20">
-            <ReverseEngineeredSection result={result} fileName={fileName} />
+            <div ref={transcriptRef} data-section="transcript" className="scroll-mt-5">
+              <TranscriptSection result={result} fileName={fileName} />
+            </div>
+            <div ref={scenesRef} data-section="scenes" className="scroll-mt-5">
+              <ReverseEngineeredSection result={result} fileName={fileName} />
+            </div>
           </div>
         </div>
       </div>
