@@ -22,11 +22,20 @@ import type { DiscoverResult } from '../types'
  * if TikTok ever starts sending CORS headers.
  */
 export async function downloadResultVideo(result: DiscoverResult): Promise<File> {
-  const url = result.videoUrl
-  if (!url) throw new Error('This result has no downloadable video.')
+  if (!result.videoUrl) throw new Error('This result has no downloadable video.')
+  return downloadVideoFile(result.videoUrl, `${result.platform}-${result.id}.mp4`)
+}
 
-  const fileName = `${result.platform}-${result.id}.mp4`
-
+/**
+ * The url-shaped half, for a caller that holds a link rather than a card.
+ *
+ * The Outlier Vault is the one: its rows are static library entries, not
+ * `DiscoverResult`s, and their video url is resolved on demand a moment before
+ * this is called. Splitting it here rather than synthesising a card keeps one
+ * fetch strategy — and one set of CORS lessons — behind every video the app
+ * pulls off a platform.
+ */
+export async function downloadVideoFile(url: string, fileName: string): Promise<File> {
   const toFile = async (res: Response): Promise<File> => {
     const blob = await res.blob()
     if (blob.size === 0) throw new Error('The downloaded file was empty.')
@@ -80,10 +89,15 @@ export async function saveResultVideoToDisk(result: DiscoverResult): Promise<voi
  * and would otherwise have to download the video a second time just to name it.
  */
 export function saveVideoFileToDisk(file: File, result: DiscoverResult): void {
+  saveFileToDisk(file, adFileName(result))
+}
+
+/** Hands a blob to the browser's downloader under a name of our choosing. */
+export function saveFileToDisk(file: File, fileName: string): void {
   const url = URL.createObjectURL(file)
   const a = document.createElement('a')
   a.href = url
-  a.download = adFileName(result)
+  a.download = fileName
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 0)
 }

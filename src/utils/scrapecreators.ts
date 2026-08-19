@@ -205,6 +205,31 @@ interface MetaAdResponse extends MetaAdItem {
   data?: MetaAdItem
 }
 
+// The Instagram post/reel endpoint, behind the Outlier Vault's "Load video".
+//
+// Instagram's own GraphQL shape, passed through: everything hangs off
+// `xdt_shortcode_media`. Only the media fields are declared, because that is
+// all the vault asks for — its likes, comments and caption are the ones
+// snapshotted when the library was harvested, and a vault row is a record of
+// what a winner looked like then, not a live feed. Same rule as
+// `refreshResultMedia`: media only, never stats.
+interface InstagramMedia {
+  video_url?: string | null
+  display_url?: string | null
+  thumbnail_src?: string | null
+  video_duration?: number | null
+  is_video?: boolean
+}
+
+interface InstagramPostResponse {
+  success?: boolean
+  credits_remaining?: number
+  data?: { xdt_shortcode_media?: InstagramMedia | null } | null
+  // A trimmed response has been seen flat; the vendor documents `trim` without
+  // documenting its shape, so read both rather than trusting one.
+  xdt_shortcode_media?: InstagramMedia | null
+}
+
 interface TranscriptResponse {
   success?: boolean
   credits_remaining?: number
@@ -411,6 +436,36 @@ export async function fetchMetaAd(
 
   return {
     ad: body.data ?? (body.ad_archive_id || body.snapshot ? body : null),
+    creditsRemaining: body.credits_remaining ?? null,
+  }
+}
+
+/**
+ * One Instagram post or reel, for a playable video url. 1 credit.
+ *
+ * The Outlier Vault ships 872 curated reels as static rows — a cover, the hook,
+ * the transcript and the numbers as harvested — and deliberately stores no
+ * video: Instagram's media urls are signed and expire within hours, so a link
+ * baked into the library would be dead long before anyone clicked it. This is
+ * how a member gets the file when they actually want it, on the same
+ * spend-on-a-press contract as the swipe file's "Restore video".
+ *
+ * Returns null for a post with no video (a carousel or a still), which is a
+ * normal outcome for a link the member pasted, not an error.
+ */
+export async function fetchInstagramPost(
+  apiKey: string,
+  url: string,
+): Promise<{ videoUrl: string | null; coverUrl: string | null; creditsRemaining: number | null }> {
+  const body = await scFetch<InstagramPostResponse>(apiKey, '/v1/instagram/post', { url })
+  const media = body.data?.xdt_shortcode_media ?? body.xdt_shortcode_media ?? null
+
+  const pick = (v: string | null | undefined): string | null =>
+    typeof v === 'string' && /^https?:\/\//.test(v) ? v : null
+
+  return {
+    videoUrl: pick(media?.video_url),
+    coverUrl: pick(media?.display_url) ?? pick(media?.thumbnail_src),
     creditsRemaining: body.credits_remaining ?? null,
   }
 }
