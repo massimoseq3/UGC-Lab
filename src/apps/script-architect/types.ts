@@ -149,6 +149,12 @@ export const isWriteStyle = (value: unknown): value is WriteStyle =>
 // generation prompt is trained on. 'auto' lets the model pick the mix that
 // fits the product; a specific category locks all 10 hooks to that family.
 export type HookCategory =
+  // Leads the list deliberately. Of the 22 hook patterns tagged across the
+  // transcript corpus, this is the ONLY one whose engagement lift survived a
+  // bootstrap CI (1.71x, 95% CI [1.09, 2.09], n=32 across 32 distinct
+  // creators) and a within-category control. Every other family here is
+  // inherited from the source PDF's own grouping and carries no such evidence.
+  | 'curiosity-gap'
   | 'educational'
   | 'comparison'
   | 'myth-busting'
@@ -188,7 +194,8 @@ export function isVariationCount(v: unknown): v is VariationCount {
 }
 
 export const HOOK_CATEGORY_META: Record<HookCategoryChoice, { label: string; hint: string }> = {
-  auto: { label: 'Best Mix', hint: 'The model picks the strongest angles across all 7 families' },
+  auto: { label: 'Best Mix', hint: 'The model picks the strongest angles across all 8 families' },
+  'curiosity-gap': { label: 'Curiosity Gap', hint: 'Name the specific thing they can\'t resolve without watching' },
   educational: { label: 'Educational', hint: '"Here\'s exactly how much X you need to get Y"' },
   comparison: { label: 'Comparison', hint: 'This vs that — same price, wildly different result' },
   'myth-busting': { label: 'Myth Busting', hint: '"Let me de-influence you" — call out the common belief' },
