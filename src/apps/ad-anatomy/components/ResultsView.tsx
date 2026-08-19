@@ -756,7 +756,7 @@ type SectionKey = 'breakdown' | 'transcript' | 'scenes'
 
 /* ─── Main ResultsView ─── */
 export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileName, mediaKind = 'video' }: ResultsViewProps) {
-  // Hide the left media column entirely when neither a video nor a saved
+  // Hide the media column entirely when neither a video nor a saved
   // still is available (e.g. restored from a history row whose thumbnail
   // capture had failed). Results panels then take the full width.
   const hasMedia = !!videoSrc || !!restoredThumbUrl
@@ -803,11 +803,16 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
 
   return (
     <div className="flex flex-col md:flex-row h-full overflow-hidden">
-      {/* Left column — pinned video or restored still */}
+      {/* The ad itself — right column on desktop, top of the stack on phones.
+          It stays FIRST in the DOM and moves with `md:order-2`, because the
+          reading order the two layouts want is different: on a phone the ad is
+          the anchor you land on and the breakdown scrolls under it, while on a
+          desktop the breakdown is the thing being read and the ad belongs
+          beside it, in the margin. */}
       {hasMedia && (
         // max-h on phones: a portrait video would otherwise fill the whole
         // stacked column and leave no room for the scorecard below.
-        <div className="flex max-h-[38dvh] md:h-full md:max-h-none w-full md:w-1/3 shrink-0 flex-col gap-4 border-b md:border-b-0 md:border-r border-ink/5 p-4 md:p-5 min-h-0">
+        <div className="flex max-h-[38dvh] md:order-2 md:h-full md:max-h-none w-full md:w-1/3 shrink-0 flex-col gap-4 border-b md:border-b-0 md:border-l border-ink/5 p-4 md:p-5 min-h-0">
           {/* Media sizes to its own aspect ratio so there are no letterbox
               black bars. The flex parent centers it within whatever vertical
               space is left after the caption / filename. */}
@@ -847,10 +852,10 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
         </div>
       )}
 
-      {/* Right column — scrollable results with a sticky section-jump toggle.
+      {/* The read — scrollable results with a sticky section-jump toggle.
           min-h-0: in the phones' stacked column the scroller must be allowed
           to shrink below its content, or it clips instead of scrolling. */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto md:order-1">
         {/* Opaque, not a tinted blur: the results column has no background of
             its own, so a translucent bar let the cards scroll visibly through
             it and the whole strip read as unpinned rather than sticky. */}
@@ -868,7 +873,7 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
         </div>
 
         <div className="flex flex-col gap-5 p-5">
-          {/* When the left column is hidden, surface the filename so there's
+          {/* When the media column is hidden, surface the filename so there's
               still an anchor with no media. */}
           {!hasMedia && (
             <div className="flex items-center gap-3 rounded-xl border border-ink/5 bg-ink/[0.02] px-4 py-3">
