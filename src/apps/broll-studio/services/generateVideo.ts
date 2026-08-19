@@ -16,7 +16,7 @@ import {
 } from '../../../utils/kie'
 import { finishVideoAssetTask } from '../../../utils/videoTask'
 import { buildVideoInput, getModel, resolveVideoModelSlug, type VideoMode } from '../../../utils/models'
-import { withIphoneRealism, withNoOnScreenText } from './realism'
+import { withIphoneRealism, withNoOnScreenText, withSingleTake } from './realism'
 
 export interface VideoGenInput {
   prompt: string
@@ -73,9 +73,12 @@ export async function startVideoTask(
   }
 
   const buildOpts = {
-    // Same rule as the stills: the character speaks the line, the clip never
-    // writes it. Captions belong in Edit, over finished footage.
-    prompt: withNoOnScreenText(input.noRealism ? input.prompt.trim() : withIphoneRealism(input.prompt)),
+    // Same rules as the stills: the character speaks the line, the clip never
+    // writes it (captions belong in Edit, over finished footage), and a clip is
+    // one continuous take rather than a montage of the prompt's beats.
+    prompt: withSingleTake(
+      withNoOnScreenText(input.noRealism ? input.prompt.trim() : withIphoneRealism(input.prompt)),
+    ),
     mode: input.mode,
     aspectRatio: input.aspectRatio,
     duration: input.durationSeconds,
