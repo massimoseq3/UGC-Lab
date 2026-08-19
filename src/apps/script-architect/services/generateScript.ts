@@ -3,6 +3,7 @@ import { REMIX_ANGLES, DEFAULT_VARIATION_COUNT, isVariationCount, DEFAULT_HOOK_C
 import { useSettingsStore, resolveScriptModel } from '../../../stores/settingsStore'
 import { kieChatCompletions, LONG_CHAT_TIMEOUT_MS, type ChatMessage } from '../../../utils/kie'
 import { getChatTarget, type ChatTarget } from '../../../utils/models'
+import { exemplarBlock, familiesForWriteStyle } from './exemplarBlock'
 import { VOICE_PROFILE_SPEC } from '../../../utils/voiceProfile'
 
 // Scripts is one of the two apps where the MEMBER picks the writer (the other
@@ -38,7 +39,7 @@ const HUMAN_VOICE_RULES = `HOW IT MUST SOUND — NON-NEGOTIABLE:
 - Build in ONE natural disfluency on purpose: a restart, a self-correction, or an aside ("it's like 30 bucks? maybe 35"). Controlled imperfection reads as real.
 - 6th-grade vocabulary. If a word would feel weird said out loud, cut it.
 - Don't oversell. Real people undersell and let the result talk: "and it just... worked" lands harder than "it works amazingly well".
-- Specifics beat claims. Real numbers, timeframes, prices, tiny concrete details ("two weeks", "$30", "every single morning") make it believable.
+- Specifics beat claims. Tiny concrete details make it believable — a named object, an exact action, a real timeframe or price ("the lid never sat right", "every single morning", "two weeks", "$30"). Reach for the concrete detail before the digit; see the numbers rule below.
 - No emojis, no hashtags, no [pause] markers.`
 
 const BANNED_AI_PATTERNS = `BANNED AI SENTENCE SHAPES — THIS IS THE #1 THING THAT GIVES AI WRITING AWAY. Word choice isn't enough; these CONSTRUCTIONS are the real tell. Never use any:
@@ -50,6 +51,36 @@ const BANNED_AI_PATTERNS = `BANNED AI SENTENCE SHAPES — THIS IS THE #1 THING T
 6. Rule of three: three parallel items for rhythm ("smooth, simple, effortless"). Real people name the ONE thing that matters and move on. Cut to one; if two genuinely matter, keep two and make them different lengths.
 - NEVER use an em-dash (—). Use periods, commas, or just restructure.
 - BANNED WORDS: elevate, unleash, revolutionary, game-changer, seamless, effortless, transform, indulge, crafted, premium, innovative, leverage, "say goodbye to", "say hello to", "look no further", "introducing", "the secret to", "must-have", "in today's world", "level up".`
+
+// ── What the transcript corpus actually supports ──
+//
+// Derived from 872 transcribed high-performing Instagram videos (the same
+// "1,000 Viral Hooks" swipe file HOOK_LIBRARY is built from, except the videos
+// behind the hooks were fetched and transcribed). Three features separate the
+// top of that set from the bottom, each surviving a permutation test on the
+// extremes, a whole-corpus rank correlation, AND a within-category control:
+// digit density in the hook (rho -0.14), digit density in the body (-0.13),
+// and first-person density (-0.09).
+//
+// They are framed as TIEBREAKERS on purpose. Every video measured was already
+// a hand-picked outlier, so this compares winners against other winners: a
+// number-led hook is not a mistake, it is just not the lever. Writing these as
+// bans would be over-reading the data.
+//
+// Note what is deliberately NOT here. The sentence-level claims that circulate
+// with this dataset — short bursty sentences, low connective density, no
+// setup sentences, heavy contractions — were all tested and NONE replicated
+// (connective and setup rates actually ran higher in the winners). The voice
+// rules above stay as they are because they are about sounding human, which an
+// all-human corpus has no power to test either way; they were simply never
+// evidence from this data, and nothing here should be dressed up as if it were.
+const CORPUS_EVIDENCE = `WHAT SEPARATES THE BIGGEST WINNERS FROM THE MERELY VIRAL — three measured tendencies, not laws. Every video these were measured on already went viral, including the ones that break them, so treat each as a tiebreaker when two lines both work:
+
+1. QUOTE FEWER FIGURES — AND SPELLING ONE OUT IS NOT CUTTING IT. Numbers are allowed anywhere, including the first line: plenty of winners open on one. But the weaker performers quote more of them all the way through, and the fix is to quote fewer FACTS, not to write the same facts differently. "Twenty four pounds" is the same figure as "24 pounds" and counts exactly the same; changing the spelling changes nothing. So count the distinct figures in what you have written — prices, durations, quantities, timeframes, percentages. Cut the ones doing no work, and never manufacture one to sound specific. Where a figure genuinely IS the story ("it took me 10 years", "I found $10 in this jacket"), lead with it and write it however it reads best out loud. Everywhere else take your specificity from concrete nouns, named objects and exact actions instead — "the cheap one from the chemist", "every morning before work", "the lid never sat right" — which is specificity without a figure at all.
+
+2. TALK ABOUT THE THING, NOT ABOUT YOURSELF. The strongest performers run noticeably lower on "I / me / my" than the weaker ones. Wherever a line could be about the product, the viewer, or what is happening on screen instead of about you, make it about that. This is a density steer, NOT a ban: it never overrides a first-person structure — a founder story or a testimonial is first person by definition. Just keep the camera on the thing rather than on the narrator wherever the line allows it.
+
+3. GET TO THE INSTRUCTION SOONER. Winners reach their first concrete imperative — the thing the viewer should do, look at, or notice — earlier, and use more of them across the whole script. Fewer sentences describing what is coming, more sentences telling them what is happening.`
 
 const HOOK_RULES = `THE HOOK IS 80% OF THE JOB:
 - The first line is the entire video. Write it to win in under 1.5 seconds of speech, in the first 3-4 words.
@@ -105,6 +136,7 @@ function lengthDiscipline(length: WriteLength): string {
 // Keys are the HookCategory slugs; values must round-trip through parseHooks'
 // slug normalisation (lowercase, non-letters → '-').
 const HOOK_TAG: Record<HookCategory, string> = {
+  'curiosity-gap': 'CURIOSITY GAP',
   educational: 'EDUCATIONAL',
   comparison: 'COMPARISON',
   'myth-busting': 'MYTH BUSTING',
@@ -114,7 +146,20 @@ const HOOK_TAG: Record<HookCategory, string> = {
   'pattern-interrupt': 'PATTERN INTERRUPT',
 }
 
-const HOOK_LIBRARY = `THE 7 HOOK FAMILIES AND THEIR PROVEN FORMULAS — every "(...)" is a blank you fill with THIS product's specifics. Each formula is a COMPLETE thought: if it has a setup and a payoff clause, both parts are the formula — never use half of one.
+const HOOK_LIBRARY = `THE 8 HOOK FAMILIES AND THEIR PROVEN FORMULAS — every "(...)" is a blank you fill with THIS product's specifics. Each formula is a COMPLETE thought: if it has a setup and a payoff clause, both parts are the formula — never use half of one.
+
+<CURIOSITY GAP> — name a SPECIFIC familiar thing whose inside, cause or outcome the viewer cannot guess, and withhold it. The specificity is the whole mechanism: "let's see what's inside Monster Energy" works, "you won't believe what's inside this drink" does not. Never tease vaguely; always name the actual thing.
+- Let's see what's actually inside (specific named thing).
+- If you (common thing they do with this category), stop what you're doing and watch this.
+- Before you ever (action) for the first time, you need to see this.
+- I think I just found the biggest (niche) cheat code.
+- Nobody talks about what (everyday habit) is actually doing to your (thing).
+- There's a reason (specific familiar thing) (surprising outcome), and nobody tells you what it is.
+- I opened up (specific named item) to see what you're actually paying for.
+- This is the part of (familiar process) that nobody shows you.
+- (Specific named thing) has one (ingredient/part/setting) in it that I need to talk about.
+- You've used (specific common item) a thousand times and never seen this side of it.
+- I always wondered why (specific familiar thing) (odd behaviour). Turns out there's a reason.
 
 <EDUCATIONAL> — teach or promise a concrete lesson. Wins when the product solves a how-do-I problem.
 - Here's exactly how much (thing) you need to (result).
@@ -327,6 +372,8 @@ ${HUMAN_VOICE_RULES}
 
 ${BANNED_AI_PATTERNS}
 
+${CORPUS_EVIDENCE}
+
 VOICE PROFILE — at the very END of your output, AFTER the last scene, emit one labeled block:
 === VOICE PROFILE (same voice in every scene) ===
 ${VOICE_PROFILE_SPEC}
@@ -362,6 +409,8 @@ ${HUMAN_VOICE_RULES}
 - Mention the product name at most twice, the way a person would ("so I got the X", "this thing").
 
 ${BANNED_AI_PATTERNS}
+
+${CORPUS_EVIDENCE}
 
 ${SELF_AUDIT}
 
@@ -415,7 +464,7 @@ const hooksSystem = (count: number) => `You are a top 1% short-form hook writer.
 ${HOOK_LIBRARY}
 
 HOW TO USE THE FORMULAS:
-- Fill every blank with THIS product's specifics — real pain points, numbers, timeframes, prices pulled from the product context. Specifics beat claims: "$30", "two weeks", "every single morning".
+- Fill every blank with THIS product's specifics — real pain points, named objects, exact actions, timeframes and prices pulled from the product context. Specifics beat claims: "every single morning", "the cheap one from the chemist", "two weeks", "$30". A blank that asks for a number does not have to be filled with one if a concrete detail says it better — see the numbers rule below.
 - Adapt the formula to the product; never template-fill robotically, and NEVER leave a "(...)" blank or placeholder in the output.
 - Each hook must stand alone as the first spoken line of its own video. No warm-up, no context-setting — the most interesting beat goes first.
 - USE THE FORMULA'S COMPLETE STRUCTURE. If a formula has a setup and a payoff clause ("(Big brand) didn't want to sponsor this video, let me show you what they're missing out on"), the hook keeps BOTH — a line that stops where the payoff should be ("(Big brand) didn't want to sponsor this video.") is a failed hook. The win happens in the first 3-4 words, but you never shorten a formula to get there.
@@ -425,12 +474,14 @@ HOW TO USE THE FORMULAS:
 
 ${BANNED_AI_PATTERNS}
 
+${CORPUS_EVIDENCE}
+
 SELF-AUDIT BEFORE YOU ANSWER (silently): read each hook and ask "would this stop MY thumb in 1.5 seconds?" — rewrite the weak ones. Then check every hook against its formula: does it carry the COMPLETE thought, setup and payoff both? Rewrite any line that ends mid-thought. Kill any banned sentence shape, any em-dash, any leftover blank. Make one vague hook specific.
 
 OUTPUT FORMAT — CRITICAL:
 - Return EXACTLY ${count} lines. One hook per line. Nothing else.
 - Every line starts with its family tag in angle brackets, then the hook, e.g.: <MYTH BUSTING> Let me de-influence you from $80 serums.
-- Valid tags: <EDUCATIONAL> <COMPARISON> <MYTH BUSTING> <STORYTELLING> <AUTHORITY> <DAY IN THE LIFE> <PATTERN INTERRUPT>
+- Valid tags: <CURIOSITY GAP> <EDUCATIONAL> <COMPARISON> <MYTH BUSTING> <STORYTELLING> <AUTHORITY> <DAY IN THE LIFE> <PATTERN INTERRUPT>
 - No numbering, no blank lines, no quotation marks, no commentary, no markdown.`
 
 // Attaching a bank product is optional in both modes: a member who has
@@ -449,7 +500,7 @@ async function runHooks(input: GenerateScriptInput, apiKey: string, endpoint: Ch
   // The spread rules scale with the pack. "At least 4 families, never more than
   // 3 from one" was written for ten hooks; on a pack of five it demands almost
   // one family per line, and on twenty it lets the pack blur.
-  const minFamilies = Math.min(7, Math.max(3, Math.ceil(count / 3)))
+  const minFamilies = Math.min(8, Math.max(3, Math.ceil(count / 3)))
   const maxPerFamily = Math.max(2, Math.round(count * 0.3))
   let prompt = `The creator's brief for these hooks:\n\n${input.brief.trim()}\n\n`
 
@@ -473,6 +524,19 @@ async function runHooks(input: GenerateScriptInput, apiKey: string, endpoint: Ch
     ? `CATEGORY MIX: you pick the families. Choose the ones that genuinely fit this product and audience — cover at least ${minFamilies} different families across the ${count} hooks, never more than ${maxPerFamily} hooks from any one family, and order the ${count} strongest-first.\n\n`
     : `CATEGORY LOCK: every one of the ${count} hooks must be <${HOOK_TAG[category]}>. Use a different formula from that family for each hook so the ${count} don't blur together, and order them strongest-first.\n\n`
 
+  // NO CALIBRATION BLOCK HERE, deliberately — measured, not assumed. Hooks got
+  // the same exemplar injection Write New gets, and an A/B on one brief (50
+  // hooks per arm, same model) showed it did nothing: mean similarity to the
+  // library's own formulas went UP, 0.72 -> 0.76, with near-verbatim fills
+  // rising from 74% to 82%. The reason is structural. This system prompt IS a
+  // fill-in-the-blanks contract — every formula is a template and the rules
+  // above tell the model to fill every blank — so a "here's how real speech
+  // sounds" block can't compete with it and shouldn't be expected to. Write New
+  // is the opposite shape (the library seeds only the opening line, the rest of
+  // the script is free) and there the same block measurably worked: opener
+  // similarity fell 0.59 -> 0.44. Adding it back here costs ~850 tokens a call
+  // and buys nothing; if hook originality is ever the goal, loosen the
+  // fill-the-blanks contract first, then re-test.
   prompt += `Write the ${count} hooks now.`
 
   const messages: ChatMessage[] = [
@@ -667,6 +731,14 @@ async function runWrite(input: GenerateScriptInput, take: number, takeCount: num
   // Formats also stage the shots — but only the blueprint has shots to stage.
   const staging = format === 'scenes' ? WRITE_STYLE_SCENE_DIRECTION[style] : undefined
   if (staging) prompt += `${staging}\n\n`
+
+  // Real transcripts, weighted toward whole scripts: the library already covers
+  // the opening line, and the body is what this app had no evidence about.
+  // Sits here rather than beside "write the script now" on purpose — it sets
+  // the register alongside the structure, and putting verbatim transcripts last
+  // invites the model to imitate their content instead of their cadence.
+  const calibration = exemplarBlock(familiesForWriteStyle(style), { hooks: 6, scripts: 3 })
+  if (calibration) prompt += `${calibration}\n\n`
 
   prompt += `${takeAngleBlock(take, takeCount)}\n\n`
 
