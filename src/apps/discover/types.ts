@@ -5,6 +5,16 @@
 
 export type DiscoverPlatform = 'tiktok' | 'meta'
 
+/**
+ * Which of Outliers' three tabs is on screen.
+ *
+ * The vault is not a platform and never becomes one — it is a fixed library
+ * that ships with the app, so it has no search state, no cursor and no
+ * credits. Keeping it out of `DiscoverPlatform` is what stops every
+ * `Record<DiscoverPlatform, …>` in the app growing a key that means nothing.
+ */
+export type DiscoverView = 'vault' | DiscoverPlatform
+
 /** Which band a video's view-to-follower multiple falls into. */
 export type OutlierBand = '2x' | '5x' | '10x'
 

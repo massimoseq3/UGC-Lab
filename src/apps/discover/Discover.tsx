@@ -3,10 +3,13 @@ import { Key, Plus, Radar, Search } from 'lucide-react'
 import Spinner from '../../components/Spinner'
 import GridCanvas, { AwaitingBody } from '../../components/GridCanvas'
 import SegmentedToggle from '../../components/SegmentedToggle'
-import Dropdown from '../../components/Dropdown'
+import FilterSelect from './components/FilterSelect'
 import ResultCard from './components/ResultCard'
 import ResultDetailModal from './components/ResultDetailModal'
 import ConnectScrapeCreators from './components/ConnectScrapeCreators'
+import VaultBrowser from './vault/VaultBrowser'
+import { vaultFiltersActive } from './vault/service'
+import { DEFAULT_VAULT_FILTERS, type VaultFilters } from './vault/types'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useAppStore } from '../../stores/appStore'
@@ -14,7 +17,7 @@ import { useBankStore } from '../../stores/bankStore'
 import { humanizeError } from '../../utils/friendlyError'
 import { applyMinViews, isPreviewable, mergeResults, runSearch, sortResults } from './services/search'
 import { downloadResultVideo, fetchResultTranscript, saveResultVideoToDisk, saveThumbnail } from './services/handoff'
-import { DEFAULT_FILTERS, type DiscoverFilters, type DiscoverPlatform, type DiscoverResult, type DiscoverSort } from './types'
+import { DEFAULT_FILTERS, type DiscoverFilters, type DiscoverPlatform, type DiscoverResult, type DiscoverSort, type DiscoverView } from './types'
 
 // Outliers — search TikTok and the Meta Ad Library for ads worth stealing,
 // then hand one straight to the Ad Analyzer or to Scripts.
@@ -191,7 +194,18 @@ export type TranscriptState =
 
 export default function Discover() {
   const baseKey = useProjectScopedKey('discover')
-  const [platform, setPlatform] = usePersistedState<DiscoverPlatform>(`${baseKey}:platform`, 'tiktok')
+  // Three tabs behind one toggle: the Outlier Vault, which ships with the app
+  // and costs nothing to browse, and the two paid searches. It takes its OWN
+  // storage key rather than the old `:platform` slot, so every member — new or
+  // returning — lands on the vault once. That is the point of making it the
+  // default: the friction this app was losing members to was having to go and
+  // find something worth tearing down before it could help.
+  const [view, setView] = usePersistedState<DiscoverView>(`${baseKey}:view`, 'vault')
+  const isVault = view === 'vault'
+  // Only the two search tabs have search state. The vault borrows TikTok's
+  // slot while it is on screen so the per-platform records below stay
+  // two-keyed and nothing has to grow a branch for a tab that never searches.
+  const platform: DiscoverPlatform = isVault ? 'tiktok' : view
   // Merged over the defaults on every hydrate, not just when the slot is
   // empty. `usePersistedState` hands back a stored blob verbatim, so a filter
   // saved before a field existed carries that field as `undefined` for good —
@@ -203,6 +217,16 @@ export default function Discover() {
     DEFAULT_FILTERS,
     { sanitize: (f) => ({ ...DEFAULT_FILTERS, ...f }) },
   )
+  // The vault's query and filters live here rather than inside VaultBrowser
+  // for the same reason the search ones do: they are persisted UI state of
+  // this app, and the header's reset button has to be able to clear them.
+  const [vaultQuery, setVaultQuery] = usePersistedState<string>(`${baseKey}:vault-query`, '')
+  const [vaultFilters, setVaultFilters] = usePersistedState<VaultFilters>(
+    `${baseKey}:vault-filters`,
+    DEFAULT_VAULT_FILTERS,
+    { sanitize: (f) => ({ ...DEFAULT_VAULT_FILTERS, ...f }) },
+  )
+
   // One search per platform, kept side by side. Flipping to the other tab used
   // to throw the grid away, which meant a credit spent and a page of 30 winners
   // lost to a glance. Each tab keeps its own query too, so the box always says
@@ -278,7 +302,11 @@ export default function Discover() {
   // from the store at mount and never re-armed, so dismissing it is respected
   // for as long as the app stays open — the empty state behind it keeps a
   // "Connect key" button, so closing this is never a dead end.
-  const [connectOpen, setConnectOpen] = useState(!apiKey)
+  // Armed only for the paid tabs. The vault is where a fresh member lands and
+  // it needs no key at all, so popping a credentials dialog over it would put
+  // a paywall-shaped thing in front of the one part of Outliers that is free.
+  // Flipping to TikTok or Meta without a key arms it there instead.
+  const [connectOpen, setConnectOpen] = useState(!apiKey && !isVault)
   const addToast = useAppStore((s) => s.addToast)
   const sendToApp = useAppStore((s) => s.sendToApp)
   const openApp = useAppStore((s) => s.openApp)
@@ -517,14 +545,20 @@ export default function Discover() {
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink/5 px-4 py-2 md:h-[57px] md:flex-nowrap md:gap-3 md:py-0">
         <SegmentedToggle
           options={[
+            { value: 'vault', label: 'Outlier Vault' },
             { value: 'tiktok', label: 'TikTok' },
             { value: 'meta', label: 'Meta Ads' },
           ]}
-          value={platform}
+          value={view}
           // Nothing is thrown away on a flip — each tab keeps its own search
           // and its own grid, so glancing at the other platform costs nothing
           // and coming back costs no credits.
-          onChange={setPlatform}
+          onChange={(next) => {
+            setView(next)
+            // Arriving on a paid tab without a key is the moment the popup is
+            // for; it stays out of the way while the free tab is on screen.
+            if (next !== 'vault' && !apiKey) setConnectOpen(true)
+          }}
           fitContent
           dense
         />
@@ -532,24 +566,42 @@ export default function Discover() {
         <div className="order-last flex w-full min-w-0 items-center gap-2 md:order-none md:contents">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-600" />
+          {/* The same field on all three tabs, and the verb changes with the
+              tab: on TikTok and Meta it BUYS a page of results, in the vault
+              it filters 872 rows already sitting on the member's machine. */}
           <input
-            value={query}
-            onChange={(e) => patchSearch(platform, { query: e.target.value })}
-            onKeyDown={(e) => { if (e.key === 'Enter') void search() }}
-            placeholder={isTikTok ? 'Search TikTok — a product, a pain point, a hook…' : 'Search the Meta Ad Library…'}
+            value={isVault ? vaultQuery : query}
+            onChange={(e) => {
+              if (isVault) setVaultQuery(e.target.value)
+              else patchSearch(platform, { query: e.target.value })
+            }}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !isVault) void search() }}
+            placeholder={
+              isVault
+                ? 'Filter the vault — a topic, a phrase, a creator…'
+                : isTikTok
+                  ? 'Search TikTok — a product, a pain point, a hook…'
+                  : 'Search the Meta Ad Library…'
+            }
             className="w-full rounded-full border border-ink/10 bg-ink/5 py-2 pl-10 pr-4 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
           />
         </div>
 
-        <button
-          type="button"
-          onClick={() => void search()}
-          disabled={!query.trim() || !apiKey || searching}
-          className="flex shrink-0 items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-ink-900 transition-colors hover:bg-ink-200 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {searching ? <Spinner className="h-3.5 w-3.5" /> : <Radar className="h-3.5 w-3.5" />}
-          Search
-        </button>
+        {/* The vault filters as you type. There is nothing to submit and
+            nothing to bill, so it carries no button — a Search button that
+            spends no credit next to one that does would teach the wrong
+            thing about both. */}
+        {!isVault && (
+          <button
+            type="button"
+            onClick={() => void search()}
+            disabled={!query.trim() || !apiKey || searching}
+            className="flex shrink-0 items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-ink-900 transition-colors hover:bg-ink-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {searching ? <Spinner className="h-3.5 w-3.5" /> : <Radar className="h-3.5 w-3.5" />}
+            Search
+          </button>
+        )}
         </div>
 
         {credits !== null && (
@@ -564,11 +616,20 @@ export default function Discover() {
             search on TikTok isn't asking to bin the Meta grid too. Nothing here
             is recoverable by re-running for free, so it only appears once there
             is something to clear. */}
-        {(query || results.length > 0) && (
+        {(isVault
+          ? vaultQuery.trim() !== '' || vaultFiltersActive(vaultFilters)
+          : query !== '' || results.length > 0) && (
           <button
             type="button"
-            title="New search — clears this tab"
-            onClick={() => patchSearch(platform, BLANK_SEARCH)}
+            title={isVault ? 'Clear the vault filters' : 'New search — clears this tab'}
+            onClick={() => {
+              if (isVault) {
+                setVaultQuery('')
+                setVaultFilters(DEFAULT_VAULT_FILTERS)
+              } else {
+                patchSearch(platform, BLANK_SEARCH)
+              }
+            }}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
           >
             <Plus className="h-4 w-4" />
@@ -576,7 +637,7 @@ export default function Discover() {
         )}
       </header>
 
-      {apiKey && (
+      {!isVault && apiKey && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink/5 px-4 py-2.5">
           <FilterSelect
             label="Sort"
@@ -652,7 +713,18 @@ export default function Discover() {
         </div>
       )}
 
-      {!apiKey ? (
+      {/* The vault renders its own filter row and grid as a fragment, so both
+          land as siblings in this column exactly like the search tab's do. */}
+      {isVault ? (
+        <VaultBrowser
+          query={vaultQuery}
+          filters={vaultFilters}
+          onFiltersChange={setVaultFilters}
+          apiKey={apiKey}
+          onCredits={setCredits}
+          onNeedKey={() => setConnectOpen(true)}
+        />
+      ) : !apiKey ? (
         <ConnectKeyPanel onConnect={() => setConnectOpen(true)} />
       ) : searching ? (
         <GridCanvas>
@@ -737,39 +809,6 @@ export default function Discover() {
         />
       )}
     </div>
-  )
-}
-
-/**
- * A compact labelled select for the filter row.
- *
- * Wraps the app's own `Dropdown` rather than a native `<select>`: the browser's
- * stock popup is the one piece of unstyled OS chrome left in the app, and it
- * ignores the theme entirely (a white system menu over the dark workspace).
- */
-function FilterSelect<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  value: T
-  options: Array<{ value: T; label: string }>
-  onChange: (value: T) => void
-}) {
-  return (
-    <Dropdown
-      compact
-      fitContent
-      // No app accent: this row is chrome above the grid, sitting under a
-      // monochrome search field and Search button.
-      accent="neutral"
-      label={label}
-      value={value}
-      options={options}
-      onChange={(v) => onChange(v as T)}
-    />
   )
 }
 

@@ -29,7 +29,7 @@ interface SegmentedToggleProps<T extends string> {
 
 // 'products' maps to the gold family (deep purple #4C1D95, the product accent);
 // 'voice'/'broll' map to their app families. Keyed by intent, not family name.
-export type SegmentedAccent = 'ink' | 'scripts' | 'influencers' | 'products' | 'voice' | 'broll' | 'playground'
+export type SegmentedAccent = 'ink' | 'scripts' | 'influencers' | 'products' | 'voice' | 'broll' | 'playground' | 'outliers'
 
 // Active-pill fill + the active label color that reads on top of it. Literal
 // class strings (Tailwind can't build names from props at runtime).
@@ -43,6 +43,9 @@ const ACCENT_INDICATOR: Record<SegmentedAccent, string> = {
   voice: 'bg-voice-500/10 ring-1 ring-inset ring-voice-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
   broll: 'bg-broll-500/10 ring-1 ring-inset ring-broll-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
   playground: 'bg-playground-500/10 ring-1 ring-inset ring-playground-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
+  // Outliers' #D9A404, as a literal: it has no Tailwind family, and the one
+  // NAMED gold (`gold-*`) is #4C1D95 — purple, the Products accent.
+  outliers: 'bg-[#D9A404]/10 ring-1 ring-inset ring-[#D9A404]/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
 }
 const ACCENT_ACTIVE_TEXT: Record<SegmentedAccent, string> = {
   ink: 'text-ink-100',
@@ -54,6 +57,9 @@ const ACCENT_ACTIVE_TEXT: Record<SegmentedAccent, string> = {
   voice: 'text-voice-300',
   broll: 'text-broll-300',
   playground: 'text-playground-300',
+  // #D9A404 is 2.32:1 on a white surface — fine as a fill, unreadable as a
+  // label, so light mode takes a darker gold (5.07:1).
+  outliers: 'text-[#D9A404] light:text-[#8A6A00]',
 }
 
 // Rounded pill segmented control — the house replacement for the old

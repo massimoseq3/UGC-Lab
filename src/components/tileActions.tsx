@@ -103,18 +103,24 @@ export function TileActionButton({
 }
 
 /**
- * Star toggle — bank cards only. Unlike its neighbours it stays visible once
- * starred, so the pin reads at a glance without hovering. Starred items surface
- * first in every bank picker.
+ * Star toggle. Unlike its neighbours it stays visible once starred, so the pin
+ * reads at a glance without hovering.
+ *
+ * `title` overrides the default tooltip, which promises a bank-picker sort —
+ * true on a bank card and a lie anywhere else. The Outlier Vault stars rows in
+ * a read-only library that no picker ever reads, so it says what its own star
+ * actually does.
  */
 export function TileStarButton({
   starred,
   onToggle,
+  title,
 }: {
   starred: boolean
   onToggle: () => void
+  title?: string
 }) {
-  const label = starred ? 'Unstar' : 'Star — starred items show first when picking from banks'
+  const label = starred ? 'Unstar' : title ?? 'Star — starred items show first when picking from banks'
   return (
     <button
       type="button"
