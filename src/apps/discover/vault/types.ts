@@ -46,8 +46,23 @@ export interface VaultItem {
 
 export type VaultSort = 'outlier' | 'recent' | 'likes'
 
+/**
+ * The "everything" folder, as a value `category` can hold.
+ *
+ * `category` carries one more state than a category since the vault gained a
+ * folder screen: '' is that screen (nothing open), ALL_HOOKS is the folder
+ * holding the whole library, and anything else is a real category. One field
+ * rather than two, so there is no way for "which folder" and "is a folder
+ * open" to disagree, and so the header's reset still lands on the folder
+ * screen by clearing to the defaults.
+ *
+ * It never reaches `filterVault` — `VaultBrowser` maps it back to '' before
+ * filtering, so the service stays a plain filter and knows no sentinels.
+ */
+export const ALL_HOOKS = '*'
+
 export interface VaultFilters {
-  /** '' means every category. */
+  /** The open folder: '' the folder screen, ALL_HOOKS everything, else a category. */
   category: string
   /** '' means every pattern. */
   pattern: string

@@ -621,7 +621,7 @@ export default function Discover() {
           : query !== '' || results.length > 0) && (
           <button
             type="button"
-            title={isVault ? 'Clear the vault filters' : 'New search — clears this tab'}
+            title={isVault ? 'Back to the folders — clears the vault filters' : 'New search — clears this tab'}
             onClick={() => {
               if (isVault) {
                 setVaultQuery('')
@@ -720,6 +720,7 @@ export default function Discover() {
           query={vaultQuery}
           filters={vaultFilters}
           onFiltersChange={setVaultFilters}
+          onClearQuery={() => setVaultQuery('')}
           apiKey={apiKey}
           onCredits={setCredits}
           onNeedKey={() => setConnectOpen(true)}
