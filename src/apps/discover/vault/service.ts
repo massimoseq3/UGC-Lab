@@ -88,6 +88,22 @@ export function categoryLabel(category: string): string {
 
 
 /**
+ * The covers a folder tile shows: that folder's biggest outliers, as urls.
+ *
+ * Biggest rather than first, because a folder is being judged on whether it's
+ * worth opening and its best rows are the honest answer to that. A row whose
+ * cover the build script couldn't make is skipped rather than rendered as a
+ * gap — the tile is a preview, not an inventory.
+ */
+export function folderCovers(rows: VaultItem[], count = 3): string[] {
+  return rows
+    .filter((r) => r.hasThumb)
+    .sort((a, b) => (b.multiple ?? 0) - (a.multiple ?? 0))
+    .slice(0, count)
+    .map(thumbUrl)
+}
+
+/**
  * The facets present in the library, each with its count, commonest first.
  *
  * Derived from the rows rather than hardcoded, so re-running the build script

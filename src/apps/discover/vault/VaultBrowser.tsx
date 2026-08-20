@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Library, RotateCw, Star } from 'lucide-react'
+import { ChevronLeft, FolderOpen, Library, RotateCw, Star } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import GridCanvas, { AwaitingBody } from '../../../components/GridCanvas'
-import SegmentedToggle from '../../../components/SegmentedToggle'
 import FilterSelect from '../components/FilterSelect'
 import VaultCard, { type VaultAction } from './VaultCard'
 import VaultDetailModal from './VaultDetailModal'
+import VaultFolders from './VaultFolders'
 import { usePersistedState, useProjectScopedKey } from '../../../hooks/usePersistedState'
 import { useAppStore } from '../../../stores/appStore'
 import { humanizeError } from '../../../utils/friendlyError'
@@ -14,6 +14,7 @@ import {
   categoryLabel, facetCounts, filterVault, loadVault, patternLabel,
   resolveVaultVideo, thumbUrl, vaultFileName, VaultMessage, type VaultRow,
 } from './service'
+import { ALL_HOOKS } from './types'
 import type { ResolvedVideo, VaultFilters, VaultItem, VaultSort } from './types'
 
 /**
@@ -39,6 +40,14 @@ interface VaultBrowserProps {
   query: string
   filters: VaultFilters
   onFiltersChange: (next: (f: VaultFilters) => VaultFilters) => void
+  /**
+   * Empties the header's field, which this app owns.
+   *
+   * Needed because a query is what opens the grid when no folder is: leaving
+   * the words behind on the way back to the folders would bounce the member
+   * straight into the results they were leaving.
+   */
+  onClearQuery: () => void
   /** Needed only to un-freeze a row's video — browsing and watching cost nothing. */
   apiKey: string
   onCredits: (remaining: number) => void
@@ -47,7 +56,7 @@ interface VaultBrowserProps {
 }
 
 export default function VaultBrowser({
-  query, filters, onFiltersChange, apiKey, onCredits, onNeedKey,
+  query, filters, onFiltersChange, onClearQuery, apiKey, onCredits, onNeedKey,
 }: VaultBrowserProps) {
   const [rows, setRows] = useState<VaultRow[] | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -112,6 +121,24 @@ export default function VaultBrowser({
   // the memoization.
   const handleStar = (item: VaultItem) => {
     setStarIds((ids) => ids.includes(item.id) ? ids.filter((i) => i !== item.id) : [...ids, item.id])
+  }
+
+  const enterFolder = (category: string, starredOnly = false) => {
+    onFiltersChange((f) => ({ ...f, category, starredOnly }))
+  }
+
+  /**
+   * Back out to the folder screen, and leave nothing narrowing it.
+   *
+   * The folder screen counts the whole library, so a hook filter or a Starred
+   * toggle still armed behind it would be state with nothing on screen
+   * describing it — and re-entering All would then quietly show a fraction of
+   * the 872 the tile just promised. Sort survives, since it changes what's at
+   * the top of a folder rather than what's in it.
+   */
+  const backToFolders = () => {
+    onClearQuery()
+    onFiltersChange((f) => ({ ...f, category: '', pattern: '', starredOnly: false }))
   }
 
   /**
@@ -252,16 +279,30 @@ export default function VaultBrowser({
   const allCategories = facetCounts(rows, (r) => [r.category])
 
   // `filters.category` doubles as the open folder — one piece of state, so the
-  // header's reset already returns to All and none of this needed a migration.
+  // header's reset already returns to the folder screen and none of this
+  // needed a migration. '' is that screen, ALL_HOOKS the everything folder.
   //
   // Coerced the same way the search tab coerces a persisted sort with no
   // option on the current platform: a category dropped by a corpus rebuild
-  // would otherwise leave every chip unlit over an empty grid, with nothing on
-  // screen saying why.
-  const openFolder = filters.category && allCategories.some((c) => c.value === filters.category)
+  // would otherwise leave a member inside a folder that no longer exists,
+  // staring at an empty grid with nothing on screen saying why.
+  const openFolder = filters.category === ALL_HOOKS
+    || allCategories.some((c) => c.value === filters.category)
     ? filters.category
     : ''
-  const active = { ...filters, category: openFolder }
+
+  // Typing in the header's field is a request to see HOOKS, not folders, so a
+  // query opens the grid across the whole library on its own. It is also the
+  // fast lane back to the old landing: search from the folder screen and the
+  // click is skipped entirely.
+  const searching = query.trim() !== ''
+  const browsing = openFolder !== '' || searching
+
+  // The sentinel stops here. Everything downstream — the filter, the facet
+  // counts, the empty-state copy — sees a plain category or none, so nothing
+  // else in the app has to know what '*' means.
+  const inCategory = openFolder !== '' && openFolder !== ALL_HOOKS
+  const active = { ...filters, category: inCategory ? openFolder : '' }
   const matches = filterVault(rows, query, active, starred)
   const page = matches.slice(0, shown)
 
@@ -276,14 +317,11 @@ export default function VaultBrowser({
   // inside Authority (35 rows) the hook menu still advertised "Plain statement
   // 286" when 10 of them were in reach, and **13 of its 27 options had nothing
   // there at all** — so picking one produced an empty grid with a number on
-  // screen insisting there were hundreds. Same the other way: with a hook
-  // picked, every folder still claimed its full size.
-  const folderScope = filterVault(rows, query, { ...active, category: '' }, starred)
-  const folderCounts = new Map<string, number>()
-  for (const r of folderScope) {
-    if (r.category) folderCounts.set(r.category, (folderCounts.get(r.category) ?? 0) + 1)
-  }
-
+  // screen insisting there were hundreds.
+  //
+  // The folder counts that used to be scoped the same way are gone with the
+  // toggle: the folder screen counts the whole library, which is honest there
+  // because backing out to it clears everything that could narrow one.
   const hookScope = filterVault(rows, query, { ...active, pattern: '' }, starred)
   const patterns = facetCounts(hookScope, (r) => r.patterns)
   const hookOptions = [
@@ -303,61 +341,64 @@ export default function VaultBrowser({
   // to 866 rather than 872 — six rows carry no category at all, so they live
   // in All and belong to no folder. That is the harvest being honest, not an
   // off-by-six.
-  const folderTotal = openFolder
+  const folderTotal = inCategory
     ? allCategories.find((c) => c.value === openFolder)?.count ?? 0
     : rows.length
 
+  const folderName = inCategory ? categoryLabel(openFolder) : 'All Outlier Videos'
+
+  if (!browsing) {
+    return <VaultFolders rows={rows} starredIds={starIds} onOpen={enterFolder} />
+  }
+
   return (
     <>
-      {/* Folders, as ONE segmented control rather than seven loose chips —
-          the same shape (and the same `dense` size) as the Outlier Vault /
-          TikTok / Meta toggle directly above it, so the two read as a pair of
-          switches rather than a switch over a row of buttons. The sliding
-          indicator is what makes it a toggle: it carries the eye from the old
-          folder to the new one instead of one pill going dark as another
-          lights up. Counts ride in its own `badge` slot.
+      {/* Where the folder toggle used to sit: the way OUT of the folder you
+          opened. One navigation rather than two — a row of folder chips beside
+          a Folders button would be two controls doing the same job, which is
+          the argument that took the category dropdown out when the chips went
+          in. The cost is that switching folders is now two clicks instead of
+          one, and the back button is the first thing on the row so both of
+          them are cheap.
 
-          All leads and is where a member lands — a folder screen with nothing
-          behind it would put the vault's one job (something worth stealing, on
-          screen, immediately) back behind a click. Ordered by size, since
-          `facetCounts` sorts by count.
-
-          The wrapper still scrolls on a phone: seven segments are wider than
-          375px, and a segmented control can't wrap. */}
-      {/* Folders and filters share ONE panel: `flex-wrap` + `justify-between`,
+          The name beside it is not decoration: with the chips gone, it is the
+          only thing on screen saying which slice of 872 rows is under you. */}
+      {/* Folder and filters share ONE panel: `flex-wrap` + `justify-between`,
           so the filters ride the right edge while both fit and tuck onto their
           own line underneath when they don't. Wrapping is what makes that
           safe — flexbox lays each item out at its natural width and moves the
           second one down rather than squeezing either, so nothing is ever
-          truncated and no folder ends up hidden behind a horizontal scroll.
-          They need ~1310px to sit together (758 of toggle against 511 of
-          filters), so a 15"-and-up display gets one line and anything
-          narrower gets two, with the hairline still only under the pair. */}
+          truncated. */}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-ink/5 px-4 py-2.5">
-        {/* max-w-full + its own scroll is the phone case only, where the
-            toggle alone is wider than the screen. */}
-        <div className="scrollbar-hide flex max-w-full items-center overflow-x-auto">
-        <SegmentedToggle
-          options={[
-            { value: '', label: 'All', badge: folderScope.length },
-            ...allCategories.map((c) => ({
-              value: c.value,
-              label: categoryLabel(c.value),
-              badge: folderCounts.get(c.value) ?? 0,
-            })),
-          ]}
-          value={openFolder}
-          onChange={(category) => onFiltersChange((f) => ({ ...f, category }))}
-          accent="outliers"
-          fitContent
-          dense
-        />
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={backToFolders}
+            title="Back to the folders"
+            // 36px, the height of the two dropdowns and the Starred pill
+            // opposite it, so the row sits on one line.
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-ink/10 px-3 text-[13px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/5"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            Folders
+          </button>
+          <span className="flex min-w-0 items-center gap-2 pl-1 text-[13px] font-medium text-ink-200">
+            {/* Outliers' gold as a literal — the app's `gold-*` family is
+                #4C1D95, which is purple and belongs to the Products bank. */}
+            <FolderOpen className="h-4 w-4 shrink-0 text-[#D9A404] light:text-[#8A6A00]" strokeWidth={1.75} />
+            <span className="truncate">{folderName}</span>
+          </span>
         </div>
 
         {/* Sort / Hook / Starred. `shrink-0` on the group so it wraps as a
             unit rather than the dropdowns squeezing; `flex-wrap` inside it for
-            the phone, where even the group is wider than the screen. */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+            the phone, where even the group is wider than the screen — and
+            `max-w-full`, which is what lets that inner wrap actually fire.
+            `shrink-0` alone pins the group at its max-content width, so on a
+            375px screen the Starred pill and the counter sat off the right
+            edge of a row that doesn't scroll. The cap never binds on a
+            desktop, where the group is half the width of its row. */}
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
         <FilterSelect
           dense
           label="Sort"
@@ -409,11 +450,11 @@ export default function VaultBrowser({
             hint={
               filters.starredOnly && starIds.length === 0
                 ? 'You haven’t starred anything yet. Star a hook from its card and it lands here.'
-                : openFolder
+                : inCategory
                   // Naming the folder is the difference between "nothing
                   // matches" and "nothing matches IN HERE" — the second tells
-                  // a member the fix is one chip away rather than a rewrite.
-                  ? `Nothing in ${categoryLabel(openFolder)} matches that. Try All, or a shorter phrase.`
+                  // a member the fix is one folder away rather than a rewrite.
+                  ? `Nothing in ${folderName} matches that. Try All Outlier Videos, or a shorter phrase.`
                   : 'No hook, script or creator in the vault matches that. Try a shorter phrase, or clear the filters.'
             }
           />
