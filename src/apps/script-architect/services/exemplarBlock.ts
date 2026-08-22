@@ -75,6 +75,7 @@ export function exemplarBlock(
   const parts: string[] = [
     `HOW REAL WINNING VIDEOS ACTUALLY SOUND — CALIBRATION, NOT MATERIAL:`,
     `Below are verbatim transcripts of real short-form videos that genuinely went viral. They are here so you can hear the RHYTHM, the CONCRETENESS and the speed they get to the point at. Study how fast they start, how plainly they name things, and how little they explain before they show.`,
+    `THEY CALIBRATE SOUND, NEVER STRUCTURE: these videos were not written to the structure or format this ad has been given, so none of them shows you how yours should open or how it should be built. The style instruction and its hook contract decide that, and they outrank every line below. Take the cadence and the concreteness from these; take the shape from the brief.`,
     `THESE ARE OTHER CREATORS' WORDS AND THEY ARE OFF-LIMITS AS CONTENT: never reproduce a line from them, never borrow their subject matter, their products, their numbers or their story. Write about THIS product, in this voice's register. If a line of yours could appear in one of these transcripts unchanged, rewrite it.`,
   ]
 

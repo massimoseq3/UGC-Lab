@@ -90,6 +90,7 @@ const HOOK_RULES = `THE HOOK IS 80% OF THE JOB:
 
 const SELF_AUDIT = `SELF-AUDIT BEFORE YOU ANSWER (do this silently; output ONLY the final result):
 1. Read the hook. Does it win in 3-4 words with no warm-up? If not, rewrite it.
+1b. Read the hook against the HOOK CONTRACT in the brief. Does it establish what that structure or format needs established, so a viewer knows from the first line what kind of video this is? If it names a count of anything, does the body deliver exactly that many, counted out loud? If either answer is no, rewrite the hook — or the body — until they agree.
 2. Scan every line for the 6 banned sentence shapes and any em-dash. Kill them.
 3. Check rhythm: if 3+ sentences in a row are the same length, break one.
 4. Find one vague claim and make it specific. Find one oversell and undersell it.
@@ -249,7 +250,9 @@ const HOOK_LIBRARY = `THE 8 HOOK FAMILIES AND THEIR PROVEN FORMULAS — every "(
 // Injected into the Write New script + scenes systems so every generated ad
 // OPENS on a proven formula instead of an invented hook. The <FAMILY> tags are
 // library labels only — the scripts must never emit them.
-const HOOK_OPENING_INSTRUCTION = `THE OPENING LINE COMES FROM THE HOOK LIBRARY: build the script's first spoken line from one of the proven formulas above. Pick the family that fits this product, audience, and structure; fill the blanks with the product's real specifics; and keep the formula's COMPLETE shape — if it has a setup and a payoff clause, the opening line keeps both. A hook that stops where the payoff should be is a failed hook. Adapt the wording so it sounds like the same person speaking the rest of the script — never a bolted-on template — and never include the <FAMILY> tags in the output; they only label the library.`
+const HOOK_OPENING_INSTRUCTION = `THE OPENING LINE COMES FROM THE HOOK LIBRARY: build the script's first spoken line from one of the proven formulas above. Fill the blanks with the product's real specifics, and keep the formula's COMPLETE shape — if it has a setup and a payoff clause, the opening line keeps both. A hook that stops where the payoff should be is a failed hook. Adapt the wording so it sounds like the same person speaking the rest of the script — never a bolted-on template — and never include the <FAMILY> tags in the output; they only label the library.
+
+WHICH FORMULA YOU PICK IS DECIDED BY THE HOOK CONTRACT IN THE BRIEF, NOT BY YOU: the brief names the script's structure or format and states what its opening line has to establish. The library supplies HOW the line is said; the contract decides WHAT it says. Work backwards from the contract — go and find the formula that can carry it and fill that one. If no formula in the library can, write the line the contract asks for in the library's register and drop the formula: an opening line that leaves the viewer expecting a different video than the one you wrote is a failed hook no matter how well it reads on its own.`
 
 // ── Remix: the source-fidelity contract ──
 //
@@ -569,6 +572,51 @@ const WRITE_STYLE_INSTRUCTION: Record<WriteStyle, string> = {
   grwm: 'FORMAT — GRWM / ROUTINE: you\'re doing the routine and the ad happens inside it. Open mid-routine, mid-task, mid-sentence, talking while your hands are busy with something else. The product shows up at the exact moment it gets used and earns one line about why it stayed in the routine. Never stop the routine to sell — the routine is the point and the sell is a byproduct. Call-to-action is an aside on the way out.',
 }
 
+// ── The hook contract, per style ──
+//
+// A style instruction describes the whole script, and the model read it as
+// something the BODY does: pick "3 Reasons" and the takes came back with three
+// counted reasons under an opening line that never mentioned a list, so the
+// viewer met a listicle they were never told to expect. The hook library is the
+// other half of the cause — it is 8 families of generic openers, and nothing
+// tied the family it hands over to the structure the member picked.
+//
+// So each style states what its FIRST LINE has to establish, and that is what
+// picks the formula (see HOOK_OPENING_INSTRUCTION). One line each, describing
+// the job rather than dictating wording: a fixed opener per style would make
+// every take of that style start the same way, which is the one thing this app
+// spends three parallel takes avoiding.
+//
+// The counting clause on `listicle` and `tutorial` is deliberate and belongs to
+// the hook, not the body — a hook that promises three and a body that delivers
+// four is the same broken promise as a hook that promises nothing.
+const WRITE_STYLE_HOOK_CONTRACT: Record<WriteStyle, string> = {
+  pas: 'the pain itself, in the viewer\'s own words, with no product and no promise of relief yet. They have to recognise their own problem in the first line, not be told a solution exists.',
+  story: 'that this already happened to you. First person, past tense, dropped into one specific moment — never a claim about the product and never a preamble about being about to tell a story.',
+  listicle: 'that this is a counted list, and the count. The viewer must know before reason one lands that they are getting "3 reasons" / "3 things" (or whatever count you name), and that the number is worth staying for. Say the count in the first line, then deliver EXACTLY that many, counted out loud in order, strongest last. A first line that opens on one reason as though it were the whole video is a failed hook here.',
+  callout: 'the thing they should stop doing. The first line is the instruction or the accusation itself, aimed at the habit and never at the viewer, so they know immediately they are being argued with.',
+  curiosity: 'a specific named thing and the gap. Name the actual thing, withhold the answer, and make the withheld part something the rest of the script genuinely pays off.',
+  'before-after': 'that a change is the subject. Either stand inside the "before" so plainly it stings, or name the change and its timeframe up front — the viewer has to know a transformation is coming.',
+  demo: 'that this is happening right now, in your hands. Present tense, first reaction, to a thing you are physically holding or opening — never a retrospective verdict.',
+  comparison: 'that two things are being put side by side. Both sides land in the first line, so the viewer knows a comparison is running before either one is judged.',
+  objection: 'the objection, said out loud in the viewer\'s own words before they can think it. The first line is their doubt, not your answer.',
+  founder: 'that you made the thing. Say it in the first line, plainly and a little reluctantly — that is the whole reason this ad is believed, and it stops being a founder story if it arrives late.',
+  podcast: 'that the viewer has walked in on the middle of an answer. Start mid-sentence on a question that was never heard, so the line reads as a clip rather than an opening.',
+  interview: 'that this is an answer given to someone holding a mic. Open already reacting to the question, unrehearsed, to a person and not to the lens.',
+  'green-screen': 'what is on the screen behind you. Read it out loud first — the review, the comment, the price, the headline — so the reaction has something to be a reaction to.',
+  reply: 'that one specific person asked one specific question. Say the question back in the first line; the viewer must know they are watching a reply.',
+  expert: 'the job and the stake, in one breath. What you do for a living, and the thing you see people get wrong, so the authority is established before any advice arrives.',
+  tutorial: 'the promise and the timeframe — what the viewer will be able to do by the end, and roughly how long it takes. If the first line names a number of steps, count exactly that many out loud in the body.',
+  grwm: 'that the routine is already underway. Mid-task, hands busy, talking over what you are doing — never stopping to introduce the video.',
+}
+
+// The style's line, then what its hook owes the viewer. Kept as one block so a
+// style is read as one instruction rather than a rule about the body and a
+// separate rule about the first line, which is exactly how they came apart.
+function styleBlock(style: WriteStyle): string {
+  return `${WRITE_STYLE_INSTRUCTION[style]}\n\nHOOK CONTRACT — WHAT THIS ${WRITE_STYLE_META[style].group === 'format' ? 'FORMAT' : 'STRUCTURE'}'S FIRST SPOKEN LINE MUST ESTABLISH: ${WRITE_STYLE_HOOK_CONTRACT[style]}\n\nThe first line is a promise about the rest of the video, and the script has to keep it. A viewer who is told what kind of video this is and then gets a different one bounces harder than one who was never told anything.`
+}
+
 // Scene staging, per FORMAT style. The instructions above shape the words;
 // these shape the SHOTS, so a "Podcast Clip" blueprint actually stages a
 // podcast instead of the default selfie-to-camera. Structures carry no entry on
@@ -597,7 +645,7 @@ export function sceneStagingFor(style: WriteStyle | null | undefined): string | 
 // A format style dictates HOW the ad is filmed and spoken; the take dictates
 // WHICH angle it argues. They collide at the opening line — a street interview
 // can't open on a stat read to camera — so this says which one bends.
-const FORMAT_OVERRIDES_TAKE = `WHEN THE FORMAT AND THE TAKE DISAGREE, THE FORMAT WINS: keep the take's angle and its anchor (which pain point, which benefit, who it's written for) and deliver it through the format's own way of opening. The hook formula still supplies the SUBSTANCE of the first line, but that line is spoken the way the format speaks — mid-answer, mid-reply, mid-routine — never as a piece delivered to camera.`
+const FORMAT_OVERRIDES_TAKE = `WHEN THE FORMAT AND THE TAKE DISAGREE, THE FORMAT WINS: keep the take's angle and its anchor (which pain point, which benefit, who it's written for) and deliver it through the format's own way of opening. The take and the hook formula supply the SUBSTANCE of the first line and the format's hook contract decides what it has to establish, but that line is spoken the way the format speaks — mid-answer, mid-reply, mid-routine — never as a piece delivered to camera.`
 
 // Three parallel takes per generate — same style, deliberately different
 // openings AND different committed angles, so the batch is a real A/B test
@@ -726,7 +774,7 @@ async function runWrite(input: GenerateScriptInput, take: number, takeCount: num
     prompt += `${NO_PRODUCT_DETAILS}\n\n`
   }
 
-  prompt += `${WRITE_STYLE_INSTRUCTION[style]}\n\n`
+  prompt += `${styleBlock(style)}\n\n`
 
   // Formats also stage the shots — but only the blueprint has shots to stage.
   const staging = format === 'scenes' ? WRITE_STYLE_SCENE_DIRECTION[style] : undefined

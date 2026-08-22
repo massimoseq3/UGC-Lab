@@ -360,18 +360,20 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     tags: ['new'],
     pricing: { unit: 'per-1k-tokens', credits: 0.27 },
     official: chatOfficial(1.5, 7.5, KIE_PRICING),
-    // CHAT_MODEL_STRONG, the Ad Analyzer's pinned model, and B-Roll's unpicked
-    // default: it holds a long prompt contract better than the cheaper entries,
-    // which is what both of those calls are. The Ad Analyzer's is one JSON
-    // object read by a person and shot against; B-Roll's is a dozen-plus
-    // paragraph prompts under a tag contract the storyboard parser reads back.
-    // It is also the only chat surface that sends a whole VIDEO inline, which
-    // is why Scripts moving to Grok 4.6 left this one here. It held the
-    // unpicked default in BOTH picker apps until August 2026, lost the pair to
-    // Grok 4.6, and took B-Roll back the same month — B-Roll writes prompts for
-    // a parser more than prose for a reader, so the extra credits Grok costs
-    // buy less there than in Scripts.
-    defaultFor: ['ad-anatomy', 'broll-studio'],
+    // CHAT_MODEL_STRONG, the Ad Analyzer's pinned model, and the unpicked
+    // default in BOTH picker apps: it holds a long prompt contract better than
+    // the cheaper entries, which is what all three of those calls are. The Ad
+    // Analyzer's is one JSON object read by a person and shot against; B-Roll's
+    // is a dozen-plus paragraph prompts under a tag contract the storyboard
+    // parser reads back; Scripts' is a take that has to open on the structure
+    // the member picked and then actually run it. It is also the only chat
+    // surface that sends a whole VIDEO inline, which is why the Ad Analyzer
+    // pins it by name. Grok 4.6 took both picker defaults for a stint in August
+    // 2026: B-Roll came back within the month, and Scripts followed at the
+    // operator's call after takes kept opening on a hook that never set up the
+    // picked structure. Holding a stated contract to the last line is what this
+    // app buys here, and it costs a third of what Grok does.
+    defaultFor: ['ad-anatomy', 'broll-studio', 'script-architect'],
     // OpenAI-compatible variant slug on kie.ai (native 3.6 uses Google's own
     // generateContent shape; our transport speaks OpenAI chat/completions).
     chatEndpoint: '/gemini-3-6-flash-openai/v1/chat/completions',
@@ -490,15 +492,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // the top of the two pickers: no member pays more for the default moving.
     pricing: { unit: 'per-1k-tokens', credits: 0.32 },
     official: chatOfficial(2, 6, KIE_PRICING),
-    // The unpicked default in SCRIPTS (August 2026). It took both picker apps
-    // from Gemini 3.6 Flash and gave B-Roll back the same month: takes are
-    // persuasive prose a person reads and performs, which is what the extra
-    // credits buy, and B-Roll's paragraph prompts are read by a parser and a
-    // video model. It is deliberately NOT wired to CHAT_MODEL_STRONG: that
-    // constant's one consumer is the Ad Analyzer, whose call sends a whole
-    // VIDEO inline, and the Responses API this transport speaks declares
-    // input_text / input_image only. Gemini 3.6 Flash keeps that surface.
-    defaultFor: ['script-architect'],
+    // The strongest writer here that isn't priced like Opus, and the row to
+    // reach for when a take should read better than it obeys. It held both
+    // picker defaults for a stint in August 2026 and holds neither now — see
+    // the Gemini 3.6 Flash entry above. It is also deliberately NOT wired to
+    // CHAT_MODEL_STRONG: that constant's one consumer is the Ad Analyzer, whose
+    // call sends a whole VIDEO inline, and the Responses API this transport
+    // speaks declares input_text / input_image only.
     chatEndpoint: '/grok/v1/responses',
     chatTransport: 'openai-responses',
     chatSlug: 'grok-4-6',
