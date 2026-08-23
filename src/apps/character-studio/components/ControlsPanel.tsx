@@ -15,7 +15,8 @@ import ChipField from './ChipField'
 import GenerateBar from './GenerateBar'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import ClearAllButton from '../../../components/ClearAllButton'
-import LoadPresetDropdown, { PresetPickerSlideOver } from './LoadPresetDropdown'
+import LoadPresetDropdown from './LoadPresetDropdown'
+import PresetPickerModal from './PresetPickerModal'
 import PhotoExtractZone from './PhotoExtractZone'
 import { buildPhysicalPrompt, buildScenePrompt } from '../services/generateCharacter'
 import { copyToClipboard } from '../../../utils/clipboard'
@@ -360,14 +361,14 @@ export default function ControlsPanel({
 
       {/* Scoped preset pickers — same slide-over as the footer's full picker,
           but each merges only its tab's fields onto the current form. */}
-      <PresetPickerSlideOver
+      <PresetPickerModal
         open={physicalPresetOpen}
         onClose={() => setPhysicalPresetOpen(false)}
         onPick={(incoming) => applyScopedPreset(incoming, PHYSICAL_KEYS)}
         title="Physical Presets"
         subtitle="Fill only the physical fields"
       />
-      <PresetPickerSlideOver
+      <PresetPickerModal
         open={scenePresetOpen}
         onClose={() => setScenePresetOpen(false)}
         onPick={(incoming) => applyScopedPreset(incoming, SCENE_KEYS)}
