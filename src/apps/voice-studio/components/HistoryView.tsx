@@ -7,6 +7,7 @@ import { seedColor } from './seedColor'
 import { GeneratingChip, GeneratingPulseRing } from '../../../components/GeneratingChip'
 import DayPill from '../../../components/DayPill'
 import Waveform from './Waveform'
+import CollapsingBar from '../../../components/CollapsingBar'
 import {
   claimAudioSlot,
   formatClock,
@@ -224,17 +225,20 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Search */}
-      <div className="border-b border-ink/5 px-5 py-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search history..."
-            className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-sm text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-voice-500/40"
-          />
+      {/* Rolls up while the list is being scrolled — see CollapsingBar. */}
+      <CollapsingBar>
+        <div className="border-b border-ink/5 px-5 py-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search history..."
+              className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-sm text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-voice-500/40"
+            />
+          </div>
         </div>
-      </div>
+      </CollapsingBar>
 
       {/* List */}
       <div className="flex-1 overflow-y-auto">

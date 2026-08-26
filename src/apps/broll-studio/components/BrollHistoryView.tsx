@@ -18,6 +18,7 @@ import { getContinuousStyle } from '../services/generateContinuous'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
 import { TileActionStack, TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
+import CollapsingBar from '../../../components/CollapsingBar'
 
 interface BrollHistoryViewProps {
   // Already filtered by the parent (see isRetiredOneShotRow) so the tab's
@@ -344,84 +345,88 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b border-ink/5 px-5 py-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search history..."
-            className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-sm text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-broll-500/40"
-          />
-        </div>
-
-        {/* Mode filter pills (left) + sort dropdown (right). The sort control is
-            always shown; the mode pills only when more than one mode is present.
-            A live "N sessions rendering" chip leads the row whenever anything is
-            in flight, so the queue is visible without scanning every row. */}
-        <div className="mt-3 flex items-start justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            {generatingRows > 0 && (
-              <span className="flex items-center rounded-full border border-broll-500/30 bg-broll-500/10 px-2.5 py-1 text-[11px]">
-                <GeneratingChip
-                  label={`${generatingRows} session${generatingRows === 1 ? '' : 's'} rendering`}
-                />
-              </span>
-            )}
-            {showModeFilters &&
-              MODE_FILTERS.map((f) => {
-                const active = activeModeFilter === f.id
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setModeFilter(f.id)}
-                    className={`rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
-                      active
-                        ? 'border-broll-500/40 bg-broll-500/15 text-broll-200'
-                        : 'border-ink/10 bg-ink/[0.03] text-ink-400 hover:bg-ink/[0.06] hover:text-ink-200'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                )
-              })}
+      {/* Search + filters + sort — ~110px of chrome above the list on a
+          phone. Rolls up as soon as the list is being read. */}
+      <CollapsingBar>
+        <div className="border-b border-ink/5 px-5 py-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search history..."
+              className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-sm text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-broll-500/40"
+            />
           </div>
 
-          <div ref={sortRef} className="relative shrink-0">
-            <button
-              type="button"
-              onClick={() => setSortOpen((o) => !o)}
-              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1 text-[11px] font-medium text-ink-300 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
-              title="Sort history"
-            >
-              <ArrowDownUp className="h-3 w-3" />
-              <span>{sortLabel}</span>
-              <ChevronDown className={`h-3 w-3 transition-transform ${sortOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {sortOpen && (
-              <div className="absolute right-0 top-full z-20 mt-1.5 w-44 overflow-hidden rounded-xl border border-ink/10 bg-surface-2 p-1 shadow-lg shadow-black/20">
-                {SORTS.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => {
-                      setSort(s.id)
-                      setSortOpen(false)
-                    }}
-                    className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[12px] transition-colors ${
-                      sort === s.id ? 'bg-broll-500/15 text-broll-200' : 'text-ink-300 hover:bg-ink/[0.06] hover:text-ink-100'
-                    }`}
-                  >
-                    <span>{s.label}</span>
-                    {sort === s.id && <Check className="h-3.5 w-3.5 shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* Mode filter pills (left) + sort dropdown (right). The sort control is
+              always shown; the mode pills only when more than one mode is present.
+              A live "N sessions rendering" chip leads the row whenever anything is
+              in flight, so the queue is visible without scanning every row. */}
+          <div className="mt-3 flex items-start justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {generatingRows > 0 && (
+                <span className="flex items-center rounded-full border border-broll-500/30 bg-broll-500/10 px-2.5 py-1 text-[11px]">
+                  <GeneratingChip
+                    label={`${generatingRows} session${generatingRows === 1 ? '' : 's'} rendering`}
+                  />
+                </span>
+              )}
+              {showModeFilters &&
+                MODE_FILTERS.map((f) => {
+                  const active = activeModeFilter === f.id
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setModeFilter(f.id)}
+                      className={`rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
+                        active
+                          ? 'border-broll-500/40 bg-broll-500/15 text-broll-200'
+                          : 'border-ink/10 bg-ink/[0.03] text-ink-400 hover:bg-ink/[0.06] hover:text-ink-200'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  )
+                })}
+            </div>
+
+            <div ref={sortRef} className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setSortOpen((o) => !o)}
+                className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1 text-[11px] font-medium text-ink-300 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
+                title="Sort history"
+              >
+                <ArrowDownUp className="h-3 w-3" />
+                <span>{sortLabel}</span>
+                <ChevronDown className={`h-3 w-3 transition-transform ${sortOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {sortOpen && (
+                <div className="absolute right-0 top-full z-20 mt-1.5 w-44 overflow-hidden rounded-xl border border-ink/10 bg-surface-2 p-1 shadow-lg shadow-black/20">
+                  {SORTS.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => {
+                        setSort(s.id)
+                        setSortOpen(false)
+                      }}
+                      className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[12px] transition-colors ${
+                        sort === s.id ? 'bg-broll-500/15 text-broll-200' : 'text-ink-300 hover:bg-ink/[0.06] hover:text-ink-100'
+                      }`}
+                    >
+                      <span>{s.label}</span>
+                      {sort === s.id && <Check className="h-3.5 w-3.5 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      </CollapsingBar>
 
       <div className="flex-1 overflow-y-auto">
         {groups.length === 0 ? (

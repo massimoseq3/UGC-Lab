@@ -753,18 +753,28 @@ textarea,
   transform: scale(1.15);
 }
 
-/* iOS Safari zooms the whole page in whenever a focused field's font-size is
-   under 16px — and it does NOT zoom back out when the field blurs. The app's
-   chrome type is 12–14px, so on a phone every prompt box, search field and
-   chip input was a one-way trip into a zoomed viewport with the dock pushed
-   off screen. Below the md breakpoint fields render at 16px, which is also
-   simply the right size to type at on a phone; desktop is untouched.
-   Range inputs are excluded — they carry no text and the rule would resize
-   the slider tracks. */
+/* Fields render a step up from the app's chrome type on a phone — 14px, not
+   the 12–13px a control wears on a desktop, because that is genuinely too
+   small to type into with a thumb.
+
+   It used to be 16px, and 16 was never a design choice: iOS Safari zooms the
+   whole page in whenever a focused field's font-size is under 16px and does
+   NOT zoom back out when the field blurs, so every prompt box and search field
+   was a one-way trip into a zoomed viewport with the dock pushed off screen.
+   The cost of buying that off with type size is paid by the biggest boxes:
+   B-Roll's script field is 13px chrome rendering at 16px, which is a fifth
+   fewer lines of a pasted script on the screen it matters most. The zoom is
+   held off by `maximum-scale=1` in index.html instead — a viewport cap, not a
+   type size — which leaves pinch-zoom intact.
+
+   So: don't shrink this below 14px (a phone is not a desktop), and don't put
+   it back to 16px without also taking the viewport cap out — the two are one
+   fix and they only work together. Range inputs are excluded: they carry no
+   text and the rule would resize the slider tracks. */
 @media (max-width: 767px) {
   input:not([type='range']),
   textarea,
   select {
-    font-size: 16px;
+    font-size: 14px;
   }
 }

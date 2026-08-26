@@ -10,6 +10,7 @@ import ContinuousView from './ContinuousView'
 import BrollHistoryView, { isRetiredOneShotRow } from './BrollHistoryView'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import GridCanvas, { AwaitingBody } from '../../../components/GridCanvas'
+import CollapsingBar from '../../../components/CollapsingBar'
 
 interface RightPanelProps {
   mode: BrollMode
@@ -136,27 +137,31 @@ export default function RightPanel(props: RightPanelProps) {
           `supports-[backdrop-filter]` keeps the opaque fill wherever the
           browser can't blur, since a merely translucent bar with cards showing
           through sharp is the one thing that reads as scrolling. */}
-      <div className="relative z-30 flex h-[57px] shrink-0 items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 supports-[backdrop-filter]:bg-surface-0/80 supports-[backdrop-filter]:backdrop-blur-xl supports-[backdrop-filter]:backdrop-saturate-150">
-        <SegmentedToggle<Tab>
-          className="h-10 !p-1 min-w-0"
-          value={tab}
-          onChange={setTab}
-          options={[
-            { value: 'scenes', label: isContinuous ? 'Continuous Storyboard' : 'Line by Line Storyboard', badge: sceneCount > 0 ? sceneCount : undefined },
-            { value: 'history', label: 'History', badge: historyCount > 0 ? historyCount : undefined },
-          ]}
-        />
-        {tab === 'scenes' && !cleared && !isGenerating && sceneCount > 0 && (
-          <button
-            type="button"
-            title="Clear the canvas"
-            onClick={onClearCanvas}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+      {/* Rolls up on a phone while the storyboard or the history list is
+          scrolled — see CollapsingBar. */}
+      <CollapsingBar>
+        <div className="relative z-30 flex h-[57px] shrink-0 items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 supports-[backdrop-filter]:bg-surface-0/80 supports-[backdrop-filter]:backdrop-blur-xl supports-[backdrop-filter]:backdrop-saturate-150">
+          <SegmentedToggle<Tab>
+            className="h-10 !p-1 min-w-0"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'scenes', label: isContinuous ? 'Continuous Storyboard' : 'Line by Line Storyboard', badge: sceneCount > 0 ? sceneCount : undefined },
+              { value: 'history', label: 'History', badge: historyCount > 0 ? historyCount : undefined },
+            ]}
+          />
+          {tab === 'scenes' && !cleared && !isGenerating && sceneCount > 0 && (
+            <button
+              type="button"
+              title="Clear the canvas"
+              onClick={onClearCanvas}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </CollapsingBar>
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         {/* The storyboard works on the same graph-paper canvas as the other

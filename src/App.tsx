@@ -13,6 +13,8 @@ import AuthGate from './components/auth/AuthGate'
 import RouterSync from './components/RouterSync'
 import LegalAcceptModal from './components/LegalAcceptModal'
 import { useAppStore } from './stores/appStore'
+import { useChromeHidden } from './stores/chromeStore'
+import { useChromeAutoHide } from './hooks/useChromeAutoHide'
 import { useAuthStore } from './stores/authStore'
 import { getAppConfig } from './utils/constants'
 import { startAppUsageTracking, stopAppUsageTracking } from './utils/appUsageTracker'
@@ -110,6 +112,10 @@ function Workspace() {
   const activeApp = useAppStore((s) => s.activeApp)
   const runningApps = useAppStore((s) => s.runningApps)
   const userId = useAuthStore((s) => s.user?.id)
+  // Phone only: scrolling down inside an app rolls the menu bar and the dock
+  // off screen and hands the pane those ~144px.
+  const chromeHidden = useChromeHidden()
+  useChromeAutoHide()
 
   // Per-app attention tracking runs for the life of the workspace. The `key`
   // below already remounts this on a user change, so start/stop lands exactly
@@ -150,8 +156,20 @@ function Workspace() {
             a browser under that much compositing pressure drops its raster
             scale. Glass belongs on small, static chrome over real content
             (B-Roll's pinned storyboard strips), not on a full-window
-            container. */}
-        <div className="absolute inset-x-0 bottom-[108px] top-9 overflow-hidden">
+            container.
+
+            The insets are phone-aware: when the chrome collapses on a scroll
+            (useChromeAutoHide) the pane takes the whole window. Deliberately
+            NOT transitioned — `top`/`bottom` are layout, so animating them
+            relayouts the entire app on every frame, and a storyboard's worth
+            of cards can't pay that for 300ms. The chrome slides; the pane
+            simply grows underneath it, which is invisible because content is
+            laid out from the top. */}
+        <div
+          className={`absolute inset-x-0 overflow-hidden md:bottom-[108px] md:top-9 ${
+            chromeHidden ? 'bottom-0 top-0' : 'bottom-[108px] top-9'
+          }`}
+        >
           {/* Empty state — visible when no app is active */}
           <div
             className={`absolute inset-0 ${
