@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Settings } from 'lucide-react'
 import { useAppStore } from '../stores/appStore'
 import { useActivityStore } from '../stores/activityStore'
+import { useChromeHidden } from '../stores/chromeStore'
 import { useSkillUpdateUnseen } from '../stores/skillUpdateStore'
 import { APP_REGISTRY, type AppCategory, type AppConfig } from '../utils/constants'
 import { getTeamMember } from '../utils/team'
@@ -25,6 +26,9 @@ export default function Dock() {
   // Edit hands out a file that never auto-updates, so a new cut of the skill
   // has to announce itself from the dock — nobody reopens a download page.
   const skillUpdate = useSkillUpdateUnseen()
+  // On a phone the dock slides away while the member reads (see
+  // useChromeAutoHide) and comes back the moment they scroll up.
+  const chromeHidden = useChromeHidden()
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   // On a phone the dock is wider than the screen and scrolls, so the running
@@ -50,7 +54,11 @@ export default function Dock() {
 
   return (
     <>
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-2 pb-[max(env(safe-area-inset-bottom),0.75rem)]">
+      <div
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:translate-y-0 ${
+          chromeHidden ? 'translate-y-full' : 'translate-y-0'
+        }`}
+      >
         {/* overflow-x-auto keeps the dock usable on narrow screens; md+ fits
             everything so overflow stays visible. */}
         <nav ref={navRef} className="pointer-events-auto flex max-w-full items-start gap-0.5 overflow-x-auto overscroll-x-contain scrollbar-hide rounded-[26px] border border-ink/10 bg-surface-1/75 px-2 pb-1.5 pt-2 shadow-2xl shadow-black/25 backdrop-blur-2xl md:overflow-visible md:px-2.5 md:pt-2.5 light:bg-white/75">

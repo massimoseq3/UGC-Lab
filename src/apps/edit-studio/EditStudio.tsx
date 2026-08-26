@@ -70,18 +70,41 @@ export default function EditStudio() {
     // Same deep-space wallpaper as the Dashboard. Edit is the other page with no
     // panels of its own — a folder and a card floating on the bare canvas — so it
     // sits on the sky rather than in an empty room.
-    <div className="relative flex min-h-full flex-col">
+    // overflow-x-clip, not hidden: the folder's halo is a 135%-wide radial glow
+    // that hangs past both edges, and on a phone that made the whole page
+    // scroll ~20px sideways. `clip` trims it without turning this into a scroll
+    // container, so the pane's own vertical scroll is untouched.
+    <div className="relative flex min-h-full flex-col overflow-x-clip">
       <DesktopWallpaper />
 
-      <div className="relative mx-auto grid w-full max-w-5xl flex-1 content-center gap-10 px-5 py-10 md:grid-cols-2 md:items-center md:gap-8 md:px-8">
-        {/* Left: the folder is the download */}
-        <div className="flex flex-col items-center gap-7">
+      {/* Phone: one column, and the READING order is not the desktop one — the
+          title says what the page is, the folder is the thing to take, the
+          benefits and the setup steps follow. Desktop keeps the two columns
+          (folder left, everything else right) via explicit grid placement, so
+          the header can lead on a phone without being duplicated.
+          No vertical centering under `md`: a flex column that centres content
+          taller than its scroller puts the top of the page out of reach. */}
+      <div className="relative mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-7 sm:px-5 md:grid md:grid-cols-2 md:content-center md:items-center md:justify-center md:gap-x-8 md:gap-y-2 md:px-8 md:py-10">
+        <header className="md:col-start-2 md:row-start-1">
+          <h1
+            className="text-[2rem] italic font-normal leading-tight tracking-tight text-ink-50 sm:text-4xl md:text-[2.6rem]"
+            style={DISPLAY_FONT}
+          >
+            Your AI Video Editor
+          </h1>
+          <p className="mt-1.5 max-w-md text-[14px] leading-relaxed text-ink-400">
+            A Claude Skill that edits your videos for you.
+          </p>
+        </header>
+
+        {/* The folder is the download */}
+        <div className="flex flex-col items-center gap-6 md:col-start-1 md:row-span-2 md:row-start-1 md:gap-7 md:self-center">
           <SkillFolder fresh={fresh} />
           <div className="flex flex-col items-center gap-2">
             <button
               type="button"
               onClick={downloadSkill}
-              className="flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-[13px] font-medium text-paper transition-opacity hover:opacity-90"
+              className="flex h-11 items-center gap-2 rounded-full bg-ink px-6 text-[14px] font-medium text-paper transition-opacity hover:opacity-90 md:h-10 md:px-5 md:text-[13px]"
             >
               <Download className="h-4 w-4" strokeWidth={2} />
               Download Skill
@@ -92,30 +115,25 @@ export default function EditStudio() {
           </div>
         </div>
 
-        {/* Right: what it is + how to set it up */}
-        <div className="flex flex-col gap-5">
-          <header>
-            <h1 className="text-4xl italic font-normal tracking-tight text-ink-50 md:text-[2.6rem]" style={DISPLAY_FONT}>
-              Your AI Video Editor
-            </h1>
-            <p className="mt-2 max-w-md text-[14px] leading-relaxed text-ink-400">
-              A Claude Skill that edits your videos for you.
-            </p>
-            <ul className="mt-2 space-y-1.5">
-              {BENEFITS.map((benefit) => (
-                <li key={benefit} className="flex items-center gap-2 text-[13.5px] text-ink-300">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500 light:text-emerald-600" strokeWidth={2} />
-                  <span>{benefit}</span>
-                </li>
-              ))}
-            </ul>
-          </header>
+        {/* What it does + how to set it up */}
+        <div className="flex flex-col gap-5 md:col-start-2 md:row-start-2">
+          <ul className="space-y-1.5">
+            {BENEFITS.map((benefit) => (
+              <li key={benefit} className="flex items-start gap-2 text-[13.5px] leading-snug text-ink-300">
+                <CheckCircle2
+                  className="mt-px h-4 w-4 shrink-0 text-emerald-500 light:text-emerald-600"
+                  strokeWidth={2}
+                />
+                <span>{benefit}</span>
+              </li>
+            ))}
+          </ul>
 
           {/* Blurred, not just translucent: over the starfield a flat 60% fill
               reads as a smudge — the blur is what makes it a pane. */}
-          <div className="rounded-3xl border border-ink/10 bg-ink/[0.045] p-5 backdrop-blur-2xl backdrop-saturate-150 shadow-lg shadow-black/30 light:border-black/[0.05] light:bg-white/70 light:shadow-black/[0.08]">
+          <div className="rounded-3xl border border-ink/10 bg-ink/[0.045] p-4 backdrop-blur-2xl backdrop-saturate-150 shadow-lg shadow-black/30 light:border-black/[0.05] light:bg-white/70 light:shadow-black/[0.08] md:p-5">
             <h2 className="text-[15px] font-semibold tracking-tight text-ink-100">Set it up</h2>
-            <ol className="mt-4 space-y-3.5">
+            <ol className="mt-3.5 space-y-3.5">
               {SKILL_STEPS.map((step, i) => (
                 <li key={i} className="flex items-start gap-3 text-[13px] leading-relaxed text-ink-400">
                   <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink/[0.06] text-[11px] font-semibold text-ink-300">

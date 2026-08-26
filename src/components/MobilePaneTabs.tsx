@@ -1,3 +1,5 @@
+import CollapsingBar from './CollapsingBar'
+import { useChromeStore } from '../stores/chromeStore'
 import SegmentedToggle, {
   type SegmentedAccent,
   type SegmentedToggleOption,
@@ -31,9 +33,26 @@ export default function MobilePaneTabs<T extends string>({
   accent = 'ink',
 }: MobilePaneTabsProps<T>) {
   return (
-    <div className="shrink-0 border-b border-ink/5 px-2 py-1.5 md:hidden">
-      <SegmentedToggle options={options} value={value} onChange={onChange} accent={accent} dense />
-    </div>
+    // Rolls up while the member scrolls down the pane it switches — the pane
+    // it would switch TO isn't what they're reading, and a scroll back up
+    // hands it straight back.
+    <CollapsingBar className="md:hidden">
+      <div className="border-b border-ink/5 px-2 py-1.5">
+        <SegmentedToggle
+          options={options}
+          value={value}
+          // Switching panes hands the chrome back. The pane you arrive on
+          // starts at the top and may be too short to scroll at all, and
+          // scrolling is the only way to ask for the chrome back.
+          onChange={(next) => {
+            useChromeStore.getState().setHidden(false)
+            onChange(next)
+          }}
+          accent={accent}
+          dense
+        />
+      </div>
+    </CollapsingBar>
   )
 }
 

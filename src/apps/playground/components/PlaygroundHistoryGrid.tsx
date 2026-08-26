@@ -25,6 +25,7 @@ import type { PlaygroundMode, InFlightGen } from '../types'
 import { humanizeError } from '../../../utils/friendlyError'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
 import useNearViewport from '../../../hooks/useNearViewport'
+import CollapsingBar from '../../../components/CollapsingBar'
 export type { InFlightGen }
 
 // List-view size-slider bounds. The raw value drives the slider fill % and the
@@ -163,28 +164,31 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
       {/* Header — card-size slider (list view only) + view switch (Grid / List).
           Matches the prompt panel's h-[57px] mode-toggle bar so the left/right
           tabs sit on the same line. */}
-      <div className="flex h-[57px] shrink-0 items-center justify-end gap-3 border-b border-ink/5 px-4">
-        {viewMode === 'list' && (
-          <div className="flex items-center gap-2.5" title="Card size">
-            <Maximize2 className="h-3.5 w-3.5 text-ink-500" />
-            <input
-              type="range"
-              min={LIST_CARD_MIN}
-              max={LIST_CARD_MAX}
-              step={10}
-              value={listCardHeight}
-              onChange={(e) => setListCardHeight(Number(e.target.value))}
-              className="slider-thin w-28"
-              style={{
-                ['--slider-pct' as string]: `${cardPct}%`,
-                ['--slider-fill' as string]: 'var(--color-playground-500)',
-              }}
-              aria-label="List card size"
-            />
-          </div>
-        )}
-        <ViewToggle value={viewMode} onChange={setViewMode} />
-      </div>
+      {/* Rolls up on a phone while the grid is scrolled — see CollapsingBar. */}
+      <CollapsingBar>
+        <div className="flex h-[57px] shrink-0 items-center justify-end gap-3 border-b border-ink/5 px-4">
+          {viewMode === 'list' && (
+            <div className="flex items-center gap-2.5" title="Card size">
+              <Maximize2 className="h-3.5 w-3.5 text-ink-500" />
+              <input
+                type="range"
+                min={LIST_CARD_MIN}
+                max={LIST_CARD_MAX}
+                step={10}
+                value={listCardHeight}
+                onChange={(e) => setListCardHeight(Number(e.target.value))}
+                className="slider-thin w-28"
+                style={{
+                  ['--slider-pct' as string]: `${cardPct}%`,
+                  ['--slider-fill' as string]: 'var(--color-playground-500)',
+                }}
+                aria-label="List card size"
+              />
+            </div>
+          )}
+          <ViewToggle value={viewMode} onChange={setViewMode} />
+        </div>
+      </CollapsingBar>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
         {visibleInFlight.length > 0 && (

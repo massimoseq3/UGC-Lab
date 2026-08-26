@@ -32,16 +32,21 @@ function PopCard({
   children,
   restClass,
   hoverClass,
+  activeClass,
   delay,
 }: {
   children: React.ReactNode
   restClass: string
   hoverClass: string
+  // The same lift under `:active`. A phone has no hover, so without this the
+  // folder is a still picture there; a tap plays the fan while the download
+  // starts, which is the only confirmation a touch member gets.
+  activeClass: string
   delay: string
 }) {
   return (
     <div
-      className={`absolute z-10 rounded-xl bg-white p-2 shadow-lg shadow-black/25 ring-1 ring-black/[0.06] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${restClass} ${hoverClass}`}
+      className={`absolute z-10 rounded-xl bg-white p-2 shadow-lg shadow-black/25 ring-1 ring-black/[0.06] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${restClass} ${hoverClass} ${activeClass}`}
       style={{ transitionDelay: delay }}
     >
       {children}
@@ -84,7 +89,7 @@ export default function SkillFolder({ fresh = false }: { fresh?: boolean }) {
     <button
       type="button"
       onClick={downloadSkill}
-      className="group relative mx-auto block w-[300px] cursor-pointer select-none outline-none sm:w-[340px]"
+      className="group relative mx-auto block w-full max-w-[300px] cursor-pointer select-none outline-none sm:max-w-[340px]"
       aria-label={`Download the video editor Claude skill, version ${SKILL_VERSION}`}
     >
       {/* Orange halo, brightens and widens on hover */}
@@ -96,7 +101,7 @@ export default function SkillFolder({ fresh = false }: { fresh?: boolean }) {
       {/* Folder stage. The drop-shadow filter hugs the folder shape and carries
           a soft highlight above the top edge (so it stops blending into the
           background) plus a grounded shadow below. */}
-      <div className="relative aspect-[10/7.6] w-full transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-1 [filter:drop-shadow(0_-5px_11px_rgba(0,0,0,0.10))_drop-shadow(0_18px_26px_rgba(0,0,0,0.22))]">
+      <div className="relative aspect-[10/7.6] w-full transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-1 group-active:-translate-y-1 [filter:drop-shadow(0_-5px_11px_rgba(0,0,0,0.10))_drop-shadow(0_18px_26px_rgba(0,0,0,0.22))]">
         {/* Tab, poking up behind the back panel */}
         <div className="absolute left-[6%] top-[5%] h-[13%] w-[34%] rounded-t-[10px] bg-[#EAE7DF]" />
 
@@ -110,6 +115,7 @@ export default function SkillFolder({ fresh = false }: { fresh?: boolean }) {
         <PopCard
           restClass="left-[15%] top-[30%] w-[29%] translate-y-[16%] rotate-0 opacity-0"
           hoverClass="group-hover:-translate-y-[4rem] group-hover:-rotate-[9deg] group-hover:opacity-100"
+          activeClass="group-active:-translate-y-[4rem] group-active:-rotate-[9deg] group-active:opacity-100"
           delay="60ms"
         >
           {/* mini video frame with play button, 16:9 */}
@@ -122,6 +128,7 @@ export default function SkillFolder({ fresh = false }: { fresh?: boolean }) {
         <PopCard
           restClass="left-[37%] top-[26%] w-[27%] translate-y-[16%] rotate-0 opacity-0"
           hoverClass="group-hover:-translate-y-[4.75rem] group-hover:rotate-1 group-hover:opacity-100"
+          activeClass="group-active:-translate-y-[4.75rem] group-active:rotate-1 group-active:opacity-100"
           delay="0ms"
         >
           {/* script card, bold heading over faint lines */}
@@ -132,6 +139,7 @@ export default function SkillFolder({ fresh = false }: { fresh?: boolean }) {
         <PopCard
           restClass="left-[56%] top-[30%] w-[27%] translate-y-[16%] rotate-0 opacity-0"
           hoverClass="group-hover:-translate-y-[4rem] group-hover:rotate-[9deg] group-hover:opacity-100"
+          activeClass="group-active:-translate-y-[4rem] group-active:rotate-[9deg] group-active:opacity-100"
           delay="110ms"
         >
           {/* waveform card */}

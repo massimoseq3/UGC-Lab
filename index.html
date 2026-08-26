@@ -8,7 +8,16 @@
          cold load and decoded to a ~4 MB bitmap for a 20px menu-bar glyph.
          Regenerate with: sips -Z 192 public/logo.png --out public/logo-192.png -->
     <link rel="icon" type="image/png" href="/logo-192.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- maximum-scale=1 is what lets fields render at their designed size on a
+         phone. iOS Safari zooms the page in whenever a focused field's font-size
+         is under 16px and never zooms back out; capping the scale stops that
+         automatic zoom. It does NOT take pinch-zoom away — Safari has ignored
+         scale caps for user-initiated gestures since iOS 10 — so the
+         accessibility escape hatch stays. See the field rule in index.css. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=DM+Sans:wght@500;600;700&family=Fraunces:ital,opsz,wght@1,14..144,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
