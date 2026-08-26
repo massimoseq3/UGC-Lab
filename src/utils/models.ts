@@ -134,6 +134,10 @@ export interface ModelEntry {
   // Undeclared models fall back to UNDECLARED_REFERENCE_VIDEO_CAP. Only set
   // from a documented provider cap — Kling 3.0 Omni takes exactly one.
   maxReferenceVideos?: number
+  // Video-only: how many reference audio clips the model takes in ONE request.
+  // Undeclared models fall back to UNDECLARED_REFERENCE_AUDIO_CAP. Only set
+  // from a documented provider cap — the Wan 3.0 family takes five.
+  maxReferenceAudios?: number
   // Video-only: combined length cap, in seconds, for the reference audio strip
   // and (separately) the reference video strip. Undeclared models fall back to
   // UNDECLARED_REFERENCE_CLIP_SECONDS. Only set from a documented provider cap.
@@ -1154,6 +1158,132 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // pick, but the *default* video model is Grok Imagine 1.5 (below), which
     // does image-to-video and so works everywhere including Animate.
   },
+  // Wan 3.0 / Wan 3.0 Prime — Alibaba Tongyi's all-in-one video model, in two
+  // speed tiers. ONE schema serves both slugs (`wan/3-0-video`,
+  // `wan/3-0-video-prime`): same fields, same caps, same routes — Prime just
+  // renders faster and costs ~1.5x. They are registered as two plain entries
+  // rather than one virtual id with a "fast" toggle, because the member picks a
+  // renderer by name everywhere else in this app and a hidden speed switch
+  // inside one row would be the only exception.
+  //
+  // Unlike Wan 2.7 (two mode-specific slugs behind one virtual id), 3.0 is a
+  // single slug that takes everything: first/last frame, up to 10 reference
+  // images, 5 reference clips, 5 reference audio tracks, and up to 30 seconds
+  // of output with native audio.
+  //
+  // Frames and reference IMAGES are mutually exclusive here — the docs say
+  // reference_image_urls "cannot be used together with first frame / last
+  // frame" — hence `mixedImageInputs: 'exclusive'`, the same contract the
+  // Seedance 2.0 family carries. Reference AUDIO and VIDEO carry no such
+  // restriction and ride along with either group.
+  //
+  // Pricing (kie, user-supplied 2026-08-26, matching kie.ai/pricing):
+  //   Wan 3.0        480P  8/s   · 720P 16/s   · 1080P 32/s    (20% under official)
+  //   Wan 3.0 Prime  480P 12.2/s · 720P 25.2/s · 1080P 50.4/s  (10% under official)
+  // `official` is those same figures lifted back out of kie's own stated
+  // discount (kie / 0.8 and kie / 0.9 respectively) rather than read off
+  // Alibaba's page — kie publishes the gap, not the competitor's rate, and the
+  // pair lands on clean numbers ($0.05/$0.10/$0.20 and $0.068/$0.14/$0.28) which
+  // is what a real list price looks like. Re-verify if kie restates the
+  // discount.
+  //
+  // THE ESTIMATE IS A FLOOR, for the same reason MiniMax H3's and Seedance
+  // 2.5's are: kie bills (input video duration + output duration) x unit
+  // price, so a reference clip is charged as if it were extra output. We can't
+  // know a clip's length at estimate time, and quoting the output seconds
+  // alone is the honest direction to be wrong in for a member who attaches
+  // none. kie's +10% top-up bonus lowers the effective rate another ~10% and
+  // is likewise not modelled — it also moves the real figure down.
+  // Docs: https://docs.kie.ai/market/wan/3-0-video
+  //       https://docs.kie.ai/market/wan/3-0-video-prime
+  {
+    id: 'wan/3-0-video',
+    displayName: 'Wan 3.0',
+    provider: 'Alibaba Tongyi',
+    task: 'video',
+    modes: ['text-to-video', 'image-to-video', 'frames-to-video', 'reference-to-video'],
+    tags: ['new'],
+    supportsReferenceImages: true,
+    maxReferenceImages: 10,
+    mixedImageInputs: 'exclusive',
+    supportsReferenceAudio: true,
+    supportsReferenceVideos: true,
+    maxReferenceVideos: 5,
+    maxReferenceAudios: 5,
+    // Each strip is capped at 15s combined — the same as the app-wide default,
+    // declared anyway so this entry stays right if that default ever moves.
+    maxReferenceClipSeconds: 15,
+    pricing: {
+      unit: 'per-second',
+      credits: 16,
+      priceFor: ({ durationSeconds = 5, resolution = '720p' }) => {
+        const perSec = resolution === '1080p' ? 32 : resolution === '480p' ? 8 : 16
+        return perSec * durationSeconds
+      },
+    },
+    official: {
+      usdFor: ({ durationSeconds = 5, resolution = '720p' }) => {
+        const perSec = resolution === '1080p' ? 0.2 : resolution === '480p' ? 0.05 : 0.1
+        return perSec * durationSeconds
+      },
+      source: KIE_PRICING,
+    },
+    videoEndpoint: 'createTask',
+    videoConstraints: {
+      // The API takes any integer 2-30. This is the app's usual ladder plus the
+      // long tail, matching Seedance 2.5 — the other 30s model in the picker.
+      durations: [4, 5, 6, 8, 10, 12, 15, 20, 25, 30],
+      resolutions: ['480p', '720p', '1080p'],
+      // kie's own default is 1080P; ours is 720p, as everywhere else — 1080p is
+      // 4x the credits of 480p and nobody should land on it without choosing it.
+      default: '720p',
+      // 'adaptive' is deliberately not offered: the constraint-snap effect
+      // resolves an unsupported ratio to aspectRatios[0], so an entry meaning
+      // "let the model decide" would quietly become the answer for every card
+      // that switched onto this model from one with a ratio it doesn't take.
+      aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+      supportsAudio: true,
+    },
+  },
+  {
+    id: 'wan/3-0-video-prime',
+    displayName: 'Wan 3.0 Prime',
+    provider: 'Alibaba Tongyi',
+    task: 'video',
+    modes: ['text-to-video', 'image-to-video', 'frames-to-video', 'reference-to-video'],
+    tags: ['new', 'fast'],
+    supportsReferenceImages: true,
+    maxReferenceImages: 10,
+    mixedImageInputs: 'exclusive',
+    supportsReferenceAudio: true,
+    supportsReferenceVideos: true,
+    maxReferenceVideos: 5,
+    maxReferenceAudios: 5,
+    maxReferenceClipSeconds: 15,
+    pricing: {
+      unit: 'per-second',
+      credits: 25.2,
+      priceFor: ({ durationSeconds = 5, resolution = '720p' }) => {
+        const perSec = resolution === '1080p' ? 50.4 : resolution === '480p' ? 12.2 : 25.2
+        return perSec * durationSeconds
+      },
+    },
+    official: {
+      usdFor: ({ durationSeconds = 5, resolution = '720p' }) => {
+        const perSec = resolution === '1080p' ? 0.28 : resolution === '480p' ? 0.068 : 0.14
+        return perSec * durationSeconds
+      },
+      source: KIE_PRICING,
+    },
+    videoEndpoint: 'createTask',
+    videoConstraints: {
+      durations: [4, 5, 6, 8, 10, 12, 15, 20, 25, 30],
+      resolutions: ['480p', '720p', '1080p'],
+      default: '720p',
+      aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
+      supportsAudio: true,
+    },
+  },
   // Wan 2.7 — Alibaba Tongyi's video suite. kie exposes T2V and I2V as
   // separate slugs; we register one virtual id and resolve to the real slug
   // at generate time via `resolveVideoModelSlug`.
@@ -1392,6 +1522,18 @@ export const UNDECLARED_REFERENCE_VIDEO_CAP = 3
 export function referenceVideoCapacity(modelId?: string): number {
   const model = modelId ? getModel(modelId) : undefined
   return model?.maxReferenceVideos ?? UNDECLARED_REFERENCE_VIDEO_CAP
+}
+
+// The same for the reference AUDIO strip. Three is the Seedance 2 family's
+// documented limit and was hardcoded in Playground's audio strip until the Wan
+// 3.0 family, which takes five — the video strip had already been lifted onto
+// the registry for Kling 3.0 Omni, and a hardcoded number beside a derived one
+// is how the audio strip came to under-offer a model that declared more.
+export const UNDECLARED_REFERENCE_AUDIO_CAP = 3
+
+export function referenceAudioCapacity(modelId?: string): number {
+  const model = modelId ? getModel(modelId) : undefined
+  return model?.maxReferenceAudios ?? UNDECLARED_REFERENCE_AUDIO_CAP
 }
 
 // What happens when a start/end FRAME and REFERENCE images are attached to the
@@ -1981,6 +2123,38 @@ export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<
     }
   }
 
+  // ── Wan 3.0 / Wan 3.0 Prime ──
+  // One body shape, two slugs. Frames and reference IMAGES are mutually
+  // exclusive on this model, so the frames win and the references are dropped —
+  // the more specific instruction survives, and Playground has already named
+  // the drop for the member before the credits go (see mixedImageInputPolicy
+  // 'exclusive'). Reference audio and video carry no such restriction and ride
+  // along with either group.
+  //
+  // Two shapes here are this family's alone: `resolution` is an UPPERCASE tier
+  // ('720P'), and audio is `audio` rather than the Seedance family's
+  // `generate_audio`. Duration is a plain integer 2-30, clamped because a card
+  // persisted under another model can carry an off-grid length (Kling's 3s).
+  // `seed` and `nsfw_checker` are left unsent — kie's own defaults are what we
+  // want, and a seed we don't expose is one we can't let a member reuse.
+  if (modelId === 'wan/3-0-video' || modelId === 'wan/3-0-video-prime') {
+    const startFrame = opts.firstFrameUrl ?? (opts.mode === 'image-to-video' ? opts.imageUrl : undefined)
+    const hasFrame = !!(startFrame || opts.lastFrameUrl)
+    const referenceImages = hasFrame ? [] : (opts.referenceImageUrls ?? [])
+    return {
+      prompt: opts.prompt,
+      ...(startFrame ? { first_frame_url: startFrame } : {}),
+      ...(opts.lastFrameUrl ? { last_frame_url: opts.lastFrameUrl } : {}),
+      ...(referenceImages.length ? { reference_image_urls: referenceImages.slice(0, 10) } : {}),
+      ...(opts.referenceAudioUrls?.length ? { reference_audio_urls: opts.referenceAudioUrls.slice(0, 5) } : {}),
+      ...(opts.referenceVideoUrls?.length ? { reference_video_urls: opts.referenceVideoUrls.slice(0, 5) } : {}),
+      aspect_ratio: ar,
+      duration: Math.min(30, Math.max(2, Math.round(duration))),
+      resolution: resolution === '480p' ? '480P' : resolution === '1080p' ? '1080P' : '720P',
+      audio: opts.audio ?? true,
+    }
+  }
+
   // ── Wan 2.7 ──
   // T2V uses `ratio` (not `aspect_ratio`); I2V infers aspect from the input
   // image and accepts both first_frame_url and last_frame_url.
@@ -2102,12 +2276,24 @@ export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<
   }
 
   // ── Seedance 2.0 family (default) ──
+  // Frames and reference images are 'exclusive' on this family — kie documents
+  // first/last-frame and multimodal reference-to-video as "three mutually
+  // exclusive scenarios [that] cannot be used simultaneously" — so a frame
+  // DROPS the references rather than riding beside them. Playground has already
+  // told the member the frames win by the time this runs; sending both anyway
+  // made that promise false and put a forbidden pair of fields on a run they'd
+  // committed to. The reference images reach here on purpose (the hosting step
+  // deliberately doesn't gate them, because merged-input models need both), so
+  // this is where the policy has to be applied. Reference AUDIO and VIDEO are
+  // not part of the exclusion and ride along with either group.
+  const hasFrame = !!(opts.firstFrameUrl || opts.lastFrameUrl
+    || (opts.imageUrl && opts.mode === 'image-to-video'))
   return {
     prompt: opts.prompt,
     ...(opts.firstFrameUrl ? { first_frame_url: opts.firstFrameUrl } : {}),
     ...(opts.lastFrameUrl ? { last_frame_url: opts.lastFrameUrl } : {}),
     ...(opts.imageUrl && opts.mode === 'image-to-video' ? { first_frame_url: opts.imageUrl } : {}),
-    ...(opts.referenceImageUrls?.length ? { reference_image_urls: opts.referenceImageUrls } : {}),
+    ...(!hasFrame && opts.referenceImageUrls?.length ? { reference_image_urls: opts.referenceImageUrls } : {}),
     ...(opts.referenceAudioUrls?.length ? { reference_audio_urls: opts.referenceAudioUrls } : {}),
     ...(opts.referenceVideoUrls?.length ? { reference_video_urls: opts.referenceVideoUrls } : {}),
     aspect_ratio: ar,

@@ -31,6 +31,7 @@ import {
   videoResolutionLabel,
   snapVideoDuration,
   officialSavingsPercent,
+  referenceAudioCapacity,
   referenceClipCapacitySeconds,
   referenceVideoCapacity,
   type Task,
@@ -311,6 +312,8 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
   // How many clips the video strip accepts — 3 on the Seedance family, exactly
   // 1 on Kling 3.0 Omni, which takes a single source video.
   const refVideoMax = referenceVideoCapacity(state.modelId)
+  // Same for the audio strip — 3 on the Seedance family, 5 on Wan 3.0.
+  const refAudioMax = referenceAudioCapacity(state.modelId)
   // A source clip in the request moves several models onto a different billing
   // tier (Omni's flat per-call rate, Kling 3.0 Omni's higher per-second one).
   // Omni carries its clip in its own slot; every other model uses the shared
@@ -403,7 +406,13 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             (r) => r.slot !== 'omni-character' && r.slot !== 'omni-voice' && r.slot !== 'omni-clip',
           )
         }
-        if (!model?.supportsReferenceAudio) nextRefs = nextRefs.filter((r) => r.slot !== 'audio')
+        if (!model?.supportsReferenceAudio) {
+          nextRefs = nextRefs.filter((r) => r.slot !== 'audio')
+        } else {
+          const audioCap = referenceAudioCapacity(state.modelId)
+          const keptAudio = nextRefs.filter((r) => r.slot === 'audio').slice(0, audioCap)
+          nextRefs = nextRefs.filter((r) => r.slot !== 'audio' || keptAudio.includes(r))
+        }
         if (!model?.supportsReferenceVideos) {
           nextRefs = nextRefs.filter((r) => r.slot !== 'video')
         } else {
@@ -810,7 +819,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                                 kind="audio"
                                 values={mediaStripValues('audio')}
                                 onChange={(v) => setMediaStrip('audio', v)}
-                                max={3}
+                                max={refAudioMax}
                                 maxTotalSeconds={refClipSeconds}
                                 onLimitError={(m) => addToast(m, 'error')}
                               />

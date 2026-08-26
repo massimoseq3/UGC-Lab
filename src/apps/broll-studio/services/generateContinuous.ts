@@ -39,6 +39,8 @@ export const CONTINUOUS_MODEL_IDS = [
   'kling-3.0/video',
   'kling-3.0-omni',
   'grok-imagine-video-1-5-preview',
+  'wan/3-0-video',
+  'wan/3-0-video-prime',
   'wan/2-7',
   'kling/v3-turbo-image-to-video',
   'gemini-omni-video',
