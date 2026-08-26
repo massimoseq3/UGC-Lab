@@ -25,7 +25,7 @@ const SYSTEM_TOKENS: Record<BrollMode, number> = {
   continuous: 4000,
 }
 
-// With Dialogue sends the same base instruction plus the delivery override.
+// Dialogue Clips sends the same base instruction plus the delivery override.
 const DIALOGUE_ADDENDUM_TOKENS = 500
 
 // Typical output size of one unit of work, in tokens.

@@ -517,7 +517,7 @@ export default function InputPanel({
           </div>
 
           {/* Line-by-Line delivery — "B-Roll Clips" keeps every card silent,
-              for a voiceover laid over in the edit; "With Dialogue" makes all
+              for a voiceover laid over in the edit; "Dialogue Clips" makes all
               three the character speaking that line, staged three different
               ways. It's the last row INSIDE the References card, under Visual
               Style: it decides what KIND of storyboard the references above it
@@ -532,7 +532,7 @@ export default function InputPanel({
               column above the References heading.)
               Continuous has no deliveries — it's narration over footage — so
               it isn't rendered there at all. **B-Roll Clips leads the toggle,
-              With Dialogue is still the default**: the order reads left to
+              Dialogue Clips is still the default**: the order reads left to
               right as the plainer thing first, while the default stays on the
               one most members are here to make. Position and default are
               separate here on purpose — don't "fix" one to match the other. */}
@@ -547,7 +547,7 @@ export default function InputPanel({
               // picked here rather than as a third piece of vocabulary.
               options={[
                 { value: 'silent', label: 'B-Roll Clips', icon: Film },
-                { value: 'dialogue', label: 'With Dialogue', icon: MessageSquareQuote },
+                { value: 'dialogue', label: 'Dialogue Clips', icon: MessageSquareQuote },
               ]}
             />
           )}

@@ -58,7 +58,7 @@ function isAdBlueprint(raw: unknown): raw is AdBlueprintPayload {
 // sanitize only sees its OWN value, and the delivery toggle needs this one: a
 // member left mid-session while Dialogue was briefly its own mode has
 // `:mode === 'dialogue'` and a `:lineDelivery` that predates it, so reading the
-// mode back is the only way they reopen in With Dialogue rather than silently
+// mode back is the only way they reopen in Dialogue Clips rather than silently
 // losing the delivery they were working in.
 function readPersistedMode(baseKey: string): string {
   try {

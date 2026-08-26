@@ -179,7 +179,7 @@ export default function ScenesView({
   )
 
   // ─── Dialogue chain ────────────────────────────────────────────────────
-  // In "With Dialogue" delivery each scene carries one talking-to-camera card,
+  // In "Dialogue Clips" delivery each scene carries one talking-to-camera card,
   // and those cards chain: card N generates with card N-1's chosen still
   // attached, so the whole ad reads as one continuous piece to camera cut into
   // pieces rather than a new setup every line. Resolved here (the parent owns
@@ -373,7 +373,7 @@ export default function ScenesView({
     }
   }
   // Auto is only on this menu when some card in the storyboard speaks its line —
-  // i.e. this is a With Dialogue session. A silent b-roll run has no words to
+  // i.e. this is a Dialogue Clips session. A silent b-roll run has no words to
   // fit anywhere in it, so the run pins one length exactly as it did before Auto
   // existed. Derived from the storyboard rather than from the ticked targets, so
   // the chip doesn't change shape as options are scoped in and out.
@@ -1130,7 +1130,7 @@ export default function ScenesView({
                       render={videoResolutionLabel}
                     />
                   )}
-                  {/* Clip length. On a With Dialogue storyboard it defaults to
+                  {/* Clip length. On a Dialogue Clips storyboard it defaults to
                       Auto — one length per spoken line rather than one length
                       for the whole run — and the trigger reads back the run's
                       real spread ("Auto · 5–10s"), since every one of those
@@ -1621,7 +1621,7 @@ function SceneSection({
       {/* The scene's variations plus the Add-option card across one row at xl —
           the Add card is just another cell in the grid. Both deliveries are three
           variations (a four-column row); a scene that carries four — an added
-          option, or a session generated back when With Dialogue emitted a fourth
+          option, or a session generated back when Dialogue Clips emitted a fourth
           card — runs five wide rather than wrapping the Add card onto a line of
           its own. */}
       <div className={`grid grid-cols-2 gap-3 md:grid-cols-3 ${scene.variations.length >= 4 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
