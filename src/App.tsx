@@ -132,28 +132,26 @@ function Workspace() {
         <MenuBar />
         <Dock />
 
-        {/* macOS-style app "window": a rounded, bordered frame floating between
-            the menu bar and the dock, desktop gradient peeking around it. App
-            chrome clips at the window edge instead of ending in a hard line
-            against the dock gutter. */}
-        {/* NO `backdrop-blur` on this frame, deliberately (August 2026).
-            It carried `backdrop-blur-xl` and it was the most expensive thing in
-            the app for the least return. What sits behind it is `AppBackground`
-            — a smooth near-black radial gradient with ±3 levels of dither —
-            and blurring a smooth gradient gives you back the same gradient, so
-            the blur was invisible. What it cost was not: a `backdrop-filter`
-            element is a backdrop root, and a repaint ANYWHERE inside it
-            invalidates the whole backdrop. This frame contains the entire
-            workspace, so every animating pixel in every app — a dozen
-            generating tiles during a B-Roll batch especially — dragged a
-            full-viewport filter recompute behind it. That surfaced as laggy
-            generation animations, laggy zoom (a zoom re-rasters everything, the
-            backdrop included), and images going blocky, since a browser under
-            that much compositing pressure drops its raster scale. The frame is
-            a plain translucent fill now and looks the same.
-            Glass belongs on small, static chrome over real content (B-Roll's
-            pinned storyboard strips), not on a full-window container. */}
-        <div className="absolute inset-x-2 bottom-[108px] top-11 overflow-hidden rounded-2xl border border-ink/10 bg-surface-0/60 shadow-2xl shadow-black/25 md:inset-x-3">
+        {/* The workspace pane. It was a macOS-style floating "window" — a
+            rounded, bordered, translucent frame with the desktop gradient
+            peeking around it — until August 2026, when the frame came off:
+            it fills the space between the menu bar and the dock flush now, so
+            every app gets the full width and nothing draws a box around them.
+            Keep `overflow-hidden` (app chrome still clips to the pane) and the
+            bottom inset (the dock floats over that strip; content underneath
+            it would be unreachable). NO `backdrop-blur` here, deliberately:
+            a `backdrop-filter` element is a backdrop root, and a repaint
+            ANYWHERE inside it invalidates the whole backdrop. This pane
+            contains the entire workspace, so every animating pixel in every
+            app — a dozen generating tiles during a B-Roll batch especially —
+            dragged a full-viewport filter recompute behind it. That surfaced
+            as laggy generation animations, laggy zoom (a zoom re-rasters
+            everything, the backdrop included), and images going blocky, since
+            a browser under that much compositing pressure drops its raster
+            scale. Glass belongs on small, static chrome over real content
+            (B-Roll's pinned storyboard strips), not on a full-window
+            container. */}
+        <div className="absolute inset-x-0 bottom-[108px] top-9 overflow-hidden">
           {/* Empty state — visible when no app is active */}
           <div
             className={`absolute inset-0 ${
