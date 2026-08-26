@@ -5,10 +5,8 @@ import GenerationProgress from '../../../components/GenerationProgress'
 import ClearAllButton from '../../../components/ClearAllButton'
 import BatchCountStepper from '../../../components/BatchCountStepper'
 import { clampBatchCount } from '../../../utils/batchCount'
-import { estimateCredits, formatCredits, getModel } from '../../../utils/models'
-import { TTS_MODEL_ID } from '../services/generateVoice'
-
-const MODEL_NAME = getModel(TTS_MODEL_ID)?.displayName ?? 'Gemini 3.1 Flash TTS'
+import { estimateCredits, formatCredits, getDefaultModel, TTS_MODEL_PRO, TTS_MODEL_SLOT } from '../../../utils/models'
+import { useSettingsStore } from '../../../stores/settingsStore'
 
 const MAX_CHARACTERS = 5000
 
@@ -58,13 +56,19 @@ export default function EditorArea({
 }: EditorAreaProps) {
   const charCount = scriptText.length
   const overLimit = charCount > MAX_CHARACTERS
-  // Gemini 3.1 Flash TTS bills by tokens; we estimate from the script's char
-  // count (see geminiTtsCredits in models.ts). Show the estimate on the Generate
-  // button so cost is visible before spending.
+  // The model the left panel's picker is on — read THROUGH the selector, never
+  // by calling a getter pulled out of the store (see the React Compiler note in
+  // CLAUDE.md), so the price follows a swap. Falls back the same way
+  // resolveTtsModel does, so the button quotes what the run will actually cost.
+  const pickedModel = useSettingsStore((s) => s.getAppModel(TTS_MODEL_SLOT))
+  const modelId = pickedModel ?? getDefaultModel('voice-studio', 'tts')?.id ?? TTS_MODEL_PRO
+  // Gemini TTS bills by tokens; we estimate from the script's char count (see
+  // geminiTtsCredits in models.ts). Show the estimate on the Generate button so
+  // cost is visible before spending.
   const count = clampBatchCount(batchCount, VOICE_BATCH_MAX)
   // TTS is billed per call, so a run of N is N times one read.
   const creditsFor = (n: number) => {
-    const one = estimateCredits(TTS_MODEL_ID, { charCount })
+    const one = estimateCredits(modelId, { charCount })
     return one === null ? null : one * n
   }
   const creditsLabel = charCount > 0 ? formatCredits(creditsFor(count)) : null
@@ -233,22 +237,17 @@ export default function EditorArea({
           </div>
         </div>
 
-        {/* Right — character count, with the model name stacked under it. The
-            model used to be a bordered pill beside Generate, which cost a whole
-            slot in the button's own row to say something that never changes
-            (there is one TTS model). Stacked here it reads as the fine print
-            under the count, the same way a resolution pill sits beside a model
-            elsewhere — and the footer keeps one row on a laptop instead of
-            wrapping. The word "characters" and the model line are both
-            desktop-only: on a phone either one wraps to a second line beside
-            the button. */}
-        <div className="flex shrink-0 flex-col items-end gap-0.5">
+        {/* Right — the character count, and only that. The model name used to
+            sit stacked under it as fine print; the left panel's picker names it
+            now, at the top of the settings it belongs to, and one footer saying
+            it twice is one too many. The word "characters" stays desktop-only:
+            on a phone it wraps to a second line beside the button. */}
+        <div className="flex shrink-0 items-center">
           <div className={`text-sm tabular-nums ${overLimit ? 'text-red-400 light:text-red-600' : 'text-ink-400'}`}>
             <span className={overLimit ? 'text-red-300 light:text-red-700' : 'text-ink-200'}>{charCount.toLocaleString()}</span>
             <span className="text-ink-500"> / {MAX_CHARACTERS.toLocaleString()}</span>
             <span className="hidden text-ink-500 md:inline"> characters</span>
           </div>
-          <div className="hidden text-[11px] font-medium text-ink-500 md:block">{MODEL_NAME}</div>
         </div>
       </div>
     </div>

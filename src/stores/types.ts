@@ -201,10 +201,14 @@ export interface VideoHistoryItem {
 
 export interface VoiceHistoryItem {
   id: string
+  // Which TTS model read it. Optional because rows written before Voiceovers
+  // had a model picker carry none — those are all Gemini 3.1 Flash TTS, which
+  // is what the usage ledger falls back to.
+  modelId?: string
   voiceId: string
   voiceName: string
   gender?: 'Female' | 'Male'
-  // Gemini 3.1 Flash TTS delivery params (see voice-studio/types.ts).
+  // Gemini TTS delivery params (see voice-studio/types.ts).
   style: string
   pace: string
   accent: string

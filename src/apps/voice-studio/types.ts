@@ -223,6 +223,8 @@ export function settingsFromPreset(preset: {
 
 export interface HistoryItem {
   id: string
+  // The TTS model this read was generated with (see stores/types.ts).
+  modelId?: string
   voiceId: string
   voiceName: string
   gender?: Gender

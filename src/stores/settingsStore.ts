@@ -3,7 +3,7 @@ import { saveProfile } from '../lib/cloudSync'
 import { isCloudEnabled } from '../lib/supabase'
 import { useAuthStore } from './authStore'
 import { useAppStore } from './appStore'
-import { getModel, getDefaultModel, CHAT_MODEL_DEFAULT } from '../utils/models'
+import { getModel, getDefaultModel, CHAT_MODEL_DEFAULT, TTS_MODEL_PRO, TTS_MODEL_SLOT } from '../utils/models'
 
 const STORAGE_KEY = 'ai-ugc-lab-settings'
 
@@ -513,5 +513,17 @@ export function resolveScriptModel(appId: ScriptModelApp): string {
     useSettingsStore.getState().getAppModel(scriptModelSlot(appId)) ??
     getDefaultModel(appId, 'chat')?.id ??
     CHAT_MODEL_DEFAULT
+  )
+}
+
+// Which TTS model reads the script in Voiceovers. Same shape as the pair above:
+// the member's pick if there is one, otherwise the app's own registry default.
+// Nothing writes the default into the slot, so an empty slot follows
+// `defaultFor` and a stored id is always a deliberate pick.
+export function resolveTtsModel(): string {
+  return (
+    useSettingsStore.getState().getAppModel(TTS_MODEL_SLOT) ??
+    getDefaultModel('voice-studio', 'tts')?.id ??
+    TTS_MODEL_PRO
   )
 }

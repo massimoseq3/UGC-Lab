@@ -26,6 +26,12 @@ import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersisted
 interface InFlightVoice {
   id: string
   taskId: string
+  // The TTS model this task was submitted against — snapshotted rather than
+  // re-resolved on resume, so a task that outlives a model swap still finishes
+  // (and is priced) as the model that actually ran it. Optional: entries
+  // persisted before the picker shipped carry none, and finishVoiceTask defaults
+  // those to the model they were all fired with.
+  modelId?: string
   settings: VoiceSettings
   scriptText: string
   startedAt: number
@@ -137,7 +143,7 @@ export default function VoiceStudio() {
   const finishVoice = async (entry: InFlightVoice) => {
     setError(null)
     try {
-      const item = await finishVoiceTask(entry.taskId, entry.settings, entry.scriptText)
+      const item = await finishVoiceTask(entry.taskId, entry.settings, entry.scriptText, entry.modelId)
       addVoiceHistory(item)
       setActivePlayerItem(item)
       refreshCredits()
@@ -181,9 +187,11 @@ export default function VoiceStudio() {
     setError(null)
 
     let taskId: string
+    let modelId: string
     try {
       const start = await startVoiceTask(settings, scriptText)
       taskId = start.taskId
+      modelId = start.modelId
     } catch (err) {
       const msg = humanizeError(err, 'Audio generation failed. Check your API key and try again.')
       setError(msg)
@@ -195,6 +203,7 @@ export default function VoiceStudio() {
     const entry: InFlightVoice = {
       id: crypto.randomUUID(),
       taskId,
+      modelId,
       settings,
       scriptText,
       startedAt: Date.now(),

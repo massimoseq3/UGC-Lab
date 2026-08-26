@@ -5,7 +5,7 @@ import { useAuthStore } from './authStore'
 import { isCloudEnabled } from '../lib/supabase'
 import { saveRow, deleteRow, recordPendingUpsert, recordPendingDelete, clearPending, scheduleOutboxDrain, type BankKey } from '../lib/cloudSync'
 import { useAppStore } from './appStore'
-import { estimateCredits, estimateOfficialUsd, estimateMarketUsd, creditsToUsd, TTS_MODEL_ID, type CostEstimateParams } from '../utils/models'
+import { estimateCredits, estimateOfficialUsd, estimateMarketUsd, creditsToUsd, TTS_MODEL_FLASH, type CostEstimateParams } from '../utils/models'
 import { usageDayId } from '../utils/usage'
 import { readBanks, writeBanks, clearBanks, readLegacySync, dropLegacy } from '../utils/bankPersist'
 
@@ -950,7 +950,10 @@ export const useBankStore = create<BankState>((set, get) => ({
       return next
     })
     pushRow('voiceHistory', item)
-    get().recordUsage({ kind: 'voice', modelId: TTS_MODEL_ID, params: { charCount: item.scriptText.length } })
+    // Rows written before Voiceovers had a model picker carry no modelId — they
+    // are all Gemini 3.1 Flash TTS. (Both TTS models share one rate card, so the
+    // fallback can't skew the ledger either way; it keeps the row honest.)
+    get().recordUsage({ kind: 'voice', modelId: item.modelId ?? TTS_MODEL_FLASH, params: { charCount: item.scriptText.length } })
   },
 
   deleteVoiceHistory: async (id) => {
@@ -1410,7 +1413,7 @@ export function backfillUsageLedger(): void {
   }
   for (const h of s.voiceHistory) {
     if (mockVoice.has(h.id)) continue
-    events.push({ kind: 'voice', modelId: TTS_MODEL_ID, at: h.createdAt, params: { charCount: h.scriptText?.length ?? 0 } })
+    events.push({ kind: 'voice', modelId: h.modelId ?? TTS_MODEL_FLASH, at: h.createdAt, params: { charCount: h.scriptText?.length ?? 0 } })
   }
   for (const h of s.musicHistory) {
     if (mockMusic.has(h.id)) continue
