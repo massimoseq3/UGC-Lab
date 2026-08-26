@@ -12,6 +12,13 @@ import { useKeyConnect } from './ApiKeyGuide'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useBackdropClose } from '../hooks/useBackdropClose'
 
+// NO EM DASHES IN THIS SCREEN'S COPY. Massimo's call (August 2026): this is
+// the introduction, and it should read like someone talking rather than like
+// something written. Use a comma, a colon or a full stop. It applies to every
+// string this file RENDERS, which includes the team blurbs in utils/team.ts —
+// they surface here and nowhere else. Comments are prose about the code and
+// are not covered.
+//
 // "Meet the team" — the first thing a new member sees. Auto-opens once per
 // browser (appStore.teamIntroOpen), reopenable from the wordmark.
 //
@@ -38,7 +45,7 @@ const SERIF = { fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', ser
 // Outliers made nine).
 const TEAM_COUNT_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
 const teamCountWord = TEAM_COUNT_WORDS[TEAM.length] ?? String(TEAM.length)
-const DEFAULT_CAPTION = `${teamCountWord[0].toUpperCase()}${teamCountWord.slice(1)} teammates, one workspace — and everything they make lands in the shared Bank.`
+const DEFAULT_CAPTION = `${teamCountWord[0].toUpperCase()}${teamCountWord.slice(1)} teammates, one workspace, and everything they make lands in the shared Bank.`
 
 // The Create chain, in dock order. Category comes from constants.ts so this
 // can't drift if an app moves group.
@@ -213,7 +220,7 @@ function CrewCard({
       onClick={() => onVisit(member.appId)}
       onMouseEnter={() => onHover(member)}
       onFocus={() => onHover(member)}
-      title={`Open ${app.name} — ${member.blurb}`}
+      title={`Open ${app.name}: ${member.blurb}`}
       // --tint is the accent at 10%: each teammate's colour appears on demand
       // instead of eight competing swatches at rest.
       style={{ '--tint': `${app.accent}1A` } as CSSProperties}
@@ -254,7 +261,7 @@ function KeyBlock() {
           <p className="mt-0.5 text-[11.5px] leading-snug text-ink-500">
             {done
               ? 'Top up anytime via Get Credits in the menu bar.'
-              : 'Every generation runs on your own key. Stored only in this browser — do not share it with anyone.'}
+              : 'Every generation runs on your own key. Stored only in this browser, and never shared with anyone.'}
           </p>
         </div>
         {!done && (
@@ -282,7 +289,7 @@ function KeyBlock() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter') connect()
               }}
-              placeholder="Paste your key — sk-..."
+              placeholder="Paste your key (sk-...)"
               className="w-full rounded-full border border-ink/10 bg-ink/5 py-2 pl-4 pr-10 text-[13px] text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
             />
             <button

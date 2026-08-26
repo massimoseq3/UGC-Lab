@@ -54,7 +54,7 @@ export const TEAM: TeamMember[] = [
     appId: 'playground',
     name: 'Sebastian',
     role: 'Creative Director',
-    blurb: 'The do-anything senior — freeform images, video and music on demand.',
+    blurb: 'The do-anything senior for freeform images, video and music on demand.',
     roleColor: '#1FA08C',
   },
   {

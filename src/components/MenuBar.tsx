@@ -6,7 +6,6 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { useCreditsStore } from '../stores/creditsStore'
 import { useBankStore } from '../stores/bankStore'
 import { useThemeStore, type ThemePref } from '../stores/themeStore'
-import { useChromeHidden } from '../stores/chromeStore'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import { getAppConfig, SKOOL_COMMUNITY_URL } from '../utils/constants'
 import { computeUsageMetrics } from '../utils/usage'
@@ -23,15 +22,9 @@ export default function MenuBar() {
   const activeApp = useAppStore((s) => s.activeApp)
   const openTeamIntro = useAppStore((s) => s.openTeamIntro)
   const appName = activeApp ? getAppConfig(activeApp)?.name : null
-  // Phone only: rides up out of the way while the member scrolls down.
-  const chromeHidden = useChromeHidden()
 
   return (
-    <header
-      className={`fixed inset-x-0 top-0 z-40 flex h-9 select-none items-center gap-2 border-b border-ink/5 bg-surface-1/75 px-3 backdrop-blur-2xl transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] light:bg-white/75 md:translate-y-0 ${
-        chromeHidden ? '-translate-y-full' : 'translate-y-0'
-      }`}
-    >
+    <header className="fixed inset-x-0 top-0 z-40 flex h-9 select-none items-center gap-2 border-b border-ink/5 bg-surface-1/75 px-3 backdrop-blur-2xl light:bg-white/75">
       {/* Brand doubles as the "About" menu — clicking it reopens the Meet
           the Team intro (macOS: Apple menu → About This Mac). */}
       <button

@@ -703,6 +703,19 @@ async function grabFrameToDisk(video: HTMLVideoElement, fileName: string): Promi
   }
 }
 
+// The scroll port a set of sections lives in. It is the read column on a
+// desktop and the whole results pane on a phone, and an IntersectionObserver
+// rooted on a box that isn't the one scrolling reports every section as
+// intersecting at once, which pins the jump toggle to "Breakdown" for the
+// length of the read.
+function nearestScrollParent(el: HTMLElement | null): HTMLElement | null {
+  for (let node = el?.parentElement ?? null; node; node = node.parentElement) {
+    const overflowY = getComputedStyle(node).overflowY
+    if (overflowY === 'auto' || overflowY === 'scroll') return node
+  }
+  return null
+}
+
 function FrameGrabButton({
   videoRef,
   fileName,
@@ -766,7 +779,6 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
   // Native controls, but the same app-wide rule: one clip plays at a time.
   const sourceVideo = useExclusiveVideo()
 
-  const scrollRef = useRef<HTMLDivElement>(null)
   const breakdownRef = useRef<HTMLDivElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const scenesRef = useRef<HTMLDivElement>(null)
@@ -783,7 +795,10 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
   // Scroll-spy — keep the toggle in sync with whichever section sits near the
   // top of the scroll viewport, whether reached by tap or by manual scroll.
   useEffect(() => {
-    const root = scrollRef.current
+    // The scroll port is the read column on a desktop and the whole results
+    // pane on a phone, so it's found rather than named — an observer rooted on
+    // a box that isn't scrolling reports every section as visible at once.
+    const root = nearestScrollParent(breakdownRef.current)
     if (!root) return
     const els = [breakdownRef.current, transcriptRef.current, scenesRef.current].filter(Boolean) as HTMLElement[]
     if (els.length === 0) return
@@ -802,7 +817,13 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
   }, [hasMedia])
 
   return (
-    <div className="flex flex-col md:flex-row h-full overflow-hidden">
+    // One scroller on a phone, two columns on a desktop. The ad used to be a
+    // fixed 38dvh block with the read scrolling in the ~55% left under it —
+    // two thirds of a phone screen spent on a player you have already watched,
+    // and the thing you came to read moving through a slot. Stacked in one
+    // scroll the ad is simply the top of the page: it scrolls away, and the
+    // breakdown gets the whole screen.
+    <div className="flex h-full flex-col overflow-y-auto md:flex-row md:overflow-hidden">
       {/* The ad itself — right column on desktop, top of the stack on phones.
           It stays FIRST in the DOM and moves with `md:order-2`, because the
           reading order the two layouts want is different: on a phone the ad is
@@ -812,7 +833,7 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
       {hasMedia && (
         // max-h on phones: a portrait video would otherwise fill the whole
         // stacked column and leave no room for the scorecard below.
-        <div className="flex max-h-[38dvh] md:order-2 md:h-full md:max-h-none w-full md:w-1/3 shrink-0 flex-col border-b md:border-b-0 md:border-l border-ink/5 min-h-0">
+        <div className="flex w-full shrink-0 flex-col border-b border-ink/5 max-md:max-h-[70dvh] md:order-2 md:h-full md:min-h-0 md:w-1/3 md:border-b-0 md:border-l">
           {/* The file's own header band, at the shared h-[57px] panel-header
               height with the same hairline under it, so the line the rail and
               the results column already draw carries straight across all three
@@ -869,8 +890,11 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
           sticky bought nothing but the chance to come loose from the edge on
           the way back up a long read (the app-wide rule in the root
           CLAUDE.md). Outside the scroller it can't move by construction. */}
-      <div className="flex min-h-0 flex-1 flex-col md:order-1">
-        <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 bg-surface-0 px-5">
+      <div className="flex min-h-0 flex-1 flex-col max-md:flex-none md:order-1">
+        {/* Sticky on a phone, where this bar really does scroll away and come
+            back — which is the one case the app-wide rule keeps `sticky` for.
+            Opaque, never glass: a backdrop-filter bar lags its own scroller. */}
+        <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 bg-surface-0 px-5 max-md:sticky max-md:top-0 max-md:z-20">
           <SegmentedToggle<SectionKey>
             className="h-10 !p-1"
             value={active}
@@ -885,7 +909,7 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
 
         {/* min-h-0: in the phones' stacked column the scroller must be allowed
             to shrink below its content, or it clips instead of scrolling. */}
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 md:overflow-y-auto">
           <div className="flex flex-col gap-5 p-5">
             {/* When the media column is hidden, surface the filename so there's
                 still an anchor with no media. */}

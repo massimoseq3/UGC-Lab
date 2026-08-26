@@ -823,7 +823,7 @@ export default function ScenesView({
             animate pass, then videos, then the export. Same shape and styling
             as Continuous' top strip. One line from md up; below it they wrap
             rather than clipping the last button. */}
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 whitespace-nowrap md:flex-nowrap">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 whitespace-nowrap md:shrink-0 md:flex-nowrap">
           <button
             type="button"
             onClick={() => requestBatch(allKeys, 'All scenes', true)}

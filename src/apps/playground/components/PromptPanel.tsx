@@ -676,7 +676,9 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
       onDragOver={(e) => { e.preventDefault(); if (state.mode !== 'music') setDragOver(true) }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
-      className={`relative flex h-full flex-col transition-colors ${
+      /* On a phone the WHOLE panel is one scroller and the Generate band is
+         simply the last thing in it — see the note on the band below. */
+      className={`relative flex h-full flex-col transition-colors max-md:overflow-y-auto ${
         dragOver ? 'bg-playground-500/[0.04]' : ''
       }`}
     >
@@ -690,9 +692,12 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
         />
       </div>
 
-      {/* Middle: scrollable body — model picker, preset, refs, prompt. */}
-      <div className="relative min-h-0 flex-1 overflow-hidden">
-        <div className="flex h-full flex-col overflow-y-auto">
+      {/* Middle: scrollable body — model picker, preset, refs, prompt. On a
+          phone it stops being a scroller of its own and just grows: the panel
+          root above scrolls instead, so the inputs and the Generate band are
+          one page rather than a short window with a bar parked under it. */}
+      <div className="relative min-h-0 flex-1 overflow-hidden max-md:flex-none max-md:overflow-visible">
+        <div className="flex h-full flex-col overflow-y-auto max-md:h-auto max-md:overflow-visible">
           {/* `min-h-full`, not `h-full`. Both make the column at least the port,
               so the prompt box below still has a ceiling to shrink against and
               `grow` still fills a short panel — but `h-full` also made it at
@@ -705,7 +710,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               `min-h-full` the column grows, this scroller scrolls, and the box
               simply sits at its own 206px floor. Same rule on a phone, so the
               `max-md` override is gone with it. */}
-          <div className="flex min-h-full min-w-0 flex-col gap-2 px-5 pb-0 pt-3">
+          <div className="flex min-h-full min-w-0 flex-col gap-2 px-5 pb-0 pt-3 max-md:min-h-0">
             {/* Model picker now lives in the footer, above the output-settings
                 pills (see below) — the scrollable body opens straight into the
                 reference inputs. */}
@@ -1098,6 +1103,12 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
           rhythm Scripts and B-Roll run on — and 8px from the scrolling column
           above, which is this band's own `pt-2` rather than the column's
           padding: padding inside a scroller scrolls away with the content. */}
+      {/* Not pinned on a phone (August 2026, Massimo's call): a fixed band cost
+          ~180px of a ~700px column — the picker row, the settings pills and a
+          54px button, all of it standing over the fields it belongs to — and
+          the flow it protected wasn't worth it. You fill the form top to
+          bottom, and Generate is where you arrive. It stays pinned from `md`
+          up, where the column has the height to spare. */}
       <div className="shrink-0 px-5 pb-3 pt-2">
         {/* Model — video uses the slide-in side panel (matching B-Roll); image
             keeps the inline dropdown (which auto-opens upward here). Music's

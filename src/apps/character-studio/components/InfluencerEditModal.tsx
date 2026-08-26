@@ -548,16 +548,20 @@ export default function InfluencerEditModal({
       </button>
 
       <div
-        className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-ink/10 bg-surface-0 shadow-2xl"
+        className="flex h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-ink/10 bg-surface-0 shadow-2xl max-md:h-[calc(100dvh-1rem)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Body — 50/50 grid; each column scrolls. */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-2">
+        {/* One scroller on a phone, two columns on a desktop. Stacked, the two
+          halves used to be a pair of ~45dvh scroll windows — the workspace in
+          one slot and its own outputs in another, neither tall enough to work
+          in. Now the modal is one page: the setup, then what it made. */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-2 md:overflow-hidden">
           {/* LEFT — scrollable body (model + refs/prompt) over a pinned footer
               (output settings + Generate), mirroring the Playground panel. */}
-          <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 md:border-b-0 md:border-r">
+          <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 max-md:shrink-0 md:border-b-0 md:border-r">
             {/* Scrollable body */}
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <div className="flex min-h-0 flex-1 flex-col max-md:flex-none md:overflow-y-auto">
             {/* One body for BOTH output kinds. The footer toggle picks what
                 gets generated — an edited portrait or a character sheet — it
                 does not swap the panel, so the references, visual style, and
@@ -879,7 +883,7 @@ export default function InfluencerEditModal({
               now (`grid-cols-2`), landscapes span the row in both, and the day
               pills below are that gallery's too, so a lineage that ran across
               several days reads here the same way it does out there. */}
-          <div className="col-span-1 flex min-h-0 flex-col overflow-y-auto">
+          <div className="col-span-1 flex min-h-0 flex-col max-md:shrink-0 md:overflow-y-auto">
             <div className="px-4 py-4">
               {lineageInFlight.length > 0 && (
                 <>

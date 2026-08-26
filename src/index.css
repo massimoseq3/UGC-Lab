@@ -5,6 +5,20 @@
    only when a token flip can't express the difference. */
 @custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
 
+/* A device with no hover — a phone or a tablet. The app is full of affordances
+   that only appear on `group-hover`: the action stack on every media tile
+   (Download / Save to bank / Copy / Delete), the remove button on a reference
+   thumbnail, the row actions in the Voiceovers and Bank lists. On a touch
+   screen those are not hard to find, they are IMPOSSIBLE to reach — there is no
+   pointer to hover with, and a tap goes to whatever the tile itself does. So
+   anything hover reveals must also be revealed by `touch:`.
+
+   `(hover: none)` and not `(pointer: coarse)`: a laptop with a touchscreen is
+   still a hover device and should keep the clean fade, and a phone in desktop
+   width (a big tablet in landscape) still can't hover. It is a property of the
+   input, not of the viewport, which is also why this is NOT `max-md:`. */
+@custom-variant touch (@media (hover: none));
+
 /* The shared soft drop shadow — tuned for light mode where elements need to
    lift off the page. Used by cards and primary CTAs so they stay in sync. */
 :root {
@@ -753,9 +767,11 @@ textarea,
   transform: scale(1.15);
 }
 
-/* Fields render a step up from the app's chrome type on a phone — 14px, not
-   the 12–13px a control wears on a desktop, because that is genuinely too
-   small to type into with a thumb.
+/* A floor, not a size: nothing on a phone renders SMALLER than the app's own
+   field type (13px, what a ChipField or a prompt box wears on a desktop), and
+   nothing renders bigger than it either. The rule only lifts the 11–12px
+   controls — compact chips, inline rows — to something you can hit and read
+   with a thumb.
 
    It used to be 16px, and 16 was never a design choice: iOS Safari zooms the
    whole page in whenever a focused field's font-size is under 16px and does
@@ -767,14 +783,13 @@ textarea,
    held off by `maximum-scale=1` in index.html instead — a viewport cap, not a
    type size — which leaves pinch-zoom intact.
 
-   So: don't shrink this below 14px (a phone is not a desktop), and don't put
-   it back to 16px without also taking the viewport cap out — the two are one
-   fix and they only work together. Range inputs are excluded: they carry no
-   text and the rule would resize the slider tracks. */
+   So: don't put this back to 16px without also taking the viewport cap out —
+   the two are one fix and they only work together. Range inputs are excluded:
+   they carry no text and the rule would resize the slider tracks. */
 @media (max-width: 767px) {
   input:not([type='range']),
   textarea,
   select {
-    font-size: 14px;
+    font-size: 13px;
   }
 }

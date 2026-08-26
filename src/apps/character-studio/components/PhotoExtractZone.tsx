@@ -22,14 +22,18 @@ interface PhotoExtractZoneProps {
 //
 // No count rides alongside it: this row shares a half-width column with the
 // preset picker, and a badge here truncated the label that explains the drop.
-function LibraryButton({ onClick }: { onClick: () => void }) {
+// The chevron into the reference library. It takes a `className` so the row can
+// drop it where it can't afford the width: the ROW itself opens the library on
+// the same handler, so this is a second door to the same place — and on a phone
+// those 24px were the difference between "Extract DNA" and "Extract D…".
+function LibraryButton({ onClick, className = '' }: { onClick: () => void; className?: string }) {
   return (
     <button
       type="button"
       onClick={(e) => { e.stopPropagation(); onClick() }}
       title="Reference photos"
       aria-label="Open reference photos"
-      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-200"
+      className={`h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-200 ${className || 'flex'}`}
     >
       <ChevronRight className="h-4 w-4" strokeWidth={2} />
     </button>
@@ -97,7 +101,7 @@ export default function PhotoExtractZone({
             />
           )}
         </div>
-        <LibraryButton onClick={onOpenLibrary} />
+        <LibraryButton onClick={onOpenLibrary} className="hidden lg:flex" />
       </div>
     )
   }
@@ -132,7 +136,7 @@ export default function PhotoExtractZone({
         >
           <X className="h-3.5 w-3.5" />
         </button>
-        <LibraryButton onClick={onOpenLibrary} />
+        <LibraryButton onClick={onOpenLibrary} className="hidden lg:flex" />
       </div>
     )
   }
@@ -161,9 +165,16 @@ export default function PhotoExtractZone({
         {/* 13px — the B-Roll reference-row title size, matching the preset
             button beside it. No hint line: the title says it. */}
         <div className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-300">
-          {dragOver ? 'Drop to extract DNA' : 'Extract Character DNA'}
+          {dragOver ? (
+            'Drop to extract DNA'
+          ) : (
+            <>
+              <span className="lg:hidden">Extract DNA</span>
+              <span className="hidden lg:inline">Extract Character DNA</span>
+            </>
+          )}
         </div>
-        <LibraryButton onClick={onOpenLibrary} />
+        <LibraryButton onClick={onOpenLibrary} className="hidden lg:flex" />
       </div>
 
       {extractError && (

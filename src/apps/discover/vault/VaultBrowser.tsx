@@ -16,6 +16,7 @@ import {
 } from './service'
 import { ALL_HOOKS } from './types'
 import type { ResolvedVideo, VaultFilters, VaultItem, VaultSort } from './types'
+import CollapsingBar from '../../../components/CollapsingBar'
 
 /**
  * How many cards reach the DOM at once.
@@ -369,78 +370,81 @@ export default function VaultBrowser({
           safe — flexbox lays each item out at its natural width and moves the
           second one down rather than squeezing either, so nothing is ever
           truncated. */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-ink/5 px-4 py-2.5">
-        <div className="flex min-w-0 items-center gap-2">
+      {/* Sort, folders and search roll up while the grid is read — see CollapsingBar. */}
+      <CollapsingBar>
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-ink/5 px-4 py-2.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={backToFolders}
+              title="Back to the folders"
+              // 36px, the height of the two dropdowns and the Starred pill
+              // opposite it, so the row sits on one line.
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-ink/10 px-3 text-[13px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/5"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Folders
+            </button>
+            <span className="flex min-w-0 items-center gap-2 pl-1 text-[13px] font-medium text-ink-200">
+              {/* Outliers' gold as a literal — the app's `gold-*` family is
+                  #4C1D95, which is purple and belongs to the Products bank. */}
+              <FolderOpen className="h-4 w-4 shrink-0 text-[#D9A404] light:text-[#8A6A00]" strokeWidth={1.75} />
+              <span className="truncate">{folderName}</span>
+            </span>
+          </div>
+
+          {/* Sort / Hook / Starred. `shrink-0` on the group so it wraps as a
+              unit rather than the dropdowns squeezing; `flex-wrap` inside it for
+              the phone, where even the group is wider than the screen — and
+              `max-w-full`, which is what lets that inner wrap actually fire.
+              `shrink-0` alone pins the group at its max-content width, so on a
+              375px screen the Starred pill and the counter sat off the right
+              edge of a row that doesn't scroll. The cap never binds on a
+              desktop, where the group is half the width of its row. */}
+          <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
+          <FilterSelect
+            dense
+            label="Sort"
+            value={filters.sort}
+            options={SORT_OPTIONS}
+            onChange={(sort) => onFiltersChange((f) => ({ ...f, sort }))}
+          />
+          {/* The structure of the opening line, which is the lens this library is
+              actually for: "show me every big-number open" is a question no
+              search tool answers. */}
+          <FilterSelect
+            dense
+            label="Hook"
+            menuMinWidth={232}
+            value={filters.pattern}
+            options={hookOptions}
+            onChange={(pattern) => onFiltersChange((f) => ({ ...f, pattern }))}
+          />
           <button
             type="button"
-            onClick={backToFolders}
-            title="Back to the folders"
-            // 36px, the height of the two dropdowns and the Starred pill
-            // opposite it, so the row sits on one line.
-            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-ink/10 px-3 text-[13px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/5"
+            onClick={() => onFiltersChange((f) => ({ ...f, starredOnly: !f.starredOnly }))}
+            title="Show only the hooks you starred"
+            // 36px — the height of the folder toggle beside it and of the two
+            // dropdowns, so everything on this row sits on one line.
+            className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors ${
+              filters.starredOnly
+                ? 'border-amber-400/40 bg-amber-400/10 text-amber-300 light:text-amber-700'
+                : 'border-ink/10 text-ink-300 hover:border-ink/20 hover:bg-ink/5'
+            }`}
           >
-            <ChevronLeft className="h-3.5 w-3.5" />
-            Folders
+            <Star className={`h-3.5 w-3.5 ${filters.starredOnly ? 'fill-current' : ''}`} />
+            Starred
+            {starIds.length > 0 && <span className="tabular-nums opacity-60">{starIds.length}</span>}
           </button>
-          <span className="flex min-w-0 items-center gap-2 pl-1 text-[13px] font-medium text-ink-200">
-            {/* Outliers' gold as a literal — the app's `gold-*` family is
-                #4C1D95, which is purple and belongs to the Products bank. */}
-            <FolderOpen className="h-4 w-4 shrink-0 text-[#D9A404] light:text-[#8A6A00]" strokeWidth={1.75} />
-            <span className="truncate">{folderName}</span>
+
+          <span className="shrink-0 pl-1 text-[11px] tabular-nums text-ink-600">
+            {matches.length === folderTotal
+              ? `${folderTotal} hooks`
+              : `${matches.length} of ${folderTotal}`}
           </span>
+          </div>
         </div>
-
-        {/* Sort / Hook / Starred. `shrink-0` on the group so it wraps as a
-            unit rather than the dropdowns squeezing; `flex-wrap` inside it for
-            the phone, where even the group is wider than the screen — and
-            `max-w-full`, which is what lets that inner wrap actually fire.
-            `shrink-0` alone pins the group at its max-content width, so on a
-            375px screen the Starred pill and the counter sat off the right
-            edge of a row that doesn't scroll. The cap never binds on a
-            desktop, where the group is half the width of its row. */}
-        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
-        <FilterSelect
-          dense
-          label="Sort"
-          value={filters.sort}
-          options={SORT_OPTIONS}
-          onChange={(sort) => onFiltersChange((f) => ({ ...f, sort }))}
-        />
-        {/* The structure of the opening line, which is the lens this library is
-            actually for: "show me every big-number open" is a question no
-            search tool answers. */}
-        <FilterSelect
-          dense
-          label="Hook"
-          menuMinWidth={232}
-          value={filters.pattern}
-          options={hookOptions}
-          onChange={(pattern) => onFiltersChange((f) => ({ ...f, pattern }))}
-        />
-        <button
-          type="button"
-          onClick={() => onFiltersChange((f) => ({ ...f, starredOnly: !f.starredOnly }))}
-          title="Show only the hooks you starred"
-          // 36px — the height of the folder toggle beside it and of the two
-          // dropdowns, so everything on this row sits on one line.
-          className={`flex h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] font-medium transition-colors ${
-            filters.starredOnly
-              ? 'border-amber-400/40 bg-amber-400/10 text-amber-300 light:text-amber-700'
-              : 'border-ink/10 text-ink-300 hover:border-ink/20 hover:bg-ink/5'
-          }`}
-        >
-          <Star className={`h-3.5 w-3.5 ${filters.starredOnly ? 'fill-current' : ''}`} />
-          Starred
-          {starIds.length > 0 && <span className="tabular-nums opacity-60">{starIds.length}</span>}
-        </button>
-
-        <span className="shrink-0 pl-1 text-[11px] tabular-nums text-ink-600">
-          {matches.length === folderTotal
-            ? `${folderTotal} hooks`
-            : `${matches.length} of ${folderTotal}`}
-        </span>
-        </div>
-      </div>
+      </CollapsingBar>
 
       {matches.length === 0 ? (
         <GridCanvas>

@@ -502,15 +502,20 @@ export default function CardDetailModal(props: CardDetailModalProps) {
 
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink-950/95 shadow-2xl"
+        className="flex h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink-950/95 shadow-2xl max-md:h-[calc(100dvh-1rem)]"
       >
-        {/* Body — fixed 50/50 grid; content scrolls inside each column. The
-            variation's tag + roll/scene line now lives in the right panel
-            header (the modal-wide top bar was removed). */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-2">
+        {/* Body — a 50/50 grid on a desktop, each column scrolling its own
+            content. The variation's tag + roll/scene line lives in the right
+            panel header (the modal-wide top bar was removed).
+
+            On a phone it is ONE scroller instead. Stacked, the two halves were
+            a pair of ~45dvh scroll windows — the workspace in one slot and its
+            own outputs in another, neither tall enough to work in. Now the
+            modal reads as one page: the setup, then what it made. */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-2 md:overflow-hidden">
           {/* LEFT 50% — scrollable body (model + refs + prompt) over a pinned
               footer (output settings + Generate), mirroring the Playground panel. */}
-          <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 md:border-b-0 md:border-r">
+          <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 max-md:shrink-0 md:border-b-0 md:border-r">
             {/* Sticky header — the Image / Video / Animate toggle, pulled out of
                 the scroll area so it stays put while the body scrolls. Mirrors
                 the right panel's identity header (same px-5 pt-3, h-12 row, and
@@ -533,7 +538,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
             </div>
 
             {/* Scrollable body */}
-            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <div className="flex min-h-0 flex-1 flex-col max-md:flex-none md:overflow-y-auto">
               <div className="flex grow flex-col gap-2 px-5 pb-1 pt-2">
                 {/* The session's look, read-only at the top of the workspace —
                     same note Continuous' frame and clip modals carry. It's
@@ -1000,7 +1005,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
 
           {/* RIGHT 50% — variation meta header (moved out of the removed top
               bar) + per-card gallery (Playground masonry). */}
-          <div className="col-span-1 flex min-h-0 flex-col overflow-hidden">
+          <div className="col-span-1 flex min-h-0 flex-col max-md:shrink-0 md:overflow-hidden">
             <div className="flex flex-col gap-2 px-5 pt-3">
               {/* Identity header — serif scene number, a vertical rule, then the
                   role pill stacked over the script line. Mirrors the main

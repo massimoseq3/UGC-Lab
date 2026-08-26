@@ -63,7 +63,7 @@ export default function FrameSlot({
           type="button"
           onClick={() => onChange(null)}
           title={`Remove ${label.toLowerCase()}`}
-          className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity hover:bg-black/75 group-hover:opacity-100"
+          className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity hover:bg-black/75 group-hover:opacity-100 touch:opacity-100"
         >
           <X className="h-3.5 w-3.5" />
         </button>

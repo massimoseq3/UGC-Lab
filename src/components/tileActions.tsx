@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Star, Trash2 } from 'lucide-react'
+import { MoreHorizontal, Star, Trash2, X } from 'lucide-react'
 import Spinner from './Spinner'
 
 // The hover action controls that sit on top of a generated media tile —
@@ -51,13 +51,70 @@ export function TileActionStack({
   hidden?: boolean
   className?: string
 }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
+
+  // Only ever true on a touch device — the toggle that sets it is
+  // `display: none` under a pointer — so nothing here runs on a desktop.
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: PointerEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown, true)
+    return () => document.removeEventListener('pointerdown', onDown, true)
+  }, [open])
+
   return (
     <div
+      ref={ref}
       onClick={(e) => e.stopPropagation()}
-      className={`${hidden ? 'hidden' : 'flex'} ${STACK_POSITION} ${forceVisible ? '[&>*]:opacity-100' : ''} ${className}`}
+      className={`${hidden ? 'hidden' : 'flex'} ${STACK_POSITION} ${
+        forceVisible || open
+          ? '[&>*]:opacity-100'
+          // An `opacity-0` button still takes its taps. Under a pointer that
+          // never shows, because hovering the tile reveals the column anyway —
+          // on a phone it means the 100px of dead air under the ⋯ swallows
+          // taps aimed at the picture. Everything but the doorway stands down
+          // while the stack is shut.
+          : 'touch:[&>*+*]:pointer-events-none'
+      } ${className}`}
     >
+      <TouchDisclosure open={open} onToggle={() => setOpen((o) => !o)} />
       {children}
     </div>
+  )
+}
+
+/**
+ * The touch-only way into the stack.
+ *
+ * A phone has no pointer to hover with, and a tap goes to whatever the tile
+ * itself does — so on a touch screen the actions above aren't merely hidden,
+ * they're unreachable. The obvious fix is to show the whole column there, and
+ * it was tried: four 32px circles is 140px of chrome down the side of a tile
+ * that is 110px wide on a three-across B-Roll storyboard, permanently, over the
+ * still it exists to let you judge. So the column gets a doorway instead — one
+ * button at rest, the full stack one tap away, at any tile size.
+ *
+ * It carries its own `display` rather than a `useIsTouch()`: under a pointer
+ * this is `display: none`, so it can never be pressed, `open` can never become
+ * true, and the hover behaviour is untouched by construction rather than by a
+ * media query the two could disagree about.
+ */
+function TouchDisclosure({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={open ? 'Hide actions' : 'Show actions'}
+      aria-expanded={open}
+      onClick={(e) => { e.stopPropagation(); onToggle() }}
+      className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/20 text-white touch:flex ${
+        open ? 'bg-black/75' : 'bg-black/55'
+      }`}
+    >
+      {open ? <X className="h-4 w-4" /> : <MoreHorizontal className="h-4 w-4" />}
+    </button>
   )
 }
 

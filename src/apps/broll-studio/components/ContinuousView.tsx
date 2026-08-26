@@ -1208,7 +1208,11 @@ export default function ContinuousView({
           <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">~{totalSeconds}s</span>
           <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{framesPicked}/{result.frames.length} keyframes picked</span>
         </div>
-        <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
+        {/* Wraps on a phone. `shrink-0` with no wrap pinned this group to its
+            max-content width, so "Generate all videos" and the download
+            button ran off the right edge of a 375px screen with nothing to
+            scroll them back. One row from md up, as before. */}
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 whitespace-nowrap md:shrink-0 md:flex-nowrap">
           <button
             type="button"
             onClick={() => requestFrames()}

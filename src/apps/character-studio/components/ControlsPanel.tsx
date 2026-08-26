@@ -61,10 +61,13 @@ function CopyPromptButton({ text, label, title }: { text: string; label: string;
       onClick={handleCopy}
       disabled={!text.trim()}
       title={title}
-      className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.02] px-2.5 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:border-ink/20 hover:bg-ink/[0.05] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-ink/10 bg-ink/[0.02] px-2.5 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:border-ink/20 hover:bg-ink/[0.05] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-40"
     >
       {copied ? <Check className="h-3 w-3 text-emerald-400 light:text-emerald-600" /> : <Copy className="h-3 w-3" />}
-      {copied ? 'Copied' : label}
+      {/* Just "Copy" where the divider is narrow. The full label wrapped onto
+          two lines on a phone, which made a 22px pill two rows tall. The
+          divider it sits on already says which tab's fields these are. */}
+      {copied ? 'Copied' : <><span className="lg:hidden">Copy</span><span className="hidden lg:inline">{label}</span></>}
     </button>
   )
 }
@@ -203,7 +206,10 @@ export default function ControlsPanel({
   const scenePrompt = buildScenePrompt(profile)
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col">
+    // On a phone the whole column is one scroller and the Generate bar is the
+    // last thing in it, not a band pinned over the fields — see the note above
+    // the GenerateBar below.
+    <div className="flex h-full min-h-0 min-w-0 flex-col max-md:overflow-y-auto">
       {/* Rounded segmented toggle — filled so all tabs share the column with no
           horizontal scroll. The h-[57px] band + bottom hairline is the app-wide
           panel-header spec (Scripts, B-Roll, Bank, Playground, Ad Analyzer and
@@ -230,9 +236,14 @@ export default function ControlsPanel({
           loose rather than as part of the panel's chrome. A row that must never
           move doesn't belong in the thing that moves. */}
       <div className="shrink-0 px-4 pb-2 pt-2">
-        {/* Stacked under sm: two picker rows sharing a phone-width column
-            truncate to "Load Cha…" / "Extract C…", which names neither. */}
-        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
+        {/* Side by side at every width. They were stacked under `sm` because
+            two picker rows sharing a phone-width column truncated to
+            "Load Cha…" / "Extract C…", which names neither — but the fix for a
+            label that doesn't fit is a shorter label, not a second row of
+            chrome on the screen with the least of it. Each row carries a short
+            name and swaps to the full one at `lg`, which is the first width
+            where this column is wide enough to read it. */}
+        <div className="flex items-center gap-2">
           <div className="min-w-0 flex-1">
             <LoadPresetDropdown onLoadProfile={onProfileChange} />
           </div>
@@ -256,9 +267,13 @@ export default function ControlsPanel({
           Both edges feather out — under the Generate bar and under the pinned
           band above — so fields dissolve at the boundary instead of cutting off
           mid-row, which reads as a render glitch. */}
+      {/* On a phone this stops being a scroller of its own and simply grows —
+          the column above scrolls. The feathered edges go with it: they mark
+          where content passes under pinned chrome, and on a phone there is
+          none to pass under. */}
       <div
         ref={scrollRef}
-        className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 pb-4 [mask-image:linear-gradient(to_bottom,transparent_0,black_0.5rem,black_calc(100%-1.5rem),transparent_100%)]"
+        className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 pb-4 [mask-image:linear-gradient(to_bottom,transparent_0,black_0.5rem,black_calc(100%-1.5rem),transparent_100%)] max-md:flex-none max-md:overflow-visible max-md:[mask-image:none]"
       >
         <div className="flex flex-col gap-4 pt-2">
           {TABS.map((tab, tabIndex) => (
@@ -343,7 +358,12 @@ export default function ControlsPanel({
 
       {/* Action footer — model picker, chips, Generate, and a tight Clear All
           sit at the foot of the controls column, directly under all the inputs
-          that feed them. */}
+          that feed them.
+
+          Pinned from `md` up only (August 2026, Massimo's call). On a phone a
+          fixed band stood over the 28 fields it belongs to and cost most of a
+          short column; you fill the form top to bottom, and Generate is where
+          you arrive. */}
       <GenerateBar
         error={error}
         onGenerate={onGenerate}

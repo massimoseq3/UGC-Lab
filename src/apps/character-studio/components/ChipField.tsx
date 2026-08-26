@@ -166,7 +166,7 @@ export default function ChipField({ label, value, onChange, suggestions, placeho
           onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false) }}
           readOnly={locked}
           placeholder={placeholder ?? `Search or type ${label.toLowerCase()}...`}
-          className={`w-full rounded-full border border-ink/15 bg-transparent px-4 py-2 ${showExpand ? 'pr-10' : ''} text-sm text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-influencers-500/40 ${locked ? 'cursor-not-allowed opacity-70' : ''}`}
+          className={`w-full rounded-full border border-ink/15 bg-transparent px-4 py-2 ${showExpand ? 'pr-10' : ''} text-sm max-md:text-[13px] text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-influencers-500/40 ${locked ? 'cursor-not-allowed opacity-70' : ''}`}
         />
         {showExpand && (
           // Mousedown-preventDefault keeps the input from blurring (which would
@@ -228,7 +228,7 @@ export default function ChipField({ label, value, onChange, suggestions, placeho
                 onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false) }}
                 rows={5}
                 placeholder={placeholder ?? `Edit ${label.toLowerCase()}...`}
-                className="w-full resize-none rounded-xl bg-transparent px-3 py-2 text-sm leading-relaxed text-ink-100 placeholder-ink-500 outline-none"
+                className="w-full resize-none rounded-xl bg-transparent px-3 py-2 text-sm leading-relaxed text-ink-100 placeholder-ink-500 outline-none max-md:text-[13px]"
               />
               <div className="flex items-center justify-between gap-2 px-1 pb-0.5 pt-1">
                 <span className="text-[10px] font-medium uppercase tracking-widest text-ink-500">{label}</span>
