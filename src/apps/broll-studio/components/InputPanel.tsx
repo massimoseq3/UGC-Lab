@@ -435,6 +435,19 @@ export default function InputPanel({
             </div>
           </div>
 
+          {/* The words above, the look and the delivery below — one break
+              inside one card, not two cards. Everything here is still a
+              reference the storyboard is built FROM, so splitting the group
+              would say they're different kinds of thing; a hairline just says
+              you've finished reading one half. INSET, not full-bleed: it takes
+              SectionCard's own `p-3` like every row it sits between, so it ends
+              exactly where the card's HEADER hairline ends and the two read as
+              one pair of rules rather than two widths of line in one card. (It
+              was briefly `-mx-3` edge-to-edge, which met the card's border and
+              cut the card in half — the opposite of a break inside one group.)
+              `shrink-0` so a squeezed column can't drop it. */}
+          <div className="shrink-0 border-t border-ink/10" />
+
           {/* Visual Style — the last reference, under the Script: the look is
               something the storyboard is built FROM, so it reads as one of the
               inputs rather than a switch on the way to Generate. Required, so
