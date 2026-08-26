@@ -385,18 +385,83 @@ export default function InputPanel({
             {selectedModel && <ModelCard model={selectedModel} />}
           </BankCard>
 
-          {/* Visual Style — third reference, under Character: the look is
+          {/* Script — REQUIRED (half of `canGenerate`), and the only reference
+              here that GROWS as you paste, which is why it sits under the two
+              bank pills rather than above them: there, every keystroke would
+              shove them down the column. Visual Style follows it for the same
+              reason it used to lead it — a 58px row that gets pushed down is
+              cheaper than three that do.
+              Bring your own words from the bank or a paste. It and the
+              Instructions box below share the
+              column's leftover height (`flex-1`, no `basis-0`): each one's base
+              size is its own content, so a pasted script grows its box while an
+              empty brief stays a strip, and whatever is still spare is split
+              between them. With basis-0 they were always an even split whatever
+              was in them — a matched pair on an empty panel, and a script fighting
+              for room the moment one was pasted in. */}
+          <div className={`flex min-h-[140px] flex-1 flex-col overflow-hidden rounded-3xl border transition-colors max-md:min-h-[220px] max-md:flex-none ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
+            <BankCard
+              icon={FileText}
+              label="Script / Hooks"
+              accentClass="bg-scripts-500/15 text-scripts-text"
+              selectedClass="border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10"
+              isEmpty={!selectedScript}
+              // NOT "Or let the format write it": B-Roll stopped writing
+              // scripts in July 2026, so that offered a deleted feature — and
+              // the slot wore an OPTIONAL tag while being half of `canGenerate`,
+              // which is why an empty script left Generate grey with nothing on
+              // screen saying so. It's required, and the dot says it.
+              emptyHint="Pick one from your bank, or paste it below"
+              required
+              filled={hasScript}
+              onSelect={onSelectScript}
+              onClear={selectedScript ? onClearScript : undefined}
+              flat
+            >
+              {selectedScript && <ScriptCard script={selectedScript} />}
+            </BankCard>
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              <textarea
+                value={scriptText}
+                onChange={(e) => onScriptTextChange(e.target.value)}
+                rows={1}
+                // flex-1 above hands this box every spare pixel in the column,
+                // so the min-height is only the floor it gives way to on a short
+                // window — not the size it normally renders at.
+                placeholder="…or paste your own script here"
+                className="min-h-[56px] w-full grow resize-none border-0 bg-transparent px-4 py-2.5 text-[13px] leading-relaxed text-ink-200 placeholder-ink-700 outline-none"
+              />
+              <ExpandButton onClick={() => setScriptExpanded(true)} className="absolute bottom-2 right-2" />
+            </div>
+          </div>
+
+          {/* The words above, the look and the delivery below — one break
+              inside one card, not two cards. Everything here is still a
+              reference the storyboard is built FROM, so splitting the group
+              would say they're different kinds of thing; a hairline just says
+              you've finished reading one half. INSET, not full-bleed: it takes
+              SectionCard's own `p-3` like every row it sits between, so it ends
+              exactly where the card's HEADER hairline ends and the two read as
+              one pair of rules rather than two widths of line in one card. (It
+              was briefly `-mx-3` edge-to-edge, which met the card's border and
+              cut the card in half — the opposite of a break inside one group.)
+              `shrink-0` so a squeezed column can't drop it. */}
+          <div className="shrink-0 border-t border-ink/10" />
+
+          {/* Visual Style — the last reference, under the Script: the look is
               something the storyboard is built FROM, so it reads as one of the
               inputs rather than a switch on the way to Generate. Required, so
               it's dashed and asking to be filled until picked, then
-              accent-filled with an X to clear. */}
+              accent-filled with an X to clear. `shrink-0` because it now sits
+              below the box that owns the column's leftover height, and a fixed
+              58px row under a `flex-1` sibling is the one that gets squeezed. */}
           <div
             role="button"
             tabIndex={0}
             onClick={onOpenStyle}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenStyle() } }}
             title={styleChosen ? styleHint : 'How every clip looks'}
-            className={`group flex h-[58px] w-full cursor-pointer items-center gap-2.5 rounded-full border px-4 text-left transition-colors ${
+            className={`group flex h-[58px] w-full shrink-0 cursor-pointer items-center gap-2.5 rounded-full border px-4 text-left transition-colors ${
               styleChosen
                 ? 'border-broll-500/25 bg-broll-500/[0.07] hover:border-broll-500/35 hover:bg-broll-500/10'
                 : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-broll-500/30 hover:bg-broll-500/5'
@@ -451,74 +516,29 @@ export default function InputPanel({
             )}
           </div>
 
-          {/* Script — REQUIRED (half of `canGenerate`), and last in the card:
-              it's the only reference here that grows as you paste, so above the
-              three pills it would shove them down the column on every keystroke.
-              Bring your own words from the bank or a paste. It and the
-              Instructions box below share the
-              column's leftover height (`flex-1`, no `basis-0`): each one's base
-              size is its own content, so a pasted script grows its box while an
-              empty brief stays a strip, and whatever is still spare is split
-              between them. With basis-0 they were always an even split whatever
-              was in them — a matched pair on an empty panel, and a script fighting
-              for room the moment one was pasted in. */}
-          <div className={`flex min-h-[140px] flex-1 flex-col overflow-hidden rounded-3xl border transition-colors max-md:min-h-[220px] max-md:flex-none ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
-            <BankCard
-              icon={FileText}
-              label="Script / Hooks"
-              accentClass="bg-scripts-500/15 text-scripts-text"
-              selectedClass="border-scripts-500/30 bg-scripts-500/[0.06] hover:bg-scripts-500/10"
-              isEmpty={!selectedScript}
-              // NOT "Or let the format write it": B-Roll stopped writing
-              // scripts in July 2026, so that offered a deleted feature — and
-              // the slot wore an OPTIONAL tag while being half of `canGenerate`,
-              // which is why an empty script left Generate grey with nothing on
-              // screen saying so. It's required, and the dot says it.
-              emptyHint="Pick one from your bank, or paste it below"
-              required
-              filled={hasScript}
-              onSelect={onSelectScript}
-              onClear={selectedScript ? onClearScript : undefined}
-              flat
-            >
-              {selectedScript && <ScriptCard script={selectedScript} />}
-            </BankCard>
-            <div className="relative flex min-h-0 flex-1 flex-col">
-              <textarea
-                value={scriptText}
-                onChange={(e) => onScriptTextChange(e.target.value)}
-                rows={1}
-                // flex-1 above hands this box every spare pixel in the column,
-                // so the min-height is only the floor it gives way to on a short
-                // window — not the size it normally renders at.
-                placeholder="…or paste your own script here"
-                className="min-h-[56px] w-full grow resize-none border-0 bg-transparent px-4 py-2.5 text-[13px] leading-relaxed text-ink-200 placeholder-ink-700 outline-none"
-              />
-              <ExpandButton onClick={() => setScriptExpanded(true)} className="absolute bottom-2 right-2" />
-            </div>
-          </div>
-        </SectionCard>
-
           {/* Line-by-Line delivery — "B-Roll Clips" keeps every card silent,
-              for a voiceover laid over in the edit; "With Dialogue" makes all
+              for a voiceover laid over in the edit; "Dialogue Clips" makes all
               three the character speaking that line, staged three different
-              ways. It sits directly under the References card
-              and above the Instructions box: it decides what KIND of storyboard
-              the references just gathered are for, so it reads as the answer to
-              the card above it rather than as a setting down in the generate
-              band. Shrink-0 — it's a fixed h-12 row between two boxes that
-              split the column's leftover height. (It has also led the settings
-              band, sat at that band's bottom directly above Generate, and sat
-              at the very top of the column above the References heading.)
+              ways. It's the last row INSIDE the References card, under Visual
+              Style: it decides what KIND of storyboard the references above it
+              are for, so it belongs to them rather than sitting outside the
+              card as a setting on the way to Generate. Shrink-0 — a fixed h-12
+              row in a column whose script box takes the leftover height. It
+              keeps that 48px switch height rather than the 58px of the picker
+              rows it now stacks with: it's a two-word toggle, not a row that
+              opens something. (It has also sat between the card and the
+              Instructions box, led the settings band, sat at that band's
+              bottom directly above Generate, and sat at the very top of the
+              column above the References heading.)
               Continuous has no deliveries — it's narration over footage — so
               it isn't rendered there at all. **B-Roll Clips leads the toggle,
-              With Dialogue is still the default**: the order reads left to
+              Dialogue Clips is still the default**: the order reads left to
               right as the plainer thing first, while the default stays on the
               one most members are here to make. Position and default are
               separate here on purpose — don't "fix" one to match the other. */}
           {isLineMode(mode) && (
             <SegmentedToggle<BrollDelivery>
-              className="mb-2 h-12 shrink-0 !p-1"
+              className="h-12 shrink-0 !p-1"
               value={lineDelivery}
               onChange={onLineDeliveryChange}
               accent="broll"
@@ -527,10 +547,11 @@ export default function InputPanel({
               // picked here rather than as a third piece of vocabulary.
               options={[
                 { value: 'silent', label: 'B-Roll Clips', icon: Film },
-                { value: 'dialogue', label: 'With Dialogue', icon: MessageSquareQuote },
+                { value: 'dialogue', label: 'Dialogue Clips', icon: MessageSquareQuote },
               ]}
             />
           )}
+        </SectionCard>
 
           {/* Additional instructions — a real textarea you type straight into.
               It was a pill that opened a centred editor popup, which put a

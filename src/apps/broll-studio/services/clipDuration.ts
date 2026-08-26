@@ -56,7 +56,7 @@ export const MAX_CLIP_SECONDS = 15
 export const DEFAULT_CLIP_SECONDS = 5
 
 // Does this card's character speak the scene's line on camera? The one test for
-// whether Auto is on the table at all: under With Dialogue every variation is a
+// whether Auto is on the table at all: under Dialogue Clips every variation is a
 // DIALOGUE card, under B-Roll Clips none is, and a hand-added option is a silent
 // b-roll card everywhere else in the app (no voice profile, no anchor chain), so
 // it is one here too.

@@ -40,7 +40,7 @@ function nextId() {
 export const VARIATIONS_PER_SCENE = 3
 
 /**
- * How many variations a "With Dialogue" scene gets: the SAME three as a silent
+ * How many variations a "Dialogue Clips" scene gets: the SAME three as a silent
  * scene, with the talking-to-camera card taking the first slot and two silent
  * b-roll ideas after it. It briefly ADDED a fourth card, on the theory that the
  * talking head needs three ways to cut away from it — but four cards per line is
@@ -79,7 +79,7 @@ const MAX_PARSED_VARIATIONS = 4
  * over these shots in the edit.
  */
 // Shared readable-paragraph rules — no silence clause, so both the silent b-roll
-// format and the "With Dialogue" talking-card format can build on it.
+// format and the "Dialogue Clips" talking-card format can build on it.
 const PROMPT_FORMAT_CORE = `Every prompt is ONE flowing paragraph. There is NO word limit and no target length — write as long as it takes to see the shot through, and never drop a detail to keep it short. Vagueness is the only failure; length is not. Plain, concrete, readable — no labels, no field names, no line breaks, no "Style:" trailer.
 
 ONE FRAME, ONE ACTION. What you are writing is a SINGLE STILL FRAME — one instant of one continuous action, the frame a video model is then handed and animates forward from. Describe the picture as it stands at that instant and nothing else: the hands where they are right now, the gesture part-way through, the expression halfway to landing. NEVER a sequence of beats. The moment a prompt says "then", "after which", "before finally", or chains two acts together — the drawer slides open AND the hand sweeps it out AND the drawer knocks shut — an image model draws all of them at once: a strip of stacked panels, a split screen, or one impossible frame with three pairs of hands in it. Pick the single strongest instant of the beat and write only that one.
@@ -92,7 +92,7 @@ const PROMPT_FORMAT = `${PROMPT_FORMAT_CORE} You may end with the natural sound 
 
 The footage is SILENT: no one speaks, mouths words, or addresses the viewer. A voiceover is laid over these clips in the edit.`
 
-// The talking-card format for "With Dialogue" delivery — the character speaks
+// The talking-card format for "Dialogue Clips" delivery — the character speaks
 // the scene's line to camera. Used by the DIALOGUE regen/enhance paths.
 const PROMPT_FORMAT_DIALOGUE = `${PROMPT_FORMAT_CORE} The character SPEAKS the scene's line — embed the exact words verbatim inside double quotes (the character … says: "…"), copied character for character so the app can rewrite them when the line is edited. Audio is on: just them talking, no background music, no extra voiceover.
 
@@ -237,7 +237,7 @@ Wrap every scene in this exact XML envelope. Do not include any text outside the
 </VAR_3>
 </SCENE>`
 
-// Delivery override appended to the system instruction ONLY under With Dialogue.
+// Delivery override appended to the system instruction ONLY under Dialogue Clips.
 // Read last, so it wins over the "every shot is SILENT" doctrine everywhere.
 //
 // ALL THREE cards speak the line. This used to be one talking card plus two
@@ -293,7 +293,7 @@ VOICE — describe, in rich and reproducible detail, HOW the character sounds: p
 This one voice is shared by every clip in the ad, so it must be self-contained and consistent.`
 
 // The system instruction the scene call runs on, with the dialogue override
-// appended in "With Dialogue" delivery. Exported so the Import-prompts brief
+// appended in "Dialogue Clips" delivery. Exported so the Import-prompts brief
 // hands an outside model the EXACT same rules — one source, no drift.
 // `productPhotoCount` is how many photos the product bank row holds. More than
 // one and the storyboard is shown all of them and asked to pick per variation
@@ -533,7 +533,7 @@ const ALL_TAGS: VariationTag[] = ['ACTION', 'EMOTIONAL', 'PRODUCT', 'POV', 'ENVI
 
 // Tags the parser will accept off the wire. Superset of ALL_TAGS (which is the
 // silent-b-roll menu offered to the model) plus DIALOGUE — emitted for VAR_1 in
-// "With Dialogue" delivery — and legacy STATIC, so old persisted rows survive.
+// "Dialogue Clips" delivery — and legacy STATIC, so old persisted rows survive.
 const PARSEABLE_TAGS: VariationTag[] = [...ALL_TAGS, 'DIALOGUE', 'STATIC']
 
 function parseTag(raw: string | undefined): VariationTag | undefined {
@@ -566,7 +566,7 @@ function parseRefs(raw: string | undefined): VariationRefs | undefined {
 // forced to 'character' whatever VISIBILITY said, because back when a scene had
 // ONE talking card and two b-roll cards, the product had its own shots to live
 // in and attaching packaging to a talking head just pulled it into a frame that
-// only needed a face. Under With Dialogue every card is a talking card, so that
+// only needed a face. Under Dialogue Clips every card is a talking card, so that
 // exception would mean the product never appears in the whole ad — and a line
 // that names the product still has to be built from the real packaging.
 function clampRefsToVisibility(refs: VariationRefs, productVisible: boolean | undefined): VariationRefs {
@@ -582,7 +582,7 @@ function clampRefsToVisibility(refs: VariationRefs, productVisible: boolean | un
 function defaultRefsFor(tag: VariationTag, productVisible: boolean | undefined): VariationRefs {
   // The legacy STATIC anchor take is sourced from the character reference
   // alone. DIALOGUE cards used to be too; they now follow VISIBILITY like
-  // everything else, since under With Dialogue every card is a talking card and a
+  // everything else, since under Dialogue Clips every card is a talking card and a
   // line about the product still has to be built from the real packaging.
   if (tag === 'STATIC') return 'character'
   // Product must not appear when VISIBILITY is no — keep the character ref on so
@@ -771,7 +771,7 @@ export async function finishImageTask(taskId: string, modelId: string, resolutio
 // One-line role brief per tag, shared by the regenerate + free-form variation
 // prompts so a forced tag always carries its definition.
 const TAG_BRIEFS: Record<VariationTag, string> = {
-  // DIALOGUE is the "With Dialogue" talking card: the character looks into the
+  // DIALOGUE is the "Dialogue Clips" talking card: the character looks into the
   // lens and speaks the scene's exact line. STATIC stays a legacy silent anchor.
   DIALOGUE: 'A talking-to-camera shot: the character looks into the lens and SPEAKS the scene\'s exact script line word-for-word, natural like a real person talking to their phone. Audio is on. Embed the line verbatim (the character ... says: "…") — the words are heard out loud, never written anywhere in the picture. Say where they are, what their hands are doing, and where the light comes from; if a "previous cut" reference is attached, this shot is the NEXT CUT of that same sitting, so keep its place, spot, wardrobe, light and camera position and change only the moment. The subject is the person talking, never the product — don\'t stage it in their hands or in the background.',
   STATIC: 'A silent shot of the character in their own space, present and natural but NOT speaking — lips closed, no words mouthed. A voiceover is added later.',

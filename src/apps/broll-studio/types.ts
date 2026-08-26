@@ -16,7 +16,7 @@ export type SceneType =
 // adapts to what each script line earns. No shot speaks — a voiceover is laid
 // over in the edit.
 //
-// Under With Dialogue all 3 are DIALOGUE: the character speaking that line,
+// Under Dialogue Clips all 3 are DIALOGUE: the character speaking that line,
 // staged three different ways. DIALOGUE is therefore not in ALL_TAGS (which is
 // the silent menu) but is emitted wholesale by the dialogue delivery override —
 // see PARSEABLE_TAGS.
@@ -101,7 +101,7 @@ export interface BrollResult {
   // "Warm 90s Camcorder" instead of a generic "Custom style".
   styleName?: string
   // One shared voice description for the whole ad's dialogue clips. Auto-written
-  // in "With Dialogue" delivery and user-editable; appended to every DIALOGUE
+  // in "Dialogue Clips" delivery and user-editable; appended to every DIALOGUE
   // card's video prompt at fire time so all talking clips share one voice.
   // Undefined in silent delivery and on legacy rows.
   voiceProfile?: string
@@ -348,7 +348,7 @@ export interface CardState {
 // 'oneshot' for anything else.
 export type BrollMode = 'line' | 'continuous'
 
-// Line-by-Line delivery — the "B-Roll Clips / With Dialogue" toggle.
+// Line-by-Line delivery — the "B-Roll Clips / Dialogue Clips" toggle.
 //
 // 'dialogue' — every variation is the character speaking the scene's exact
 //              line, staged three different ways.

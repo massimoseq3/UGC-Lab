@@ -868,7 +868,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 its footer was a lone hand-rolled toggle standing in for a row of
                 chips, sized `h-10` to match chips that aren't there in this
                 mode. The toggle is a real `SegmentedToggle` at `h-12` now — the
-                same control at the same height as B-Roll's With Dialogue /
+                same control at the same height as B-Roll's Dialogue Clips /
                 B-Roll Clips pair, which is the same question asked of a
                 generation. */}
             {state.mode === 'music' && (

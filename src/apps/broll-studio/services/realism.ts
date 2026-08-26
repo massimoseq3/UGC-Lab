@@ -41,7 +41,7 @@ export function withIphoneRealism(prompt: string): string {
 // storyboard) was uncovered, so the guarantee lives here instead, appended at
 // request time exactly like the realism stack.
 //
-// It matters most under With Dialogue, where the prompt by design carries the
+// It matters most under Dialogue Clips, where the prompt by design carries the
 // spoken line verbatim inside double quotes — and an image model handed a
 // quoted string draws it. That is how a talking-head still came back with its
 // own line burned across the frame as a TikTok caption. The words are AUDIO:
