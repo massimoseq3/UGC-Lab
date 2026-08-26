@@ -211,9 +211,29 @@ export interface ModelEntry {
 //   'ad-anatomy', 'script-architect', 'character-studio',
 //   'broll-studio', 'voice-studio', 'video-studio'
 
-// The TTS registry id. Voiceovers has no model picker, so this is the single
-// source consumers (bankStore usage ledger, generateVoice) share.
-export const TTS_MODEL_ID = 'google/gemini-3-1-flash-tts'
+// The two TTS registry ids. Voiceovers picks between them (a `ModelPicker row`
+// at the top of its left panel) and persists the pick under TTS_MODEL_SLOT;
+// services call `resolveTtsModel()` in settingsStore rather than naming either
+// id, same rule as the chat roles below.
+//
+// PRO is the default. Both models bill on the SAME rate card — 140 credits/M
+// input tokens, 2,800 credits/M audio tokens, verified on both kie model pages
+// (2026-08-26) — so the choice costs nothing either way and is purely about the
+// read: Pro is Google's studio-quality tier, Flash is the faster/newer one.
+// Nothing writes the resolved default into the slot, so an unpicked slot follows
+// `defaultFor` on its own and a stored id is always a real pick — no migration
+// ships with a flip here.
+//
+// FLASH is also the id LEGACY history rows are priced against: `modelId` only
+// started being stamped on a voiceover when the picker landed, and every row
+// written before that was this model.
+export const TTS_MODEL_PRO = 'google/gemini-2-5-pro-tts'
+export const TTS_MODEL_FLASH = 'google/gemini-3-1-flash-tts'
+
+// The settingsStore key the picker reads/writes — ModelPicker derives it from
+// `${appId}:${task}`, so the panel and `resolveTtsModel` agree without either
+// knowing about the other.
+export const TTS_MODEL_SLOT = 'voice-studio:tts'
 
 // The two chat roles. Services name a role rather than a slug, so swapping a
 // chat model is a one-line edit here — same rule as every other model in the
@@ -237,7 +257,7 @@ export const TTS_MODEL_ID = 'google/gemini-3-1-flash-tts'
 export const CHAT_MODEL_DEFAULT = 'gemini-3-flash'
 export const CHAT_MODEL_STRONG = 'gemini-3-6-flash'
 
-// Gemini 3.1 Flash TTS bills by tokens, not characters:
+// Both Gemini TTS models bill by tokens, not characters, on one rate card:
 //   input text:  140 credits / 1M tokens
 //   audio output: 2,800 credits / 1M tokens
 // We only know the script's character count at estimate time, so approximate:
@@ -1457,16 +1477,43 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   },
 
   // ── Text-to-Speech ────────────────────────────────────────────
-  // Voiceovers uses Gemini 3.1 Flash TTS exclusively (no picker).
-  // Spec: https://docs.kie.ai/ (google/gemini-3-1-flash-tts).
+  // Voiceovers picks between these two. They take the IDENTICAL request body —
+  // `speakers` (speaker_id / voice_name / audio_profile / style / pace /
+  // accent), `dialogue_turns`, temperature, scene, sample_context — off the same
+  // 30-voice catalog and the same style/pace/accent enums, verified on both kie
+  // model pages (2026-08-26). So `buildVoiceInput` is shared and swapping model
+  // is a swap of the id passed to createTask, nothing else.
   // Voice catalog lives in src/apps/voice-studio/types.ts — VOICES.
+  //
+  // Pro leads the list because it's the default (see TTS_MODEL_PRO above).
 
   {
-    id: TTS_MODEL_ID,
+    id: TTS_MODEL_PRO,
+    displayName: 'Gemini 2.5 Pro TTS',
+    provider: 'Google',
+    task: 'tts',
+    tags: ['recommended'],
+    // Same token-metered rate card as the Flash entry below — see
+    // geminiTtsCredits. `unit`/`credits` are unused when `priceFor` is present
+    // but required by the type — keep them sane.
+    pricing: {
+      unit: 'per-1k-chars',
+      credits: 7,
+      priceFor: ({ charCount = 1000 }) => geminiTtsCredits(charCount),
+    },
+    official: {
+      usdFor: ({ charCount = 1000 }) => geminiTtsCredits(charCount) / CREDITS_PER_USD / 0.7,
+      source: 'https://kie.ai/gemini-2.5-pro-preview-tts',
+    },
+    defaultFor: ['voice-studio'],
+  },
+
+  {
+    id: TTS_MODEL_FLASH,
     displayName: 'Gemini 3.1 Flash TTS',
     provider: 'Google',
     task: 'tts',
-    tags: ['recommended', 'new'],
+    tags: ['fast'],
     // Token-metered (see geminiTtsCredits above). `unit`/`credits` are unused
     // when `priceFor` is present but required by the type — keep them sane.
     pricing: {
@@ -1481,7 +1528,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       usdFor: ({ charCount = 1000 }) => geminiTtsCredits(charCount) / CREDITS_PER_USD / 0.7,
       source: 'https://kie.ai/pricing',
     },
-    defaultFor: ['voice-studio'],
   },
 ]
 

@@ -5,6 +5,7 @@ import { seedColor } from './seedColor'
 import Slider from './Slider'
 import Dropdown from '../../../components/Dropdown'
 import SectionCard, { StatusDot } from '../../../components/SectionCard'
+import ModelPicker from '../../../components/ModelPicker'
 
 // One size for every setting subheading (Style / Pace / Accent /
 // Expressiveness / Tone / Scene). Influencers' small-caps field register: the
@@ -38,6 +39,19 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="flex flex-col gap-3 px-5 pb-6 pt-2">
+        {/* Which TTS model reads the script. Above the Voice card because it's
+            what everything below runs on — the voice, the delivery and the
+            direction are all settings OF this model. Deliberately not carded:
+            a border around one row says nothing (see the root CLAUDE.md), and
+            the label alone is what it needs. No StatusDot either — there is
+            always a resolved model, and a permanent green dot is decoration.
+            The pick persists per browser under `voice-studio:tts`, which is
+            the same key `resolveTtsModel()` reads at generate time. */}
+        <div className="flex flex-col gap-2">
+          <span className={SETTING_LABEL}>Model</span>
+          <ModelPicker row appId="voice-studio" task="tts" />
+        </div>
+
         {/* Who is speaking. The card holds one control on purpose — the header
             is what carries the preset pill, and a preset writes every setting
             in this panel, so it needs a home above the first of them rather

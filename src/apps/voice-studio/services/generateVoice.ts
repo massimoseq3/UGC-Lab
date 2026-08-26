@@ -1,11 +1,8 @@
 import type { VoiceSettings, HistoryItem } from '../types'
-import { useSettingsStore } from '../../../stores/settingsStore'
+import { useSettingsStore, resolveTtsModel } from '../../../stores/settingsStore'
 import { createTask, pollTask, parseResult, fetchGeneratedAsset } from '../../../utils/kie'
 import { saveAsset } from '../../../utils/assetStore'
-import { TTS_MODEL_ID } from '../../../utils/models'
-
-// Re-exported so voice-studio components can keep importing it from here.
-export { TTS_MODEL_ID }
+import { TTS_MODEL_FLASH } from '../../../utils/models'
 
 // The duration is a label on the history card, never a gate — so every failure
 // path resolves 0 rather than rejecting, and a clip that simply never reports
@@ -36,8 +33,10 @@ async function probeAudioDuration(blob: Blob): Promise<number> {
   })
 }
 
-// Build the Gemini 3.1 Flash TTS `input` body from the app's settings. The
-// model takes `speakers` + `dialogue_turns` as native JSON arrays — one speaker
+// Build the Gemini TTS `input` body from the app's settings. Both TTS models in
+// the registry take this exact body (same speaker fields, same style/pace/accent
+// enums, same 30-voice catalog) — only the model id passed to createTask
+// differs. They take `speakers` + `dialogue_turns` as native JSON arrays — one speaker
 // + one dialogue turn for a single-voice ad read — plus top-level temperature /
 // scene / sample_context. (kie's fastjson backend rejects these fields as
 // strings with "expect {, actual string" — they must NOT be JSON.stringify'd.)
@@ -61,25 +60,32 @@ export function buildVoiceInput(settings: VoiceSettings, scriptText: string): Re
   return input
 }
 
-// Phase 1: POST createTask, return the kie taskId so the caller can persist
-// it before awaiting completion. A mid-flight refresh can resume polling by
-// calling finishVoiceTask with the stored taskId.
+// Phase 1: POST createTask, return the kie taskId AND the model it was fired
+// against so the caller can persist both before awaiting completion. A mid-flight
+// refresh can resume polling by calling finishVoiceTask with the stored taskId.
+// The model is snapshotted rather than re-resolved at finish time — a resumed
+// task belongs to whichever model was picked when it was submitted.
 export async function startVoiceTask(
   settings: VoiceSettings,
   scriptText: string,
-): Promise<{ taskId: string }> {
+): Promise<{ taskId: string; modelId: string }> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const taskId = await createTask(apiKey, TTS_MODEL_ID, buildVoiceInput(settings, scriptText))
-  return { taskId }
+  const modelId = resolveTtsModel()
+  const taskId = await createTask(apiKey, modelId, buildVoiceInput(settings, scriptText))
+  return { taskId, modelId }
 }
 
 // Phase 2: poll the kie taskId, download the audio, save as an asset, and
 // build a HistoryItem from the snapshotted settings + script. Resumable —
 // pass the taskId returned by startVoiceTask (possibly from a prior session).
+// `modelId` defaults to the Flash entry: the only entries that reach here
+// without one are in-flight tasks persisted before the picker shipped, and every
+// one of those was fired against that model.
 export async function finishVoiceTask(
   taskId: string,
   settings: VoiceSettings,
   scriptText: string,
+  modelId: string = TTS_MODEL_FLASH,
 ): Promise<HistoryItem> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const record = await pollTask(apiKey, taskId)
@@ -103,6 +109,7 @@ export async function finishVoiceTask(
 
   return {
     id: crypto.randomUUID(),
+    modelId,
     voiceId: settings.voiceId,
     voiceName: settings.voiceName,
     gender: settings.gender,
@@ -124,6 +131,6 @@ export async function generateVoice(
   settings: VoiceSettings,
   scriptText: string,
 ): Promise<HistoryItem> {
-  const { taskId } = await startVoiceTask(settings, scriptText)
-  return finishVoiceTask(taskId, settings, scriptText)
+  const { taskId, modelId } = await startVoiceTask(settings, scriptText)
+  return finishVoiceTask(taskId, settings, scriptText, modelId)
 }

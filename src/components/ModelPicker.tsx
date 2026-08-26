@@ -90,10 +90,12 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
   const models = task === 'video'
     ? [...scopedModels].sort((a, b) => a.displayName.localeCompare(b.displayName))
     : scopedModels
-  // Image has only a handful of models — show them as one flat list (no pinned
-  // "recommended" group and no divider) so the dropdown reads cleanly. The
-  // recommended star still shows inline on the models that earn it.
-  const flatList = task === 'image'
+  // Image and TTS have only a handful of models — show them as one flat list
+  // (no pinned "recommended" group and no divider) so the dropdown reads
+  // cleanly. With two TTS entries a pinned group would print one of them twice
+  // over a hairline. The recommended star still shows inline on the models that
+  // earn it.
+  const flatList = task === 'image' || task === 'tts'
   const recommended = flatList ? [] : models.filter((m) => m.tags.includes('recommended'))
   const fallback = getDefaultModel(appId, task, mode)
   const resolved = value ?? persisted ?? fallback?.id
