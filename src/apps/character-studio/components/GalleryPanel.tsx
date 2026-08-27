@@ -594,10 +594,28 @@ function NameEditor({
 
 // ── Single view ─────────────────────────────────────────────────
 
-function ratioOf(ar: string): number {
+// The frame's shape. A number is a ratio MEASURED off the picture that landed
+// and always wins: what the member asked for and what the model returned are
+// routinely different shapes — GPT Image 2 answers a 9:16 request with a 2:3
+// file — and the frame is only honest about the output if it follows the file.
+// The string is the requested ratio, used before a picture exists (an in-flight
+// tile, the awaiting frame) and as the placeholder shape until one decodes.
+function ratioOf(ar: string | number): number {
+  if (typeof ar === 'number') return ar
   if (ar.includes('16:9')) return 16 / 9
   if (ar.includes('1:1')) return 1
   return 9 / 16
+}
+
+// The picture's own ratio, read off the decoded file. Null until it lands.
+function useNaturalRatio() {
+  const [ratio, setRatio] = useState<number | null>(null)
+  const onLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth: w, naturalHeight: h } = e.currentTarget
+    if (w > 0 && h > 0) setRatio(w / h)
+  }
+  // For a frame whose picture is drawn by a child component rather than inline.
+  return { ratio, onLoad, set: setRatio }
 }
 
 // Sizes the single view's media frame so it hugs the picture exactly: the frame
@@ -607,7 +625,7 @@ function ratioOf(ar: string): number {
 // axis, and a fixed choice either distorts the box (a 16:9 sheet in a tall
 // panel) or overflows it. Measures the container, never the frame, so setting
 // the frame's size can't feed back into the measurement.
-function useFitFrame(aspectRatio: string) {
+function useFitFrame(aspectRatio: string | number) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [fit, setFit] = useState<'width' | 'height'>('height')
   const ratio = ratioOf(aspectRatio)
@@ -640,7 +658,7 @@ function FittedFrame({
   aspectRatio,
   children,
 }: {
-  aspectRatio: string
+  aspectRatio: string | number
   children: (frameStyle: React.CSSProperties) => React.ReactNode
 }) {
   const { containerRef, frameStyle } = useFitFrame(aspectRatio)
@@ -668,7 +686,7 @@ function Stage({
   aspectRatio,
   children,
 }: {
-  aspectRatio: string
+  aspectRatio: string | number
   children: (frameStyle: React.CSSProperties) => React.ReactNode
 }) {
   return (
@@ -759,12 +777,9 @@ function SingleView({
         <>
           <StageSurface>
             <div className={`relative grid h-full w-full gap-3 ${stageGridClass(slots.length)}`}>
-              {slots.map((slot) => (
-                <FittedFrame
-                  key={slot.key}
-                  aspectRatio={slot.kind === 'gen' ? slot.gen.aspectRatio : slot.item.aspectRatio}
-                >
-                  {(frameStyle) => slot.kind === 'gen' ? (
+              {slots.map((slot) => slot.kind === 'gen' ? (
+                <FittedFrame key={slot.key} aspectRatio={slot.gen.aspectRatio}>
+                  {(frameStyle) => (
                     <div
                       className="relative overflow-hidden rounded-xl shadow-[0_0_60px_-28px_rgba(247,79,158,0.35)]"
                       style={frameStyle}
@@ -778,21 +793,18 @@ function SingleView({
                         fill
                       />
                     </div>
-                  ) : (
-                    // The finished cell is the grid view's own tile, fitted to
-                    // the frame — so its hover actions, badges and inline name
-                    // input are the ones the member already knows.
-                    <HistoryTile
-                      item={slot.item}
-                      frameStyle={frameStyle}
-                      onClick={() => onOpen(slot.item.id)}
-                      onDelete={() => onDelete(slot.item)}
-                      onMakeSheet={() => onMakeSheet(slot.item)}
-                      onCopyPrompt={() => onCopyPrompt(slot.item)}
-                      onShowInSingle={() => onShowInSingle(slot.item)}
-                    />
                   )}
                 </FittedFrame>
+              ) : (
+                <StageCell
+                  key={slot.key}
+                  item={slot.item}
+                  onClick={() => onOpen(slot.item.id)}
+                  onDelete={() => onDelete(slot.item)}
+                  onMakeSheet={() => onMakeSheet(slot.item)}
+                  onCopyPrompt={() => onCopyPrompt(slot.item)}
+                  onShowInSingle={() => onShowInSingle(slot.item)}
+                />
               ))}
             </div>
           </StageSurface>
@@ -801,6 +813,44 @@ function SingleView({
         </>
       )}
     </div>
+  )
+}
+
+// One finished cell of a multi-slot stage. The tile is the grid view's own —
+// so its hover actions, badges and inline name input are the ones the member
+// already knows — but the frame around it follows the decoded picture rather
+// than the ratio the run was fired at, the same rule `SingleCard` follows.
+function StageCell({
+  item,
+  onClick,
+  onDelete,
+  onMakeSheet,
+  onCopyPrompt,
+  onShowInSingle,
+}: {
+  item: CharacterHistoryItem
+  onClick: () => void
+  onDelete: () => void | Promise<unknown>
+  onMakeSheet: () => void
+  onCopyPrompt: () => void
+  onShowInSingle: () => void
+}) {
+  const natural = useNaturalRatio()
+  return (
+    <FittedFrame aspectRatio={natural.ratio ?? item.aspectRatio}>
+      {(frameStyle) => (
+        <HistoryTile
+          item={item}
+          frameStyle={frameStyle}
+          onNaturalRatio={natural.set}
+          onClick={onClick}
+          onDelete={onDelete}
+          onMakeSheet={onMakeSheet}
+          onCopyPrompt={onCopyPrompt}
+          onShowInSingle={onShowInSingle}
+        />
+      )}
+    </FittedFrame>
   )
 }
 
@@ -891,10 +941,15 @@ function SingleCard({
   onCopyPrompt: () => void
 }) {
   const a = useHistoryTileActions(item, onDelete)
+  const natural = useNaturalRatio()
 
   return (
     <>
-      <Stage aspectRatio={item.aspectRatio}>
+      {/* The frame follows the PICTURE once it decodes, not the ratio the run
+          was fired at. Sized to the request, a 2:3 file in a 9:16 frame was
+          letterboxed, and `bg-black light:bg-zinc-200` painted those bars as a
+          pale strip above and below the character. */}
+      <Stage aspectRatio={natural.ratio ?? item.aspectRatio}>
         {(frameStyle) => (
           <div
             onClick={onClick}
@@ -902,7 +957,7 @@ function SingleCard({
             style={frameStyle}
           >
             {a.status === 'ready' && a.url ? (
-              <img src={a.url} alt="" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-contain" />
+              <img src={a.url} alt="" loading="lazy" decoding="async" onLoad={natural.onLoad} className="absolute inset-0 h-full w-full object-contain" />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center">
                 {a.status === 'loading'
@@ -1082,6 +1137,7 @@ function pendingItemFromGen(gen: InFlightCharacterGen): CharacterHistoryItem {
 function HistoryTile({
   item,
   frameStyle,
+  onNaturalRatio,
   onClick,
   onDelete,
   onMakeSheet,
@@ -1093,6 +1149,9 @@ function HistoryTile({
   // rather than to its own image. The picture then fills that frame
   // `object-contain` instead of driving the tile's height.
   frameStyle?: React.CSSProperties
+  // Fitted tiles only: the picture's measured ratio, so the cell that sized
+  // this frame can reshape itself around the file instead of the request.
+  onNaturalRatio?: (ratio: number) => void
   onClick: () => void
   onDelete: () => void | Promise<unknown>
   onMakeSheet: () => void
@@ -1116,6 +1175,10 @@ function HistoryTile({
           alt=""
           loading="lazy"
           decoding="async"
+          onLoad={(e) => {
+            const { naturalWidth: w, naturalHeight: h } = e.currentTarget
+            if (w > 0 && h > 0) onNaturalRatio?.(w / h)
+          }}
           className={fitted ? 'absolute inset-0 h-full w-full object-contain' : 'block h-auto w-full'}
         />
       ) : (

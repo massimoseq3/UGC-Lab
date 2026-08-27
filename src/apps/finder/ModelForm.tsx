@@ -293,10 +293,13 @@ export default function ModelForm({ item, onSave, onCancel }: ModelFormProps) {
             <p className="text-xs text-ink-500">{metaParts.join(' · ')}</p>
           </div>
 
+          {/* The transparent border is load-bearing: Copy Prompt below draws a
+              real 1px one, and without a matching box here the two stacked
+              buttons came out 40px and 42px. */}
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center justify-center gap-2 rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-ink-900 transition-colors hover:bg-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex items-center justify-center gap-2 rounded-full border border-transparent bg-ink px-5 py-2.5 text-sm font-semibold text-ink-900 transition-colors hover:bg-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving && <Spinner className="h-4 w-4" />}
             {saving ? 'Saving…' : (item ? 'Save Changes' : 'Add Character')}
@@ -314,8 +317,13 @@ export default function ModelForm({ item, onSave, onCancel }: ModelFormProps) {
           )}
         </div>
 
-        {/* Right — character sheet + spec sheet (the only part that scrolls) */}
-        <div className="flex min-w-0 flex-1 flex-col gap-7 lg:min-h-0 lg:overflow-y-auto lg:overflow-x-hidden lg:pr-1">
+        {/* Right — character sheet + spec sheet (the only part that scrolls).
+            Inset from the DNA cards by the width of their drop shadow: a scroll
+            port clips on both axes, so a card flush against it lost its shadow
+            down the sides and along the bottom. The negative margin hands that
+            room back out of the pane's own `p-5` and the 32px column gap, so
+            every card keeps the width and position it had. */}
+        <div className="flex min-w-0 flex-1 flex-col gap-7 lg:-mx-5 lg:min-h-0 lg:overflow-y-auto lg:px-5 lg:pb-8">
           {/* Character sheet — attached from a sheet generation in Influencers.
               Read-only here apart from removal; regenerate from the studio.
               Skipped when the sheet IS the portrait (a sheet-only entry stamps
