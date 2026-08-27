@@ -276,11 +276,14 @@ function GrowthStrip({ growth }: { growth: { newThisWeek: number; newLastWeek: n
   const DeltaIcon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : null
   const deltaColor = delta > 0 ? 'text-emerald-400 light:text-emerald-600' : delta < 0 ? 'text-red-400 light:text-red-600' : 'text-ink-500'
   return (
-    <div className="grid grid-cols-3 gap-3 rounded-xl border border-ink/10 bg-ink/[0.02] p-4">
+    <div className="grid grid-cols-3 gap-3 rounded-xl border border-ink/10 bg-ink/[0.02] p-4 max-sm:gap-2 max-sm:p-3">
       <div>
         <div className="flex items-center gap-1.5 text-[11px] text-ink-500"><UserPlus className="h-3.5 w-3.5" /> New this week</div>
-        <div className="mt-1 flex items-baseline gap-2">
-          <span className="text-2xl font-semibold tracking-tight text-ink-100">{growth.newThisWeek}</span>
+        {/* The delta wraps under the figure on a phone rather than squeezing
+            it: three columns of ~100px can't hold "12  +3 vs last wk" on one
+            line, and the number is the half that has to stay legible. */}
+        <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
+          <span className="text-xl font-semibold tracking-tight text-ink-100 sm:text-2xl">{growth.newThisWeek}</span>
           <span className={`flex items-center gap-0.5 text-[11px] ${deltaColor}`}>
             {DeltaIcon && <DeltaIcon className="h-3 w-3" />}
             {delta === 0 ? 'flat' : `${delta > 0 ? '+' : ''}${delta} vs last wk`}
@@ -289,11 +292,11 @@ function GrowthStrip({ growth }: { growth: { newThisWeek: number; newLastWeek: n
       </div>
       <div>
         <div className="flex items-center gap-1.5 text-[11px] text-ink-500"><Ban className="h-3.5 w-3.5" /> Lost this week</div>
-        <div className="mt-1 text-2xl font-semibold tracking-tight text-ink-100">{growth.lostThisWeek}</div>
+        <div className="mt-1 text-xl font-semibold tracking-tight text-ink-100 sm:text-2xl">{growth.lostThisWeek}</div>
       </div>
       <div>
         <div className="flex items-center gap-1.5 text-[11px] text-ink-500">Net change</div>
-        <div className={`mt-1 text-2xl font-semibold tracking-tight ${growth.net > 0 ? 'text-emerald-400 light:text-emerald-600' : growth.net < 0 ? 'text-red-400 light:text-red-600' : 'text-ink-100'}`}>
+        <div className={`mt-1 text-xl font-semibold tracking-tight sm:text-2xl ${growth.net > 0 ? 'text-emerald-400 light:text-emerald-600' : growth.net < 0 ? 'text-red-400 light:text-red-600' : 'text-ink-100'}`}>
           {growth.net > 0 ? '+' : ''}{growth.net}
         </div>
       </div>
@@ -373,9 +376,9 @@ function StatCard({ icon: Icon, label, value, accent }: { icon: typeof Users; la
 
 function Panel({ title, hint, action, children }: { title: string; hint?: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-4">
+    <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-4 max-sm:p-3">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-[13px] font-medium text-ink-200">{title}</h3>
+        <h3 className="shrink-0 text-[13px] font-medium text-ink-200">{title}</h3>
         <div className="flex min-w-0 items-center gap-2">
           {hint && <span className="truncate text-[10px] text-ink-600">{hint}</span>}
           {action}
@@ -422,7 +425,7 @@ function AppUsageBars({ items }: { items: Array<{ appId: string; seconds: number
             className="flex items-center gap-2"
             title={`${appName(it.appId)} — ${it.members} member${it.members === 1 ? '' : 's'}`}
           >
-            <div className="flex w-24 shrink-0 items-center gap-1.5 text-[11px] text-ink-400">
+            <div className="flex w-20 shrink-0 items-center gap-1.5 text-[11px] text-ink-400 sm:w-24">
               <AppGlyph appId={it.appId} className="h-3 w-3 shrink-0" />
               <span className="truncate">{appName(it.appId)}</span>
             </div>
@@ -432,7 +435,7 @@ function AppUsageBars({ items }: { items: Array<{ appId: string; seconds: number
                 style={{ width: `${(it.seconds / max) * 100}%`, backgroundColor: tint, minWidth: it.seconds > 0 ? 4 : 0 }}
               />
             </div>
-            <div className="w-[70px] shrink-0 text-right">
+            <div className="w-[58px] shrink-0 text-right sm:w-[70px]">
               <div className={`text-[11px] tabular-nums ${it.seconds > 0 ? 'text-ink-300' : 'text-ink-600'}`}>
                 {formatDuration(it.seconds)}
               </div>
@@ -494,14 +497,14 @@ function BarList({ items }: { items: Array<{ label: string; value: number; color
     <div className="space-y-2">
       {items.map((it, i) => (
         <div key={i} className="flex items-center gap-2">
-          <div className="w-24 shrink-0 truncate text-[11px] text-ink-400" title={it.label}>{it.label}</div>
+          <div className="w-20 shrink-0 truncate text-[11px] text-ink-400 sm:w-24" title={it.label}>{it.label}</div>
           <div className="h-4 flex-1 overflow-hidden rounded-full bg-ink/[0.06]">
             <div
               className="h-full rounded-full transition-all duration-300"
               style={{ width: `${(it.value / max) * 100}%`, backgroundColor: it.color, minWidth: it.value > 0 ? 4 : 0 }}
             />
           </div>
-          <div className="w-14 shrink-0 text-right text-[11px] tabular-nums text-ink-300">{it.display ?? it.value}</div>
+          <div className="w-12 shrink-0 text-right text-[11px] tabular-nums text-ink-300 sm:w-14">{it.display ?? it.value}</div>
         </div>
       ))}
     </div>
@@ -558,8 +561,8 @@ function StatusDonut({ active, inactive, lapsed, disabled }: { active: number; i
   const r = 60, C = 2 * Math.PI * r
   let offset = 0
   return (
-    <div className="flex items-center gap-5">
-      <svg viewBox="0 0 160 160" className="h-32 w-32 shrink-0 -rotate-90">
+    <div className="flex items-center gap-5 max-sm:gap-3">
+      <svg viewBox="0 0 160 160" className="h-24 w-24 shrink-0 -rotate-90 sm:h-32 sm:w-32">
         <circle cx={80} cy={80} r={r} fill="none" stroke="currentColor" strokeWidth={16} className="text-ink/[0.06]" />
         {total > 0 && segments.map((s, i) => {
           const len = (s.value / total) * C

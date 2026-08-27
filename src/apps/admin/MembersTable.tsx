@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Ban, CheckCircle2, AlertTriangle, ChevronUp, ChevronDown, Search, Download, Clock, Trash2, X, PauseCircle } from 'lucide-react'
 import Spinner from '../../components/Spinner'
+import Dropdown from '../../components/Dropdown'
 import { getSupabase } from '../../lib/supabase'
 import useCloseOnEscape from '../../hooks/useCloseOnEscape'
 import { deleteMember } from './deleteMember'
@@ -17,6 +18,19 @@ import {
 type SortKey = 'name' | 'email' | 'created_at' | 'last_active_at' | 'total_bytes' | 'assets_last_7d' | 'time_30d'
 type SortDir = 'asc' | 'desc'
 type StatusFilter = 'all' | 'active' | 'inactive' | 'unactivated' | 'lapsed' | 'disabled'
+
+// The phone's stand-in for the sortable column headers — a card list has no
+// header row to click, and losing sort would make the list unreadable past a
+// few dozen members. Same keys, same default directions.
+const SORT_OPTIONS: Array<{ value: SortKey; label: string }> = [
+  { value: 'created_at', label: 'Joined' },
+  { value: 'last_active_at', label: 'Last active' },
+  { value: 'name', label: 'Name' },
+  { value: 'email', label: 'Email' },
+  { value: 'total_bytes', label: 'Storage' },
+  { value: 'assets_last_7d', label: '7-day activity' },
+  { value: 'time_30d', label: 'Top app / 30d' },
+]
 
 const STATUS_LABEL: Record<MemberStatus, string> = {
   active: 'Active',
@@ -113,14 +127,15 @@ export default function MembersTable() {
     }
   }
 
+  function pickSort(key: SortKey) {
+    setSortKey(key)
+    // Sensible default direction per column
+    setSortDir(key === 'email' || key === 'name' ? 'asc' : 'desc')
+  }
+
   function toggleSort(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortKey(key)
-      // Sensible default direction per column
-      setSortDir(key === 'email' || key === 'name' ? 'asc' : 'desc')
-    }
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else pickSort(key)
   }
 
   const counts = useMemo(() => {
@@ -259,7 +274,7 @@ export default function MembersTable() {
           Refresh failed — showing the last loaded list. {profilesError}
         </div>
       )}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-[13px] text-ink-400">
           <span className="text-ink-200">{rows.length}</span> {rows.length === 1 ? 'member' : 'members'}
           <span className="text-ink-600"> · {formatBytes(totals.totalBytes)} total · {totals.totalAssets7d} {totals.totalAssets7d === 1 ? 'generation' : 'generations'} this week</span>
@@ -280,16 +295,19 @@ export default function MembersTable() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[180px] flex-1">
+        <div className="relative min-w-[180px] flex-1 max-md:w-full max-md:flex-none">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search name or email…"
-            className="w-full rounded-full border border-ink/10 bg-ink/[0.03] py-1.5 pl-8 pr-3 text-[12px] text-ink-200 outline-none transition-colors placeholder:text-ink-600 focus:border-ink/20"
+            className="w-full rounded-full border border-ink/10 bg-ink/[0.03] py-2 pl-8 pr-3 text-[12px] text-ink-200 outline-none transition-colors placeholder:text-ink-600 focus:border-ink/20 md:py-1.5"
           />
         </div>
-        <div className="flex items-center gap-0.5 rounded-full border border-ink/10 bg-ink/[0.03] p-0.5">
+        {/* Six pills are twice a phone's width. They swipe rather than wrap:
+            a wrapped row costs 30px of a screen that has none to give, and
+            the set reads as one scale either way. */}
+        <div className="flex max-w-full items-center gap-0.5 overflow-x-auto scrollbar-hide rounded-full border border-ink/10 bg-ink/[0.03] p-0.5 md:overflow-visible">
           {([
             ['all', 'All', counts.all],
             ['active', 'Active', counts.active],
@@ -301,7 +319,7 @@ export default function MembersTable() {
             <button
               key={key}
               onClick={() => setStatusFilter(key)}
-              className={`rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+              className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1.5 text-[11px] transition-colors md:py-1 ${
                 statusFilter === key ? 'bg-ink text-paper' : 'text-ink-400 hover:text-ink-200'
               }`}
             >
@@ -345,7 +363,63 @@ export default function MembersTable() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-ink/10">
+      {/* The card list has no header row to click, so sort and select-all get
+          their own line on a phone. */}
+      <div className="flex items-center gap-2 md:hidden">
+        <label
+          title={allSelected ? 'Clear selection' : 'Select all shown'}
+          className="flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-3 text-[11px] text-ink-400"
+        >
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={toggleAll}
+            disabled={selectableRows.length === 0}
+            className="h-3.5 w-3.5 cursor-pointer accent-red-400 disabled:opacity-40"
+          />
+          All
+        </label>
+        <Dropdown
+          value={sortKey}
+          options={SORT_OPTIONS}
+          onChange={(v) => pickSort(v as SortKey)}
+          accent="neutral"
+          label="Sort"
+          dense
+          className="min-w-0 flex-1"
+        />
+        <button
+          onClick={() => setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))}
+          title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-400 transition-colors hover:text-ink-200"
+        >
+          {sortDir === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+      </div>
+
+      {/* Below `md` the ten-column table has nowhere to go — a horizontal
+          scroller would put the name off screen the moment you reach for the
+          status. A card per member instead, carrying the same facts and the
+          same actions. */}
+      <div className="space-y-2 md:hidden">
+        {sortedRows.length === 0 && (
+          <p className="rounded-xl border border-ink/10 px-3 py-6 text-center text-[12px] text-ink-500">
+            No members match this filter.
+          </p>
+        )}
+        {sortedRows.map((r) => (
+          <MemberCard
+            key={r.id}
+            row={r}
+            selected={selected.has(r.id)}
+            busy={busyId === r.id}
+            onToggle={() => toggleRow(r.id)}
+            onSetStatus={setStatus}
+          />
+        ))}
+      </div>
+
+      <div className="hidden overflow-hidden rounded-lg border border-ink/10 md:block">
         <table className="w-full text-[12px]">
           <thead className="bg-ink/[0.03] text-[11px] uppercase tracking-wider text-ink-500">
             <tr>
@@ -425,39 +499,14 @@ export default function MembersTable() {
                   <StatusPill status={status} />
                 </td>
                 <td className="px-3 py-2 align-top text-right">
-                  <div className="flex items-center justify-end gap-1">
-                    {status === 'disabled' ? (
-                      <button
-                        onClick={() => setStatus(r, 'active')}
-                        disabled={busyId === r.id || r.is_admin}
-                        title="Give this account its access back"
-                        className={ACTION_BTN}
-                      >
-                        Re-enable
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => setStatus(r, status === 'lapsed' ? 'active' : 'lapsed')}
-                          disabled={busyId === r.id || r.is_admin}
-                          title={status === 'lapsed'
-                            ? 'Unlock now, without waiting for them to enter the code'
-                            : 'Lock the account but let them back in with the current access code'}
-                          className={ACTION_BTN}
-                        >
-                          {status === 'lapsed' ? 'Restore' : 'Lapse'}
-                        </button>
-                        <button
-                          onClick={() => setStatus(r, 'disabled')}
-                          disabled={busyId === r.id || r.is_admin}
-                          title="Lock the account — only you can reopen it"
-                          className={ACTION_BTN}
-                        >
-                          Disable
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  <StatusActions
+                    row={r}
+                    status={status}
+                    busy={busyId === r.id}
+                    onSetStatus={setStatus}
+                    className="flex items-center justify-end gap-1"
+                    btnClass={ACTION_BTN}
+                  />
                 </td>
               </tr>
               )
@@ -564,16 +613,21 @@ function DeleteMembersModal({
           ))}
         </div>
 
-        <label className="mt-3 flex cursor-pointer items-center gap-2 text-[12px] text-ink-300">
+        {/* Label and caveat are ONE sentence in one box: as three flex
+            children the caveat became a second column the moment the label
+            wrapped, and the two read as unrelated lines. */}
+        <label className="mt-3 flex cursor-pointer items-start gap-2 text-[12px] text-ink-300">
           <input
             type="checkbox"
             checked={removeFromAllowlist}
             onChange={(e) => setRemoveFromAllowlist(e.target.checked)}
             disabled={running}
-            className="h-3.5 w-3.5 accent-red-400"
+            className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-red-400"
           />
-          Also remove from the allowlist
-          <span className="text-ink-600">— otherwise they can sign up again</span>
+          <span>
+            Also remove from the allowlist{' '}
+            <span className="text-ink-600">— otherwise they can sign up again</span>
+          </span>
         </label>
 
         {failures.length > 0 && (
@@ -605,6 +659,144 @@ function DeleteMembersModal({
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// One member as a card, for the phone. Identity + status on the first line
+// (the two things you scan for), the table's numbers as a two-up meta grid,
+// then the same status actions the row carries — full-width, since a 24px
+// text button is a desktop target.
+function MemberCard({
+  row, selected, busy, onToggle, onSetStatus,
+}: {
+  row: MemberRow
+  selected: boolean
+  busy: boolean
+  onToggle: () => void
+  onSetStatus: (row: MemberRow, next: 'active' | 'lapsed' | 'disabled') => void
+}) {
+  const name = memberName(row)
+  const status = memberStatus(row)
+  const top = memberTopApp(row, '30d')
+  return (
+    <div
+      className={`rounded-xl border p-3 transition-colors ${
+        selected ? 'border-red-500/30 bg-red-500/[0.06]' : 'border-ink/10 bg-ink/[0.02]'
+      }`}
+    >
+      <div className="flex items-start gap-2.5">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={onToggle}
+          disabled={row.is_admin}
+          title={row.is_admin ? 'Admins cannot be deleted here' : undefined}
+          className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-red-400 disabled:cursor-not-allowed disabled:opacity-30"
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-[13px] font-medium text-ink-200">
+              {name || <span className="text-ink-600">—</span>}
+            </span>
+            {row.is_admin && (
+              <span className="shrink-0 text-[10px] uppercase tracking-wider text-amber-400 light:text-amber-600">Admin</span>
+            )}
+          </div>
+          {/* Emails run past a phone's width and the local part is the half
+              that identifies the member, so it wraps rather than truncates. */}
+          <div className="break-all text-[11px] text-ink-500">{row.email}</div>
+        </div>
+        <div className="shrink-0"><StatusPill status={status} /></div>
+      </div>
+
+      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
+        <Meta label="Joined" value={formatDate(row.created_at)} />
+        <Meta
+          label="Last active"
+          value={formatRelative(row.last_active_at)}
+          accent={status === 'inactive' ? 'text-amber-400 light:text-amber-600' : undefined}
+        />
+        <Meta label="Storage" value={`${formatBytes(row.total_bytes)} (${row.asset_count})`} />
+        <Meta label="7-day activity" value={String(row.assets_last_7d)} />
+        <Meta label="Top app / 30d" value={appLabel(top?.appId)} glyph={top?.appId} />
+        <Meta label="Time / 30d" value={top ? formatDuration(totalSeconds(row, '30d')) : '—'} />
+      </dl>
+
+      <div className="mt-2.5 text-[10px] text-ink-600">
+        {row.products}p · {row.models}i · {row.scripts}s · {row.voices}v · {row.brolls}b · {row.video_history}vid
+      </div>
+
+      <StatusActions
+        row={row}
+        status={status}
+        busy={busy}
+        onSetStatus={onSetStatus}
+        className="mt-3 flex gap-2 border-t border-ink/5 pt-3"
+        btnClass={ACTION_BTN_MOBILE}
+      />
+    </div>
+  )
+}
+
+function Meta({ label, value, accent, glyph }: { label: string; value: string; accent?: string; glyph?: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[10px] uppercase tracking-wider text-ink-600">{label}</dt>
+      <dd className={`mt-0.5 flex items-center gap-1.5 text-[12px] ${accent ?? 'text-ink-300'}`}>
+        {glyph && <AppGlyph appId={glyph} className="h-3 w-3 shrink-0" />}
+        <span className="truncate">{value}</span>
+      </dd>
+    </div>
+  )
+}
+
+// Lapse / Disable / Re-enable, shared by the table row and the phone card so
+// the two can't drift apart. Only the wrapper and the button shape differ.
+function StatusActions({
+  row, status, busy, onSetStatus, className, btnClass,
+}: {
+  row: MemberRow
+  status: MemberStatus
+  busy: boolean
+  onSetStatus: (row: MemberRow, next: 'active' | 'lapsed' | 'disabled') => void
+  className: string
+  btnClass: string
+}) {
+  const locked = busy || row.is_admin
+  return (
+    <div className={className}>
+      {status === 'disabled' ? (
+        <button
+          onClick={() => onSetStatus(row, 'active')}
+          disabled={locked}
+          title="Give this account its access back"
+          className={btnClass}
+        >
+          Re-enable
+        </button>
+      ) : (
+        <>
+          <button
+            onClick={() => onSetStatus(row, status === 'lapsed' ? 'active' : 'lapsed')}
+            disabled={locked}
+            title={status === 'lapsed'
+              ? 'Unlock now, without waiting for them to enter the code'
+              : 'Lock the account but let them back in with the current access code'}
+            className={btnClass}
+          >
+            {status === 'lapsed' ? 'Restore' : 'Lapse'}
+          </button>
+          <button
+            onClick={() => onSetStatus(row, 'disabled')}
+            disabled={locked}
+            title="Lock the account — only you can reopen it"
+            className={btnClass}
+          >
+            Disable
+          </button>
+        </>
+      )}
     </div>
   )
 }
@@ -652,6 +844,11 @@ function SortableTh({
 
 const ACTION_BTN =
   'rounded-md border border-ink/10 px-2 py-1 text-[11px] text-ink-300 transition-colors hover:bg-ink/[0.05] disabled:opacity-40'
+
+// Same button, thumb-sized: the card gives it the full width of the card
+// rather than the tail of a right-aligned row.
+const ACTION_BTN_MOBILE =
+  'flex-1 rounded-lg border border-ink/10 py-2 text-[12px] text-ink-300 transition-colors hover:bg-ink/[0.05] disabled:opacity-40'
 
 // Lapsed gets its own violet rather than a second amber: Inactive means "still
 // has access, hasn't used it", Lapsed means "locked out until they enter the

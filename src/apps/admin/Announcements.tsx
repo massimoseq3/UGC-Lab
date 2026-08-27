@@ -135,8 +135,8 @@ export default function Announcements() {
 
   return (
     <div className="space-y-4">
-      <header className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
+      <header className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 basis-full md:flex-1 md:basis-auto">
           <h2 className="text-sm font-semibold tracking-tight text-ink-100">Announcements</h2>
           <p className="text-[12px] text-ink-500">
             Broadcast to every member. Alerts open once on their next visit; updates just dot the Dashboard tile.
@@ -144,14 +144,14 @@ export default function Announcements() {
         </div>
         <button
           onClick={() => void refresh()}
-          className="flex h-8 items-center gap-1.5 rounded-full border border-ink/10 px-3 text-[12px] text-ink-400 transition-colors hover:bg-ink/5 hover:text-ink-100"
+          className="ml-auto flex h-9 items-center gap-1.5 rounded-full border border-ink/10 px-3 text-[12px] text-ink-400 transition-colors hover:bg-ink/5 hover:text-ink-100 md:h-8"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           Refresh
         </button>
         <button
           onClick={() => setDraft(emptyDraft())}
-          className="flex h-8 items-center gap-1.5 rounded-full bg-ink px-3.5 text-[12px] font-semibold text-paper transition-colors hover:bg-ink/90"
+          className="flex h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-[12px] font-semibold text-paper transition-colors hover:bg-ink/90 md:h-8"
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
           New
@@ -404,7 +404,7 @@ function Editor({
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
       {/* Form */}
       <div className="space-y-4">
         <Field label="Title">
@@ -533,7 +533,7 @@ function Editor({
           </div>
         </Field>
 
-        <div className="flex items-center gap-2 border-t border-ink/5 pt-4">
+        <div className="flex flex-wrap items-center gap-2 border-t border-ink/5 pt-4">
           <button
             onClick={primary}
             disabled={!canSave}
@@ -547,7 +547,7 @@ function Editor({
             {primaryLabel}
           </button>
           {goingLive && !armedPublish && (
-            <span className="text-[11px] text-ink-600">
+            <span className="order-last basis-full text-[11px] text-ink-600 md:order-none md:basis-auto">
               {mode === 'schedule' ? 'Goes live at the time above.' : 'Visible to every member immediately.'}
             </span>
           )}
@@ -617,9 +617,9 @@ function PreviewChip({ active, onClick, children }: { active: boolean; onClick: 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="mb-1.5 flex items-baseline gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400">{label}</span>
-        {hint && <span className="min-w-0 truncate text-[11px] text-ink-600">{hint}</span>}
+      <div className="mb-1.5 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-2">
+        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400">{label}</span>
+        {hint && <span className="min-w-0 text-[11px] text-ink-600 sm:truncate">{hint}</span>}
       </div>
       {children}
     </div>
