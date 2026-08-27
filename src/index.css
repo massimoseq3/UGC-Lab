@@ -879,4 +879,16 @@ textarea,
   select {
     font-size: 13px;
   }
+
+  /* A highlight mirror (`TokenField`, `BracketHighlightArea`) is a DIV holding
+     a transparent copy of a textarea's text, so the rule above — which is what
+     actually sets a field's size on a phone — doesn't reach it, and the two
+     layers end up a point or three apart. That isn't a small cosmetic drift:
+     they then wrap on different characters, and every wash slides further off
+     the word it marks the further down the paragraph you read. Same
+     declaration inside the same media query, so the pair can't come apart;
+     don't set a phone size on a mirror in its own component. */
+  .field-mirror {
+    font-size: 13px;
+  }
 }
