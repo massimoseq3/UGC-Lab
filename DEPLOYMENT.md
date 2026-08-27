@@ -37,6 +37,9 @@ model and known limitations, see [SECURITY.md](SECURITY.md).
    form — it defaults to `3500` and you can change it any time in
    **Admin → Allowlist** (clearing it turns the code off). Skip that
    migration and the field still shows, but nothing checks what's typed.
+   `0023_lapsed_status.sql` adds the **Lapsed** member status and the
+   `redeem_access_code` RPC behind it — skip it and Admin → Members simply
+   shows no Lapsed pill and no Lapse button.
 4. Add yourself to the allowlist so you can sign up:
    ```sql
    insert into public.allowlist (email, source) values ('you@example.com', 'manual');
@@ -53,6 +56,26 @@ model and known limitations, see [SECURITY.md](SECURITY.md).
 By default, Supabase sends a confirmation email on signup. For a community
 where you've already vetted members via the allowlist, you can disable this
 in **Auth → Providers → Email → Confirm email = off** for a smoother UX.
+
+### Password reset (two settings, both required)
+
+The sign-in screen has a **Forgot your password?** link. It sends a Supabase
+recovery email; the link lands the member on `/reset-password`, where the app
+takes over and makes them set a new password before it opens the workspace.
+
+1. **Auth → URL Configuration → Redirect URLs** — add
+   `https://<your-domain>/reset-password` (and `http://localhost:5173/reset-password`
+   if you want it to work in `npm run dev`). Supabase refuses to redirect
+   anywhere not on this list, so without it every reset link dead-ends.
+2. **Auth → SMTP Settings** — point it at a real sender (Resend, Postmark,
+   SendGrid). Supabase's built-in sender is a testing convenience: it is rate
+   limited per project and its mail routinely lands in spam. That is tolerable
+   for a signup confirmation you told the member to expect; it is not tolerable
+   for the one email a locked-out member is waiting on. One-time setup, no
+   ongoing work.
+
+Reset links expire after an hour. A member who lets one lapse just requests
+another — the screen says so.
 
 ---
 
@@ -137,7 +160,12 @@ triggers.
   - filter: `email = {{Member Email}}`
 
 The schema's `on_allowlist_delete` trigger automatically marks the matching
-profile as `disabled_at`, and the app signs them out on next page load.
+profile as `lapsed_at` (migration 0023 — it stamped `disabled_at` before that),
+and the app locks them out on next page load. Lapsed is the softer of the two
+locks: their data is untouched and they let themselves back in by entering the
+current access code, without you doing anything. A ban is still a deliberate
+**Disable** on the Members table, and a member who is already disabled is left
+disabled rather than being downgraded to lapsed.
 
 If the Skool trigger you need isn't available natively, you can use the
 **Webhooks by Zapier** trigger and configure Skool to POST to that webhook URL.
@@ -158,6 +186,13 @@ If the Skool trigger you need isn't available natively, you can use the
 - **Phase D:** As admin, see the Admin entry in the sidebar. Members table
   lists everyone with storage usage. Allowlist editor lets you add/remove
   emails. Disable a member; they're bounced on next request.
+- **Phase D2:** Sign out, hit **Forgot your password?**, and confirm the mail
+  arrives and its link lands on `/reset-password` rather than the dashboard.
+  Set a new password; you should land straight in the workspace.
+- **Phase D3:** **Lapse** a test member in Admin → Members. Sign in as them:
+  the workspace is replaced by the access-code screen and no bank data loads.
+  Enter the current code from Admin → Allowlist — the workspace comes back
+  with every product, character and generation still there.
 - **Phase E:** Add a fake member to your Skool. Within ~1 minute the
   Zapier zap fires and the email appears in `allowlist`. Sign up at the
   deployed URL — works.

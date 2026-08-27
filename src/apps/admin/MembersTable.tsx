@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { RefreshCw, Ban, CheckCircle2, AlertTriangle, ChevronUp, ChevronDown, Search, Download, Clock, Trash2, X } from 'lucide-react'
+import { RefreshCw, Ban, CheckCircle2, AlertTriangle, ChevronUp, ChevronDown, Search, Download, Clock, Trash2, X, PauseCircle } from 'lucide-react'
 import Spinner from '../../components/Spinner'
 import { getSupabase } from '../../lib/supabase'
 import useCloseOnEscape from '../../hooks/useCloseOnEscape'
@@ -10,13 +10,20 @@ import AppGlyph from './AppGlyph'
 import { appName } from './appDisplay'
 import {
   useMembers, memberName, memberTopApp, totalSeconds, formatBytes, formatDate, formatRelative,
-  daysSinceActive, isInactive, isActivated, INACTIVE_DAYS,
-  type MemberRow,
+  daysSinceActive, isActivated, memberStatus, INACTIVE_DAYS,
+  type MemberRow, type MemberStatus,
 } from './useMembers'
 
 type SortKey = 'name' | 'email' | 'created_at' | 'last_active_at' | 'total_bytes' | 'assets_last_7d' | 'time_30d'
 type SortDir = 'asc' | 'desc'
-type StatusFilter = 'all' | 'active' | 'inactive' | 'unactivated' | 'disabled'
+type StatusFilter = 'all' | 'active' | 'inactive' | 'unactivated' | 'lapsed' | 'disabled'
+
+const STATUS_LABEL: Record<MemberStatus, string> = {
+  active: 'Active',
+  inactive: 'Inactive',
+  lapsed: 'Lapsed',
+  disabled: 'Disabled',
+}
 
 // The app's display name, or an em-dash when nothing has been recorded for the
 // member yet. App tracking only started reporting recently, so a blank here
@@ -41,7 +48,7 @@ function downloadMembersCsv(rows: MemberRow[]) {
   const lines = rows.map((r) => [
     memberName(r) || '—',
     r.email,
-    r.disabled_at ? 'Disabled' : isInactive(r) ? 'Inactive' : 'Active',
+    STATUS_LABEL[memberStatus(r)],
     r.is_admin ? 'yes' : 'no',
     formatDate(r.created_at),
     r.last_active_at ? formatDate(r.last_active_at) : 'never',
@@ -77,14 +84,23 @@ export default function MembersTable() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
-  async function toggleDisabled(row: MemberRow) {
+  // Moves a member between the three real states. Both columns are always
+  // written, never just the one being set — a member can only be in one state,
+  // and leaving the other timestamp behind is how a "restored" account stays
+  // locked by the flag nobody cleared.
+  async function setStatus(row: MemberRow, next: 'active' | 'lapsed' | 'disabled') {
+    const now = new Date().toISOString()
+    const patch =
+      next === 'active' ? { disabled_at: null, lapsed_at: null }
+      : next === 'lapsed' ? { disabled_at: null, lapsed_at: now }
+      : { disabled_at: now, lapsed_at: null }
+
     setBusyId(row.id)
     try {
       await readyAdminSession()
       const sb = getSupabase()
-      const next = row.disabled_at ? null : new Date().toISOString()
       const { error } = await withTimeout(
-        (signal) => sb.from('profiles').update({ disabled_at: next }).eq('id', row.id).abortSignal(signal),
+        (signal) => sb.from('profiles').update(patch).eq('id', row.id).abortSignal(signal),
         QUERY_TIMEOUT_MS,
         'profile update',
       ) as { error: { message: string } | null }
@@ -108,22 +124,28 @@ export default function MembersTable() {
   }
 
   const counts = useMemo(() => {
-    let disabled = 0, inactive = 0, unactivated = 0
+    let disabled = 0, lapsed = 0, inactive = 0, unactivated = 0
     for (const r of rows) {
-      if (r.disabled_at) { disabled++; continue }
-      if (isInactive(r)) inactive++
+      const status = memberStatus(r)
+      if (status === 'disabled') { disabled++; continue }
+      if (status === 'lapsed') { lapsed++; continue }
+      if (status === 'inactive') inactive++
       if (!isActivated(r)) unactivated++
     }
-    return { all: rows.length, active: rows.length - disabled, disabled, inactive, unactivated }
+    return { all: rows.length, active: rows.length - disabled - lapsed, disabled, lapsed, inactive, unactivated }
   }, [rows])
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase()
     return rows.filter((r) => {
-      if (statusFilter === 'active' && r.disabled_at) return false
-      if (statusFilter === 'disabled' && !r.disabled_at) return false
-      if (statusFilter === 'inactive' && !isInactive(r)) return false
-      if (statusFilter === 'unactivated' && (r.disabled_at || isActivated(r))) return false
+      const status = memberStatus(r)
+      // "Active" is the has-access list, so it keeps the inactive rows too —
+      // they can still sign in. Only the two locked states drop out.
+      if (statusFilter === 'active' && (status === 'disabled' || status === 'lapsed')) return false
+      if (statusFilter === 'disabled' && status !== 'disabled') return false
+      if (statusFilter === 'lapsed' && status !== 'lapsed') return false
+      if (statusFilter === 'inactive' && status !== 'inactive') return false
+      if (statusFilter === 'unactivated' && (status === 'disabled' || status === 'lapsed' || isActivated(r))) return false
       if (q && !r.email.toLowerCase().includes(q) && !memberName(r).toLowerCase().includes(q)) return false
       return true
     })
@@ -273,6 +295,7 @@ export default function MembersTable() {
             ['active', 'Active', counts.active],
             ['inactive', `Inactive ${INACTIVE_DAYS}d+`, counts.inactive],
             ['unactivated', 'Never used', counts.unactivated],
+            ['lapsed', 'Lapsed', counts.lapsed],
             ['disabled', 'Disabled', counts.disabled],
           ] as Array<[StatusFilter, string, number]>).map(([key, label, count]) => (
             <button
@@ -357,7 +380,7 @@ export default function MembersTable() {
             )}
             {sortedRows.map((r) => {
               const name = memberName(r)
-              const inactive = isInactive(r)
+              const status = memberStatus(r)
               return (
               <tr key={r.id} className={`text-ink-300 ${selected.has(r.id) ? 'bg-red-500/[0.06]' : ''}`}>
                 <td className="px-3 py-2 align-top">
@@ -382,7 +405,7 @@ export default function MembersTable() {
                 </td>
                 <td className="px-3 py-2 align-top text-ink-400">{formatDate(r.created_at)}</td>
                 <td className="px-3 py-2 align-top text-ink-400">
-                  <span className={inactive ? 'text-amber-400 light:text-amber-600' : undefined}>{formatRelative(r.last_active_at)}</span>
+                  <span className={status === 'inactive' ? 'text-amber-400 light:text-amber-600' : undefined}>{formatRelative(r.last_active_at)}</span>
                 </td>
                 <td className="px-3 py-2 align-top text-ink-400">
                   {formatBytes(r.total_bytes)}
@@ -399,22 +422,42 @@ export default function MembersTable() {
                   <TopAppCell row={r} />
                 </td>
                 <td className="px-3 py-2 align-top">
-                  {r.disabled_at ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] text-red-300 light:text-red-700"><Ban className="h-2.5 w-2.5" /> Disabled</span>
-                  ) : inactive ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-300 light:text-amber-700"><Clock className="h-2.5 w-2.5" /> Inactive</span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300 light:text-emerald-700"><CheckCircle2 className="h-2.5 w-2.5" /> Active</span>
-                  )}
+                  <StatusPill status={status} />
                 </td>
                 <td className="px-3 py-2 align-top text-right">
-                  <button
-                    onClick={() => toggleDisabled(r)}
-                    disabled={busyId === r.id || r.is_admin}
-                    className="rounded-md border border-ink/10 px-2 py-1 text-[11px] text-ink-300 transition-colors hover:bg-ink/[0.05] disabled:opacity-40"
-                  >
-                    {r.disabled_at ? 'Re-enable' : 'Disable'}
-                  </button>
+                  <div className="flex items-center justify-end gap-1">
+                    {status === 'disabled' ? (
+                      <button
+                        onClick={() => setStatus(r, 'active')}
+                        disabled={busyId === r.id || r.is_admin}
+                        title="Give this account its access back"
+                        className={ACTION_BTN}
+                      >
+                        Re-enable
+                      </button>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setStatus(r, status === 'lapsed' ? 'active' : 'lapsed')}
+                          disabled={busyId === r.id || r.is_admin}
+                          title={status === 'lapsed'
+                            ? 'Unlock now, without waiting for them to enter the code'
+                            : 'Lock the account but let them back in with the current access code'}
+                          className={ACTION_BTN}
+                        >
+                          {status === 'lapsed' ? 'Restore' : 'Lapse'}
+                        </button>
+                        <button
+                          onClick={() => setStatus(r, 'disabled')}
+                          disabled={busyId === r.id || r.is_admin}
+                          title="Lock the account — only you can reopen it"
+                          className={ACTION_BTN}
+                        >
+                          Disable
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
               )
@@ -605,4 +648,25 @@ function SortableTh({
       </span>
     </th>
   )
+}
+
+const ACTION_BTN =
+  'rounded-md border border-ink/10 px-2 py-1 text-[11px] text-ink-300 transition-colors hover:bg-ink/[0.05] disabled:opacity-40'
+
+// Lapsed gets its own violet rather than a second amber: Inactive means "still
+// has access, hasn't used it", Lapsed means "locked out until they enter the
+// code". Two shades of the same colour would read as two shades of one idea,
+// and the Insights donut — which has no glyph to fall back on — needs them
+// told apart at a glance.
+function StatusPill({ status }: { status: MemberStatus }) {
+  if (status === 'disabled') {
+    return <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] text-red-300 light:text-red-700"><Ban className="h-2.5 w-2.5" /> Disabled</span>
+  }
+  if (status === 'lapsed') {
+    return <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] text-violet-300 light:text-violet-700"><PauseCircle className="h-2.5 w-2.5" /> Lapsed</span>
+  }
+  if (status === 'inactive') {
+    return <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-300 light:text-amber-700"><Clock className="h-2.5 w-2.5" /> Inactive</span>
+  }
+  return <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-300 light:text-emerald-700"><CheckCircle2 className="h-2.5 w-2.5" /> Active</span>
 }

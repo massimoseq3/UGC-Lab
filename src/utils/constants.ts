@@ -20,6 +20,13 @@ import type { ElementType } from 'react'
 // accounts as a link back to join.
 export const SKOOL_COMMUNITY_URL = 'https://www.skool.com/ugcos'
 
+// The one classroom page inside the community that carries the current access
+// code. Linked from the two places the app asks for that code — signup and the
+// lapsed-member screen — so nobody has to go hunting for it mid-form. It is a
+// members-only page: someone who has genuinely left the community lands on the
+// group's join page instead, which is where they need to be anyway.
+export const SKOOL_ACCESS_CODE_URL = 'https://www.skool.com/ugcos/classroom/b3547c73?md=9feef1bebf964a868572185b78164206'
+
 // The paid training classroom inside the community — surfaced from the
 // Dashboard as the "AI UGC Academy" shortcut.
 export const AI_UGC_ACADEMY_URL = 'https://www.skool.com/ugcos/classroom/bd64d8bd?md=667c539f37fb4b11a832c3ad705cd4c8'
