@@ -22,10 +22,15 @@ interface PhotoExtractZoneProps {
 //
 // No count rides alongside it: this row shares a half-width column with the
 // preset picker, and a badge here truncated the label that explains the drop.
-// The chevron into the reference library. It takes a `className` so the row can
-// drop it where it can't afford the width: the ROW itself opens the library on
-// the same handler, so this is a second door to the same place — and on a phone
-// those 24px were the difference between "Extract DNA" and "Extract D…".
+//
+// It renders at EVERY width, so this row and the preset row beside it end the
+// same way — a bare chevron was the one thing telling them apart on a phone.
+// It was `hidden lg:flex` for a while, on the reasoning that 24px was the
+// difference between "Extract DNA" and "Extract D…"; the answer is a narrower
+// box, not no chevron. Below `lg` it drops its hover pad and occupies exactly
+// the 16px the preset row's plain chevron does, which is where those 8px come
+// from. Losing the tap target costs nothing: the ROW opens the library on the
+// same handler, so this is a second door to the same place.
 function LibraryButton({ onClick, className = '' }: { onClick: () => void; className?: string }) {
   return (
     <button
@@ -33,9 +38,9 @@ function LibraryButton({ onClick, className = '' }: { onClick: () => void; class
       onClick={(e) => { e.stopPropagation(); onClick() }}
       title="Reference photos"
       aria-label="Open reference photos"
-      className={`h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-200 ${className || 'flex'}`}
+      className={`h-6 w-4 shrink-0 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-200 lg:w-6 ${className || 'flex'}`}
     >
-      <ChevronRight className="h-4 w-4" strokeWidth={2} />
+      <ChevronRight className="h-4 w-4 shrink-0" strokeWidth={2} />
     </button>
   )
 }
@@ -101,7 +106,7 @@ export default function PhotoExtractZone({
             />
           )}
         </div>
-        <LibraryButton onClick={onOpenLibrary} className="hidden lg:flex" />
+        <LibraryButton onClick={onOpenLibrary} />
       </div>
     )
   }
@@ -136,7 +141,7 @@ export default function PhotoExtractZone({
         >
           <X className="h-3.5 w-3.5" />
         </button>
-        <LibraryButton onClick={onOpenLibrary} className="hidden lg:flex" />
+        <LibraryButton onClick={onOpenLibrary} />
       </div>
     )
   }
@@ -174,7 +179,7 @@ export default function PhotoExtractZone({
             </>
           )}
         </div>
-        <LibraryButton onClick={onOpenLibrary} className="hidden lg:flex" />
+        <LibraryButton onClick={onOpenLibrary} />
       </div>
 
       {extractError && (
