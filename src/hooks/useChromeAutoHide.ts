@@ -52,7 +52,7 @@ const HIDE_TRAVEL_PX = 40
 const SHOW_TRAVEL_PX = 260
 const TOP_ZONE_PX = 32
 // Apps the dock never gets out of the way for. Edit is one screen of download
-// page: collapsing the dock hands it ~108px it has no use for, and what the
+// page: collapsing the dock hands it ~98px it has no use for, and what the
 // member sees is the page jumping under a thumb that was only nudging it.
 const NEVER_HIDE_IN = new Set(['edit-studio', 'dashboard'])
 const SETTLE_MS = 420
@@ -60,7 +60,7 @@ const SETTLE_MS = 420
 // slack absorbs sub-pixel layout without letting a real swipe hide behind a
 // small reflow.
 const CLAMP_SLACK_PX = 4
-// The dock is worth ~108px. A scroller with less overflow than that gains
+// The dock is worth ~98px. A scroller with less overflow than that gains
 // nothing by hiding it — and hiding it can leave the list too short to scroll
 // back up far enough to ask for it again.
 const MIN_OVERFLOW_PX = 200
@@ -74,7 +74,7 @@ const PROGRAMMATIC_MS = 800
 // Transcript / Scenes toggle, Characters' tab jump, the Bank product form's
 // section jump, Scripts' scroll to Generate) travels most of a screen in one
 // direction, which is exactly what a deliberate swipe down looks like from
-// here — so the dock hid MID-ANIMATION, the pane's inset went 108px → 0, and
+// here — so the dock hid MID-ANIMATION, the pane's inset went 98px → 0, and
 // the browser's own smooth scroll relayouted underneath itself. Measured on the
 // Ad Analyzer at 375px: a jump to Scenes landed 670px past its target from the
 // top of the read, and did nothing at all from halfway down. Every one of these
