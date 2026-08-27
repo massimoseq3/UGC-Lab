@@ -178,13 +178,16 @@ export default function BankPicker({
   // Everything with a thumbnail (influencers, products, b-rolls, scripts) packs
   // into the same dense grid the main Bank uses — `grid-flow-row-dense`
   // backfills the hole a wide card leaves. Voices are text rows, so they stay
-  // single-column. Three columns only from `md` — that's the breakpoint where
-  // the panel becomes the fixed 560px slide-over; below it the sheet is
-  // full-width on a phone, where three tiles would be unreadable.
+  // single-column. THREE columns at every width (August 2026, Massimo's call):
+  // a phone showed two, on the theory that a third tile would be unreadable,
+  // but these are 9:16 portraits with the name written across them — at ~112px
+  // they still read, and two-up meant a 390px sheet showed four characters in a
+  // screen and a half of scrolling when the point of the picker is recognising
+  // one on sight.
   const gridClass =
     currentBankType === 'voices'
       ? 'flex flex-col gap-2'
-      : 'grid grid-flow-row-dense grid-cols-2 items-start gap-2 md:grid-cols-3'
+      : 'grid grid-flow-row-dense grid-cols-3 items-start gap-2'
 
   const renderCard = (item: BankItem) => {
     const isSelected = multiSelect && selectedIds.includes(item.id)

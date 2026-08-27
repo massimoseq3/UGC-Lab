@@ -713,6 +713,10 @@ function VariationCard({
     applyText(history[i])
   }
 
+  // Also the tooltip and the accessible name, since the word itself is hidden
+  // on a phone — the button has to keep saying what it copies somewhere.
+  const copyAllLabel = copied ? 'Copied' : scenes ? 'Copy Full Script' : hooks ? 'Copy All' : 'Copy'
+
   const handleCopyAll = async () => {
     const ok = await copyToClipboard(shareText)
     if (ok) {
@@ -825,12 +829,20 @@ function VariationCard({
           </div>
         )}
         {!editing && (
+          // Glyph only on a phone (Massimo's call, August 2026). This row also
+          // carries the Raw / Scene Prompts toggle and the scene count, and
+          // "Copy Full Script" is the longest label on it — at 375px the three
+          // ran into each other. The copy icon says what the button does
+          // without being read; the wording survives as the tooltip and the
+          // accessible name, and the tick is the same feedback either way.
           <button
             onClick={handleCopyAll}
+            title={copyAllLabel}
+            aria-label={copyAllLabel}
             className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
           >
             {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
-            {copied ? 'Copied' : scenes ? 'Copy Full Script' : hooks ? 'Copy All' : 'Copy'}
+            <span className="max-md:hidden">{copyAllLabel}</span>
           </button>
         )}
         {editing && (
@@ -1038,10 +1050,12 @@ function VoiceProfileCard({ body, onChange }: { body: string; onChange?: (next: 
         </span>
         <button
           onClick={handleCopy}
+          title={copied ? 'Copied' : 'Copy the voice profile'}
+          aria-label={copied ? 'Copied' : 'Copy the voice profile'}
           className="absolute right-0 top-1/2 flex -translate-y-1/2 shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
         >
           {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
-          {copied ? 'Copied' : 'Copy'}
+          <span className="max-md:hidden">{copied ? 'Copied' : 'Copy'}</span>
         </button>
       </div>
       {/* Always-on field, not click-to-edit: this block is plain prose with
@@ -1193,10 +1207,12 @@ function HookLineCard({ hook, index, onChange }: { hook: ParsedHook; index: numb
         </span>
         <button
           onClick={handleCopy}
+          title={copied ? 'Copied' : 'Copy this hook'}
+          aria-label={copied ? 'Copied' : 'Copy this hook'}
           className="flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
         >
           {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
-          {copied ? 'Copied' : 'Copy'}
+          <span className="max-md:hidden">{copied ? 'Copied' : 'Copy'}</span>
         </button>
       </div>
       <EditableText
@@ -1302,10 +1318,12 @@ function SceneChunkCard({
         <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
           <button
             onClick={handleCopy}
+            title={copied ? 'Copied' : 'Copy this scene'}
+            aria-label={copied ? 'Copied' : 'Copy this scene'}
             className="flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
           >
             {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
-            {copied ? 'Copied' : 'Copy'}
+            <span className="max-md:hidden">{copied ? 'Copied' : 'Copy'}</span>
           </button>
           {/* The house two-click delete, in its panel skin — never a modal. It
               cuts the scene out of the take and renumbers what's left, and it

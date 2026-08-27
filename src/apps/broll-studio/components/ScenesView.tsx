@@ -797,56 +797,66 @@ export default function ScenesView({
           over a panel background that never moves is a backdrop root's cost for
           no picture. `relative z-20` so a card's own positioned hover chrome
           can't paint over it. */}
-      {/* One row on desktop (`md:flex-nowrap`): four batch pills plus the meta
-          add up to more than the panel at 1280 and at any real zoom level, and
-          `flex-wrap` answered that by dropping the whole button group onto a
-          second line — so the strip was two rows tall on some windows and one
-          on others. The meta shrinks and truncates instead; the buttons are the
-          part you can't guess from a shorter label. Under md it still wraps,
-          where there genuinely isn't a row's worth of width. */}
-      <div className="relative z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-ink/5 px-5 py-3.5 md:flex-nowrap">
-        {/* Meta is desktop-only. On a phone this strip is the batch row and
-            nothing else: the scene count is a caption for a storyboard you can
-            see, and the style is named on every card's own footer — between
-            them they were taking the line the buttons needed. */}
-        <div className="hidden min-w-0 items-center gap-2 md:flex">
-          {/* Small-caps and dim — the count is a caption for the storyboard
-              below it, so it takes the same eyebrow treatment as the style pill
-              beside it rather than reading as a heading. */}
-          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-            {result.scenes.length} Scene{result.scenes.length === 1 ? '' : 's'}
-          </span>
-          {/* Style pill — parity with Continuous, so the member can see
-              which look every b-roll clip is rendered in. */}
-          <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-broll-500/25 bg-broll-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-broll-300">
-            <Palette className="h-3 w-3 shrink-0" strokeWidth={2} />
-            <span className="truncate">{result.styleBrief ? (result.styleName?.trim() || 'Custom style') : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
-          </span>
-        </div>
+      {/* The strip is the BATCH BUTTONS and nothing else, centred (August 2026,
+          Massimo's call). The scene count and the style pill shared this line
+          for a year, meta left and buttons right, and the two fought over it:
+          the buttons can't shrink (`shrink-0`, and a batch pill you can't read
+          is a batch you won't press), so the meta took the squeeze — and once
+          it was past its own min-content the count and the style pill PAINTED
+          OVER the first button. Reported at 900px, where the port is ~590px
+          against 592px of pills; the older `flex-wrap` shape had answered the
+          same shortage by dropping the whole button group to a second line,
+          which made the strip two rows tall on some windows and one on others.
+          The meta moved below the separator instead, into the storyboard it
+          describes — see the note there. What's left can never collide with
+          anything, because nothing else is on the line. */}
+      <div className="relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 px-5 py-3.5">
         {/* Batch actions, in the order the work happens — images, then the
             animate pass, then videos, then the export. Same shape and styling
-            as Continuous' top strip. One line from md up.
-            On a phone they are ONE line too, and it SCROLLS: four pills wrapped
-            to two or three rows there, which is 40px of chrome per extra row on
-            the screen with the least of it, and the work reads as a sequence
-            anyway — swiping along the row is closer to what it is than stacking
+            as Continuous' top strip. ONE line at every width, centred, and it
+            SCROLLS when the four pills outrun the panel — four pills wrapped to
+            two or three rows on a phone, which is 40px of chrome per extra row
+            on the screen with the least of it, and the work reads as a sequence
+            anyway, so swiping along it is closer to what it is than stacking
             it. `-mx-5 px-5` so the row scrolls edge to edge while its first and
-            last pills still sit on the panel's own inset. */}
-        <div className="-mx-5 flex w-full min-w-0 items-center gap-2 overflow-x-auto scrollbar-hide whitespace-nowrap px-5 md:mx-0 md:w-auto md:justify-end md:overflow-visible md:px-0 md:shrink-0">
+            last pills still sit on the panel's own inset.
+            `w-max min-w-full` on the inner row is what lets it be centred AND
+            scrollable: a plain `justify-center` inside a scroll port centres the
+            overflow too, which puts the first pill off the left edge with no way
+            to scroll back to it. At `min-w-full` the row is exactly the port
+            when it fits (so centring does the work) and exactly its content when
+            it doesn't (so centring is a no-op and the scroll starts at pill
+            one). */}
+        <div className="-mx-5 w-full overflow-x-auto scrollbar-hide px-5">
+        <div className="flex w-full flex-wrap items-center justify-center gap-2 md:w-max md:min-w-full md:flex-nowrap md:whitespace-nowrap">
+          {/* The three generate steps are ONE tinted family in three depths —
+              images lightest, animate medium, videos darkest (August 2026,
+              Massimo's call) — so the row reads as one sequence getting more
+              expensive rather than as two grey buttons around a solid CTA.
+              Videos used to be the app's `glass-fill` accent CTA, which made it
+              the loudest thing in the panel and read as THE button rather than
+              as the last of three. Download clips stays neutral: it's the
+              export, not a generate step, and it spends nothing. */}
           <button
             type="button"
             onClick={() => requestBatch(allKeys, 'All scenes', true)}
             title="Generate images across all scenes — one option per line, or every variation"
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/15 bg-broll-500/[0.05] px-3.5 py-1.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/30 hover:bg-broll-500/[0.12]"
           >
             <Images className="h-3.5 w-3.5" />
             {/* Two spans, no JS media query: at 375px the three full labels are
                 wider than the screen, so the row cut the last pill in half at
                 the bezel and read as clipped rather than as a scroller. Short
                 labels fit all three on one line; a fourth (Download clips) puts
-                the row back into a swipe, which is what it was built for. */}
-            <span className="md:hidden">All images</span>
-            <span className="max-md:hidden">Generate all images</span>
+                the row back into a swipe, which is what it was built for.
+                They switch at `lg`, not `md` (August 2026): the full four are
+                592px against a right panel that is 498px at a 768px window and
+                590px at 900, so the band just above the phone breakpoint was
+                where the row overflowed WORST — and there the swipe reads as a
+                clipped pill rather than as something to drag. At 1024 the panel
+                is 677px and the full labels fit with room to spare. */}
+            <span className="lg:hidden">All images</span>
+            <span className="max-lg:hidden">Generate all images</span>
           </button>
           {/* Animate — the step straight after Generate-all-images, and only
               offered once there's a still to animate. It's scoped to the cards
@@ -858,22 +868,22 @@ export default function ScenesView({
               type="button"
               onClick={() => requestVideoBatch(allKeys, 'All stills', true, true)}
               title="Animate every card that already has a still — nothing renders from a prompt alone"
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 py-1.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/40 hover:bg-broll-500/20"
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/30 bg-broll-500/[0.13] px-3.5 py-1.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.21]"
             >
               <Clapperboard className="h-3.5 w-3.5" />
-              <span className="md:hidden">Animate</span>
-              <span className="max-md:hidden">Animate all stills</span>
+              <span className="lg:hidden">Animate</span>
+              <span className="max-lg:hidden">Animate all stills</span>
             </button>
           )}
           <button
             type="button"
             onClick={() => requestVideoBatch(allKeys, 'All scenes', true)}
             title="Generate clips across all scenes — one option per line, or every variation"
-            className="flex shrink-0 items-center gap-1.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/50 bg-broll-500/[0.24] px-3.5 py-1.5 text-[11px] font-medium text-broll-200 transition-colors hover:border-broll-500/65 hover:bg-broll-500/[0.32]"
           >
             <VideoIcon className="h-3.5 w-3.5" />
-            <span className="md:hidden">All videos</span>
-            <span className="max-md:hidden">Generate all videos</span>
+            <span className="lg:hidden">All videos</span>
+            <span className="max-lg:hidden">Generate all videos</span>
           </button>
           {allClipEntries.length > 0 && (
             <button
@@ -883,16 +893,40 @@ export default function ScenesView({
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
             >
               <Download className="h-3.5 w-3.5" />
-              <span className="md:hidden">{`Clips (${allClipEntries.length})`}</span>
-              <span className="max-md:hidden">{`Download clips (${allClipEntries.length})`}</span>
+              <span className="lg:hidden">{`Clips (${allClipEntries.length})`}</span>
+              <span className="max-lg:hidden">{`Download clips (${allClipEntries.length})`}</span>
             </button>
           )}
+        </div>
         </div>
       </div>
       {/* The scroll port. `pt-5` replaces the strip's old `mb-5` — the gap
           between the bar and the first scene now belongs to the scrolling
           content, which is where it was already being drawn. */}
       <div className="flex-1 overflow-y-auto px-5 pb-4 pt-5">
+      {/* How many scenes, and the look they all render in — BELOW the strip's
+          separator, at the top of the storyboard rather than in the bar above
+          it. It's a caption for the work, not a control, and up in the bar it
+          was the thing squeezing the batch buttons off their own line. Down
+          here it scrolls away with the storyboard, which is right: you read it
+          once on arrival. Desktop-only, as it has been — on a phone the count
+          captions a storyboard you can already see and the style is named on
+          every card's own footer, and between them they're 40px of chrome on
+          the screen with the least to give. */}
+      <div className="mb-8 hidden min-w-0 max-w-full items-center justify-center gap-2 md:flex">
+        {/* Small-caps and dim — the count is a caption for the storyboard below
+            it, so it takes the same eyebrow treatment as the style pill beside
+            it rather than reading as a heading. */}
+        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
+          {result.scenes.length} Scene{result.scenes.length === 1 ? '' : 's'}
+        </span>
+        {/* Style pill — parity with Continuous, so the member can see which
+            look every b-roll clip is rendered in. */}
+        <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-broll-500/25 bg-broll-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-broll-300">
+          <Palette className="h-3 w-3 shrink-0" strokeWidth={2} />
+          <span className="truncate">{result.styleBrief ? (result.styleName?.trim() || 'Custom style') : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
+        </span>
+      </div>
       <div className="flex flex-col gap-10">
         {result.scenes.map((scene) => (
           <SceneSection
@@ -1564,31 +1598,40 @@ function SceneSection({
     // the shadow 16px of room inside the contained box; the negative margin
     // cancels against the parent's flex `gap-10`, so layout is unchanged.
     <div className="-m-4 p-4" style={{ contentVisibility: 'auto', containIntrinsicSize: '700px' }}>
-      {/* Scene header — number + tiny line chip + the line itself. The
-          spoken-duration chip was removed (its estimate was unreliable). */}
-      {/* Stacks on a phone: the two batch buttons are ~330px of shrink-0, which
-          left the line itself a column two characters wide.
-
-          And it CENTRES there. The desktop shape is a masthead — number, rule,
-          then the line running away to the right — which needs a column wide
-          enough for the rule to divide something. On a phone it doesn't have
-          one, so the number sits over the line instead and the whole block is
-          centred: the rule and the LINE N chip both go (the chip repeats the
-          number an inch above it), and what's left is the take number and the
-          words, which is what the header is for. */}
-      <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
-        <div className="flex min-w-0 items-center gap-4 max-md:flex-col max-md:gap-1">
+      {/* Scene header — the take number, the line, then the two per-scene batch
+          buttons, CENTRED and stacked at EVERY width (August 2026, Massimo's
+          call: match how it looks on a phone). It used to be a masthead on a
+          desktop — number, hairline rule, the line running away to the right,
+          the buttons parked on the far edge — a shape a phone had already given
+          up, because ~330px of shrink-0 buttons left the line a column two
+          characters wide. Centred, one header serves both, and it stacks under
+          the storyboard's own centred batch strip instead of reading as a
+          second bar aligned a different way. The rule went with the split (it
+          divided a row that no longer exists) and so did the `LINE N` chip: it
+          printed the scene's number two inches under the 48px numeral that is
+          the header's own first line. The spoken-duration chip was removed
+          earlier — its estimate was unreliable. */}
+      <div className="mb-5 flex flex-col items-center gap-3">
+        {/* `w-full`, not a shrink-to-fit column. Under `items-center` alone this
+            block sized itself to fit-content and landed at ~470px inside an
+            845px panel — with a `w-full` chain under it the percentage can't
+            resolve until the parent has a width, and the parent was waiting on
+            the content — so the line wrapped onto a second row with 180px of
+            empty panel either side of it. Full width, `text-center` inside, and
+            it wraps only when the words genuinely run out of room. */}
+        <div className="flex w-full min-w-0 flex-col items-center gap-1">
           <span
             className="text-5xl font-normal italic tabular-nums text-ink-700"
             style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
           >
             {String(scene.number).padStart(2, '0')}
           </span>
-          <div className="h-8 w-px bg-ink/10 max-md:hidden" />
-          <div className="flex min-w-0 flex-col gap-1.5 max-md:w-full max-md:items-center">
-            <span className="inline-flex w-fit rounded-full border border-ink/10 bg-ink/[0.03] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-400 max-md:hidden">
-              Line {scene.number}
-            </span>
+          {/* No reading-measure cap. A `max-w-2xl` was tried and came straight
+              off: the panel is ~1000px wide and the line is the one thing here
+              worth reading, so capping it wrapped a quote onto a second line
+              with one word alone on it while 300px sat empty either side. It
+              takes the width it has and wraps only when it genuinely runs out. */}
+          <div className="flex w-full min-w-0 flex-col items-center gap-1.5">
             {/* The line itself, and the place you retype it. Clicking it opens
                 the editor; saving swaps the quoted words in this scene's
                 prompts, so a dialogue card says the new sentence without a
@@ -1598,10 +1641,10 @@ function SceneSection({
                 type="button"
                 onClick={() => setLineEditorOpen(true)}
                 title="Edit this line"
-                className="group/line -mx-1.5 flex items-start gap-2 rounded-lg px-1.5 py-0.5 text-left transition-colors hover:bg-ink/[0.04] max-md:w-full max-md:justify-center max-md:text-center"
+                className="group/line -mx-1.5 flex w-full items-start justify-center gap-2 rounded-lg px-1.5 py-0.5 text-center transition-colors hover:bg-ink/[0.04]"
               >
                 <p
-                  className="text-lg font-normal italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200 max-md:text-center"
+                  className="text-center text-lg font-normal italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200"
                   style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
                 >
                   &ldquo;{scene.scriptLine}&rdquo;
@@ -1610,7 +1653,7 @@ function SceneSection({
               </button>
             ) : (
               <p
-                className="text-lg font-normal italic leading-relaxed text-ink-400 max-md:text-center"
+                className="text-center text-lg font-normal italic leading-relaxed text-ink-400"
                 style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
               >
                 &ldquo;{scene.scriptLine}&rdquo;
@@ -1621,7 +1664,7 @@ function SceneSection({
         {/* Per-scene batches — one row's worth of images or clips, so a member
             can work scene by scene instead of committing the whole storyboard's
             credits in one press. */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2 max-md:justify-center">
+        <div className="flex shrink-0 flex-wrap items-center justify-center gap-2">
           <button
             type="button"
             onClick={onGenerateScene}
