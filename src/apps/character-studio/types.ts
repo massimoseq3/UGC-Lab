@@ -172,67 +172,12 @@ export const TABS: TabConfig[] = [
         ],
       },
       {
-        id: 'eyes',
-        label: 'Eyes',
-        icon: Eye,
-        fields: [
-          {
-            key: 'eyeColor',
-            label: 'Eye Color',
-            chips: ['Brown', 'Blue', 'Green', 'Hazel', 'Gray', 'Amber', 'Dark brown'],
-          },
-          {
-            key: 'eyeShape',
-            label: 'Eye Shape',
-            chips: ['Almond', 'Round', 'Hooded', 'Monolid', 'Upturned', 'Downturned', 'Deep-set', 'Wide-set'],
-          },
-        ],
-      },
-      {
-        id: 'hair',
-        label: 'Hair',
-        icon: Scissors,
-        fields: [
-          {
-            key: 'hairColor',
-            label: 'Hair Color',
-            chips: ['Blonde', 'Brunette', 'Black', 'Red', 'Auburn', 'Gray', 'Platinum'],
-          },
-          {
-            key: 'hairTexture',
-            label: 'Hair Texture',
-            chips: ['Straight', 'Wavy', 'Curly', 'Coily', 'Kinky', 'Fine', 'Thick'],
-          },
-          {
-            key: 'hairStyle',
-            label: 'Hair Style',
-            chips: [
-              'Long straight', 'Long wavy', 'Shoulder-length', 'Bob', 'Pixie cut', 'Ponytail', 'Messy bun', 'Braids', 'Curtain Bangs + Layers', 'Short textured', 'Buzz cut',
-              // Micro-realism variants — loose flyaways and baby hairs kill the
-              // "too-perfect helmet hair" AI tell. Each bundles a base style
-              // with the realism cue so it stays a single click. Long enough to
-              // star (see ChipField's DETAILED_LEN), which is also what the
-              // built-in presets pick so a loaded recipe shows the starred row
-              // as selected rather than a bare word.
-              'Long wavy with loose flyaways and baby hairs framing the face',
-              'Messy bun with soft flyaways and stray strands at the hairline',
-              'Sleek ponytail with natural baby hairs at the hairline',
-              'Effortless waves with subtle frizz and natural flyaways',
-              'Long straight with blunt bangs and soft flyaways',
-              'Short textured crop with natural movement and a few stray strands',
-              'Thick box braids pulled back, with baby hairs along the hairline',
-              'Neatly combed short side part, silver-gray at the temples',
-              'Soft silver bob with natural flyaways and a gentle wave',
-              'Closely shaved head with fine natural stubble and visible scalp texture',
-            ],
-            wide: true,
-          },
-        ],
-      },
-      {
         // Skin tone/texture live here with the facial-feature fields — one
-        // "face" group rather than a separate Skin section higher up, so the
-        // top of the form stays light and the descriptive fields cluster.
+        // "face" group rather than a separate Skin section. It sits directly
+        // under Identity, above Eyes and Hair: skin and realism is what decides
+        // whether a render reads as a photograph at all, so it's the group a
+        // member fills first rather than the one they reach by scrolling past
+        // eye shape and hair texture.
         id: 'face-skin',
         label: 'Face & Skin',
         icon: Smile,
@@ -302,6 +247,64 @@ export const TABS: TabConfig[] = [
             label: 'Distinguishing Marks',
             chips: ['None', 'Beauty mark', 'Dimples', 'Scar', 'Birthmark', 'Tattoo', 'Piercing'],
             placeholder: 'e.g. "Beauty mark on left cheek"',
+          },
+        ],
+      },
+      {
+        id: 'eyes',
+        label: 'Eyes',
+        icon: Eye,
+        fields: [
+          {
+            key: 'eyeColor',
+            label: 'Eye Color',
+            chips: ['Brown', 'Blue', 'Green', 'Hazel', 'Gray', 'Amber', 'Dark brown'],
+          },
+          {
+            key: 'eyeShape',
+            label: 'Eye Shape',
+            chips: ['Almond', 'Round', 'Hooded', 'Monolid', 'Upturned', 'Downturned', 'Deep-set', 'Wide-set'],
+          },
+        ],
+      },
+      {
+        id: 'hair',
+        label: 'Hair',
+        icon: Scissors,
+        fields: [
+          {
+            key: 'hairColor',
+            label: 'Hair Color',
+            chips: ['Blonde', 'Brunette', 'Black', 'Red', 'Auburn', 'Gray', 'Platinum'],
+          },
+          {
+            key: 'hairTexture',
+            label: 'Hair Texture',
+            chips: ['Straight', 'Wavy', 'Curly', 'Coily', 'Kinky', 'Fine', 'Thick'],
+          },
+          {
+            key: 'hairStyle',
+            label: 'Hair Style',
+            chips: [
+              'Long straight', 'Long wavy', 'Shoulder-length', 'Bob', 'Pixie cut', 'Ponytail', 'Messy bun', 'Braids', 'Curtain Bangs + Layers', 'Short textured', 'Buzz cut',
+              // Micro-realism variants — loose flyaways and baby hairs kill the
+              // "too-perfect helmet hair" AI tell. Each bundles a base style
+              // with the realism cue so it stays a single click. Long enough to
+              // star (see ChipField's DETAILED_LEN), which is also what the
+              // built-in presets pick so a loaded recipe shows the starred row
+              // as selected rather than a bare word.
+              'Long wavy with loose flyaways and baby hairs framing the face',
+              'Messy bun with soft flyaways and stray strands at the hairline',
+              'Sleek ponytail with natural baby hairs at the hairline',
+              'Effortless waves with subtle frizz and natural flyaways',
+              'Long straight with blunt bangs and soft flyaways',
+              'Short textured crop with natural movement and a few stray strands',
+              'Thick box braids pulled back, with baby hairs along the hairline',
+              'Neatly combed short side part, silver-gray at the temples',
+              'Soft silver bob with natural flyaways and a gentle wave',
+              'Closely shaved head with fine natural stubble and visible scalp texture',
+            ],
+            wide: true,
           },
         ],
       },
