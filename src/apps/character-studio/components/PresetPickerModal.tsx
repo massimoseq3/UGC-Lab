@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Search, Sparkles, Star } from 'lucide-react'
+import { X, Search, Sparkles, Star, UserRound, Images } from 'lucide-react'
 import type { CharacterProfile } from '../types'
 import type { Model } from '../../../stores/types'
 import { useBankStore } from '../../../stores/bankStore'
@@ -31,12 +31,14 @@ const PAGE = 30
 // One card's worth of anything pickable — a starter shipped with the app, or a
 // character out of the member's own bank. The grid doesn't care which; the two
 // differ only in where the cover comes from (a bundled URL vs an asset ref).
+type Source = 'bank' | 'starter'
+
 interface Entry {
   key: string
   name: string
   // Starters only — the descriptive name behind the scene-and-gender label.
   title?: string
-  source: 'bank' | 'starter'
+  source: Source
   imageUrl?: string
   imageRef?: string
   note?: string
@@ -115,15 +117,6 @@ function CountSlot({ value }: { value: number }) {
   return <span className="inline-block min-w-[2ch] text-center tabular-nums">{value}</span>
 }
 
-function SectionLabel({ children, count }: { children: string; count: number }) {
-  return (
-    <div className="flex items-center gap-2 px-0.5 pb-2 pt-1">
-      <span className="text-[9px] font-semibold uppercase tracking-widest text-ink-500">{children}</span>
-      <span className="rounded-full bg-ink/[0.06] px-1.5 text-[10px] font-medium text-ink-600">{count}</span>
-    </div>
-  )
-}
-
 /**
  * The centred preset browser — the starters shipped with the app and the
  * member's own saved characters in one scrolling grid.
@@ -132,8 +125,16 @@ function SectionLabel({ children, count }: { children: string; count: number }) 
  * library: three faces across meant the starters alone ran past a screen, and
  * a member's own characters were only reachable by scrolling past every
  * built-in. A centred modal gets six across at a size a face is still
- * judgeable at, puts the bank FIRST (they're yours), and pages the grid in as
- * you scroll rather than mounting a few hundred image decodes on open.
+ * judgeable at and pages the grid in as you scroll rather than mounting a few
+ * hundred image decodes on open.
+ *
+ * The two libraries are a TOGGLE, not two sections of one scroll. Stacked,
+ * your own characters were a band at the top that a member with 35 of them
+ * scrolled past to reach a template, and the templates' scene facet was
+ * filtering a list that was half bank rows — where a scene is a keyword guess
+ * off free text rather than the library's own shot category. One at a time,
+ * each side gets the whole grid and the scene menu belongs to the side it was
+ * built for; it renders only there.
  *
  * Calls `onPick` with the chosen recipe as a flat profile map, then closes.
  * Callers decide what to do with that map: apply it wholesale
@@ -153,6 +154,7 @@ export default function PresetPickerModal({
   title?: string
   subtitle?: string
 }) {
+  const gridRef = useRef<HTMLDivElement>(null)
   const backdrop = useBackdropClose(onClose)
   useCloseOnEscape(open, onClose)
   useCloseOnAppSwitch(open, onClose)
@@ -163,6 +165,12 @@ export default function PresetPickerModal({
   const [reloadKey, setReloadKey] = useState(0)
 
   const [search, setSearch] = useState('')
+  // `null` is "hasn't picked yet", so the front door can be DERIVED from the
+  // bank rather than corrected by an effect after the first render: your own
+  // characters, unless you don't have any yet. A click makes it a real pick,
+  // including a click onto an empty bank — the badge reads 0 and the empty
+  // state says why, which beats a segment that ignores you.
+  const [sourcePick, setSourcePick] = useState<Source | null>(null)
   const [gender, setGender] = useState('')
   const [setting, setSetting] = useState('')
   const [visible, setVisible] = useState(PAGE)
@@ -200,6 +208,8 @@ export default function PresetPickerModal({
     })
   }, [bankModels])
 
+  const source: Source = sourcePick ?? (bankEntries.length > 0 ? 'bank' : 'starter')
+
   const starterEntries = useMemo<Entry[]>(() => (starters ?? []).map((s) => ({
     key: `starter-${s.id}`,
     name: s.name,
@@ -226,9 +236,10 @@ export default function PresetPickerModal({
   const q = search.trim().toLowerCase()
   const passes = useMemo(() => ({
     q: (e: Entry) => !q || e.search.includes(q),
+    source: (e: Entry) => e.source === source,
     gender: (e: Entry) => !gender || e.gender === gender,
     setting: (e: Entry) => !setting || e.setting === setting,
-  }), [q, gender, setting])
+  }), [q, source, gender, setting])
 
   // The scene segments, in the LIBRARY's own order — the order the source
   // folder numbers its shot categories in, which the build script bakes into
@@ -243,6 +254,32 @@ export default function PresetPickerModal({
     }
     return seen
   }, [starterEntries, bankEntries])
+
+  // The two library counts are tallied against search and gender but NOT
+  // against the scene, which belongs to the templates alone: a scene picked on
+  // that side would otherwise narrow the "Your Characters" badge too, and the
+  // number would stop matching the grid you get on clicking it.
+  const sourceOptions = useMemo(() => {
+    const rows = all.filter((e) => passes.q(e) && passes.gender(e))
+    const count = (k: Source) => rows.filter((e) => e.source === k).length
+    return [
+      {
+        value: 'bank' as Source,
+        // Shortened below `sm` rather than shrinking the control: at 375px the
+        // segment has ~145px for an icon, a label and a count, and the full
+        // wording rendered as "Your Chara…". Two spans, no JS media query.
+        label: (
+          <>
+            <span className="sm:hidden">Yours</span>
+            <span className="hidden sm:inline">Your Characters</span>
+          </>
+        ),
+        icon: UserRound,
+        badge: <CountSlot value={count('bank')} />,
+      },
+      { value: 'starter' as Source, label: 'Templates', icon: Images, badge: <CountSlot value={count('starter')} /> },
+    ]
+  }, [all, passes])
 
   const facets = useMemo(() => {
     // Rows passing every filter but this one — the pool each facet counts in,
@@ -285,8 +322,6 @@ export default function PresetPickerModal({
   )
 
   const shown = filtered.slice(0, visible)
-  const bankShown = shown.filter((e) => e.source === 'bank')
-  const starterShown = shown.filter((e) => e.source === 'starter')
 
   // Infinite scroll: the next page is pulled in once the grid is within a
   // screenful of its end, so it's already rendered by the time the last row
@@ -305,6 +340,15 @@ export default function PresetPickerModal({
   // Done on the way in rather than in an effect watching the filters, which
   // would render the long list once before cutting it back.
   const refilter = <T,>(set: (v: T) => void) => (value: T) => { set(value); setVisible(PAGE) }
+
+  const changeSource = (value: Source) => {
+    setSourcePick(value)
+    setVisible(PAGE)
+    // Back to the top with it. The page count resets, so a member deep in the
+    // templates who switches would otherwise be dropped at the foot of a
+    // three-card bank by the browser's own clamp.
+    if (gridRef.current) gridRef.current.scrollTop = 0
+  }
 
   const pick = (profile: Record<string, string> | CharacterProfile) => {
     onPick(profile)
@@ -352,20 +396,21 @@ export default function PresetPickerModal({
           </button>
         </div>
 
-        {/* Search and both facets on ONE bar. Gender is a toggle — three
-            options, all worth seeing without a click — and the eleven scenes
-            are a menu, since as a toggle they made a strip no window fits and
-            pushed the grid down a row. Shot type (Close-up / Medium / Full
-            body) was a third facet and is gone: a starter is chosen by who and
-            where, and three framings across 76 characters mostly cut the grid
-            down without answering anything. */}
+        {/* Search and the facets on one bar, the library toggle on its own
+            line beneath them. Gender is a toggle (three options, all worth
+            seeing without a click); the scenes are a menu, since as a toggle
+            they made a strip no window fits and pushed the grid down a row.
+            Shot type (Close-up / Medium / Full body) was a third facet and is
+            gone: a starter is chosen by who and where, and three framings
+            across the library mostly cut the grid down without answering
+            anything. */}
         <div className="flex shrink-0 flex-col gap-2 border-b border-ink/5 px-5 py-3">
-          {/* One bar: search, then the two facets. The scene menu takes a
-              FIXED width rather than fitting its content — its label swings
-              from "All Scenes" to "Holding Product", and a trigger that
-              resized itself would push the gender toggle along the row on
-              every pick, which is the shifting this control was moved to
-              avoid. Every count rides in a `CountSlot` for the same reason. */}
+          {/* One bar. The scene menu takes a FIXED width rather than fitting
+              its content — its label swings from "All Scenes" to "Holding
+              Product", and a trigger that resized itself would push the gender
+              toggle along the row on every pick, which is the shifting this
+              control was moved to avoid. Every count rides in a `CountSlot`
+              for the same reason. */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex h-9 min-w-[180px] flex-1 items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5">
               <Search className="h-3.5 w-3.5 shrink-0 text-ink-600" />
@@ -395,11 +440,24 @@ export default function PresetPickerModal({
               />
             </div>
           </div>
+          {/* Which library, on its own full-width line under the filters — the
+              same shape as the Controls column's own Physical / Scene & Pose
+              toggle, because it does the same job: it swaps what the panel is
+              showing, where the row above it only narrows it. Inside that row
+              it was a third control competing with two facets; under it, it
+              reads as the two halves of the library. */}
+          <SegmentedToggle
+            value={source}
+            onChange={changeSource}
+            options={sourceOptions}
+            accent="influencers"
+            className="h-10 !p-1"
+          />
         </div>
 
         {/* Grid */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4" onScroll={handleScroll}>
-          {loadError && starterEntries.length === 0 ? (
+        <div ref={gridRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4" onScroll={handleScroll}>
+          {loadError && source === 'starter' && starterEntries.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <p className="max-w-sm text-sm text-ink-500">{loadError}</p>
               <button
@@ -410,34 +468,23 @@ export default function PresetPickerModal({
                 Try again
               </button>
             </div>
-          ) : !starters && bankEntries.length === 0 ? (
+          ) : !starters && source === 'starter' ? (
             <div className="flex h-full items-center justify-center">
               <Spinner className="h-5 w-5 text-ink-600" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex h-full items-center justify-center">
-              <p className="text-sm text-ink-600">No characters match those filters.</p>
+              <p className="text-sm text-ink-600">
+                {source === 'bank' && bankEntries.length === 0
+                  ? 'No saved characters yet.'
+                  : 'No characters match those filters.'}
+              </p>
             </div>
           ) : (
             <>
-              {bankShown.length > 0 && (
-                <>
-                  <SectionLabel count={filtered.filter((e) => e.source === 'bank').length}>Your Characters</SectionLabel>
-                  <div className={grid}>
-                    {bankShown.map((e) => <PresetCard key={e.key} entry={e} onClick={() => pick(e.profile)} />)}
-                  </div>
-                </>
-              )}
-              {starterShown.length > 0 && (
-                <>
-                  <div className={bankShown.length > 0 ? 'mt-5' : ''}>
-                    <SectionLabel count={filtered.filter((e) => e.source === 'starter').length}>Starters</SectionLabel>
-                  </div>
-                  <div className={grid}>
-                    {starterShown.map((e) => <PresetCard key={e.key} entry={e} onClick={() => pick(e.profile)} />)}
-                  </div>
-                </>
-              )}
+              <div className={grid}>
+                {shown.map((e) => <PresetCard key={e.key} entry={e} onClick={() => pick(e.profile)} />)}
+              </div>
               {hasMore && (
                 <div className="flex h-14 items-center justify-center">
                   <Spinner className="h-4 w-4 text-ink-700" />
