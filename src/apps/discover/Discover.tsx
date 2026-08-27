@@ -541,13 +541,39 @@ export default function Discover() {
           ~60px wide, showing neither the placeholder nor what you typed. The
           field + button take their own full-width row (`order-last`); md+ is the
           single 57px band, unchanged, because the wrapper holding them turns
-          into `display: contents` there and puts them straight back in place. */}
+          into `display: contents` there and puts them straight back in place.
+          Everything else — the toggle, the credits chip, the + — shares ONE
+          row, and the toggle gives up the width they need rather than claiming
+          the line: full-width it wrapped them onto a row of their own, 40px of
+          a phone's header spent on a 36px circle. */}
       <header className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink/5 px-4 py-2 md:h-[57px] md:flex-nowrap md:gap-3 md:py-0">
         <SegmentedToggle
           options={[
-            { value: 'vault', label: 'Outlier Vault' },
+            // The segments share the width equally, so the longest label sets
+            // what all three can show — and on a phone this row also carries
+            // the credits chip and the +, which left "Outlier Vault" reading
+            // "Outlie…" and "Meta Ads" as "Meta …". Both shorten there: the
+            // app is already called Outliers and the other two are platform
+            // names either way. Two spans, no JS media query.
+            {
+              value: 'vault',
+              label: (
+                <>
+                  <span className="md:hidden">Vault</span>
+                  <span className="max-md:hidden">Outlier Vault</span>
+                </>
+              ),
+            },
             { value: 'tiktok', label: 'TikTok' },
-            { value: 'meta', label: 'Meta Ads' },
+            {
+              value: 'meta',
+              label: (
+                <>
+                  <span className="md:hidden">Meta</span>
+                  <span className="max-md:hidden">Meta Ads</span>
+                </>
+              ),
+            },
           ]}
           value={view}
           // Nothing is thrown away on a flip — each tab keeps its own search
@@ -561,9 +587,12 @@ export default function Discover() {
           }}
           // Fits its content from `md` up, where it shares the 57px header band
           // with the search field, the Search button and the credits chip. On a
-          // phone that header wraps and this toggle already owns its own line,
-          // so shrinking to three labels only left dead space to the right of
-          // Meta Ads — it takes the full width there instead.
+          // phone it takes the width instead — but as `flex-1`, not `w-full`:
+          // full width forced a wrap, which pushed the + and the credits chip
+          // onto a line of their own under the toggle, 40px of header spent on
+          // one 36px circle. Sharing the row leaves the toggle everything the
+          // two of them don't take.
+          className="max-md:min-w-0 max-md:flex-1"
           fitContent="md"
           dense
         />

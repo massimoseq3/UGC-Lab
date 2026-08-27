@@ -21,8 +21,10 @@ interface SegmentedToggleProps<T extends string> {
   // `'md'` is that behaviour FROM `md` UP and the full-width default below it,
   // for a control that shares a wrapping header row: fitting its content is
   // what keeps it from eating a desktop line it has to share, but on a phone
-  // where it already has a row to itself, shrinking just leaves dead space to
-  // the right of it (Outliers' Outlier Vault / TikTok / Meta Ads).
+  // it should take the width its row has left and split it evenly between its
+  // segments, rather than shrinking to its labels and leaving dead space
+  // beside them (Outliers' Vault / TikTok / Meta, which pairs it with
+  // `max-md:flex-1` so the row's other chrome is served first).
   fitContent?: boolean | 'md'
   // Slimmer padding + smaller icons, sized to sit inline with compact rows
   // (e.g. the sidebar). Keeps the same sliding-indicator animation.
