@@ -238,40 +238,44 @@ export default function ControlsPanel({
           the fields and the member lost the way back to the other tab halfway
           down a form. Above `md` this is a plain wrapper and the column below
           scrolls on its own. */}
-      <div className="flex min-h-0 flex-1 flex-col max-md:overflow-y-auto">
-        {/* Preset loader + reference-photo autofill — a FIXED band under the tab
-            toggle, outside the scroll container entirely. It used to be a
-            `sticky top-0` child of the scroller, which pins it only once the
-            scroll has started: at scroll-top it sat in normal flow and every
-            rubber-band / trackpad overscroll floated it, so the two rows read as
-            loose rather than as part of the panel's chrome. A row that must never
-            move doesn't belong in the thing that moves. */}
-        <div className="shrink-0 px-5 pb-2 pt-2">
-          {/* Side by side at every width. They were stacked under `sm` because
-              two picker rows sharing a phone-width column truncated to
-              "Load Cha…" / "Extract C…", which names neither — but the fix for a
-              label that doesn't fit is a shorter label, not a second row of
-              chrome on the screen with the least of it. Each row carries a short
-              name and swaps to the full one at `lg`, which is the first width
-              where this column is wide enough to read it. */}
-          <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <LoadPresetDropdown onLoadProfile={onProfileChange} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <PhotoExtractZone
-                analyzingCount={analyzingCount}
-                extractError={extractError}
-                applied={referenceApplied}
-                thumbnail={extractedThumb}
-                onPhotoDrop={onPhotoDrop}
-                onReset={onResetExtract}
-                onOpenLibrary={onOpenLibrary}
-              />
-            </div>
+      {/* Preset loader + reference-photo autofill — a FIXED band under the tab
+          toggle, a sibling of BOTH scrollers: the desktop fields column below
+          and the phone-width wrapper around it. It used to be a `sticky top-0`
+          child of the scroller, which pins it only once the scroll has started:
+          at scroll-top it sat in normal flow and every rubber-band / trackpad
+          overscroll floated it, so the two rows read as loose rather than as
+          part of the panel's chrome. It then sat INSIDE the phone wrapper,
+          which is the scroller under `md` — so on a phone it scrolled away with
+          the fields and the two things every run starts from (load a preset,
+          drop a reference photo) were gone by the second card. A row that must
+          never move doesn't belong in the thing that moves, at either width. */}
+      <div className="shrink-0 px-5 pb-2 pt-2">
+        {/* Side by side at every width. They were stacked under `sm` because
+            two picker rows sharing a phone-width column truncated to
+            "Load Cha…" / "Extract C…", which names neither — but the fix for a
+            label that doesn't fit is a shorter label, not a second row of
+            chrome on the screen with the least of it. Each row carries a short
+            name and swaps to the full one at `lg`, which is the first width
+            where this column is wide enough to read it. */}
+        <div className="flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <LoadPresetDropdown onLoadProfile={onProfileChange} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <PhotoExtractZone
+              analyzingCount={analyzingCount}
+              extractError={extractError}
+              applied={referenceApplied}
+              thumbnail={extractedThumb}
+              onPhotoDrop={onPhotoDrop}
+              onReset={onResetExtract}
+              onOpenLibrary={onOpenLibrary}
+            />
           </div>
         </div>
+      </div>
 
+      <div className="flex min-h-0 flex-1 flex-col max-md:overflow-y-auto">
         {/* Scrollable parameter fields. Every
             tab's groups render on one page — each group sits in its own card, and
             the top toggle scroll-jumps between tab blocks (Ad Analyzer pattern).

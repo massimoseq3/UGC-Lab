@@ -199,11 +199,15 @@ function Crew({ onVisit }: { onVisit: (appId: string) => void }) {
 // `tracking-widest`, ink-300. It was 10px semibold at `0.14em` in ink-400,
 // which is the same "one house style too many" this screen's own headings kept
 // falling into — a word doing the same job in two places should look the same
-// in both. The trailing hairline is this screen's, not the shared component's,
-// so it stays out here as a sibling.
+// in both. The hairline is this screen's, not the shared component's,
+// so it stays out here as a sibling — one on EACH side, because the label is
+// centred: this screen's own rows (the crew grid, the blurb, the key card) are
+// all centred columns, and a left-hung heading with a rule trailing off to the
+// right was the only thing on it reading from an edge.
 function GroupHeading({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
+      <span className="h-px flex-1 bg-ink/10" />
       <SectionLabel label={String(children)} />
       <span className="h-px flex-1 bg-ink/10" />
     </div>
