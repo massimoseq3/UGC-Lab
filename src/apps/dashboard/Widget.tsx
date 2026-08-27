@@ -50,10 +50,31 @@ export default function Widget({ index = 0, className = '', pad = 'p-4', childre
 /** Top-left caption: what this widget measures. Optional value on the right. */
 export function WidgetLabel({ icon: Icon, label, note }: { icon: ElementType; label: string; note?: string }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <Icon className="h-[15px] w-[15px] shrink-0 text-dashboard-400" strokeWidth={1.75} />
-      <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-400">{label}</span>
-      {note && <span className="ml-auto truncate text-[11px] tabular-nums text-ink-600">{note}</span>}
+    // Centred on a PHONE only. From `sm` this is the row it has always been —
+    // icon + label at the left edge, note pushed to the right by `ml-auto` —
+    // because the centring is a bento treatment for a half-width tile, not a
+    // change to the desktop wall. (It doesn't cost the note anything either:
+    // the note only renders from `sm`, so on the phone there is nothing beside
+    // the label to knock it off centre.)
+    <div className="flex w-full items-center gap-1.5 max-sm:justify-center">
+      {/* Monochrome, and sized to the word beside it. It was 15px in the
+          dashboard green, which made the glyph the loudest thing in an eyebrow
+          whose whole job is to be quiet — and a 15px icon against 11px caps
+          sits taller than the letters it labels, so every label read as
+          slightly off its own baseline. 13px in the label's own ink hangs the
+          two on one optical line. */}
+      <Icon className="h-[13px] w-[13px] shrink-0 text-ink-300" strokeWidth={1.75} />
+      {/* The same eyebrow every field label in the app wears (`SectionLabel`
+          in components/SectionCard — Characters' GENDER / AGE RANGE, the Bank
+          forms, the B-Roll cards): 11px, medium, `tracking-widest`, ink-300.
+          It read as its own thing here — semibold, tighter tracking, a step
+          dimmer — which is one house style too many for a word that does the
+          same job in both places. */}
+      <span className="whitespace-nowrap text-[11px] font-medium uppercase tracking-widest text-ink-300">{label}</span>
+      {/* The note is the first thing to go in a bento tile: at half a phone's
+          width it left "MONEY SAVED" wrapping to two lines to make room for a
+          credit count truncated to "1,261 …", which is neither fact. */}
+      {note && <span className="ml-auto hidden truncate text-[11px] tabular-nums text-ink-600 sm:block">{note}</span>}
     </div>
   )
 }
@@ -61,9 +82,11 @@ export function WidgetLabel({ icon: Icon, label, note }: { icon: ElementType; la
 /** The headline number, with an optional rolling-week delta beside it. */
 export function WidgetFigure({ value, delta, size = 'hero' }: { value: string; delta?: string; size?: 'hero' | 'small' }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2.5">
+    <div className="flex flex-wrap items-baseline gap-x-2.5 max-sm:justify-center">
       <p
-        className={`italic font-normal tracking-tight text-ink-50 ${size === 'hero' ? 'text-5xl lg:text-[56px] lg:leading-[1.05]' : 'text-[32px] leading-none'}`}
+        // The hero shrinks below `sm`, where the tile is half a phone's width:
+        // "459 hrs" at 48px is wider than the box it sits in.
+        className={`italic font-normal tracking-tight text-ink-50 ${size === 'hero' ? 'text-[34px] leading-none sm:text-5xl sm:leading-normal lg:text-[56px] lg:leading-[1.05]' : 'text-[32px] leading-none'}`}
         style={DISPLAY_FONT}
       >
         {value}

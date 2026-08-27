@@ -130,19 +130,33 @@ export default function RightPanel(props: RightPanelProps) {
     <div className="flex h-full flex-col">
       {/* Toggle strip — no global Settings popover anymore: each card owns its
           own settings inside its detail modal. */}
-      {/* Glass, and stacked above the storyboard: cards pass UNDER the header
-          blurred rather than being cut off by an opaque band. It reads as
-          pinned because it's blurred and saturated, not because it's solid —
-          `supports-[backdrop-filter]` keeps the opaque fill wherever the
-          browser can't blur, since a merely translucent bar with cards showing
-          through sharp is the one thing that reads as scrolling. */}
-      <div className="relative z-30 flex h-[57px] shrink-0 items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 supports-[backdrop-filter]:bg-surface-0/80 supports-[backdrop-filter]:backdrop-blur-xl supports-[backdrop-filter]:backdrop-saturate-150">
+      {/* NO fill, and that's the point. This bar wore glass over an opaque
+          `bg-surface-0` on the theory that cards pass under it blurred — but
+          they don't: it's a SIBLING of the scroll port below, so nothing has
+          ever passed under it. What the fill actually did was make the top of
+          this panel a different tone from the batch strip under it and from
+          the storyboard under that — three surfaces in the first 150px, with a
+          visible step between each. Every other panel header in the app is a
+          hairline over the pane's own background; this one is too now. */}
+      <div className="relative z-30 flex h-[57px] shrink-0 items-center justify-between gap-3 border-b border-ink/5 px-5">
         <SegmentedToggle<Tab>
           className="h-10 !p-1 min-w-0"
           value={tab}
           onChange={setTab}
           options={[
-            { value: 'scenes', label: isContinuous ? 'Continuous Storyboard' : 'Line by Line Storyboard', badge: sceneCount > 0 ? sceneCount : undefined },
+            {
+              value: 'scenes',
+              // "Storyboard" alone on a phone: the mode it qualifies is already
+              // picked one row up (Line-by-Line / Continuous), and spelling it
+              // out again is what pushed this pill past its own width.
+              label: (
+                <>
+                  <span className="md:hidden">Storyboard</span>
+                  <span className="hidden md:inline">{isContinuous ? 'Continuous Storyboard' : 'Line by Line Storyboard'}</span>
+                </>
+              ),
+              badge: sceneCount > 0 ? sceneCount : undefined,
+            },
             { value: 'history', label: 'History', badge: historyCount > 0 ? historyCount : undefined },
           ]}
         />

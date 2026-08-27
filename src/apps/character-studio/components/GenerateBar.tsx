@@ -78,7 +78,10 @@ export default function GenerateBar({
     // it — you fill the form top to bottom and Generate is where you arrive.
     // The opaque fill stays: it's still a band with a hairline over it, and
     // backdrop-filter has never re-blurred usefully here.
-    <div className="min-w-0 space-y-2 border-t border-ink/5 bg-surface-0 p-3 md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
+    // `max-md:px-5` because on a phone this is not a card — the rounding and
+    // the border are `md:` only, so it's a full-bleed band and its contents
+    // belong on the column's own edge, with the toggles and the fields above.
+    <div className="min-w-0 space-y-2 border-t border-ink/5 bg-surface-0 p-3 max-md:px-5 md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
       {error && (
         <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
           <p className="text-xs leading-relaxed text-red-300 light:text-red-700">{error}</p>

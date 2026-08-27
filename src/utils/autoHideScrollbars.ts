@@ -12,6 +12,12 @@
 const IDLE_MS = 1100
 
 export function initAutoHideScrollbars(): void {
+  // Touch screens get nothing: there is no pointer to drag a scrollbar with,
+  // and a bar that fades in under the thumb doing the scrolling is chrome over
+  // the content. The native track is 0px wide there too (index.css), so this
+  // also stops the app reserving 11px of every phone scroller for it.
+  if (window.matchMedia('(hover: none)').matches) return
+
   let thumb: HTMLElement | null = null
   let hideTimer = 0
   let frame = 0

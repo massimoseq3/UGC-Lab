@@ -491,7 +491,7 @@ export default function InputPanel({
     // On a phone the WHOLE column is one scroller and the Generate band is the
     // last thing in it, not a footer standing over the fields — see the note on
     // the band below.
-    <div className="flex h-full min-h-0 flex-col max-md:overflow-y-auto">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Mode toggle — rounded segmented pill, mirrored by the Output/History
           toggle in the right panel so both strips share the same baseline. */}
       {/* Full-width divider in the subtle vertical-divider tone (border-ink/5).
@@ -511,196 +511,330 @@ export default function InputPanel({
         <ClearAllButton onClear={onClearInputs} label="New" className="shrink-0" iconOnly />
       </div>
 
-      {/* Scrollable inputs — a flex column so step 1's textarea can absorb
-          leftover height (same expand-don't-scroll pattern as Playground).
-          Tight top padding so the first section sits close to the toggle. */}
-      {/* pb-1, not pb-5: the brief grows to the bottom of this column and the
-          footer starts right under it, so anything more reads as a gap between
-          the box and the controls that belong to it. */}
-      {/* 8px between every row, and 8px from the last one to the footer band
-          (pb-2 + the band's pt-0) — B-Roll's rhythm. This column ran on 12s
-          and 16s, which read as loose beside it. */}
-      {/* pb-0, and the 8px to the band lives on the BAND (`pt-2`), not here.
-          It used to be this column's `pb-2`, which is inside the scroller — so
-          it was part of the scrolled content and slid out of view the moment
-          the column overflowed, which is its normal state once a script is
-          pasted in. Measured: the last box sat 2.5px off the band at scroll-top
-          (reading as touching), 8.5px scrolled to the bottom. A gap that
-          changes as you scroll isn't a gap. On the band it can't scroll away. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-0 pt-3 max-md:flex-none max-md:overflow-visible">
-        {mode === 'write' ? (
-          <>
-            {/* Output sub-mode toggle — governs the form below (which style
-                picker, the length options, the artifact), so it leads, right
-                under the mode toggle. h-12, matching the Influencers
-                Portrait/Character Sheet toggle: a three-way switch of one-word
-                labels doesn't need a picker row's height, and at 58 it read as
-                the heaviest thing in a column it only introduces. */}
-            <div className="mb-2">
-              <SegmentedToggle<WriteFormat>
-                className="h-12 !p-1"
-                accent="scripts"
-                value={writeFormat}
-                onChange={onWriteFormatChange}
-                options={[
-                  { value: 'script', label: 'Script', icon: FileText },
-                  { value: 'hooks', label: 'Hooks', icon: FishingHook },
-                  { value: 'scenes', label: 'Scenes', icon: Clapperboard },
-                ]}
-              />
-            </div>
+      {/* The phone's scroll port. It starts BELOW the toggle above, which is
+          why that toggle is a sibling of this box and not its first child: the
+          panel root used to be the scroller, so the tab bar scrolled away with
+          the fields and the member lost the way back to the other tab halfway
+          down a form. Above `md` this is a plain wrapper and the column below
+          scrolls on its own. */}
+      <div className="flex min-h-0 flex-1 flex-col max-md:overflow-y-auto">
 
-            {/* References — what this script is built from, grouped in the
-                Influencers section card so the two picker rows read as one
-                thing rather than as two more rungs on a ladder. The card also
-                hosts the status dots: every row's dot sits at its left edge, so
-                they stack into one column you can scan without reading a word.
-                The STYLE leads and the product closes the card, in both modes
-                (August 2026) — the picker above it is the one you set once and
-                leave, where the product is what changes from script to script,
-                so it belongs nearest the button you press next. */}
-            <SectionCard icon={Layers} title="References" className="mb-2">
-            {/* Hook Style — the hooks format's replacement for the Script Style
-                picker. 'auto' (Best Mix) is the default and renders as the
-                dashed unset affordance; picking a family flips it solid, and
-                the X resets back to auto. */}
-            {isHooksFormat && (
-            <div>
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => setHookSlideOpen(true)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHookSlideOpen(true) } }}
-                className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-full border px-4 py-2.5 text-left transition-colors ${
-                  hookCategory !== 'auto'
-                    ? 'border-scripts-500/20 bg-scripts-500/[0.06] hover:border-scripts-500/30 hover:bg-scripts-500/10'
-                    : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
-                }`}
-              >
-                {/* Not `required`: Best Mix is a real answer, so an unpicked
-                    family is neutral rather than something blocking the run. */}
-                <StatusDot filled={hookCategory !== 'auto'} />
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-text">
-                  <FishingHook className="h-[18px] w-[18px]" strokeWidth={1.75} />
-                </div>
-                <div className="min-w-0 flex-1">
+        {/* Scrollable inputs — a flex column so step 1's textarea can absorb
+            leftover height (same expand-don't-scroll pattern as Playground).
+            Tight top padding so the first section sits close to the toggle. */}
+        {/* pb-1, not pb-5: the brief grows to the bottom of this column and the
+            footer starts right under it, so anything more reads as a gap between
+            the box and the controls that belong to it. */}
+        {/* 8px between every row, and 8px from the last one to the footer band
+            (pb-2 + the band's pt-0) — B-Roll's rhythm. This column ran on 12s
+            and 16s, which read as loose beside it. */}
+        {/* pb-0, and the 8px to the band lives on the BAND (`pt-2`), not here.
+            It used to be this column's `pb-2`, which is inside the scroller — so
+            it was part of the scrolled content and slid out of view the moment
+            the column overflowed, which is its normal state once a script is
+            pasted in. Measured: the last box sat 2.5px off the band at scroll-top
+            (reading as touching), 8.5px scrolled to the bottom. A gap that
+            changes as you scroll isn't a gap. On the band it can't scroll away. */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-0 pt-3 max-md:flex-none max-md:overflow-visible">
+          {mode === 'write' ? (
+            <>
+              {/* Output sub-mode toggle — governs the form below (which style
+                  picker, the length options, the artifact), so it leads, right
+                  under the mode toggle. h-12, matching the Influencers
+                  Portrait/Character Sheet toggle: a three-way switch of one-word
+                  labels doesn't need a picker row's height, and at 58 it read as
+                  the heaviest thing in a column it only introduces. */}
+              <div className="mb-2">
+                <SegmentedToggle<WriteFormat>
+                  className="h-12 !p-1"
+                  accent="scripts"
+                  value={writeFormat}
+                  onChange={onWriteFormatChange}
+                  options={[
+                    { value: 'script', label: 'Script', icon: FileText },
+                    { value: 'hooks', label: 'Hooks', icon: FishingHook },
+                    { value: 'scenes', label: 'Scenes', icon: Clapperboard },
+                  ]}
+                />
+              </div>
+
+              {/* References — what this script is built from, grouped in the
+                  Influencers section card so the two picker rows read as one
+                  thing rather than as two more rungs on a ladder. The card also
+                  hosts the status dots: every row's dot sits at its left edge, so
+                  they stack into one column you can scan without reading a word.
+                  The STYLE leads and the product closes the card, in both modes
+                  (August 2026) — the picker above it is the one you set once and
+                  leave, where the product is what changes from script to script,
+                  so it belongs nearest the button you press next. */}
+              <SectionCard icon={Layers} title="References" className="mb-2">
+              {/* Hook Style — the hooks format's replacement for the Script Style
+                  picker. 'auto' (Best Mix) is the default and renders as the
+                  dashed unset affordance; picking a family flips it solid, and
+                  the X resets back to auto. */}
+              {isHooksFormat && (
+              <div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setHookSlideOpen(true)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHookSlideOpen(true) } }}
+                  className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-full border px-4 py-2.5 text-left transition-colors ${
+                    hookCategory !== 'auto'
+                      ? 'border-scripts-500/20 bg-scripts-500/[0.06] hover:border-scripts-500/30 hover:bg-scripts-500/10'
+                      : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
+                  }`}
+                >
+                  {/* Not `required`: Best Mix is a real answer, so an unpicked
+                      family is neutral rather than something blocking the run. */}
+                  <StatusDot filled={hookCategory !== 'auto'} />
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-text">
+                    <FishingHook className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    {hookCategory !== 'auto' ? (
+                      <>
+                        <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">{HOOK_CATEGORY_META[hookCategory].label}</div>
+                        <div className="truncate text-[11px] leading-snug text-ink-500">{HOOK_CATEGORY_META[hookCategory].hint}</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-[13px] font-medium text-ink-300">Hook Style</div>
+                        {/* "family", not "category" — the picker itself calls
+                            them families, and one control shouldn't use two
+                            names for the same thing. */}
+                        <div className="text-[11px] text-ink-600">Auto picks the best mix — or lock one family</div>
+                      </>
+                    )}
+                  </div>
                   {hookCategory !== 'auto' ? (
-                    <>
-                      <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">{HOOK_CATEGORY_META[hookCategory].label}</div>
-                      <div className="truncate text-[11px] leading-snug text-ink-500">{HOOK_CATEGORY_META[hookCategory].hint}</div>
-                    </>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
+                        <RefreshCw className="h-2.5 w-2.5" />
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onHookCategoryChange('auto') }}
+                        title="Back to Best Mix"
+                        aria-label="Back to Best Mix"
+                        className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   ) : (
-                    <>
-                      <div className="text-[13px] font-medium text-ink-300">Hook Style</div>
-                      {/* "family", not "category" — the picker itself calls
-                          them families, and one control shouldn't use two
-                          names for the same thing. */}
-                      <div className="text-[11px] text-ink-600">Auto picks the best mix — or lock one family</div>
-                    </>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
                   )}
                 </div>
-                {hookCategory !== 'auto' ? (
-                  <div className="flex shrink-0 items-center gap-1">
-                    <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
-                      <RefreshCw className="h-2.5 w-2.5" />
-                    </span>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onHookCategoryChange('auto') }}
-                      title="Back to Best Mix"
-                      aria-label="Back to Best Mix"
-                      className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
-                )}
               </div>
-            </div>
-            )}
+              )}
 
-            {/* Script Style — leads the card, with the product under it.
-                Tapping the button opens the style picker slide-over. Hidden in
-                the hooks format, which has its own family picker above. */}
-            {!isHooksFormat && (
-            <div>
-              <div
-                role="button"
-                tabIndex={0}
-                onClick={() => setStyleSlideOpen(true)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
-                className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-full border px-4 py-2.5 text-left transition-colors ${
-                  styleChosen
-                    ? 'border-scripts-500/20 bg-scripts-500/[0.06] hover:border-scripts-500/30 hover:bg-scripts-500/10'
-                    : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
-                }`}
-              >
-                {/* Optional — nothing is waiting on a style, so an unpicked one
-                    is neutral, never red. */}
-                <StatusDot filled={styleChosen} />
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-text">
-                  {styleChosen && WRITE_STYLE_META[writeStyle].group === 'format'
-                    ? <Video className="h-[18px] w-[18px]" strokeWidth={1.75} />
-                    : <FileText className="h-[18px] w-[18px]" strokeWidth={1.75} />}
-                </div>
-                <div className="min-w-0 flex-1">
+              {/* Script Style — leads the card, with the product under it.
+                  Tapping the button opens the style picker slide-over. Hidden in
+                  the hooks format, which has its own family picker above. */}
+              {!isHooksFormat && (
+              <div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setStyleSlideOpen(true)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
+                  className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-full border px-4 py-2.5 text-left transition-colors ${
+                    styleChosen
+                      ? 'border-scripts-500/20 bg-scripts-500/[0.06] hover:border-scripts-500/30 hover:bg-scripts-500/10'
+                      : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-scripts-500/30 hover:bg-scripts-500/5'
+                  }`}
+                >
+                  {/* Optional — nothing is waiting on a style, so an unpicked one
+                      is neutral, never red. */}
+                  <StatusDot filled={styleChosen} />
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-scripts-500/10 text-scripts-text">
+                    {styleChosen && WRITE_STYLE_META[writeStyle].group === 'format'
+                      ? <Video className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                      : <FileText className="h-[18px] w-[18px]" strokeWidth={1.75} />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    {styleChosen ? (
+                      <>
+                        <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">{WRITE_STYLE_META[writeStyle].label}</div>
+                        <div className="truncate text-[11px] leading-snug text-ink-500">{WRITE_STYLE_META[writeStyle].hint}</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-[13px] font-medium text-ink-300">Script Style</div>
+                        <div className="text-[11px] text-ink-600">A structure to argue with, or a format to hide in</div>
+                      </>
+                    )}
+                  </div>
                   {styleChosen ? (
-                    <>
-                      <div className="truncate text-[13px] font-medium tracking-tight text-scripts-text">{WRITE_STYLE_META[writeStyle].label}</div>
-                      <div className="truncate text-[11px] leading-snug text-ink-500">{WRITE_STYLE_META[writeStyle].hint}</div>
-                    </>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
+                        <RefreshCw className="h-2.5 w-2.5" />
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setStyleChosen(false) }}
+                        title="Clear style"
+                        aria-label="Clear style"
+                        className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   ) : (
-                    <>
-                      <div className="text-[13px] font-medium text-ink-300">Script Style</div>
-                      <div className="text-[11px] text-ink-600">A structure to argue with, or a format to hide in</div>
-                    </>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
                   )}
                 </div>
-                {styleChosen ? (
-                  <div className="flex shrink-0 items-center gap-1">
-                    <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
-                      <RefreshCw className="h-2.5 w-2.5" />
+              </div>
+              )}
+
+              {productSection}
+              </SectionCard>
+
+              {/* The brief — the SAME box the remix modes get, header and all:
+                  it's the same field doing the same job, and the two modes only
+                  differ in what's above it. Its name sits INSIDE the box rather
+                  than on a StepLabel row above, which is what closed the gap
+                  under the product row — that row plus its margins was ~40px of
+                  nothing between the pickers and the field.
+                  `flex-1 basis-0` with the floor on the SECTION: the box takes
+                  whatever height is left, so it opens tall on a fresh panel and
+                  gives ground as the pickers above it fill up. */}
+              {/* No top margin: the product row above already carries mb-2, and
+                  the pair of them stacked a 16px gap where every other row in the
+                  column sits 8 apart. */}
+              {/* max-md: the growable boxes stop sharing the leftover height. On a
+                  phone there IS no leftover — the column is shorter than its own
+                  contents — so flex-1 just squeezes every box until the card's
+                  overflow-hidden slices it. Fixed floors + a scrolling column is
+                  the phone shape; the height-sharing is a desktop luxury. */}
+              <div className="flex min-h-[160px] flex-1 basis-0 flex-col max-md:min-h-[220px] max-md:flex-none max-md:basis-auto">
+                <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
+                  <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-2.5">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <PenLine className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
+                      <span className="truncate text-[13px] font-medium text-ink-200">Additional Instructions</span>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
+                      optional
+                    </span>
+                  </div>
+                  <textarea
+                    value={brief}
+                    onChange={(e) => handleBriefType(e.target.value)}
+                    onBlur={commitBriefDraft}
+                    placeholder={"Leave blank and I'll come up with the angle — or steer it: e.g. A girl in her 20s talking about this serum like she's telling her best friend, focus on how fast it cleared her skin. Casual, a little funny, end with the discount code."}
+                    className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 pb-3 pt-1.5 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
+                  />
+                  <PromptToolbar
+                    accent="scripts"
+                    onEnhance={handleEnhanceBrief}
+                    enhanceTitle="Enhance prompt"
+                    enhanceDisabled={!brief.trim()}
+                    busy={isEnhancing}
+                    onClear={handleBriefClear}
+                    clearDisabled={!brief.trim()}
+                    onUndo={handleBriefUndo}
+                    canUndo={canUndoBrief}
+                    onRedo={handleBriefRedo}
+                    canRedo={canRedoBrief}
+                    onExpand={() => setExpandedField('brief')}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            // Same References card as Write New, holding the source the remix is
+            // built from plus the same product row — and in the same order the
+            // other mode uses: what the script is MADE FROM first, the product it
+            // is made FOR last, nearest the button. The source box is a fixed
+            // share of the card's height (flex-1, its own scroller), so a row
+            // under it isn't pushed down as you paste.
+            <SectionCard
+              icon={Layers}
+              title="References"
+              className="mb-2 flex flex-1 flex-col max-md:flex-none"
+              contentClassName="flex flex-1 flex-col gap-2"
+            >
+            <div className="flex min-h-[140px] flex-1 flex-col max-md:min-h-[240px] max-md:flex-none">
+              {/* Select from bank (header) + paste manually (textarea) merged into
+                  one rounded box so the two sources read as a single input. One
+                  box serves both remix pipelines: the pasted source's format is
+                  auto-detected (a scene blueprint flips the chrome to fuchsia and
+                  routes to the scene-rewrite pipeline; plain text gets 3 remixed
+                  variations). It splits the column's leftover height evenly with
+                  the Additional Context box below (both flex-1 basis-0) — the two
+                  writing surfaces are a matched pair, and a fixed-height slab here
+                  is what pushed the rest of the column past the fold. */}
+              <div className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30 ${sourceScript ? (blueprintActive ? 'border-fuchsia-500/40' : 'border-scripts-500/40') : 'border-dashed border-ink/10'} ${highlightField === 'source' ? 'animate-field-flash' : ''}`}>
+                <ScriptBankCard
+                  selected={sourceScript}
+                  // Filled is about the TEXT, not the bank pick — a pasted
+                  // transcript is a filled source with no bank row behind it.
+                  filled={sourceFilled}
+                  label={blueprintActive ? 'Scene' : 'Script'}
+                  icon={blueprintActive ? Clapperboard : FileText}
+                  accentClass={blueprintActive ? 'bg-fuchsia-500/10 text-fuchsia-300/80 light:text-fuchsia-700/80' : 'bg-scripts-500/10 text-scripts-300/80'}
+                  onSelect={() => setScriptPickerOpen(true)}
+                  onClear={() => setSourceScript(null)}
+                  className="shrink-0"
+                  flat
+                />
+                <div className="relative flex min-h-0 grow flex-col">
+                  <textarea
+                    value={source}
+                    onChange={(e) => { onSourceChange(e.target.value); setSourceScript(null) }}
+                    rows={6}
+                    placeholder={'…or paste a proven ad transcript, or a scene blueprint from Ad Analyzer — the format is detected automatically.'}
+                    className={`w-full min-h-0 grow resize-none overflow-y-auto border-0 bg-transparent px-4 py-3 leading-relaxed text-ink-200 outline-none ${
+                      isBlueprint ? 'font-mono text-xs placeholder-ink-700' : 'text-sm placeholder-ink-600'
+                    }`}
+                  />
+                  <ExpandButton onClick={() => setExpandedField('source')} className="absolute bottom-2 right-2" />
+                </div>
+                {/* Detection chip — only shows once a blueprint is recognised.
+                    The right-hand button is the escape hatch for the one case
+                    auto-detect can't know: remixing a blueprint's spoken lines
+                    as a plain script instead of rewriting its scenes. */}
+                {isBlueprint && (
+                  <div className="flex shrink-0 items-center justify-between gap-2 border-t border-ink/10 px-4 py-2">
+                    <span className={`flex min-w-0 items-center gap-1.5 truncate text-[11px] font-medium ${blueprintActive ? 'text-fuchsia-300 light:text-fuchsia-700' : 'text-ink-500'}`}>
+                      {blueprintActive ? <Clapperboard className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
+                      {blueprintActive ? 'Scene blueprint detected — scenes will be rewritten' : `Remixing as a plain script — ${variationCount} variations`}
                     </span>
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); setStyleChosen(false) }}
-                      title="Clear style"
-                      aria-label="Clear style"
-                      className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
+                      onClick={() => onForceTranscriptChange(!forceTranscript)}
+                      className="shrink-0 rounded-full border border-ink/10 px-2.5 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      {blueprintActive ? 'Remix as script instead' : 'Rewrite scenes instead'}
                     </button>
                   </div>
-                ) : (
-                  <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
                 )}
               </div>
             </div>
-            )}
-
             {productSection}
             </SectionCard>
+          )}
 
-            {/* The brief — the SAME box the remix modes get, header and all:
-                it's the same field doing the same job, and the two modes only
-                differ in what's above it. Its name sits INSIDE the box rather
-                than on a StepLabel row above, which is what closed the gap
-                under the product row — that row plus its margins was ~40px of
-                nothing between the pickers and the field.
-                `flex-1 basis-0` with the floor on the SECTION: the box takes
-                whatever height is left, so it opens tall on a fresh panel and
-                gives ground as the pickers above it fill up. */}
-            {/* No top margin: the product row above already carries mb-2, and
-                the pair of them stacked a 16px gap where every other row in the
-                column sits 8 apart. */}
-            {/* max-md: the growable boxes stop sharing the leftover height. On a
-                phone there IS no leftover — the column is shorter than its own
-                contents — so flex-1 just squeezes every box until the card's
-                overflow-hidden slices it. Fixed floors + a scrolling column is
-                the phone shape; the height-sharing is a desktop luxury. */}
-            <div className="flex min-h-[160px] flex-1 basis-0 flex-col max-md:min-h-[220px] max-md:flex-none max-md:basis-auto">
+          {/* Final step — the free-text steer. Write New has its own copy of this
+              box higher up (it doubles as the brief there), so this one is only
+              shown for the remix / scene-rewrite modes. */}
+          {mode !== 'write' && (
+            // flex-1 basis-0 with the floor on the SECTION, never min-h-0 plus a
+            // min-height on the textarea: that shape let the section shrink to
+            // zero on a short viewport while the textarea kept its own floor, so
+            // the box's overflow-hidden sliced the footer toolbar in half. A
+            // min-height on the section overrides its auto min-size, so it shrinks
+            // to a real, known floor and everything inside shrinks with it.
+            <div className="flex min-h-[120px] flex-1 flex-col max-md:min-h-[200px] max-md:flex-none">
+              {/* Single rounded box (matches the Write New brief): a header row
+                  naming the field, the textarea taking whatever height is left,
+                  then Enhance / Clear / Undo / Redo + Expand in a footer. The
+                  label used to sit ABOVE the box as a StepLabel; it's the same
+                  shape as B-Roll's Instructions/Brief box now — a field's name
+                  belongs on the field, and the row it needed outside cost the
+                  textarea its height in a column that's already tight. */}
               <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
                 <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-2.5">
                   <div className="flex min-w-0 items-center gap-1.5">
@@ -712,408 +846,283 @@ export default function InputPanel({
                   </span>
                 </div>
                 <textarea
-                  value={brief}
-                  onChange={(e) => handleBriefType(e.target.value)}
-                  onBlur={commitBriefDraft}
-                  placeholder={"Leave blank and I'll come up with the angle — or steer it: e.g. A girl in her 20s talking about this serum like she's telling her best friend, focus on how fast it cleared her skin. Casual, a little funny, end with the discount code."}
+                  value={additionalContext}
+                  onChange={(e) => handleContextType(e.target.value)}
+                  onBlur={commitContextDraft}
+                  placeholder={blueprintActive
+                    ? "Extra instructions for the rewrite (e.g. 'Keep tone playful', 'Make the CTA softer')..."
+                    : "Extra instructions for this script (e.g. 'Focus on the self-cleaning feature', 'Summer campaign tone')..."}
                   className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 pb-3 pt-1.5 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                 />
                 <PromptToolbar
                   accent="scripts"
-                  onEnhance={handleEnhanceBrief}
+                  onEnhance={handleEnhanceContext}
                   enhanceTitle="Enhance prompt"
-                  enhanceDisabled={!brief.trim()}
-                  busy={isEnhancing}
-                  onClear={handleBriefClear}
-                  clearDisabled={!brief.trim()}
-                  onUndo={handleBriefUndo}
-                  canUndo={canUndoBrief}
-                  onRedo={handleBriefRedo}
-                  canRedo={canRedoBrief}
-                  onExpand={() => setExpandedField('brief')}
+                  enhanceDisabled={!additionalContext.trim()}
+                  busy={isEnhancingContext}
+                  onClear={handleContextClear}
+                  clearDisabled={!additionalContext.trim()}
+                  onUndo={handleContextUndo}
+                  canUndo={canUndoContext}
+                  onRedo={handleContextRedo}
+                  canRedo={canRedoContext}
+                  onExpand={() => setExpandedField('additionalContext')}
                 />
               </div>
             </div>
-          </>
-        ) : (
-          // Same References card as Write New, holding the source the remix is
-          // built from plus the same product row — and in the same order the
-          // other mode uses: what the script is MADE FROM first, the product it
-          // is made FOR last, nearest the button. The source box is a fixed
-          // share of the card's height (flex-1, its own scroller), so a row
-          // under it isn't pushed down as you paste.
-          <SectionCard
-            icon={Layers}
-            title="References"
-            className="mb-2 flex flex-1 flex-col max-md:flex-none"
-            contentClassName="flex flex-1 flex-col gap-2"
+          )}
+        </div>
+
+        {/* Generate band — a normal `shrink-0` footer at the foot of the column,
+            exactly as in B-Roll, Playground and Characters.
+            It used to go `position: fixed` under `md`, and that is a zoom trap,
+            not just a phone shape: browser zoom shrinks the viewport in CSS px, so
+            zooming a 1440px desktop to 200% lands under the 768px breakpoint with
+            the desktop two-pane layout still on screen. The bar then detached to
+            the window's bottom edge and covered the last ~150px of the scrolling
+            column — which is what clipped Additional Instructions at 2× in Write
+            New, and left Hooks looking fine only because its footer is one row
+            shorter. A static footer is laid out by the flex column above it, so
+            the scroll area can never run underneath it at any zoom.
+            Opaque bg under md: backdrop-filter doesn't re-blur inside the
+            already-blurred window frame, so any alpha lets content ghost through.
+            No rule above it: the brief box ends where its own toolbar ends, so a
+            hairline there just fenced off controls that belong to the same column. */}
+        {/* Not pinned on a phone (August 2026, Massimo's call): a fixed band cost
+            ~150px of a ~700px column and stood over the fields it belongs to. You
+            fill the form top to bottom and Generate is where you arrive. It stays
+            a footer from `md` up, where the column has the height to spare. */}
+        <div className="shrink-0 bg-surface-0 px-5 pb-3 pt-2 md:bg-transparent">
+          {/* ONE row above Generate on a desktop: who writes it, how long it runs,
+              how many come back. The model takes HALF and the two chips a quarter
+              each (`flex-[2]` against `flex-1`, both zero-basis, so the ratio
+              holds whatever is in them). Equal thirds was tried first and the
+              model row is the one control here with something to say — at a third
+              it read "GPT 5.6…" over "The Scrip…", while the chips had spare room
+              around two words. All at 58px, the picker-row height the column's
+              other rows share.
+
+              TWO rows on a phone: the model takes the full width (`basis-full`)
+              and the two pearls sit side by side under it. Half of a 335px column
+              is 167px for a control whose whole job is naming the model that
+              writes your script, and the name is the half that was being cut.
+              The chips take `basis-0` there so they split the second row evenly
+              rather than inheriting the desktop ratio.
+              They were a chip band stacked over the model row, which made two
+              rows out of one decision each. Both chips are pearls rather than
+              fields: the pair was two full-width `SegmentedToggle` slabs, then
+              full-width `Dropdown`s, each costing the brief its height for a
+              control nobody sweeps through. Each hides on its own — Hooks have no
+              duration, the blueprint rewrite has no count. Everything here opens
+              UPWARD: a downward menu covers the button you're heading for. */}
+          <div className="mb-2 flex flex-wrap items-stretch gap-1.5">
+            <ScriptModelRow appId="script-architect" className="min-w-0 flex-[2] max-md:basis-full" />
+            {showLength && (
+              // The clock carries the meaning the old dim "Length" label did —
+              // "15s" alone doesn't say what it measures, and a chip has no
+              // room for a second word. Remix's list leads with "Default": the
+              // source ad already has a length, and keeping it is usually the
+              // point of remixing a winner. Write New has no source to inherit.
+              // It sits in the MIDDLE of the row, so its menu anchors left and
+              // has room either side; the count on the right is the one that has
+              // to hang its menu off the panel edge.
+              <div className="flex min-w-0 flex-1 max-md:basis-0">
+                <ConstraintChip
+                  grow
+                  size="xl"
+                  openDirection="up"
+                  value={mode === 'write' ? `${writeLength}s` : remixLength === 'default' ? 'Default' : `${remixLength}s`}
+                  options={
+                    mode === 'write'
+                      ? WRITE_LENGTHS.map((len) => `${len}s`)
+                      : REMIX_LENGTHS.map((len) => (len === 'default' ? 'Default' : `${len}s`))
+                  }
+                  onChange={(v) => {
+                    if (mode === 'write') onWriteLengthChange(Number(v.replace('s', '')) as WriteLength)
+                    else onRemixLengthChange((v === 'Default' ? 'default' : Number(v.replace('s', ''))) as RemixLength)
+                  }}
+                  render={(v) => (
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{v}</span>
+                    </span>
+                  )}
+                />
+              </div>
+            )}
+            {showCount && <div className="flex min-w-0 flex-1 max-md:basis-0">{countChip}</div>}
+          </div>
+          {/* `disabled:hover:bg-scripts-500` — a disabled button must not answer
+              the pointer. `:hover` still matches one, so the blocker state
+              ("Paste a script to remix") repainted under the cursor and read as
+              clickable. */}
+          <button
+            onClick={() => onGenerate(editableContext)}
+            disabled={!canGenerate || isGenerating}
+            className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-scripts-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-scripts-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-scripts-500"
           >
-          <div className="flex min-h-[140px] flex-1 flex-col max-md:min-h-[240px] max-md:flex-none">
-            {/* Select from bank (header) + paste manually (textarea) merged into
-                one rounded box so the two sources read as a single input. One
-                box serves both remix pipelines: the pasted source's format is
-                auto-detected (a scene blueprint flips the chrome to fuchsia and
-                routes to the scene-rewrite pipeline; plain text gets 3 remixed
-                variations). It splits the column's leftover height evenly with
-                the Additional Context box below (both flex-1 basis-0) — the two
-                writing surfaces are a matched pair, and a fixed-height slab here
-                is what pushed the rest of the column past the fold. */}
-            <div className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30 ${sourceScript ? (blueprintActive ? 'border-fuchsia-500/40' : 'border-scripts-500/40') : 'border-dashed border-ink/10'} ${highlightField === 'source' ? 'animate-field-flash' : ''}`}>
-              <ScriptBankCard
-                selected={sourceScript}
-                // Filled is about the TEXT, not the bank pick — a pasted
-                // transcript is a filled source with no bank row behind it.
-                filled={sourceFilled}
-                label={blueprintActive ? 'Scene' : 'Script'}
-                icon={blueprintActive ? Clapperboard : FileText}
-                accentClass={blueprintActive ? 'bg-fuchsia-500/10 text-fuchsia-300/80 light:text-fuchsia-700/80' : 'bg-scripts-500/10 text-scripts-300/80'}
-                onSelect={() => setScriptPickerOpen(true)}
-                onClear={() => setSourceScript(null)}
-                className="shrink-0"
-                flat
-              />
-              <div className="relative flex min-h-0 grow flex-col">
-                <textarea
-                  value={source}
-                  onChange={(e) => { onSourceChange(e.target.value); setSourceScript(null) }}
-                  rows={6}
-                  placeholder={'…or paste a proven ad transcript, or a scene blueprint from Ad Analyzer — the format is detected automatically.'}
-                  className={`w-full min-h-0 grow resize-none overflow-y-auto border-0 bg-transparent px-4 py-3 leading-relaxed text-ink-200 outline-none ${
-                    isBlueprint ? 'font-mono text-xs placeholder-ink-700' : 'text-sm placeholder-ink-600'
-                  }`}
-                />
-                <ExpandButton onClick={() => setExpandedField('source')} className="absolute bottom-2 right-2" />
-              </div>
-              {/* Detection chip — only shows once a blueprint is recognised.
-                  The right-hand button is the escape hatch for the one case
-                  auto-detect can't know: remixing a blueprint's spoken lines
-                  as a plain script instead of rewriting its scenes. */}
-              {isBlueprint && (
-                <div className="flex shrink-0 items-center justify-between gap-2 border-t border-ink/10 px-4 py-2">
-                  <span className={`flex min-w-0 items-center gap-1.5 truncate text-[11px] font-medium ${blueprintActive ? 'text-fuchsia-300 light:text-fuchsia-700' : 'text-ink-500'}`}>
-                    {blueprintActive ? <Clapperboard className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
-                    {blueprintActive ? 'Scene blueprint detected — scenes will be rewritten' : `Remixing as a plain script — ${variationCount} variations`}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onForceTranscriptChange(!forceTranscript)}
-                    className="shrink-0 rounded-full border border-ink/10 px-2.5 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-200"
-                  >
-                    {blueprintActive ? 'Remix as script instead' : 'Rewrite scenes instead'}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-          {productSection}
-          </SectionCard>
-        )}
-
-        {/* Final step — the free-text steer. Write New has its own copy of this
-            box higher up (it doubles as the brief there), so this one is only
-            shown for the remix / scene-rewrite modes. */}
-        {mode !== 'write' && (
-          // flex-1 basis-0 with the floor on the SECTION, never min-h-0 plus a
-          // min-height on the textarea: that shape let the section shrink to
-          // zero on a short viewport while the textarea kept its own floor, so
-          // the box's overflow-hidden sliced the footer toolbar in half. A
-          // min-height on the section overrides its auto min-size, so it shrinks
-          // to a real, known floor and everything inside shrinks with it.
-          <div className="flex min-h-[120px] flex-1 flex-col max-md:min-h-[200px] max-md:flex-none">
-            {/* Single rounded box (matches the Write New brief): a header row
-                naming the field, the textarea taking whatever height is left,
-                then Enhance / Clear / Undo / Redo + Expand in a footer. The
-                label used to sit ABOVE the box as a StepLabel; it's the same
-                shape as B-Roll's Instructions/Brief box now — a field's name
-                belongs on the field, and the row it needed outside cost the
-                textarea its height in a column that's already tight. */}
-            <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
-              <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-2.5">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <PenLine className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
-                  <span className="truncate text-[13px] font-medium text-ink-200">Additional Instructions</span>
-                </div>
-                <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
-                  optional
-                </span>
-              </div>
-              <textarea
-                value={additionalContext}
-                onChange={(e) => handleContextType(e.target.value)}
-                onBlur={commitContextDraft}
-                placeholder={blueprintActive
-                  ? "Extra instructions for the rewrite (e.g. 'Keep tone playful', 'Make the CTA softer')..."
-                  : "Extra instructions for this script (e.g. 'Focus on the self-cleaning feature', 'Summer campaign tone')..."}
-                className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 pb-3 pt-1.5 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
-              />
-              <PromptToolbar
-                accent="scripts"
-                onEnhance={handleEnhanceContext}
-                enhanceTitle="Enhance prompt"
-                enhanceDisabled={!additionalContext.trim()}
-                busy={isEnhancingContext}
-                onClear={handleContextClear}
-                clearDisabled={!additionalContext.trim()}
-                onUndo={handleContextUndo}
-                canUndo={canUndoContext}
-                onRedo={handleContextRedo}
-                canRedo={canRedoContext}
-                onExpand={() => setExpandedField('additionalContext')}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Generate band — a normal `shrink-0` footer at the foot of the column,
-          exactly as in B-Roll, Playground and Characters.
-          It used to go `position: fixed` under `md`, and that is a zoom trap,
-          not just a phone shape: browser zoom shrinks the viewport in CSS px, so
-          zooming a 1440px desktop to 200% lands under the 768px breakpoint with
-          the desktop two-pane layout still on screen. The bar then detached to
-          the window's bottom edge and covered the last ~150px of the scrolling
-          column — which is what clipped Additional Instructions at 2× in Write
-          New, and left Hooks looking fine only because its footer is one row
-          shorter. A static footer is laid out by the flex column above it, so
-          the scroll area can never run underneath it at any zoom.
-          Opaque bg under md: backdrop-filter doesn't re-blur inside the
-          already-blurred window frame, so any alpha lets content ghost through.
-          No rule above it: the brief box ends where its own toolbar ends, so a
-          hairline there just fenced off controls that belong to the same column. */}
-      {/* Not pinned on a phone (August 2026, Massimo's call): a fixed band cost
-          ~150px of a ~700px column and stood over the fields it belongs to. You
-          fill the form top to bottom and Generate is where you arrive. It stays
-          a footer from `md` up, where the column has the height to spare. */}
-      <div className="shrink-0 bg-surface-0 px-5 pb-3 pt-2 md:bg-transparent">
-        {/* ONE row above Generate on a desktop: who writes it, how long it runs,
-            how many come back. The model takes HALF and the two chips a quarter
-            each (`flex-[2]` against `flex-1`, both zero-basis, so the ratio
-            holds whatever is in them). Equal thirds was tried first and the
-            model row is the one control here with something to say — at a third
-            it read "GPT 5.6…" over "The Scrip…", while the chips had spare room
-            around two words. All at 58px, the picker-row height the column's
-            other rows share.
-
-            TWO rows on a phone: the model takes the full width (`basis-full`)
-            and the two pearls sit side by side under it. Half of a 335px column
-            is 167px for a control whose whole job is naming the model that
-            writes your script, and the name is the half that was being cut.
-            The chips take `basis-0` there so they split the second row evenly
-            rather than inheriting the desktop ratio.
-            They were a chip band stacked over the model row, which made two
-            rows out of one decision each. Both chips are pearls rather than
-            fields: the pair was two full-width `SegmentedToggle` slabs, then
-            full-width `Dropdown`s, each costing the brief its height for a
-            control nobody sweeps through. Each hides on its own — Hooks have no
-            duration, the blueprint rewrite has no count. Everything here opens
-            UPWARD: a downward menu covers the button you're heading for. */}
-        <div className="mb-2 flex flex-wrap items-stretch gap-1.5">
-          <ScriptModelRow appId="script-architect" className="min-w-0 flex-[2] max-md:basis-full" />
-          {showLength && (
-            // The clock carries the meaning the old dim "Length" label did —
-            // "15s" alone doesn't say what it measures, and a chip has no
-            // room for a second word. Remix's list leads with "Default": the
-            // source ad already has a length, and keeping it is usually the
-            // point of remixing a winner. Write New has no source to inherit.
-            // It sits in the MIDDLE of the row, so its menu anchors left and
-            // has room either side; the count on the right is the one that has
-            // to hang its menu off the panel edge.
-            <div className="flex min-w-0 flex-1 max-md:basis-0">
-              <ConstraintChip
-                grow
-                size="xl"
-                openDirection="up"
-                value={mode === 'write' ? `${writeLength}s` : remixLength === 'default' ? 'Default' : `${remixLength}s`}
-                options={
-                  mode === 'write'
-                    ? WRITE_LENGTHS.map((len) => `${len}s`)
-                    : REMIX_LENGTHS.map((len) => (len === 'default' ? 'Default' : `${len}s`))
-                }
-                onChange={(v) => {
-                  if (mode === 'write') onWriteLengthChange(Number(v.replace('s', '')) as WriteLength)
-                  else onRemixLengthChange((v === 'Default' ? 'default' : Number(v.replace('s', ''))) as RemixLength)
-                }}
-                render={(v) => (
-                  <span className="flex items-center gap-1.5">
-                    <Clock className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{v}</span>
-                  </span>
-                )}
-              />
-            </div>
-          )}
-          {showCount && <div className="flex min-w-0 flex-1 max-md:basis-0">{countChip}</div>}
+            {isGenerating ? (
+              <>
+                <Spinner className="h-4 w-4" />
+                <span>{mode === 'write' ? (writeFormat === 'hooks' ? `Writing ${hookCount} Hooks...` : `Writing ${variationCount} Takes...`) : blueprintActive ? 'Rewriting Scene Prompts...' : `Generating ${variationCount} Script Variations...`}</span>
+              </>
+            ) : blocker ? (
+              <>
+                <blocker.icon className="h-4 w-4" strokeWidth={2.5} />
+                <span>{blocker.label}</span>
+              </>
+            ) : (
+              <>
+                <PenLine className="h-4 w-4" strokeWidth={2.5} />
+                <span>{generateLabel}</span>
+              </>
+            )}
+          </button>
         </div>
-        {/* `disabled:hover:bg-scripts-500` — a disabled button must not answer
-            the pointer. `:hover` still matches one, so the blocker state
-            ("Paste a script to remix") repainted under the cursor and read as
-            clickable. */}
-        <button
-          onClick={() => onGenerate(editableContext)}
-          disabled={!canGenerate || isGenerating}
-          className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-scripts-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-scripts-400 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-scripts-500"
-        >
-          {isGenerating ? (
-            <>
-              <Spinner className="h-4 w-4" />
-              <span>{mode === 'write' ? (writeFormat === 'hooks' ? `Writing ${hookCount} Hooks...` : `Writing ${variationCount} Takes...`) : blueprintActive ? 'Rewriting Scene Prompts...' : `Generating ${variationCount} Script Variations...`}</span>
-            </>
-          ) : blocker ? (
-            <>
-              <blocker.icon className="h-4 w-4" strokeWidth={2.5} />
-              <span>{blocker.label}</span>
-            </>
-          ) : (
-            <>
-              <PenLine className="h-4 w-4" strokeWidth={2.5} />
-              <span>{generateLabel}</span>
-            </>
-          )}
-        </button>
-      </div>
 
-      {/* Bank Pickers */}
-      <BankPicker
-        bankType="products"
-        isOpen={productPickerOpen}
-        onSelect={(item) => onProductSelect(item as Product)}
-        onClose={() => setProductPickerOpen(false)}
-      />
-      <BankPicker
-        bankType="scripts"
-        isOpen={scriptPickerOpen}
-        onSelect={(item) => handleBankScriptSelect(item as Script)}
-        onClose={() => setScriptPickerOpen(false)}
-      />
-
-      {/* Edit product details — opens in a right slide-over with full-size
-          fields, so you never scroll the form or fight tiny inline boxes. */}
-      <SlideOver
-        open={detailsOpen}
-        onClose={() => setDetailsOpen(false)}
-        title="Edit product details"
-        subtitle="Edit for this script, or push the changes back to your bank"
-        footer={
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={handleSaveForScript}
-              className="w-full rounded-full border border-white/15 bg-scripts-500 px-5 py-2.5 text-[13px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-scripts-400"
-            >
-              Save for this script only
-            </button>
-            <button
-              type="button"
-              onClick={handleUpdateBank}
-              className="w-full rounded-full border border-ink/10 bg-ink/[0.02] px-5 py-2.5 text-[13px] font-medium tracking-tight text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.05] hover:text-ink-100"
-            >
-              Update product in bank
-            </button>
-          </div>
-        }
-      >
-        {editableContext && (
-          <div className="flex flex-col gap-4 p-5">
-            <EditableField label="Name" value={editableContext.productName} onChange={(v) => updateField('productName', v)} />
-            <EditableField label="Description" value={editableContext.productDescription} onChange={(v) => updateField('productDescription', v)} />
-            <EditableField label="Target Market" value={editableContext.targetMarket} onChange={(v) => updateField('targetMarket', v)} />
-            <EditableField label="Pain Points" value={editableContext.painPoints} onChange={(v) => updateField('painPoints', v)} />
-            <EditableField label="USPs" value={editableContext.usps} onChange={(v) => updateField('usps', v)} />
-            <EditableField label="Benefits" value={editableContext.benefits} onChange={(v) => updateField('benefits', v)} />
-            <EditableField label="Key Specs & Facts" value={editableContext.keySpecs} onChange={(v) => updateField('keySpecs', v)} />
-            <EditableField label="Objections" value={editableContext.objections} onChange={(v) => updateField('objections', v)} />
-            <EditableField label="Offer" value={editableContext.offer} onChange={(v) => updateField('offer', v)} />
-            <EditableField label="CTA" value={editableContext.cta} onChange={(v) => updateField('cta', v)} />
-          </div>
-        )}
-      </SlideOver>
-
-      {/* Style picker — opens from the right; tap a style to select it. */}
-      <SlideOver
-        open={styleSlideOpen}
-        onClose={() => setStyleSlideOpen(false)}
-        title="Choose a style"
-        subtitle="What kind of content the ad looks like — and how it's built"
-        size="wide"
-      >
-        {/* Two sections: Structures (how the argument is built) on top, then
-            Formats (the kind of content the ad imitates). Structures lead HERE
-            because the question this app is asking is how the argument is
-            built; B-Roll passes `formatsFirst` and leads with Formats, since
-            it's picking the kind of ad to shoot and a format is the half that
-            stages the shots. Same list either way — only the reading order
-            differs, and the component is shared so the slugs can't drift. */}
-        <ScriptStyleList
-          value={styleChosen ? writeStyle : null}
-          onSelect={(style) => { onWriteStyleChange(style); setStyleChosen(true); setStyleSlideOpen(false) }}
+        {/* Bank Pickers */}
+        <BankPicker
+          bankType="products"
+          isOpen={productPickerOpen}
+          onSelect={(item) => onProductSelect(item as Product)}
+          onClose={() => setProductPickerOpen(false)}
         />
-      </SlideOver>
+        <BankPicker
+          bankType="scripts"
+          isOpen={scriptPickerOpen}
+          onSelect={(item) => handleBankScriptSelect(item as Script)}
+          onClose={() => setScriptPickerOpen(false)}
+        />
 
-      {/* Hook family picker — mirrors the style slide-over. 'auto' leads. */}
-      <SlideOver
-        open={hookSlideOpen}
-        onClose={() => setHookSlideOpen(false)}
-        title="Choose a hook style"
-        subtitle={`Which formula family the ${hookCount} hooks draw from`}
-        size="wide"
-      >
-        <div className="flex flex-col gap-2 p-4">
-          {(Object.keys(HOOK_CATEGORY_META) as HookCategoryChoice[]).map((choice) => {
-            const active = choice === hookCategory
-            return (
+        {/* Edit product details — opens in a right slide-over with full-size
+            fields, so you never scroll the form or fight tiny inline boxes. */}
+        <SlideOver
+          open={detailsOpen}
+          onClose={() => setDetailsOpen(false)}
+          title="Edit product details"
+          subtitle="Edit for this script, or push the changes back to your bank"
+          footer={
+            <div className="flex flex-col gap-2">
               <button
-                key={choice}
                 type="button"
-                onClick={() => { onHookCategoryChange(choice); setHookSlideOpen(false) }}
-                className={`flex items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
-                  active
-                    ? 'border-scripts-500/30 bg-scripts-500/10'
-                    : 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'
-                }`}
+                onClick={handleSaveForScript}
+                className="w-full rounded-full border border-white/15 bg-scripts-500 px-5 py-2.5 text-[13px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-scripts-400"
               >
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${active ? 'bg-scripts-500/10 text-scripts-text' : 'bg-ink/5 text-ink-500'}`}>
-                  {choice === 'auto' ? <Sparkles className="h-5 w-5" strokeWidth={1.75} /> : <FishingHook className="h-5 w-5" strokeWidth={1.75} />}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className={`text-[13px] font-medium tracking-tight ${active ? 'text-scripts-300' : 'text-ink-200'}`}>
-                    {HOOK_CATEGORY_META[choice].label}
-                  </div>
-                  <div className="text-[11px] leading-snug text-ink-500">{HOOK_CATEGORY_META[choice].hint}</div>
-                </div>
+                Save for this script only
               </button>
-            )
-          })}
-        </div>
-      </SlideOver>
+              <button
+                type="button"
+                onClick={handleUpdateBank}
+                className="w-full rounded-full border border-ink/10 bg-ink/[0.02] px-5 py-2.5 text-[13px] font-medium tracking-tight text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.05] hover:text-ink-100"
+              >
+                Update product in bank
+              </button>
+            </div>
+          }
+        >
+          {editableContext && (
+            <div className="flex flex-col gap-4 p-5">
+              <EditableField label="Name" value={editableContext.productName} onChange={(v) => updateField('productName', v)} />
+              <EditableField label="Description" value={editableContext.productDescription} onChange={(v) => updateField('productDescription', v)} />
+              <EditableField label="Target Market" value={editableContext.targetMarket} onChange={(v) => updateField('targetMarket', v)} />
+              <EditableField label="Pain Points" value={editableContext.painPoints} onChange={(v) => updateField('painPoints', v)} />
+              <EditableField label="USPs" value={editableContext.usps} onChange={(v) => updateField('usps', v)} />
+              <EditableField label="Benefits" value={editableContext.benefits} onChange={(v) => updateField('benefits', v)} />
+              <EditableField label="Key Specs & Facts" value={editableContext.keySpecs} onChange={(v) => updateField('keySpecs', v)} />
+              <EditableField label="Objections" value={editableContext.objections} onChange={(v) => updateField('objections', v)} />
+              <EditableField label="Offer" value={editableContext.offer} onChange={(v) => updateField('offer', v)} />
+              <EditableField label="CTA" value={editableContext.cta} onChange={(v) => updateField('cta', v)} />
+            </div>
+          )}
+        </SlideOver>
 
-      <ExpandTextModal
-        open={expandedField === 'brief'}
-        onClose={() => { commitBriefDraft(); setExpandedField(null) }}
-        value={brief}
-        onChange={handleBriefType}
-        title="Additional Instructions"
-        accent="scripts"
-        placeholder="What should this video say or focus on? Vibe, angle, key points…"
-      />
-      <ExpandTextModal
-        open={expandedField === 'source'}
-        onClose={() => setExpandedField(null)}
-        value={source}
-        onChange={(v) => { onSourceChange(v); setSourceScript(null) }}
-        title={blueprintActive ? 'Scene Blueprint' : 'Proven Script Transcript'}
-        accent="scripts"
-        mono={isBlueprint}
-        placeholder="Paste a proven ad transcript or an Ad Analyzer scene blueprint…"
-      />
-      <ExpandTextModal
-        open={expandedField === 'additionalContext'}
-        onClose={() => { commitContextDraft(); setExpandedField(null) }}
-        value={additionalContext}
-        onChange={handleContextType}
-        title="Additional Instructions"
-        accent="scripts"
-        placeholder="Extra instructions for this generation…"
-      />
+        {/* Style picker — opens from the right; tap a style to select it. */}
+        <SlideOver
+          open={styleSlideOpen}
+          onClose={() => setStyleSlideOpen(false)}
+          title="Choose a style"
+          subtitle="What kind of content the ad looks like — and how it's built"
+          size="wide"
+        >
+          {/* Two sections: Structures (how the argument is built) on top, then
+              Formats (the kind of content the ad imitates). Structures lead HERE
+              because the question this app is asking is how the argument is
+              built; B-Roll passes `formatsFirst` and leads with Formats, since
+              it's picking the kind of ad to shoot and a format is the half that
+              stages the shots. Same list either way — only the reading order
+              differs, and the component is shared so the slugs can't drift. */}
+          <ScriptStyleList
+            value={styleChosen ? writeStyle : null}
+            onSelect={(style) => { onWriteStyleChange(style); setStyleChosen(true); setStyleSlideOpen(false) }}
+          />
+        </SlideOver>
+
+        {/* Hook family picker — mirrors the style slide-over. 'auto' leads. */}
+        <SlideOver
+          open={hookSlideOpen}
+          onClose={() => setHookSlideOpen(false)}
+          title="Choose a hook style"
+          subtitle={`Which formula family the ${hookCount} hooks draw from`}
+          size="wide"
+        >
+          <div className="flex flex-col gap-2 p-4">
+            {(Object.keys(HOOK_CATEGORY_META) as HookCategoryChoice[]).map((choice) => {
+              const active = choice === hookCategory
+              return (
+                <button
+                  key={choice}
+                  type="button"
+                  onClick={() => { onHookCategoryChange(choice); setHookSlideOpen(false) }}
+                  className={`flex items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
+                    active
+                      ? 'border-scripts-500/30 bg-scripts-500/10'
+                      : 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'
+                  }`}
+                >
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${active ? 'bg-scripts-500/10 text-scripts-text' : 'bg-ink/5 text-ink-500'}`}>
+                    {choice === 'auto' ? <Sparkles className="h-5 w-5" strokeWidth={1.75} /> : <FishingHook className="h-5 w-5" strokeWidth={1.75} />}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className={`text-[13px] font-medium tracking-tight ${active ? 'text-scripts-300' : 'text-ink-200'}`}>
+                      {HOOK_CATEGORY_META[choice].label}
+                    </div>
+                    <div className="text-[11px] leading-snug text-ink-500">{HOOK_CATEGORY_META[choice].hint}</div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </SlideOver>
+
+        <ExpandTextModal
+          open={expandedField === 'brief'}
+          onClose={() => { commitBriefDraft(); setExpandedField(null) }}
+          value={brief}
+          onChange={handleBriefType}
+          title="Additional Instructions"
+          accent="scripts"
+          placeholder="What should this video say or focus on? Vibe, angle, key points…"
+        />
+        <ExpandTextModal
+          open={expandedField === 'source'}
+          onClose={() => setExpandedField(null)}
+          value={source}
+          onChange={(v) => { onSourceChange(v); setSourceScript(null) }}
+          title={blueprintActive ? 'Scene Blueprint' : 'Proven Script Transcript'}
+          accent="scripts"
+          mono={isBlueprint}
+          placeholder="Paste a proven ad transcript or an Ad Analyzer scene blueprint…"
+        />
+        <ExpandTextModal
+          open={expandedField === 'additionalContext'}
+          onClose={() => { commitContextDraft(); setExpandedField(null) }}
+          value={additionalContext}
+          onChange={handleContextType}
+          title="Additional Instructions"
+          accent="scripts"
+          placeholder="Extra instructions for this generation…"
+        />
+      </div>
     </div>
   )
 }

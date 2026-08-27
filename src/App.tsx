@@ -112,8 +112,8 @@ function Workspace() {
   const activeApp = useAppStore((s) => s.activeApp)
   const runningApps = useAppStore((s) => s.runningApps)
   const userId = useAuthStore((s) => s.user?.id)
-  // Phone only: scrolling down inside an app rolls the menu bar and the dock
-  // off screen and hands the pane those ~144px.
+  // Phone only: scrolling down inside an app rolls the DOCK away and hands the
+  // pane its ~108px. The menu bar stays — see the pane's own note below.
   const chromeHidden = useChromeHidden()
   useChromeAutoHide()
 
@@ -158,16 +158,24 @@ function Workspace() {
             (B-Roll's pinned storyboard strips), not on a full-window
             container.
 
-            The insets are phone-aware: when the chrome collapses on a scroll
-            (useChromeAutoHide) the pane takes the whole window. Deliberately
-            NOT transitioned — `top`/`bottom` are layout, so animating them
-            relayouts the entire app on every frame, and a storyboard's worth
-            of cards can't pay that for 300ms. The chrome slides; the pane
-            simply grows underneath it, which is invisible because content is
-            laid out from the top. */}
+            Only the BOTTOM inset is phone-aware: when the dock rolls away on
+            a scroll (useChromeAutoHide) the pane claims its 108px. The top
+            stays at `top-9` in every state, deliberately. It used to go to
+            `top-0` and take the menu bar's 36px too — but the menu bar doesn't
+            move, it's opaque and it's `fixed`, so what the app actually gained
+            was 36px UNDERNEATH it: every app's first row slid out of sight,
+            which on a two-pane app is the Setup/Storyboard tabs and on Outliers
+            is the platform tabs. Scrolling a list is not a reason to cover the
+            navigation, and 36px was never worth it.
+
+            Deliberately NOT transitioned — `bottom` is layout, so animating it
+            relayouts the entire app on every frame, and a storyboard's worth of
+            cards can't pay that for 300ms. The dock slides; the pane simply
+            grows underneath it, which is invisible because content is laid out
+            from the top. */}
         <div
-          className={`absolute inset-x-0 overflow-hidden md:bottom-[108px] md:top-9 ${
-            chromeHidden ? 'bottom-0 top-0' : 'bottom-[108px] top-9'
+          className={`absolute inset-x-0 top-9 overflow-hidden md:bottom-[108px] ${
+            chromeHidden ? 'bottom-0' : 'bottom-[108px]'
           }`}
         >
           {/* Empty state — visible when no app is active */}

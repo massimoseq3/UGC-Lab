@@ -118,7 +118,12 @@ export default function SegmentedToggle<T extends string>({
             type="button"
             onClick={() => onChange(opt.value)}
             className={`relative z-[1] flex min-w-0 ${fitContent ? '' : 'flex-1'} items-center justify-center rounded-full font-medium tracking-tight transition-colors duration-200 ${
-              dense ? 'gap-1.5 px-3 py-1 text-[12px]' : 'gap-2 px-4 py-2.5 text-[13px]'
+              // The full-size segment gives back 8px of padding and half a
+              // point of type below `sm`. These are the second-row toggles —
+              // three-up section jumps, mode switches — and at 375px their
+              // labels were truncating to "Breakd…" / "Transcr…" for want of
+              // exactly that. `dense` is already sized for a tight row.
+              dense ? 'gap-1.5 px-3 py-1 text-[12px]' : 'gap-1.5 px-2.5 py-2.5 text-[12.5px] sm:gap-2 sm:px-4 sm:text-[13px]'
             } ${
               active ? ACCENT_ACTIVE_TEXT[accent] : 'text-ink-400 hover:text-ink-200'
             }`}

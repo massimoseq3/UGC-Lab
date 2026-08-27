@@ -16,7 +16,6 @@ import {
 } from './service'
 import { ALL_HOOKS } from './types'
 import type { ResolvedVideo, VaultFilters, VaultItem, VaultSort } from './types'
-import CollapsingBar from '../../../components/CollapsingBar'
 
 /**
  * How many cards reach the DOM at once.
@@ -347,6 +346,10 @@ export default function VaultBrowser({
     : rows.length
 
   const folderName = inCategory ? categoryLabel(openFolder) : 'All Outlier Videos'
+  // One string, two places: it rides the filter group on a desktop and the
+  // folder line on a phone (see the panel below).
+  const countLabel =
+    matches.length === folderTotal ? `${folderTotal} hooks` : `${matches.length} of ${folderTotal}`
 
   if (!browsing) {
     return <VaultFolders rows={rows} starredIds={starIds} onOpen={enterFolder} />
@@ -366,45 +369,57 @@ export default function VaultBrowser({
           only thing on screen saying which slice of 872 rows is under you. */}
       {/* Folder and filters share ONE panel: `flex-wrap` + `justify-between`,
           so the filters ride the right edge while both fit and tuck onto their
-          own line underneath when they don't. Wrapping is what makes that
-          safe — flexbox lays each item out at its natural width and moves the
-          second one down rather than squeezing either, so nothing is ever
-          truncated. */}
-      {/* Sort, folders and search roll up while the grid is read — see CollapsingBar. */}
-      <CollapsingBar>
-        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-ink/5 px-4 py-2.5">
-          <div className="flex min-w-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={backToFolders}
-              title="Back to the folders"
-              // 36px, the height of the two dropdowns and the Starred pill
-              // opposite it, so the row sits on one line.
-              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-ink/10 px-3 text-[13px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/5"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              Folders
-            </button>
-            <span className="flex min-w-0 items-center gap-2 pl-1 text-[13px] font-medium text-ink-200">
-              {/* Outliers' gold as a literal — the app's `gold-*` family is
-                  #4C1D95, which is purple and belongs to the Products bank. */}
-              <FolderOpen className="h-4 w-4 shrink-0 text-[#D9A404] light:text-[#8A6A00]" strokeWidth={1.75} />
-              <span className="truncate">{folderName}</span>
-            </span>
-          </div>
+          own line underneath when they don't.
 
-          {/* Sort / Hook / Starred. `shrink-0` on the group so it wraps as a
-              unit rather than the dropdowns squeezing; `flex-wrap` inside it for
-              the phone, where even the group is wider than the screen — and
-              `max-w-full`, which is what lets that inner wrap actually fire.
-              `shrink-0` alone pins the group at its max-content width, so on a
-              375px screen the Starred pill and the counter sat off the right
-              edge of a row that doesn't scroll. The cap never binds on a
-              desktop, where the group is half the width of its row. */}
-          <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
+          On a phone that used to land as THREE lines — folder, then Sort and
+          Hook, then Starred and the counter on a third — which is 145px of
+          chrome over a grid of pictures on a screen that has ~700px to give.
+          It's two now, and the split is by kind: where you are on the first
+          line, what you're filtering by on the second. The counter moves up
+          beside the folder name (it describes the folder, not the filters) and
+          the second line is forced to its own row by `w-full`, then held to
+          ONE line by giving the two selects `flex-auto` — they share the
+          shortfall by truncating their own values rather than one of them
+          wrapping and putting the third line back. Above `md` every one of
+          those rules is off and the row is unchanged. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-ink/5 px-4 py-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2 md:flex-none">
+          <button
+            type="button"
+            onClick={backToFolders}
+            title="Back to the folders"
+            // 36px, the height of the two dropdowns and the Starred pill
+            // opposite it, so the row sits on one line.
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-ink/10 px-3 text-[13px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/5"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+            Folders
+          </button>
+          <span className="flex min-w-0 items-center gap-2 pl-1 text-[13px] font-medium text-ink-200">
+            {/* Outliers' gold as a literal — the app's `gold-*` family is
+                #4C1D95, which is purple and belongs to the Products bank. */}
+            <FolderOpen className="h-4 w-4 shrink-0 text-[#D9A404] light:text-[#8A6A00]" strokeWidth={1.75} />
+            <span className="truncate">{folderName}</span>
+          </span>
+          {/* The count of what's in the folder, on the folder's own line. It
+              sits at the end of the filter group on a desktop, where the whole
+              panel is one line and the distinction doesn't arise. */}
+          <span className="ml-auto shrink-0 pl-1 text-[11px] tabular-nums text-ink-600 md:hidden">
+            {countLabel}
+          </span>
+        </div>
+
+        {/* Sort / Hook / Starred. On a phone `w-full` puts the group on its own
+            line and its members take the width they can get; from `md` it's
+            `shrink-0` again so it wraps as a unit rather than the dropdowns
+            squeezing, with `flex-wrap` + `max-w-full` as the tablet fallback
+            (`shrink-0` alone pins the group at its max-content width, which put
+            the Starred pill off the right edge of a row that doesn't scroll). */}
+        <div className="flex w-full min-w-0 items-center gap-2 md:w-auto md:max-w-full md:shrink-0 md:flex-wrap">
           <FilterSelect
             dense
             label="Sort"
+            className="max-md:min-w-0 max-md:flex-auto"
             value={filters.sort}
             options={SORT_OPTIONS}
             onChange={(sort) => onFiltersChange((f) => ({ ...f, sort }))}
@@ -415,6 +430,7 @@ export default function VaultBrowser({
           <FilterSelect
             dense
             label="Hook"
+            className="max-md:min-w-0 max-md:flex-auto"
             menuMinWidth={232}
             value={filters.pattern}
             options={hookOptions}
@@ -433,18 +449,19 @@ export default function VaultBrowser({
             }`}
           >
             <Star className={`h-3.5 w-3.5 ${filters.starredOnly ? 'fill-current' : ''}`} />
-            Starred
+            {/* The word goes on a phone and the star carries it: it's the one
+                control on that line whose glyph says the whole thing, so it's
+                the one that can afford to, and the ~55px it gives back is what
+                keeps the two selects from truncating. */}
+            <span className="max-md:hidden">Starred</span>
             {starIds.length > 0 && <span className="tabular-nums opacity-60">{starIds.length}</span>}
           </button>
 
-          <span className="shrink-0 pl-1 text-[11px] tabular-nums text-ink-600">
-            {matches.length === folderTotal
-              ? `${folderTotal} hooks`
-              : `${matches.length} of ${folderTotal}`}
+          <span className="hidden shrink-0 pl-1 text-[11px] tabular-nums text-ink-600 md:inline">
+            {countLabel}
           </span>
-          </div>
         </div>
-      </CollapsingBar>
+      </div>
 
       {matches.length === 0 ? (
         <GridCanvas>

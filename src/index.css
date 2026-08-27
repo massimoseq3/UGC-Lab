@@ -255,6 +255,7 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
+  overscroll-behavior: none;
   font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
@@ -270,11 +271,28 @@ select {
   letter-spacing: -0.025em;
 }
 
-/* Prevent iOS auto-zoom on input focus (triggers when font-size < 16px) */
-@media (max-width: 1023px) {
-  input, textarea, select {
-    font-size: 16px !important;
-  }
+/* NOTE: a `font-size: 16px !important` rule for fields under 1024px lived here
+   from the first commit, to stop iOS' focus zoom. The zoom is held off by the
+   viewport cap in index.html now and the field size is set by the floor at the
+   bottom of this file — but `!important` outranks that floor whatever the
+   source order, so the 16px never actually went away and every field on a
+   phone kept rendering a size bigger than its own design. Removed August 2026.
+   Don't reintroduce an `!important` here: put field sizing in the floor rule. */
+
+/* Nothing in the app rubber-bands. On a phone, pulling past the end of a
+   scroller drags the whole surface up and reveals a band of empty page under
+   it (reported on the Dashboard and Edit, where the pane's own scroller is the
+   one being pulled) — a window chrome does not do that, and the app is dressed
+   as a window. `overscroll-behavior: none` stops the bounce AND stops a nested
+   scroller chaining its leftover scroll into its parent, which is the other
+   half of the same feel. Written against the overflow utilities rather than a
+   bare `*`, so it lands on exactly the boxes that scroll. */
+.overflow-auto,
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-y-scroll,
+.overflow-x-scroll {
+  overscroll-behavior: none;
 }
 
 /* Touch polish: no gray flash on tap, and `manipulation` removes the
@@ -306,6 +324,21 @@ textarea,
 ::-webkit-scrollbar {
   width: 11px;
   height: 11px;
+}
+
+/* …but not on a touch screen, where there is no pointer to drag one with. The
+   11px is LAYOUT: it comes out of every scroller's width, so a bar pinned
+   inside a scroller (the Ad Analyzer's section toggle, sticky at the top of
+   the read) painted its background 11px short of the pane's edge while the
+   pane tabs above it — outside that scroller — ran full width. The two rows
+   met in a visible step down the right-hand side. It also took 11px off every
+   phone grid for a scrollbar nobody can use, and `autoHideScrollbars` draws
+   the visible thumb itself, which is skipped on touch for the same reason. */
+@media (hover: none) {
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -702,8 +735,7 @@ textarea,
 .offscreen-idle { content-visibility: auto; }
 
 /* Thin range slider — used by Voiceovers settings.
-   Track: 2px hairline. Thumb: 12px white circle.
-   Override iOS' 16px auto font-size since we don't use type-in here. */
+   Track: 2px hairline. Thumb: 12px white circle. */
 .slider-thin {
   -webkit-appearance: none;
   appearance: none;
@@ -712,7 +744,6 @@ textarea,
   background: transparent;
   cursor: pointer;
   outline: none;
-  font-size: inherit !important;
 }
 .slider-thin::-webkit-slider-runnable-track {
   height: 2px;

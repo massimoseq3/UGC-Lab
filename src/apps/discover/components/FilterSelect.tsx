@@ -18,6 +18,7 @@ export default function FilterSelect<T extends string>({
   onChange,
   menuMinWidth,
   dense = false,
+  className,
 }: {
   label: string
   value: T
@@ -27,12 +28,17 @@ export default function FilterSelect<T extends string>({
   menuMinWidth?: number
   /** 36px, to sit level with a `dense` SegmentedToggle on the same row. */
   dense?: boolean
+  /** Sizing for a row that has to fit on one line — the vault's phone layout
+   *  gives its two selects `max-md:flex-auto`, so they share the shortfall by
+   *  truncating instead of one of them wrapping onto a third line. */
+  className?: string
 }) {
   return (
     <Dropdown
       compact
       dense={dense}
       fitContent
+      className={className}
       // No app accent: this row is chrome above the grid, sitting under a
       // monochrome search field and Search button.
       accent="neutral"

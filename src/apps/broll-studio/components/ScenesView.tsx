@@ -804,8 +804,12 @@ export default function ScenesView({
           on others. The meta shrinks and truncates instead; the buttons are the
           part you can't guess from a shorter label. Under md it still wraps,
           where there genuinely isn't a row's worth of width. */}
-      <div className="relative z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5 md:flex-nowrap">
-        <div className="flex min-w-0 items-center gap-2">
+      <div className="relative z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-ink/5 px-5 py-3.5 md:flex-nowrap">
+        {/* Meta is desktop-only. On a phone this strip is the batch row and
+            nothing else: the scene count is a caption for a storyboard you can
+            see, and the style is named on every card's own footer — between
+            them they were taking the line the buttons needed. */}
+        <div className="hidden min-w-0 items-center gap-2 md:flex">
           {/* Small-caps and dim — the count is a caption for the storyboard
               below it, so it takes the same eyebrow treatment as the style pill
               beside it rather than reading as a heading. */}
@@ -821,14 +825,19 @@ export default function ScenesView({
         </div>
         {/* Batch actions, in the order the work happens — images, then the
             animate pass, then videos, then the export. Same shape and styling
-            as Continuous' top strip. One line from md up; below it they wrap
-            rather than clipping the last button. */}
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 whitespace-nowrap md:shrink-0 md:flex-nowrap">
+            as Continuous' top strip. One line from md up.
+            On a phone they are ONE line too, and it SCROLLS: four pills wrapped
+            to two or three rows there, which is 40px of chrome per extra row on
+            the screen with the least of it, and the work reads as a sequence
+            anyway — swiping along the row is closer to what it is than stacking
+            it. `-mx-5 px-5` so the row scrolls edge to edge while its first and
+            last pills still sit on the panel's own inset. */}
+        <div className="-mx-5 flex w-full min-w-0 items-center gap-2 overflow-x-auto scrollbar-hide whitespace-nowrap px-5 md:mx-0 md:w-auto md:justify-end md:overflow-visible md:px-0 md:shrink-0">
           <button
             type="button"
             onClick={() => requestBatch(allKeys, 'All scenes', true)}
             title="Generate images across all scenes — one option per line, or every variation"
-            className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
           >
             <Images className="h-3.5 w-3.5" />
             Generate all images
@@ -843,7 +852,7 @@ export default function ScenesView({
               type="button"
               onClick={() => requestVideoBatch(allKeys, 'All stills', true, true)}
               title="Animate every card that already has a still — nothing renders from a prompt alone"
-              className="flex items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 py-1.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/40 hover:bg-broll-500/20"
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 py-1.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/40 hover:bg-broll-500/20"
             >
               <Clapperboard className="h-3.5 w-3.5" />
               Animate all stills
@@ -853,7 +862,7 @@ export default function ScenesView({
             type="button"
             onClick={() => requestVideoBatch(allKeys, 'All scenes', true)}
             title="Generate clips across all scenes — one option per line, or every variation"
-            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400"
           >
             <VideoIcon className="h-3.5 w-3.5" />
             Generate all videos
@@ -863,7 +872,7 @@ export default function ScenesView({
               type="button"
               onClick={() => setDownloadOpen(true)}
               title="Pick which clips to download as a zip"
-              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
             >
               <Download className="h-3.5 w-3.5" />
               {`Download clips (${allClipEntries.length})`}
@@ -1444,11 +1453,10 @@ function SceneLineEditModal({
           placeholder={speaks ? 'What the character says here' : 'What the voiceover says over this scene'}
         />
 
-        <p className="mt-2 text-[11px] leading-relaxed text-ink-500">
-          {speaks
-            ? 'Saving rewrites the spoken words in all three prompts — free and instant. Everything else about each shot stays as it is; use a card’s Regenerate prompt if the new line needs a different shot.'
-            : 'These shots are silent, so saving updates the line without touching the prompts. Use a card’s Regenerate prompt to rewrite a shot against the new line.'}
-        </p>
+        {/* No explainer under the box. It ran to three lines to say that saving
+            is free, instant and doesn't touch the shots — which is what saving
+            a line has always done, and reading it every time you fix a typo is
+            the clutter, not the reassurance. */}
 
         <div className="mt-4 flex items-center justify-end gap-2">
           <button
@@ -1550,18 +1558,26 @@ function SceneSection({
       {/* Scene header — number + tiny line chip + the line itself. The
           spoken-duration chip was removed (its estimate was unreliable). */}
       {/* Stacks on a phone: the two batch buttons are ~330px of shrink-0, which
-          left the line itself a column two characters wide. */}
+          left the line itself a column two characters wide.
+
+          And it CENTRES there. The desktop shape is a masthead — number, rule,
+          then the line running away to the right — which needs a column wide
+          enough for the rule to divide something. On a phone it doesn't have
+          one, so the number sits over the line instead and the whole block is
+          centred: the rule and the LINE N chip both go (the chip repeats the
+          number an inch above it), and what's left is the take number and the
+          words, which is what the header is for. */}
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
-        <div className="flex min-w-0 items-center gap-4">
+        <div className="flex min-w-0 items-center gap-4 max-md:flex-col max-md:gap-1">
           <span
             className="text-5xl font-normal italic tabular-nums text-ink-800"
             style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
           >
             {String(scene.number).padStart(2, '0')}
           </span>
-          <div className="h-8 w-px bg-ink/10" />
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="inline-flex w-fit rounded-full border border-ink/10 bg-ink/[0.03] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-400">
+          <div className="h-8 w-px bg-ink/10 max-md:hidden" />
+          <div className="flex min-w-0 flex-col gap-1.5 max-md:w-full max-md:items-center">
+            <span className="inline-flex w-fit rounded-full border border-ink/10 bg-ink/[0.03] px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-ink-400 max-md:hidden">
               Line {scene.number}
             </span>
             {/* The line itself, and the place you retype it. Clicking it opens
@@ -1573,10 +1589,10 @@ function SceneSection({
                 type="button"
                 onClick={() => setLineEditorOpen(true)}
                 title="Edit this line"
-                className="group/line -mx-1.5 flex items-start gap-2 rounded-lg px-1.5 py-0.5 text-left transition-colors hover:bg-ink/[0.04]"
+                className="group/line -mx-1.5 flex items-start gap-2 rounded-lg px-1.5 py-0.5 text-left transition-colors hover:bg-ink/[0.04] max-md:w-full max-md:justify-center max-md:text-center"
               >
                 <p
-                  className="text-lg font-normal not-italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200"
+                  className="text-lg font-normal not-italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200 max-md:text-center"
                   style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
                 >
                   &ldquo;{scene.scriptLine}&rdquo;
@@ -1585,7 +1601,7 @@ function SceneSection({
               </button>
             ) : (
               <p
-                className="text-lg font-normal not-italic leading-relaxed text-ink-400"
+                className="text-lg font-normal not-italic leading-relaxed text-ink-400 max-md:text-center"
                 style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
               >
                 &ldquo;{scene.scriptLine}&rdquo;
@@ -1596,7 +1612,7 @@ function SceneSection({
         {/* Per-scene batches — one row's worth of images or clips, so a member
             can work scene by scene instead of committing the whole storyboard's
             credits in one press. */}
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 max-md:justify-center">
           <button
             type="button"
             onClick={onGenerateScene}

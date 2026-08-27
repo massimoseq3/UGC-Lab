@@ -823,8 +823,9 @@ function PreviewModal({
   }, [onClose])
 
   const prompt = entry.kind === 'image' || entry.kind === 'video' ? entry.data.prompt : ''
-  // Video previews lay out side-by-side (clip left, prompt + actions + frames
-  // in a column to the right); images stay stacked.
+  // Video previews lay out side-by-side FROM `md` (clip left, prompt + actions
+  // + frames in a column to the right) and stack below it; images stay stacked
+  // at every width.
   const isVideo = entry.kind === 'video' && !!videoUrl
   const lightboxVideo = useExclusiveVideo()
   // Already-saved entries link a B-Roll id; show a tick instead of the bookmark.
@@ -883,7 +884,12 @@ function PreviewModal({
       <div
         className={
           isVideo
-            ? 'mx-auto flex h-full w-full max-w-6xl flex-row items-center justify-center gap-8 overflow-hidden px-6 py-16'
+            // The side column is a fixed 380px and `shrink-0`, which on a 375px
+            // phone claimed the whole row and squeezed the clip — the thing the
+            // modal is for — into a sliver against the left edge. Below `md` the
+            // two stack and the wrapper scrolls: clip first at its own size,
+            // then the frames, the prompt and the actions under it.
+            ? 'mx-auto flex h-full w-full max-w-6xl flex-col items-center justify-start gap-4 overflow-y-auto px-4 py-14 md:flex-row md:justify-center md:gap-8 md:overflow-hidden md:px-6 md:py-16'
             : 'mx-auto flex h-full w-full max-w-5xl flex-col items-center justify-center gap-4 overflow-hidden px-6 py-16'
         }
       >
@@ -898,7 +904,7 @@ function PreviewModal({
           </div>
         )}
         {entry.kind === 'video' && videoUrl && (
-          <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+          <div className="flex min-h-0 w-full flex-1 items-center justify-center max-md:flex-none">
             {/* Autoplays with sound, so it claims the app-wide playback slot
                 — opening the lightbox stops whatever tile was playing. */}
             <video
@@ -908,7 +914,7 @@ function PreviewModal({
               autoPlay
               loop
               onClick={(e) => e.stopPropagation()}
-              className="max-h-[72vh] max-w-full rounded-xl border border-white/10 object-contain"
+              className="max-h-[52vh] max-w-full rounded-xl border border-white/10 object-contain md:max-h-[72vh]"
             />
           </div>
         )}
@@ -917,7 +923,7 @@ function PreviewModal({
           onClick={(e) => e.stopPropagation()}
           className={
             isVideo
-              ? 'flex h-full w-[380px] shrink-0 flex-col items-center justify-center gap-4 overflow-y-auto py-4'
+              ? 'flex w-full shrink-0 flex-col items-center gap-4 md:h-full md:w-[380px] md:justify-center md:overflow-y-auto md:py-4'
               : 'flex w-full max-w-2xl shrink-0 flex-col items-center gap-3'
           }
         >
@@ -938,7 +944,7 @@ function PreviewModal({
               both themes, like everything else in it. */}
           <ModelPill modelId={entry.data.modelId} variant="media" className="shrink-0" />
           {prompt && (
-            <div className="max-h-[18vh] w-full overflow-y-auto rounded-lg bg-white/[0.02] px-4 py-3 text-center text-[12px] leading-relaxed text-zinc-400">
+            <div className="w-full overflow-y-auto rounded-lg bg-white/[0.02] px-4 py-3 text-center text-[12px] leading-relaxed text-zinc-400 md:max-h-[18vh]">
               {prompt}
             </div>
           )}

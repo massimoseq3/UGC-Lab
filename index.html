@@ -8,6 +8,25 @@
          cold load and decoded to a ~4 MB bitmap for a 20px menu-bar glyph.
          Regenerate with: sips -Z 192 public/logo.png --out public/logo-192.png -->
     <link rel="icon" type="image/png" href="/logo-192.png" />
+    <!-- Installed to a phone's home screen, UGC OS runs as ONE app, not as a
+         Safari tab per page. Without a manifest, iOS gives a web clip a scope
+         of the exact start URL it was saved at — so the first in-app route
+         change (Dashboard → Outliers) reads as leaving the app and Safari
+         pops its in-app browser chrome over the top: the URL, a back chevron
+         and a reload. `scope: "/"` covers every route the router can push, and
+         `display: standalone` is what drops the browser chrome in the first
+         place. `apple-mobile-web-app-capable` is the same instruction for
+         older iOS, which ignores the manifest's display mode. The status bar
+         is `black`, NOT `black-translucent`: translucent hands the app the
+         status bar's own strip, and the menu bar is `fixed top-0` at 36px, so
+         the clock and the battery would sit on top of it. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="UGC OS" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <!-- maximum-scale=1 is what lets fields render at their designed size on a
          phone. iOS Safari zooms the page in whenever a focused field's font-size
          is under 16px and never zooms back out; capping the scale stops that

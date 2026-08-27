@@ -41,6 +41,7 @@ export default function BatchCountStepper({
   noun,
   label,
   stacked = false,
+  labelClassName = '',
   accent,
   size = 'lg',
   grow = false,
@@ -58,6 +59,11 @@ export default function BatchCountStepper({
   // a generate bar, where the count is the thing being read and the word is
   // what it counts — side by side at that height the pair floats mid-pill.
   stacked?: boolean
+  // Extra classes on the label alone — for a bar where the word costs more
+  // than it's worth at one width. Voiceovers hides it under `md`: the Generate
+  // button beside it already reads "Generate 2 Voiceovers", and on a 375px
+  // screen the two of them saying so clipped the button's own label.
+  labelClassName?: string
   accent: keyof typeof ACCENT_ON
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'fill'
   grow?: boolean
@@ -90,11 +96,11 @@ export default function BatchCountStepper({
       {stacked ? (
         <span className={`flex min-w-0 flex-col items-center justify-center px-1 leading-none ${s.text}`}>
           <span className="tabular-nums font-semibold">{count}</span>
-          {label && <span className="mt-1 truncate text-[10px] font-medium tracking-tight text-ink-500">{label}</span>}
+          {label && <span className={`mt-1 truncate text-[10px] font-medium tracking-tight text-ink-500 ${labelClassName}`}>{label}</span>}
         </span>
       ) : (
         <span className={`flex min-w-0 items-center justify-center gap-1.5 px-1 tabular-nums ${s.text}`}>
-          {label && <span className="truncate text-[11px] text-ink-500">{label}</span>}
+          {label && <span className={`truncate text-[11px] text-ink-500 ${labelClassName}`}>{label}</span>}
           {count}
         </span>
       )}

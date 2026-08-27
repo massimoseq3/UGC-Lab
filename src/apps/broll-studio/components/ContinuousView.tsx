@@ -1197,8 +1197,9 @@ export default function ContinuousView({
           moment the meta pills and the buttons together outgrew the panel, so
           the strip's height changed with the window. The meta wraps and shrinks
           instead. */}
-      <div className="relative z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-ink/5 bg-surface-0 px-5 py-3.5 md:flex-nowrap">
-        <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
+      <div className="relative z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-ink/5 px-5 py-3.5 md:flex-nowrap">
+        {/* Desktop-only — see the note on the Line-by-Line strip. */}
+        <div className="hidden min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400 md:flex">
           {/* Scene count matches the per-line storyboard's — small-caps and dim,
               the same eyebrow treatment as the pills beside it. */}
           <span className="font-semibold text-ink-500">
@@ -1208,11 +1209,11 @@ export default function ContinuousView({
           <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">~{totalSeconds}s</span>
           <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{framesPicked}/{result.frames.length} keyframes picked</span>
         </div>
-        {/* Wraps on a phone. `shrink-0` with no wrap pinned this group to its
-            max-content width, so "Generate all videos" and the download
-            button ran off the right edge of a 375px screen with nothing to
-            scroll them back. One row from md up, as before. */}
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 whitespace-nowrap md:shrink-0 md:flex-nowrap">
+        {/* One SCROLLING line on a phone, one static line from md up — see the
+            note on the Line-by-Line strip. It used to wrap there, which put the
+            strip at two or three rows tall on the screen with the least room to
+            give. */}
+        <div className="-mx-5 flex w-full min-w-0 items-center gap-2 overflow-x-auto scrollbar-hide whitespace-nowrap px-5 md:mx-0 md:w-auto md:justify-end md:overflow-visible md:px-0 md:shrink-0">
           <button
             type="button"
             onClick={() => requestFrames()}
@@ -1220,7 +1221,7 @@ export default function ContinuousView({
             // card rendering on its own doesn't, so the two can overlap.
             disabled={chainRunning}
             title="Generate a keyframe image for every frame that doesn't have one yet"
-            className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {chainRunning ? <Spinner className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
             {chainRunning
@@ -1234,7 +1235,7 @@ export default function ContinuousView({
             // stop the member firing the rest.
             disabled={readyClipIndices.length === 0}
             title="Generate every clip whose two keyframes are picked"
-            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <VideoIcon className="h-3.5 w-3.5" />
             Generate all videos
@@ -1244,7 +1245,7 @@ export default function ContinuousView({
               type="button"
               onClick={() => setDownloadOpen(true)}
               title="Pick which clips to download as a zip"
-              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
+              className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
             >
               <Download className="h-3.5 w-3.5" />
               {`Download clips (${allClipEntries.length})`}

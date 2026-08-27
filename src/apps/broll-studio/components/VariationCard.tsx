@@ -1039,10 +1039,13 @@ export default function VariationCard(props: VariationCardProps) {
             // direction is glanceable without opening the card. Mirrors the
             // Script Bank card: text fills the face and fades out at the
             // bottom. The mask fades the text to transparent regardless of the
-            // translucent card background behind it. `pt-9` clears the
-            // top-left type chip.
+            // translucent card background behind it. The top padding clears
+            // the type chip — and has to follow it DOWN on a touch screen,
+            // where the chip drops to `top-11` to get out of the top corners
+            // (see its own note below). It didn't, so on a phone the tag sat
+            // squarely across the second line of the prompt.
             <>
-              <div className="flex h-full w-full flex-col px-3 pb-3 pt-9">
+              <div className="flex h-full w-full flex-col px-3 pb-3 pt-9 touch:pt-[68px]">
                 <p
                   className="flex-1 overflow-hidden whitespace-pre-wrap text-[11px] leading-relaxed tracking-tight text-ink-400"
                   style={{
