@@ -21,6 +21,9 @@ export interface MemberRow {
   last_name: string | null
   is_admin: boolean
   disabled_at: string | null
+  // Cancelled but not banned (migration 0023). Data intact; the member lets
+  // themselves back in with the current access code.
+  lapsed_at: string | null
   created_at: string
   last_active_at: string | null
   total_bytes: number
@@ -64,9 +67,23 @@ export function daysSinceActive(r: Pick<MemberRow, 'last_active_at' | 'created_a
   return Math.floor((Date.now() - new Date(ref).getTime()) / (24 * 60 * 60_000))
 }
 
-// A non-disabled member who hasn't been active in INACTIVE_DAYS+ days.
+// A member with app access who hasn't been active in INACTIVE_DAYS+ days.
+// Locked accounts are excluded from both directions: "inactive" is the
+// chase-them list, and someone who is disabled or lapsed has already gone.
 export function isInactive(r: MemberRow): boolean {
-  return !r.disabled_at && daysSinceActive(r) >= INACTIVE_DAYS
+  return !r.disabled_at && !r.lapsed_at && daysSinceActive(r) >= INACTIVE_DAYS
+}
+
+export type MemberStatus = 'disabled' | 'lapsed' | 'inactive' | 'active'
+
+// One place deciding which of the four states a row is in, so the pill, the
+// filter, the counts and the CSV can never disagree. Disabled outranks lapsed:
+// a banned member who also left the allowlist is still banned.
+export function memberStatus(r: MemberRow): MemberStatus {
+  if (r.disabled_at) return 'disabled'
+  if (r.lapsed_at) return 'lapsed'
+  if (isInactive(r)) return 'inactive'
+  return 'active'
 }
 
 // Has the member ever produced anything? asset_count covers every stored blob,
@@ -163,9 +180,17 @@ async function fetchDirectory(set: Setter, hadRows: boolean): Promise<void> {
     const sb = getSupabase()
     const [profilesRes, storageRes, activityRes, appUsageRes] = await Promise.allSettled([
       withTimeout(
-        (signal) => sb.from('profiles')
-          .select('id, email, display_name, first_name, last_name, is_admin, disabled_at, created_at, last_active_at')
-          .abortSignal(signal),
+        async (signal) => {
+          const cols = 'id, email, display_name, first_name, last_name, is_admin, disabled_at, created_at, last_active_at'
+          const res = await sb.from('profiles').select(`${cols}, lapsed_at`).abortSignal(signal)
+          // 42703 — migration 0023 hasn't run in this environment. Losing the
+          // Lapsed column beats blanking the whole members table under the
+          // admin, which is what selecting a missing column would do.
+          const missingCol = /column .* does not exist|42703/i.test(`${res.error?.message ?? ''} ${res.error?.code ?? ''}`)
+          if (!res.error || !missingCol) return res
+          console.warn('[admin] profiles.lapsed_at missing — run migration 0023.')
+          return await sb.from('profiles').select(cols).abortSignal(signal)
+        },
         QUERY_TIMEOUT_MS,
         'profiles query',
       ),
@@ -243,6 +268,9 @@ async function fetchDirectory(set: Setter, hadRows: boolean): Promise<void> {
       const s = storageMap.get(p.id)
       const a = activityMap.get(p.id)
       return {
+        // Defaulted before the spread so a selected value still wins — the
+        // fallback tier above omits the column entirely.
+        lapsed_at: null,
         ...p,
         total_bytes: s?.total_bytes ?? 0,
         asset_count: s?.asset_count ?? 0,
