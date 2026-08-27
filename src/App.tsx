@@ -113,7 +113,7 @@ function Workspace() {
   const runningApps = useAppStore((s) => s.runningApps)
   const userId = useAuthStore((s) => s.user?.id)
   // Phone only: scrolling down inside an app rolls the DOCK away and hands the
-  // pane its ~108px. The menu bar stays — see the pane's own note below.
+  // pane its ~98px. The menu bar stays — see the pane's own note below.
   const chromeHidden = useChromeHidden()
   useChromeAutoHide()
 
@@ -159,7 +159,7 @@ function Workspace() {
             container.
 
             Only the BOTTOM inset is phone-aware: when the dock rolls away on
-            a scroll (useChromeAutoHide) the pane claims its 108px. The top
+            a scroll (useChromeAutoHide) the pane claims its 98px. The top
             stays at `top-9` in every state, deliberately. It used to go to
             `top-0` and take the menu bar's 36px too — but the menu bar doesn't
             move, it's opaque and it's `fixed`, so what the app actually gained
@@ -174,12 +174,12 @@ function Workspace() {
             grows underneath it, which is invisible because content is laid out
             from the top.
 
-            The inset is the DOCK'S OWN expression, not a flat 108px: the dock
+            The inset is the DOCK'S OWN expression, not a flat number: the dock
             is `fixed bottom-0` with `pb-[max(env(safe-area-inset-bottom),
-            0.75rem)]`, so its height is 96px of nav plus whichever of those two
+            0.5rem)]`, so its height is ~90px of nav plus whichever of those two
             wins. In a browser tab `env(safe-area-inset-bottom)` is 0 — the
-            browser's own bar owns that strip — so the 12px floor wins and this
-            is 108px exactly as it always was. INSTALLED to the home screen it
+            browser's own bar owns that strip — so the 8px floor wins and this
+            is 98px. INSTALLED to the home screen it
             isn't: `viewport-fit=cover` plus no browser bar means the page runs
             to the physical bottom edge and the inset reports the ~34px the home
             indicator sits in, so the dock stands 22px taller than a flat 108
@@ -189,8 +189,8 @@ function Workspace() {
             it's the strip the home indicator lives in, and content under it is
             content you can't reliably touch. */}
         <div
-          className={`absolute inset-x-0 top-9 overflow-hidden md:bottom-[calc(96px+max(env(safe-area-inset-bottom),0.75rem))] ${
-            chromeHidden ? 'bottom-[env(safe-area-inset-bottom)]' : 'bottom-[calc(96px+max(env(safe-area-inset-bottom),0.75rem))]'
+          className={`absolute inset-x-0 top-9 overflow-hidden md:bottom-[calc(90px+max(env(safe-area-inset-bottom),0.5rem))] ${
+            chromeHidden ? 'bottom-[env(safe-area-inset-bottom)]' : 'bottom-[calc(90px+max(env(safe-area-inset-bottom),0.5rem))]'
           }`}
         >
           {/* Empty state — visible when no app is active */}

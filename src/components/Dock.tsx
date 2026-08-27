@@ -55,13 +55,13 @@ export default function Dock() {
   return (
     <>
       <div
-        className={`pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-2 pb-[max(env(safe-area-inset-bottom),0.75rem)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:translate-y-0 ${
+        className={`pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] md:translate-y-0 ${
           chromeHidden ? 'translate-y-full' : 'translate-y-0'
         }`}
       >
         {/* overflow-x-auto keeps the dock usable on narrow screens; md+ fits
             everything so overflow stays visible. */}
-        <nav ref={navRef} className="pointer-events-auto flex max-w-full items-start gap-0.5 overflow-x-auto overscroll-x-contain scrollbar-hide rounded-[26px] border border-ink/10 bg-surface-1/75 px-2 pb-1.5 pt-2 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-2xl backdrop-saturate-150 md:overflow-visible md:px-2.5 md:pt-2.5 light:bg-white/75 light:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.9)]">
+        <nav ref={navRef} className="pointer-events-auto flex max-w-full items-start gap-0.5 overflow-x-auto overscroll-x-contain scrollbar-hide rounded-[26px] border border-ink/10 bg-surface-1/75 px-2 pb-1 pt-1.5 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-2xl backdrop-saturate-150 md:overflow-visible md:px-2.5 md:pt-2 light:bg-white/75 light:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.9)]">
           {groups.map((apps, i) => (
             <Fragment key={apps[0].category}>
               {i > 0 && <DockDivider />}
