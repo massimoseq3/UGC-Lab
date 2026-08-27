@@ -12,6 +12,9 @@ import ToastContainer from './components/Toast'
 import AuthGate from './components/auth/AuthGate'
 import RouterSync from './components/RouterSync'
 import LegalAcceptModal from './components/LegalAcceptModal'
+import AppErrorBoundary from './components/AppErrorBoundary'
+import UpdateNotice from './components/UpdateNotice'
+import { useAppUpdateCheck } from './hooks/useAppUpdateCheck'
 import { useAppStore } from './stores/appStore'
 import { useChromeHidden } from './stores/chromeStore'
 import { useChromeAutoHide } from './hooks/useChromeAutoHide'
@@ -116,6 +119,9 @@ function Workspace() {
   // pane its ~98px. The menu bar stays — see the pane's own note below.
   const chromeHidden = useChromeHidden()
   useChromeAutoHide()
+  // Notices a deploy that landed under this tab, so a member finds out from a
+  // pill rather than from an app that won't open. See useAppUpdateCheck.
+  useAppUpdateCheck()
 
   // Per-app attention tracking runs for the life of the workspace. The `key`
   // below already remounts this on a user change, so start/stop lands exactly
@@ -236,9 +242,15 @@ function Workspace() {
                     more than a graceful 450px viewport. */}
                 <div className="h-full overflow-y-auto bg-transparent">
                   {Component ? (
-                    <Suspense fallback={<AppPlaceholder appId={appId} />}>
-                      <Component />
-                    </Suspense>
+                    // Per PANE, not around the whole workspace: the error this
+                    // catches is nearly always a lazy chunk that a deploy
+                    // renamed, and one app failing to load is no reason to
+                    // unmount the ones already open with work in them.
+                    <AppErrorBoundary>
+                      <Suspense fallback={<AppPlaceholder appId={appId} />}>
+                        <Component />
+                      </Suspense>
+                    </AppErrorBoundary>
                   ) : (
                     <AppPlaceholder appId={appId} />
                   )}
@@ -248,6 +260,7 @@ function Workspace() {
           })}
         </div>
 
+        <UpdateNotice />
         <ToastContainer />
         <MeetTheTeam />
         <AnnouncementsHost />
