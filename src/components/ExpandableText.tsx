@@ -55,7 +55,7 @@ export function renderBracketHighlight(text: string): ReactNode[] {
 // The textarea's own form metrics (index.css gives every input font-weight 300
 // + tight tracking). The highlight layer isn't a form control, so it has to be
 // told, or the two layers wrap on different characters.
-const MIRROR_METRICS = 'font-light tracking-[-0.025em]'
+const MIRROR_METRICS = 'field-mirror font-light tracking-[-0.025em]'
 
 // Where the caret sits, in px from the top of the text — measured in a throwaway
 // mirror div that copies the textarea's own metrics. Used to bring a restored

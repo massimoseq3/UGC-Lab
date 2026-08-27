@@ -28,10 +28,14 @@ const IS_TOKEN = /^\[(?:CHARACTER|PRODUCT|INFLUENCER)\]$/i
 
 // The mirror isn't a form control, so it inherits none of the metrics
 // `index.css` gives inputs — spell them out, or the two layers wrap on
-// different characters. The 16px floor under `lg` is the iOS zoom rule from the
-// same file, which applies to the textarea and would otherwise leave the wash
-// set at the card's own 12.5px.
-const MIRROR_METRICS = 'font-light tracking-[-0.025em] max-lg:text-[16px]'
+// different characters. `field-mirror` is the size half: on a phone the
+// textarea is set by the unlayered floor rule in that file rather than by its
+// own `textClass`, and the mirror has to be set by the same rule or it wraps
+// somewhere else and the wash slides off the word. This carried its own
+// `max-lg:text-[16px]` until August 2026 — the size the floor USED to impose,
+// under a breakpoint it no longer uses — so on a phone the wash was painted
+// from a 16px copy of a 13px paragraph and landed lines away from its token.
+const MIRROR_METRICS = 'field-mirror font-light tracking-[-0.025em]'
 
 // Reference-image slots, not typos — B-Roll binds them to the real character
 // and packaging, so they read as deliberate placeholders rather than raw text.
