@@ -136,6 +136,16 @@ step 3 below.
    `/api/r2-sign` Edge function.
 5. Update the R2 bucket CORS policy with your real Vercel domain.
 
+**Deploys land under members who are already using the app.** The build stamps
+itself with `VERCEL_GIT_COMMIT_SHA` and writes that id to `/version.json`
+(`vite.config.ts`); the running app re-reads that file and offers a reload when
+the two disagree, and catches the stale-chunk failure if the member gets there
+first (`hooks/useAppUpdateCheck.ts`, `components/AppErrorBoundary.tsx`). Two
+things have to stay true on any host: **`/version.json` must be served
+uncached** (the `Cache-Control: no-store` rule in `vercel.json`) and it must be
+served as the real file rather than swallowed by the SPA rewrite — Vercel checks
+the filesystem before rewriting, so it is.
+
 ---
 
 ## 4. Zapier sync (Skool → allowlist)
