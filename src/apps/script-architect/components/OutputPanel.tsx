@@ -1389,6 +1389,12 @@ function SceneChunkCard({
   )
 }
 
+// Height of the take switcher, which floats OVER the scroll port so the takes
+// pass under its frosted glass. Kept in sync by hand with the bar's own
+// `h-[53px]` and the scroller's `pt-[73px]` (this + the column's own 20px
+// inset) — a Tailwind class can't be built from a variable.
+const SWITCHER_H = 53
+
 export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, hookCount = DEFAULT_HOOK_COUNT, linkedProductId, isGenerating, error, runId, onEditVariation }: OutputPanelProps) {
   // Resolve the linked product so saved scripts get a meaningful default title
   // ("<Product> — Hook-Led Script").
@@ -1425,6 +1431,10 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
   }, [runId])
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  // The switcher only floats when it's rendered, so the scroll maths only owes
+  // it clearance then.
+  const switcherOffset = variations.length > 1 ? SWITCHER_H : 0
+
   const scrollToTake = (i: number) => {
     setActiveTake(i)
     const card = cardRefs.current[i]
@@ -1432,7 +1442,7 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
     if (!card || !container) return
     const top = card.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
     suspendChromeAutoHide()
-    container.scrollTo({ top: Math.max(0, top - 20), behavior: 'smooth' })
+    container.scrollTo({ top: Math.max(0, top - 20 - switcherOffset), behavior: 'smooth' })
   }
 
   const handleScroll = () => {
@@ -1448,7 +1458,7 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
       idx = 0
       for (let i = 0; i < variations.length; i++) {
         const card = cardRefs.current[i]
-        if (card && card.getBoundingClientRect().top - cTop <= 40) idx = i
+        if (card && card.getBoundingClientRect().top - cTop <= switcherOffset + 40) idx = i
       }
     }
     setActiveTake((prev) => (prev === idx ? prev : idx))
@@ -1517,9 +1527,14 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
   // No canvas once the takes are in: the grid marks an empty stage waiting for
   // work, and behind finished output it's just texture under the reading.
   return (
-    <div className="flex h-full flex-col overflow-hidden" onMouseDown={clearSelectionOnChrome}>
+    <div className="relative flex h-full flex-col overflow-hidden" onMouseDown={clearSelectionOnChrome}>
+      {/* Floats OVER the scroll port rather than sitting above it, so the takes
+          slide under its frosted glass as you read. Absolute, not `sticky`: it
+          is a sibling of the scroller and never moves, so the compositor can't
+          leave it a frame behind its own container — the artifact that took the
+          glass off B-Roll's storyboard strips. */}
       {variations.length > 1 && (
-        <div className="flex select-none items-center justify-center border-b border-ink/5 px-5 py-2.5">
+        <div className="absolute inset-x-0 top-0 z-20 flex h-[53px] select-none items-center justify-center border-b border-ink/5 bg-surface-1/70 px-5 backdrop-blur-2xl backdrop-saturate-150 light:bg-white/70">
           <div className="flex items-center gap-1 rounded-full border border-ink/10 bg-ink/[0.02] p-0.5">
             {variations.map((_, i) => (
               <button
@@ -1539,7 +1554,11 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
           </div>
         </div>
       )}
-      <div ref={scrollRef} onScroll={handleScroll} className="flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto p-5">
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className={`flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto p-5 ${variations.length > 1 ? 'pt-[73px]' : ''}`}
+      >
         {variations.map((text, i) => {
           const isRemix = mode === 'remix'
           const isWrite = mode === 'write'
