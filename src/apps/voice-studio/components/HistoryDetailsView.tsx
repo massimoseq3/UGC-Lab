@@ -4,6 +4,7 @@ import type { VoiceHistoryItem } from '../../../stores/types'
 import type { VoiceSettings } from '../types'
 import { getVoiceById } from '../types'
 import { getUrl } from '../../../utils/assetStore'
+import { getModel, TTS_MODEL_FLASH } from '../../../utils/models'
 import { seedColor } from './seedColor'
 
 interface HistoryDetailsViewProps {
@@ -22,6 +23,14 @@ async function resolveAudioUrl(ref: string): Promise<string> {
   return ref
 }
 
+// A row written before the TTS picker shipped carries no modelId — those are
+// all Flash, the entry that held the slot alone. Resolved through the registry
+// rather than hardcoded, so a Pro read isn't labelled as a Flash one.
+function modelNameFor(modelId: string | undefined): string {
+  const id = modelId ?? TTS_MODEL_FLASH
+  return getModel(id)?.displayName ?? id
+}
+
 function formatRelative(ts: number): string {
   const diff = Date.now() - ts
   if (diff < 60_000) return 'just now'
@@ -34,6 +43,7 @@ export default function HistoryDetailsView({ item, onClose, onRestoreText, onRes
   const [isPlaying, setIsPlaying] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const voice = getVoiceById(item.voiceId)
+  const modelName = modelNameFor(item.modelId)
 
   useEffect(() => {
     return () => {
@@ -121,7 +131,7 @@ export default function HistoryDetailsView({ item, onClose, onRestoreText, onRes
         {/* Pills */}
         <div className="mt-3 flex flex-wrap gap-1.5">
           <span className="rounded-full border border-ink/10 bg-ink/[0.03] px-2.5 py-1 text-[11px] text-ink-300">
-            Gemini 3.1 Flash TTS
+            {modelName}
           </span>
           <span className="rounded-full border border-ink/10 bg-ink/[0.03] px-2.5 py-1 text-[11px] text-ink-300">
             {item.scriptText.length} chars
@@ -163,7 +173,7 @@ export default function HistoryDetailsView({ item, onClose, onRestoreText, onRes
         <div className="mt-6">
           <div className="mb-3 text-sm font-semibold text-ink-100">Settings</div>
           <div className="flex flex-col gap-2.5">
-            <SettingRow label="Model" value="Gemini 3.1 Flash TTS" />
+            <SettingRow label="Model" value={modelName} />
             <SettingRow label="Style" value={item.style ?? '—'} />
             <SettingRow label="Pace" value={item.pace ?? '—'} />
             <SettingRow label="Accent" value={item.accent ?? '—'} />
