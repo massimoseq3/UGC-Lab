@@ -1040,12 +1040,12 @@ export default function VariationCard(props: VariationCardProps) {
             // Script Bank card: text fills the face and fades out at the
             // bottom. The mask fades the text to transparent regardless of the
             // translucent card background behind it. The top padding clears
-            // the type chip — and has to follow it DOWN on a touch screen,
-            // where the chip drops to `top-11` to get out of the top corners
-            // (see its own note below). It didn't, so on a phone the tag sat
-            // squarely across the second line of the prompt.
+            // the type chip, and the two numbers are a PAIR — the chip sat a
+            // row lower on touch for a while and this padding had to follow it
+            // down; both are back on the top row now (see its note below), so
+            // change one and check the other.
             <>
-              <div className="flex h-full w-full flex-col px-3 pb-3 pt-9 touch:pt-[68px]">
+              <div className="flex h-full w-full flex-col px-3 pb-3 pt-9">
                 <p
                   className="flex-1 overflow-hidden whitespace-pre-wrap text-[11px] leading-relaxed tracking-tight text-ink-400"
                   style={{
@@ -1079,22 +1079,25 @@ export default function VariationCard(props: VariationCardProps) {
               action stack and (when playing) the mute button both reach into
               its lane on a narrow card.
 
-              On a touch screen it sits a row LOWER (`touch:top-11`). There the
-              action stack's doorway is permanent rather than a hover state, so
-              the play button, this chip and that button were three things
-              sharing one 103px strip on a three-across storyboard. Below them
-              it keeps its full width and collides with nothing. */}
+              It stays on the TOP row on a touch screen too. It dropped to
+              `touch:top-11` for a three-across phone storyboard, where the play
+              button, this chip and the permanent action doorway were three
+              things sharing one 103px strip — but the phone grid is two across
+              (`grid-cols-2`), which leaves the chip a clear lane between the
+              two corner buttons. A row down it read as floating in the middle
+              of the still instead of labelling it. The prompt face's `pt-9`
+              is the pair to this and moved back with it. */}
           {isManual ? (
             // No `light:` override here: the ink ramp already mirrors per theme,
             // so ink-300 is the readable tint in both. Adding light:text-ink-700
             // double-flipped it to near-white on the pale pill and the word
             // vanished in light mode.
-            <span className={`pointer-events-none absolute left-1/2 top-2 z-10 max-w-[60%] -translate-x-1/2 truncate rounded-full touch:top-11 border border-ink/15 bg-ink/10 px-2 py-0.5 text-[10px] font-medium tracking-tight text-ink-300 transition-opacity ${videoControlsExpanded ? 'opacity-0' : ''}`}>
+            <span className={`pointer-events-none absolute left-1/2 top-2 z-10 max-w-[60%] -translate-x-1/2 truncate rounded-full border border-ink/15 bg-ink/10 px-2 py-0.5 text-[10px] font-medium tracking-tight text-ink-300 transition-opacity ${videoControlsExpanded ? 'opacity-0' : ''}`}>
               Custom
             </span>
           ) : (
             <span
-              className={`pointer-events-none absolute left-1/2 top-2 z-10 max-w-[60%] -translate-x-1/2 truncate rounded-full touch:top-11 border px-2 py-0.5 text-[10px] font-medium tracking-tight transition-opacity ${videoControlsExpanded ? 'opacity-0' : ''} ${tagChipStyle(variation.tag)}`}
+              className={`pointer-events-none absolute left-1/2 top-2 z-10 max-w-[60%] -translate-x-1/2 truncate rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-tight transition-opacity ${videoControlsExpanded ? 'opacity-0' : ''} ${tagChipStyle(variation.tag)}`}
             >
               {tagText}
             </span>

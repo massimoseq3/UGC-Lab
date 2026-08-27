@@ -12,6 +12,7 @@ import SegmentedToggle from '../../components/SegmentedToggle'
 import ExpandTextModal, { ExpandButton } from '../../components/ExpandableText'
 import AutoGrowTextarea from '../../components/AutoGrowTextarea'
 import SectionCard, { SectionLabel } from '../../components/SectionCard'
+import { suspendChromeAutoHide } from '../../hooks/useChromeAutoHide'
 
 interface ProductFormProps {
   item?: Product | null
@@ -425,6 +426,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
 
   const jumpTo = (key: SectionKey) => {
     setActiveSection(key)
+    suspendChromeAutoHide()
     sectionRefs.current[key]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 

@@ -9,6 +9,7 @@ import TokenField from './TokenField'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
 import { REMIX_ANGLE_LABEL, remixAnglesForCount, HOOK_CATEGORY_META, DEFAULT_HOOK_COUNT, parseHooks, hooksPlainText, hooksToText, type ParsedHook, type RemixAngle, type ScriptMode, type WriteFormat } from '../types'
+import { suspendChromeAutoHide } from '../../../hooks/useChromeAutoHide'
 
 interface OutputPanelProps {
   variations: string[]
@@ -1412,6 +1413,7 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
     const container = scrollRef.current
     if (!card || !container) return
     const top = card.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop
+    suspendChromeAutoHide()
     container.scrollTo({ top: Math.max(0, top - 20), behavior: 'smooth' })
   }
 

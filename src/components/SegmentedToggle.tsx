@@ -17,7 +17,13 @@ interface SegmentedToggleProps<T extends string> {
   // Default: fills its column with equal-width segments. When true, the
   // control shrinks to its content (segments sized to their labels) so it
   // doesn't stretch across the full width.
-  fitContent?: boolean
+  //
+  // `'md'` is that behaviour FROM `md` UP and the full-width default below it,
+  // for a control that shares a wrapping header row: fitting its content is
+  // what keeps it from eating a desktop line it has to share, but on a phone
+  // where it already has a row to itself, shrinking just leaves dead space to
+  // the right of it (Outliers' Outlier Vault / TikTok / Meta Ads).
+  fitContent?: boolean | 'md'
   // Slimmer padding + smaller icons, sized to sit inline with compact rows
   // (e.g. the sidebar). Keeps the same sliding-indicator animation.
   dense?: boolean
@@ -99,7 +105,9 @@ export default function SegmentedToggle<T extends string>({
   return (
     <div
       ref={containerRef}
-      className={`relative ${fitContent ? 'inline-flex w-auto' : 'flex w-full'} items-center gap-0.5 rounded-full border border-ink/10 bg-ink/[0.03] ${dense ? 'p-1' : 'p-1.5'} ${className}`}
+      className={`relative ${
+        fitContent === 'md' ? 'flex w-full md:inline-flex md:w-auto' : fitContent ? 'inline-flex w-auto' : 'flex w-full'
+      } items-center gap-0.5 rounded-full border border-ink/10 bg-ink/[0.03] ${dense ? 'p-1' : 'p-1.5'} ${className}`}
     >
       {indicator && (
         <div
@@ -117,7 +125,9 @@ export default function SegmentedToggle<T extends string>({
             ref={(el) => { buttonRefs.current.set(opt.value, el) }}
             type="button"
             onClick={() => onChange(opt.value)}
-            className={`relative z-[1] flex min-w-0 ${fitContent ? '' : 'flex-1'} items-center justify-center rounded-full font-medium tracking-tight transition-colors duration-200 ${
+            className={`relative z-[1] flex min-w-0 ${
+              fitContent === 'md' ? 'flex-1 md:flex-none' : fitContent ? '' : 'flex-1'
+            } items-center justify-center rounded-full font-medium tracking-tight transition-colors duration-200 ${
               // The full-size segment gives back 8px of padding and half a
               // point of type below `sm`. These are the second-row toggles —
               // three-up section jumps, mode switches — and at 375px their

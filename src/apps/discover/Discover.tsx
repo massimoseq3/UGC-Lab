@@ -559,7 +559,12 @@ export default function Discover() {
             // for; it stays out of the way while the free tab is on screen.
             if (next !== 'vault' && !apiKey) setConnectOpen(true)
           }}
-          fitContent
+          // Fits its content from `md` up, where it shares the 57px header band
+          // with the search field, the Search button and the credits chip. On a
+          // phone that header wraps and this toggle already owns its own line,
+          // so shrinking to three labels only left dead space to the right of
+          // Meta Ads — it takes the full width there instead.
+          fitContent="md"
           dense
         />
 
