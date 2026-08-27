@@ -924,9 +924,23 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
           CLAUDE.md). Outside the scroller it can't move by construction. */}
       <div className="flex min-h-0 flex-1 flex-col max-md:flex-none md:order-1">
         {/* Sticky on a phone, where this bar really does scroll away and come
-            back — which is the one case the app-wide rule keeps `sticky` for.
-            Opaque, never glass: a backdrop-filter bar lags its own scroller. */}
-        <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 bg-surface-0 px-5 max-md:sticky max-md:top-0 max-md:z-20">
+            back — the one case the app-wide rule keeps `sticky` for, and the
+            reason it has to paint SOMETHING: the read scrolls underneath it, so
+            transparent is not on the table (tried, August 2026, and the bar had
+            to come back).
+            It paints `.app-backdrop-fill` — AppBackground's own gradient,
+            anchored to the viewport — so it is opaque without being a surface:
+            it lines up with the canvas behind it and reads as the page. See the
+            note on that class. `bg-surface-0` was tried (a black band five to
+            fourteen units darker than everything around it), then a flat colour
+            sampled off the canvas (still seams — the backdrop is radial and
+            drops ~10 units across one bar's width), then no fill at all, which
+            cost the pin.
+            Never glass: a backdrop-filter bar lags its own scroller on the way
+            back up, which is the app-wide rule for sticky chrome. The fill is
+            harmless above `md` where the bar doesn't stick — it matches the
+            backdrop there too, by construction. */}
+        <div className="app-backdrop-fill flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5 max-md:sticky max-md:top-0 max-md:z-20">
           <SegmentedToggle<SectionKey>
             className="h-10 !p-1"
             value={active}
