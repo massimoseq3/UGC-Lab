@@ -1192,28 +1192,24 @@ export default function ContinuousView({
           Line-by-Line strip for why (a glass sticky bar lagged its own
           scroller on the way back up and read as coming loose). It never
           scrolled away, so nothing is lost but the blur-under. */}
-      {/* One row on desktop — see the note on the Line-by-Line strip: with
-          `flex-wrap` alone the whole button group dropped to a second line the
-          moment the meta pills and the buttons together outgrew the panel, so
-          the strip's height changed with the window. The meta wraps and shrinks
-          instead. */}
-      <div className="relative z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-ink/5 px-5 py-3.5 md:flex-nowrap">
-        {/* Desktop-only — see the note on the Line-by-Line strip. */}
-        <div className="hidden min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400 md:flex">
-          {/* Scene count matches the per-line storyboard's — small-caps and dim,
-              the same eyebrow treatment as the pills beside it. */}
-          <span className="font-semibold text-ink-500">
-            {result.scenes.length} {result.scenes.length === 1 ? 'Scene' : 'Scenes'}
-          </span>
-          <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{style.label}</span>
-          <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">~{totalSeconds}s</span>
-          <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{framesPicked}/{result.frames.length} keyframes picked</span>
-        </div>
-        {/* One SCROLLING line on a phone, one static line from md up — see the
-            note on the Line-by-Line strip. It used to wrap there, which put the
-            strip at two or three rows tall on the screen with the least room to
-            give. */}
-        <div className="-mx-5 flex w-full min-w-0 items-center gap-2 overflow-x-auto scrollbar-hide whitespace-nowrap px-5 md:mx-0 md:w-auto md:justify-end md:overflow-visible md:px-0 md:shrink-0">
+      {/* The strip is the BATCH BUTTONS and nothing else, centred — see the note
+          on the Line-by-Line strip, which this one mirrors. The meta pills used
+          to share the line and lost the squeeze to buttons that can't shrink,
+          painting over the first of them on a narrow window; they sit under the
+          separator now, at the top of the storyboard they describe. This strip
+          had it worse than its twin — four pills against the other's two. */}
+      <div className="relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 px-5 py-3.5">
+        {/* One CENTRED line that scrolls when the pills outrun the panel — see
+            the note on the Line-by-Line strip for the `w-max min-w-full` shape
+            and why a plain `justify-center` inside a scroll port strands the
+            first pill off the left edge. */}
+        <div className="-mx-5 w-full overflow-x-auto scrollbar-hide px-5">
+        {/* The generate steps are ONE tinted family in graded depths, lightest
+            first — the same ramp as the Line-by-Line strip, so the two tabs of
+            one panel don't dress the same job two ways. Download clips stays
+            neutral: it's the export, not a generate step, and it spends
+            nothing. */}
+        <div className="flex w-full flex-wrap items-center justify-center gap-2 md:w-max md:min-w-full md:flex-nowrap md:whitespace-nowrap">
           <button
             type="button"
             onClick={() => requestFrames()}
@@ -1221,7 +1217,7 @@ export default function ContinuousView({
             // card rendering on its own doesn't, so the two can overlap.
             disabled={chainRunning}
             title="Generate a keyframe image for every frame that doesn't have one yet"
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/15 bg-broll-500/[0.05] px-3.5 py-1.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/30 hover:bg-broll-500/[0.12] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {chainRunning ? <Spinner className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
             {chainRunning
@@ -1235,7 +1231,7 @@ export default function ContinuousView({
             // stop the member firing the rest.
             disabled={readyClipIndices.length === 0}
             title="Generate every clip whose two keyframes are picked"
-            className="flex shrink-0 items-center gap-1.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/50 bg-broll-500/[0.24] px-3.5 py-1.5 text-[11px] font-medium text-broll-200 transition-colors hover:border-broll-500/65 hover:bg-broll-500/[0.32] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <VideoIcon className="h-3.5 w-3.5" />
             Generate all videos
@@ -1252,8 +1248,24 @@ export default function ContinuousView({
             </button>
           )}
         </div>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto px-5 pb-4 pt-5">
+      {/* The storyboard's caption — scene count, look, running time, and how
+          many keyframes are picked. Below the separator rather than in the bar
+          above it: it describes the work, it isn't a control, and up there it
+          was what squeezed the batch buttons off their own line. Desktop-only,
+          as it has been. */}
+      <div className="mb-8 hidden min-w-0 max-w-full flex-wrap items-center justify-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400 md:flex">
+        {/* Scene count matches the per-line storyboard's — small-caps and dim,
+            the same eyebrow treatment as the pills beside it. */}
+        <span className="font-semibold text-ink-500">
+          {result.scenes.length} {result.scenes.length === 1 ? 'Scene' : 'Scenes'}
+        </span>
+        <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{style.label}</span>
+        <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">~{totalSeconds}s</span>
+        <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{framesPicked}/{result.frames.length} keyframes picked</span>
+      </div>
       {result.demo && (
         <div className="mb-4 mt-4 flex items-start gap-2 rounded-2xl border border-broll-500/25 bg-broll-500/10 px-4 py-3">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-broll-300" />

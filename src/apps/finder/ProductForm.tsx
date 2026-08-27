@@ -671,7 +671,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
               onChange={(e) => setListingText(e.target.value)}
               rows={5}
               maxHeight={280}
-              placeholder="Paste the product page or Amazon listing text — auto-fill gets far more accurate with it."
+              placeholder="Paste the product page or Amazon listing text. Auto-fill gets far more accurate with it."
               className="w-full resize-none rounded-2xl border border-ink/10 bg-ink/[0.02] px-4 py-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
             />
           </label>
@@ -706,11 +706,19 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
             />
           </div>
 
+          {/* The scroll port is INSET from the cards it holds, by the width of
+              their drop shadow. `overflow-y-auto` computes to `auto` on the
+              other axis too, so a card flush against this box had its shadow
+              sliced off down both sides and along the bottom — the shadow is
+              0/8px offset on a 24px blur, so it needs ~20px of room. The
+              negative margins hand that room back out of the pane's own `p-5`
+              and the 24px gap beside the photo column, which keeps every card
+              at exactly the width and position it had. */}
           <div
             ref={fieldsRef}
-            className={`min-h-0 flex-1 lg:overflow-y-auto lg:pr-1 ${fieldsHaveMore ? 'scroll-fade-b' : ''}`}
+            className={`min-h-0 flex-1 lg:-mx-5 lg:-mt-3 lg:overflow-y-auto lg:px-5 lg:pt-3 ${fieldsHaveMore ? 'scroll-fade-b' : ''}`}
           >
-            <div className="flex flex-col gap-3 pb-2">
+            <div className="flex flex-col gap-3 pb-8">
               {/* One SectionCard per section. This was a left-aligned small-caps
                   eyebrow with a hairline running off to the right — the exact
                   shape SectionCard was written to replace, and one that reads as

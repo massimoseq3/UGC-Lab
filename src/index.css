@@ -854,6 +854,31 @@ textarea,
   transform: scale(1.15);
 }
 
+/* An opaque bar that must not read as a slab. A `sticky` bar HAS to paint —
+   the page scrolls underneath it — but everything else in the workspace paints
+   nothing at all and shows `AppBackground`, so any flat token is a visible
+   band. `surface-0` (#050505) was 5–14 units darker than its surroundings;
+   a colour sampled off the canvas still seams, because the backdrop is a
+   RADIAL gradient and changes by ~10 units across one bar's width.
+
+   So paint the same gradient AppBackground paints — same geometry, same stops,
+   same sRGB interpolation — and anchor it to the viewport with
+   `background-attachment: fixed`, which makes the positioning area the viewport
+   exactly as the canvas is. The two line up pixel for pixel and the bar
+   disappears at rest and while pinned. The only difference is AppBackground's
+   ±0.5 LSB dither, which is what it's for and is invisible here.
+
+   Keep the stops in step with `GRADIENT_STOPS` / `MID_STOP` in
+   `components/AppBackground.tsx` — they are one design in two places. */
+.app-backdrop-fill {
+  background-color: var(--color-surface-0);
+  background-image: radial-gradient(circle farthest-corner at 0% 0%, #1f1f22 0%, #09090b 45%, #000000 100%);
+  background-attachment: fixed;
+}
+[data-theme="light"] .app-backdrop-fill {
+  background-image: radial-gradient(circle farthest-corner at 0% 0%, #ffffff 0%, #f6f6f7 45%, #e9e9eb 100%);
+}
+
 /* A floor, not a size: nothing on a phone renders SMALLER than the app's own
    field type (13px, what a ChipField or a prompt box wears on a desktop), and
    nothing renders bigger than it either. The rule only lifts the 11–12px

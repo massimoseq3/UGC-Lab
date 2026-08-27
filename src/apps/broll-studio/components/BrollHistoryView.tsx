@@ -349,7 +349,14 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
           that rolls away on a scroll and unrolls on the way back up moves the
           list under the thumb reading it. */}
       <div className="border-b border-ink/5 px-5 py-4">
-        <div className="relative">
+        {/* ONE row: search, then the mode pills, then sort (August 2026,
+            Massimo's call). The field had the first line to itself and the pills
+            and sort the next, which spent ~40px of a panel that is otherwise all
+            list — and neither line was close to full. The field takes what's
+            left of the row (`flex-1` off a 200px floor) and the row wraps on its
+            own when there isn't room, which is what a phone gets. */}
+        <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[200px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
           <input
             value={query}
@@ -359,11 +366,10 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
           />
         </div>
 
-        {/* Mode filter pills (left) + sort dropdown (right). The sort control is
-            always shown; the mode pills only when more than one mode is present.
-            A live "N sessions rendering" chip leads the row whenever anything is
-            in flight, so the queue is visible without scanning every row. */}
-        <div className="mt-3 flex items-start justify-between gap-2">
+        {/* Mode filter pills, then the sort dropdown. Sort is always shown; the
+            mode pills only when more than one mode is present. A live "N
+            sessions rendering" chip leads them whenever anything is in flight,
+            so the queue is visible without scanning every row. */}
           <div className="flex flex-wrap items-center gap-1.5">
             {generatingRows > 0 && (
               <span className="flex items-center rounded-full border border-broll-500/30 bg-broll-500/10 px-2.5 py-1 text-[11px]">
