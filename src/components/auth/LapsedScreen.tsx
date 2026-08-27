@@ -38,10 +38,10 @@ export default function LapsedScreen() {
         onSubmit={handleSubmit}
         className="space-y-3 rounded-xl border border-ink/10 bg-ink/[0.03] p-5 backdrop-blur-xl"
       >
-        <p className="text-[13px] leading-relaxed text-ink-400">
-          Everything in your workspace is still here. Enter the current access code to pick up where you left off.
-        </p>
-
+        {/* No explanatory paragraph above the field. "Welcome back" is the
+            heading, the field is labelled Access code and carries its own hint,
+            and the button says Unlock my workspace — a sentence restating all
+            three is the one thing on this screen nobody has to read. */}
         <AuthField
           label="Access code"
           type="text"

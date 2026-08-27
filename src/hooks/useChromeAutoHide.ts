@@ -64,6 +64,27 @@ const CLAMP_SLACK_PX = 4
 // nothing by hiding it — and hiding it can leave the list too short to scroll
 // back up far enough to ask for it again.
 const MIN_OVERFLOW_PX = 200
+// How long a programmatic jump owns the scroller. A smooth scroll of a couple
+// of thousand pixels runs a few hundred ms, and the browser gives no event when
+// it ends.
+const PROGRAMMATIC_MS = 800
+
+// A scroll NOBODY MADE is not a gesture — the same rule as the clamp above, for
+// the other way it arrives. An in-app jump (the Ad Analyzer's Breakdown /
+// Transcript / Scenes toggle, Characters' tab jump, the Bank product form's
+// section jump, Scripts' scroll to Generate) travels most of a screen in one
+// direction, which is exactly what a deliberate swipe down looks like from
+// here — so the dock hid MID-ANIMATION, the pane's inset went 108px → 0, and
+// the browser's own smooth scroll relayouted underneath itself. Measured on the
+// Ad Analyzer at 375px: a jump to Scenes landed 670px past its target from the
+// top of the read, and did nothing at all from halfway down. Every one of these
+// call sites announces itself instead, and the dock simply stays where it is
+// for the length of the jump — which is right anyway, since the member tapped a
+// tab rather than swiping.
+let programmaticUntil = 0
+export function suspendChromeAutoHide(ms: number = PROGRAMMATIC_MS): void {
+  programmaticUntil = Math.max(programmaticUntil, performance.now() + ms)
+}
 
 export function useChromeAutoHide(): void {
   const activeApp = useAppStore((s) => s.activeApp)
@@ -112,8 +133,10 @@ export function useChromeAutoHide(): void {
       const delta = top - prev
       if (delta === 0) return
 
-      // Everything the relayout itself caused is not a gesture.
-      if (performance.now() < mutedUntil) {
+      // Everything the relayout itself caused is not a gesture — nor is a
+      // scroll this app started itself (see `suspendChromeAutoHide`).
+      const now = performance.now()
+      if (now < mutedUntil || now < programmaticUntil) {
         travel = 0
         return
       }

@@ -20,6 +20,7 @@ import PresetPickerModal from './PresetPickerModal'
 import PhotoExtractZone from './PhotoExtractZone'
 import { buildPhysicalPrompt, buildScenePrompt } from '../services/generateCharacter'
 import { copyToClipboard } from '../../../utils/clipboard'
+import { suspendChromeAutoHide } from '../../../hooks/useChromeAutoHide'
 
 // Field keys owned by each tab, derived from the tab config so the scoped
 // preset pickers stay in sync with the form. Physical = identity/physical/
@@ -177,6 +178,7 @@ export default function ControlsPanel({
 
   const scrollToTab = (id: TabId) => {
     onActiveTabChange(id)
+    suspendChromeAutoHide()
     tabRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 

@@ -44,10 +44,17 @@ export default function SlideOver({ open, onClose, title, subtitle, children, fo
         }`}
         onClick={onClose}
       />
+      {/* `pb-[env(safe-area-inset-bottom)]` on the panel, not on the footer:
+          it shrinks the flex column, so the scrolling list AND the footer under
+          it both end above the home indicator. Zero in a browser tab, ~34px
+          installed to an iPhone home screen — where `viewport-fit=cover` and no
+          browser bar mean this panel really does run to the physical bottom
+          edge, and the last row of a picker sits in a strip you can't reliably
+          touch. Same fix as the workspace pane's bottom inset in App.tsx. */}
       <div
         className={`fixed bottom-0 right-0 top-0 ${layer === 'below-pickers' ? 'z-[66]' : 'z-[80]'} flex ${
           size === 'wide' ? 'w-[560px]' : size === 'medium' ? 'w-[460px]' : 'w-[380px]'
-        } max-w-full flex-col border-l border-ink/5 bg-surface-1/95 backdrop-blur-2xl transition-transform duration-300 ease-out ${
+        } max-w-full flex-col border-l border-ink/5 bg-surface-1/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl transition-transform duration-300 ease-out ${
           open ? 'translate-x-0' : 'translate-x-full'
         }`}
       >

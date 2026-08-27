@@ -172,10 +172,25 @@ function Workspace() {
             relayouts the entire app on every frame, and a storyboard's worth of
             cards can't pay that for 300ms. The dock slides; the pane simply
             grows underneath it, which is invisible because content is laid out
-            from the top. */}
+            from the top.
+
+            The inset is the DOCK'S OWN expression, not a flat 108px: the dock
+            is `fixed bottom-0` with `pb-[max(env(safe-area-inset-bottom),
+            0.75rem)]`, so its height is 96px of nav plus whichever of those two
+            wins. In a browser tab `env(safe-area-inset-bottom)` is 0 — the
+            browser's own bar owns that strip — so the 12px floor wins and this
+            is 108px exactly as it always was. INSTALLED to the home screen it
+            isn't: `viewport-fit=cover` plus no browser bar means the page runs
+            to the physical bottom edge and the inset reports the ~34px the home
+            indicator sits in, so the dock stands 22px taller than a flat 108
+            reserves and covered the bottom of every pinned Generate button.
+            Both halves derive from the same numbers now, so they can't drift.
+            Even with the dock rolled away the safe area is still held back —
+            it's the strip the home indicator lives in, and content under it is
+            content you can't reliably touch. */}
         <div
-          className={`absolute inset-x-0 top-9 overflow-hidden md:bottom-[108px] ${
-            chromeHidden ? 'bottom-0' : 'bottom-[108px]'
+          className={`absolute inset-x-0 top-9 overflow-hidden md:bottom-[calc(96px+max(env(safe-area-inset-bottom),0.75rem))] ${
+            chromeHidden ? 'bottom-[env(safe-area-inset-bottom)]' : 'bottom-[calc(96px+max(env(safe-area-inset-bottom),0.75rem))]'
           }`}
         >
           {/* Empty state — visible when no app is active */}

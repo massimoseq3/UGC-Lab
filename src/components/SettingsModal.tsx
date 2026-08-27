@@ -440,7 +440,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                   <div className="flex items-center justify-between">
                     <label className="text-[12px] font-medium text-ink-300">
                       ScrapeCreators key
-                      <span className="ml-1.5 text-[11px] font-normal text-ink-600">Optional — powers Outliers</span>
+                      <span className="ml-1.5 text-[11px] font-normal text-ink-600">(for Outliers)</span>
                     </label>
                     <a
                       href="https://scrapecreators.com"

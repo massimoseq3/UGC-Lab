@@ -31,6 +31,7 @@ import { rangeDurationLabel } from '../../../utils/timecode'
 import { captureFrameFromElement, frameTimeStamp } from '../../../utils/videoFrames'
 import { downloadImage } from '../../../utils/downloadImage'
 import Spinner from '../../../components/Spinner'
+import { suspendChromeAutoHide } from '../../../hooks/useChromeAutoHide'
 
 interface ResultsViewProps {
   result: AnalysisResult
@@ -99,12 +100,19 @@ function Section({ children, className = '' }: { children: React.ReactNode; clas
 // Copy) sits at the right of the band.
 function CardHeader({ icon: Icon, title, accentClass = 'text-[#FF5257]/80', action }: { icon: React.ElementType; title: string; accentClass?: string; action?: React.ReactNode }) {
   return (
-    <div className="relative flex items-center justify-center gap-2 border-b border-ink/5 px-4 py-3">
-      <span className="flex items-center gap-2 text-sm font-semibold tracking-tight text-ink-200">
-        <Icon className={`h-4 w-4 ${accentClass}`} strokeWidth={1.5} />
-        {title}
+    // A 3-column grid, not an absolutely-positioned action slot: the two 1fr
+    // gutters are equal, so the title is genuinely centred, and a pane too
+    // narrow for both squeezes the title instead of letting the button land on
+    // top of it. The absolute version takes no layout space at all, so at 375px
+    // "Reverse-Engineered Scenes" ran straight under "Copy All" — the same
+    // failure `SectionCard`'s header was rebuilt to avoid.
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-ink/5 px-4 py-3">
+      <span aria-hidden />
+      <span className="flex min-w-0 items-center justify-center gap-2 text-sm font-semibold tracking-tight text-ink-200">
+        <Icon className={`h-4 w-4 shrink-0 ${accentClass}`} strokeWidth={1.5} />
+        <span className="truncate">{title}</span>
       </span>
-      {action && <div className="absolute right-4 top-1/2 -translate-y-1/2">{action}</div>}
+      <div className="flex min-w-0 justify-end">{action}</div>
     </div>
   )
 }
@@ -349,14 +357,24 @@ function MasterBlock({
   )
 }
 
+// The utility beside a master block's title — Save style, Copy.
+//
+// **Glyph only below `md`** (Massimo's call, August 2026): these sit on the
+// title's own line inside a card that is already inset twice, so at 375px
+// "Save style" and "Copy" were two labels competing with the block's heading
+// for a line none of the three fit on. The glyph says what the button does,
+// the wording survives as the tooltip and the accessible name, and the 28px
+// square it takes there is a better tap target than the 20px pill was.
 function MiniButton({ onClick, icon: Icon, label }: { onClick: () => void; icon: React.ElementType; label: string }) {
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
+      title={label}
+      aria-label={label}
+      className="flex shrink-0 items-center gap-1 rounded-full text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300 max-md:h-7 max-md:w-7 max-md:justify-center max-md:gap-0 md:px-2 md:py-0.5"
     >
-      <Icon className="h-3 w-3" strokeWidth={1.75} />
-      {label}
+      <Icon className="h-3 w-3 shrink-0" strokeWidth={1.75} />
+      <span className="max-md:hidden">{label}</span>
     </button>
   )
 }
@@ -590,6 +608,12 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
   // B-Roll's consumer are all still wired — restore the button here if the
   // handoff comes back under a label that says where it goes.
 
+  const copyLabel = copied
+    ? 'Copied'
+    : scenes.length > 1 || fullPrompt !== scenes[0]?.prompt
+      ? 'Copy all prompts'
+      : 'Copy prompt'
+
   return (
     <Section>
       <CardHeader
@@ -597,18 +621,22 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
         title="Reverse-Engineered Scenes"
         accentClass="text-fuchsia-400/90 light:text-fuchsia-700"
         action={
+          // Glyph only (Massimo's call, August 2026). This is the longest title
+          // in the read and it sits beside the longest label — "Reverse-
+          // Engineered Scenes" and "Copy All" don't share a 375px line, and the
+          // copy icon says what the button does without being read. The wording
+          // survives as the tooltip and the accessible name: "Copy Prompt" only
+          // when the copy IS one prompt — with a master block in front of it,
+          // or several scenes, it's the whole set.
           <button
             onClick={() => copy(fullPrompt)}
-            className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
+            title={copyLabel}
+            aria-label={copyLabel}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
           >
-            {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
-            {/* "Copy Prompt" only when the copy IS one prompt — with a master
-                block in front of it, or several scenes, it's the whole set. */}
             {copied
-              ? 'Copied'
-              : scenes.length > 1 || fullPrompt !== scenes[0]?.prompt
-                ? 'Copy All'
-                : 'Copy Prompt'}
+              ? <Check className="h-3.5 w-3.5 text-green-400 light:text-green-600" />
+              : <Copy className="h-3.5 w-3.5" />}
           </button>
         }
       />
@@ -789,6 +817,10 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
 
   const scrollTo = (k: SectionKey) => {
     setActive(k)
+    // A tap is not a swipe: hold the dock still for the length of the jump, or
+    // it hides mid-animation and relayouts the pane under the browser's own
+    // smooth scroll (see `suspendChromeAutoHide`).
+    suspendChromeAutoHide()
     refFor(k).current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
@@ -921,13 +953,22 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
                 </div>
               </div>
             )}
-            <div ref={breakdownRef} data-section="breakdown" className="scroll-mt-5">
+            {/* `scroll-mt` is what a section jump lands ON, and on a phone it
+                has to clear the toggle bar. The bar is `sticky top-0` at 57px
+                INSIDE this scroller there, so a plain `block: 'start'` put each
+                section's own heading squarely behind it — you tapped Transcript
+                and arrived 57px into the transcript, with nothing on screen
+                saying which section you were in. 73px = the bar plus 16px, so
+                the heading lands just under it. Desktop keeps the bare 20px:
+                there the bar is a sibling OUTSIDE the scroll port and nothing
+                overlaps the top edge. */}
+            <div ref={breakdownRef} data-section="breakdown" className="scroll-mt-5 max-md:scroll-mt-[73px]">
               <BreakdownSection result={result} />
             </div>
-            <div ref={transcriptRef} data-section="transcript" className="scroll-mt-5">
+            <div ref={transcriptRef} data-section="transcript" className="scroll-mt-5 max-md:scroll-mt-[73px]">
               <TranscriptSection result={result} fileName={fileName} />
             </div>
-            <div ref={scenesRef} data-section="scenes" className="scroll-mt-5">
+            <div ref={scenesRef} data-section="scenes" className="scroll-mt-5 max-md:scroll-mt-[73px]">
               <ReverseEngineeredSection result={result} fileName={fileName} />
             </div>
           </div>
