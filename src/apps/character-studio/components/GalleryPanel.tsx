@@ -411,7 +411,16 @@ function useHistoryTileActions(item: CharacterHistoryItem, onDelete: () => void 
   const addToast = useAppStore((s) => s.addToast)
   const [savingToBank, setSavingToBank] = useState(false)
   const [nameDraft, setNameDraft] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState(false)
+  // Scoped to the item, not a bare boolean. `confirmDelete` deliberately leaves
+  // this SET on success — the tile is about to disappear with its row, and
+  // clearing it would flash the button back to life on the way out — which is
+  // only safe while the tile actually unmounts. The Single view doesn't unmount
+  // it: it swaps the item on the stage for the next character, so a bare flag
+  // stayed true against a row it was never about, and the `if (deleting) return`
+  // guard below then refused every further delete behind a spinner that would
+  // never stop.
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const deleting = deletingId === item.id
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
   const isSheet = item.kind === 'sheet'
@@ -492,11 +501,11 @@ function useHistoryTileActions(item: CharacterHistoryItem, onDelete: () => void 
   // delete and tracks the in-flight state so the button can show a spinner.
   async function confirmDelete() {
     if (deleting) return
-    setDeleting(true)
+    setDeletingId(item.id)
     try {
       await onDelete()
     } catch {
-      setDeleting(false)
+      setDeletingId(null)
     }
   }
 
@@ -732,7 +741,13 @@ function SingleView({
             <StageCaption generating={1} total={1} queuedElsewhere={queuedElsewhere} />
           </>
         ) : (
+          // Keyed on the item, like the multi-slot branch below: the state
+          // this card owns is scoped to its item, but `TileDeleteButton`'s
+          // two-click ARMED state is internal to that component and can only be
+          // cleared by a remount — without this, deleting a character left the
+          // next one's delete button already showing "Confirm".
           <SingleCard
+            key={first!.item.id}
             item={first!.item}
             onClick={() => onOpen(first!.item.id)}
             onDelete={() => onDelete(first!.item)}
@@ -907,6 +922,17 @@ function SingleCard({
         )}
       </Stage>
 
+      {/* Model · when, directly under the picture it describes (Massimo's call,
+          August 2026). It sat at the FOOT of the card, under Prompt data, where
+          it was a lone line of chrome holding open the gap between the panel's
+          last content and its bottom edge — and a caption three controls away
+          from its subject isn't read as a caption at all. Quieter with it:
+          `ink-600` at the normal weight, no tracking, since here it sits close
+          enough to the image to be found without being announced. */}
+      <p className="-mt-1 truncate text-center text-[10px] text-ink-600">
+        {getModel(item.modelId)?.displayName ?? item.modelId} · {formatRelative(item.createdAt)}
+      </p>
+
       {a.nameDraft !== null ? (
         <div className="mx-auto w-full max-w-[340px]">
           <NameEditor
@@ -953,12 +979,6 @@ function SingleCard({
       )}
 
       <PromptData profile={item.profile} />
-
-      {/* Model · when. The stage holds one character, so its caption is the one
-          place the model name costs nothing to state outright. */}
-      <p className="truncate text-center text-[10px] font-medium tracking-wider text-ink-500">
-        {getModel(item.modelId)?.displayName ?? item.modelId} · {formatRelative(item.createdAt)}
-      </p>
     </>
   )
 }
