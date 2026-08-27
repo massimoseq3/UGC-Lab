@@ -11,6 +11,7 @@ import AppLogo from './AppLogo'
 import { useKeyConnect } from './ApiKeyGuide'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useBackdropClose } from '../hooks/useBackdropClose'
+import { SectionLabel } from './SectionCard'
 
 // NO EM DASHES IN THIS SCREEN'S COPY. Massimo's call (August 2026): this is
 // the introduction, and it should read like someone talking rather than like
@@ -138,7 +139,7 @@ function Crew({ onVisit }: { onVisit: (appId: string) => void }) {
 
   return (
     <div onMouseLeave={() => setHovered(null)}>
-      <SectionLabel>The workflow</SectionLabel>
+      <GroupHeading>The workflow</GroupHeading>
       {/* Five cards with the pipeline running through them. The arrows carry
           real information — this order is the order you work in — so they only
           appear between the Create apps, never around Bank or the tools. */}
@@ -175,7 +176,7 @@ function Crew({ onVisit }: { onVisit: (appId: string) => void }) {
         )}
       </p>
 
-      <SectionLabel className="mt-4">Always on call</SectionLabel>
+      <GroupHeading className="mt-4">Always on call</GroupHeading>
       {/* Column count follows the roster: hardcoded at 3, the fourth on-call
           member (Outliers) wrapped onto a line of its own, left-aligned under
           the others. The workflow row above is a fixed chain of five, so only
@@ -192,10 +193,18 @@ function Crew({ onVisit }: { onVisit: (appId: string) => void }) {
   )
 }
 
-function SectionLabel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+// The group heading, and it wears the app's OWN field-label treatment
+// (`SectionLabel` from components/SectionCard — Characters' GENDER / AGE RANGE,
+// the Bank forms, the B-Roll cards) rather than one of its own: 11px, medium,
+// `tracking-widest`, ink-300. It was 10px semibold at `0.14em` in ink-400,
+// which is the same "one house style too many" this screen's own headings kept
+// falling into — a word doing the same job in two places should look the same
+// in both. The trailing hairline is this screen's, not the shared component's,
+// so it stays out here as a sibling.
+function GroupHeading({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={`flex items-center gap-3 ${className}`}>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-400">{children}</span>
+      <SectionLabel label={String(children)} />
       <span className="h-px flex-1 bg-ink/10" />
     </div>
   )

@@ -107,27 +107,32 @@ export default function ActivityHeatmap({ days }: { days: UsageDay[] }) {
   }, [days, now])
 
   return (
-    <div className="min-w-0 overflow-x-auto pb-1">
-      <div className="inline-flex flex-col gap-1.5">
+    <div className="w-full min-w-0 pb-1 sm:w-auto sm:overflow-x-auto">
+      {/* Below `sm` the grid FILLS the tile: the columns share its width with
+          `flex-1` and each cell is `aspect-square w-full`, so the blocks come
+          out as big as the row allows instead of drawing 8px squares against a
+          margin of empty tile. From `sm` it goes back to the fixed 11px grid,
+          which is what the 26-week desktop row is sized around. */}
+      <div className="flex w-full flex-col gap-1.5 sm:inline-flex sm:w-auto">
         {/* Month labels row */}
         <div className="flex gap-[2px] sm:gap-[3px]">
           {weeks.map((week, i) => (
-            <span key={i} className={`w-2 shrink-0 overflow-visible whitespace-nowrap text-[9px] leading-none text-ink-500 sm:w-[11px] ${phoneHidden(i)}`}>
+            <span key={i} className={`min-w-0 flex-1 overflow-visible whitespace-nowrap text-[9px] leading-none text-ink-500 sm:w-[11px] sm:flex-none sm:shrink-0 ${phoneHidden(i)}`}>
               {week.monthLabel ?? ''}
             </span>
           ))}
         </div>
         <div className="flex gap-[2px] sm:gap-[3px]">
           {weeks.map((week, i) => (
-            <div key={i} className={`flex flex-col gap-[2px] sm:gap-[3px] ${phoneHidden(i)}`}>
+            <div key={i} className={`flex min-w-0 flex-1 flex-col gap-[2px] sm:flex-none sm:gap-[3px] ${phoneHidden(i)}`}>
               {week.days.map((day) =>
                 day.future ? (
-                  <span key={day.id} className="h-2 w-2 rounded-[2px] sm:h-[11px] sm:w-[11px] sm:rounded-[3px]" />
+                  <span key={day.id} className="aspect-square w-full rounded-[2px] sm:aspect-auto sm:h-[11px] sm:w-[11px] sm:rounded-[3px]" />
                 ) : (
                   <span
                     key={day.id}
                     title={day.label}
-                    className={`h-2 w-2 rounded-[2px] sm:h-[11px] sm:w-[11px] sm:rounded-[3px] ${levelClass(day.count)}`}
+                    className={`aspect-square w-full rounded-[2px] sm:aspect-auto sm:h-[11px] sm:w-[11px] sm:rounded-[3px] ${levelClass(day.count)}`}
                   />
                 ),
               )}

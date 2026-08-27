@@ -66,11 +66,16 @@ export function WidgetLabel({ icon: Icon, label, note }: { icon: ElementType; la
       <Icon className="h-[13px] w-[13px] shrink-0 text-ink-300" strokeWidth={1.75} />
       {/* The same eyebrow every field label in the app wears (`SectionLabel`
           in components/SectionCard — Characters' GENDER / AGE RANGE, the Bank
-          forms, the B-Roll cards): 11px, medium, `tracking-widest`, ink-300.
-          It read as its own thing here — semibold, tighter tracking, a step
-          dimmer — which is one house style too many for a word that does the
-          same job in both places. */}
-      <span className="whitespace-nowrap text-[11px] font-medium uppercase tracking-widest text-ink-300">{label}</span>
+          forms, the B-Roll cards): 11px, medium, ink-300. It read as its own
+          thing here — semibold, a step dimmer — which is one house style too
+          many for a word that does the same job in both places.
+          The ONE thing it does differently is tracking: `0.07em` against
+          `SectionLabel`'s `widest` (Massimo's call, August 2026). A field label
+          sits over a form and has a whole column to be spaced across; these
+          sit at the top of a half-width bento tile beside a 13px glyph, where
+          `0.1em` pushed TIME SAVED / ACTIVITY out to the tile's edges and read
+          as stretched rather than as quiet. */}
+      <span className="whitespace-nowrap text-[11px] font-medium uppercase tracking-[0.07em] text-ink-300">{label}</span>
       {/* The note is the first thing to go in a bento tile: at half a phone's
           width it left "MONEY SAVED" wrapping to two lines to make room for a
           credit count truncated to "1,261 …", which is neither fact. */}

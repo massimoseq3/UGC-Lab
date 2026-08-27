@@ -108,24 +108,23 @@ export default function Dashboard() {
                 From `sm` the wall is the desktop wall and this reads from the
                 left edge like every other page in the app. */}
             <header className="text-center sm:text-left">
-              {/* Two faces on one line: the salutation is chrome and takes
-                  the app's own Geist, the NAME is the display face — it's the
-                  one word on the page that's about this member, and the serif
-                  is what marks it as such. Both were Instrument Serif, which
-                  made the whole line ornament and left nothing for the name to
-                  be set apart by. */}
-              {/* 30px on a phone, not 36: Geist is a wider face than the
-                  Instrument Serif this line used to be set in, so "Good
-                  afternoon, <name>" gained a second line at the old size and
-                  pushed the bento's last row under the fold. */}
-              <h1 className="text-[30px] leading-tight font-normal tracking-tight text-ink-50 sm:text-4xl sm:leading-normal md:text-[46px] md:leading-[1.1]">
+              {/* ONE face for the whole line — `DISPLAY_FONT`, italic,
+                  `tracking-tighter` (Massimo's call, August 2026). It was two
+                  for a while, Geist for the salutation and the serif for the
+                  name alone; the masthead reads better as a single mark.
+                  `font-normal` and it stays that way: Instrument Serif ships a
+                  single weight, so `font-bold` here only asks the browser to
+                  synthesize one, which thickens the strokes without the face
+                  ever drawing a real bold.
+                  30px on a phone rather than 36 so "Good afternoon, <name>"
+                  can't gain a second line and push the bento's last row under
+                  the fold. */}
+              <h1
+                className="text-[30px] leading-tight font-normal italic tracking-tighter text-ink-50 sm:text-4xl sm:leading-normal md:text-[46px] md:leading-[1.1]"
+                style={DISPLAY_FONT}
+              >
                 {salutation}
-                {displayName && (
-                  <>
-                    ,{' '}
-                    <span className="italic font-normal" style={DISPLAY_FONT}>{displayName}</span>
-                  </>
-                )}
+                {displayName && <>, {displayName}</>}
               </h1>
               {/* The date, and — for a member with nothing yet — the one line
                   that says where the numbers come from. "Here's what UGC OS has

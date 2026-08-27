@@ -840,7 +840,13 @@ export default function ScenesView({
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
           >
             <Images className="h-3.5 w-3.5" />
-            Generate all images
+            {/* Two spans, no JS media query: at 375px the three full labels are
+                wider than the screen, so the row cut the last pill in half at
+                the bezel and read as clipped rather than as a scroller. Short
+                labels fit all three on one line; a fourth (Download clips) puts
+                the row back into a swipe, which is what it was built for. */}
+            <span className="md:hidden">All images</span>
+            <span className="max-md:hidden">Generate all images</span>
           </button>
           {/* Animate — the step straight after Generate-all-images, and only
               offered once there's a still to animate. It's scoped to the cards
@@ -855,7 +861,8 @@ export default function ScenesView({
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 py-1.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/40 hover:bg-broll-500/20"
             >
               <Clapperboard className="h-3.5 w-3.5" />
-              Animate all stills
+              <span className="md:hidden">Animate</span>
+              <span className="max-md:hidden">Animate all stills</span>
             </button>
           )}
           <button
@@ -865,7 +872,8 @@ export default function ScenesView({
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400"
           >
             <VideoIcon className="h-3.5 w-3.5" />
-            Generate all videos
+            <span className="md:hidden">All videos</span>
+            <span className="max-md:hidden">Generate all videos</span>
           </button>
           {allClipEntries.length > 0 && (
             <button
@@ -875,7 +883,8 @@ export default function ScenesView({
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
             >
               <Download className="h-3.5 w-3.5" />
-              {`Download clips (${allClipEntries.length})`}
+              <span className="md:hidden">{`Clips (${allClipEntries.length})`}</span>
+              <span className="max-md:hidden">{`Download clips (${allClipEntries.length})`}</span>
             </button>
           )}
         </div>
@@ -1570,7 +1579,7 @@ function SceneSection({
       <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between md:gap-4">
         <div className="flex min-w-0 items-center gap-4 max-md:flex-col max-md:gap-1">
           <span
-            className="text-5xl font-normal italic tabular-nums text-ink-800"
+            className="text-5xl font-normal italic tabular-nums text-ink-700"
             style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
           >
             {String(scene.number).padStart(2, '0')}
@@ -1592,7 +1601,7 @@ function SceneSection({
                 className="group/line -mx-1.5 flex items-start gap-2 rounded-lg px-1.5 py-0.5 text-left transition-colors hover:bg-ink/[0.04] max-md:w-full max-md:justify-center max-md:text-center"
               >
                 <p
-                  className="text-lg font-normal not-italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200 max-md:text-center"
+                  className="text-lg font-normal italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200 max-md:text-center"
                   style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
                 >
                   &ldquo;{scene.scriptLine}&rdquo;
@@ -1601,7 +1610,7 @@ function SceneSection({
               </button>
             ) : (
               <p
-                className="text-lg font-normal not-italic leading-relaxed text-ink-400 max-md:text-center"
+                className="text-lg font-normal italic leading-relaxed text-ink-400 max-md:text-center"
                 style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
               >
                 &ldquo;{scene.scriptLine}&rdquo;

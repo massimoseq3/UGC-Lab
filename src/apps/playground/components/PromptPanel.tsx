@@ -671,6 +671,15 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
 
   const generateCredits = formatCredits(creditsForRun(state.mode === 'music' ? 1 : batchCount))
 
+  // Does the output-settings row have anything to draw? Music never does, and
+  // neither does a mode whose resolved model declares no constraints. The row
+  // used to be unconditional because the batch stepper always sat in it; now
+  // that the stepper rides on the model row, an unguarded row would render as
+  // an empty 8px margin above Generate.
+  const hasOutputSettings =
+    (state.mode === 'video' && !!model?.videoConstraints) ||
+    (state.mode === 'image' && !!model?.imageConstraints)
+
   return (
     <div
       onDragOver={(e) => { e.preventDefault(); if (state.mode !== 'music') setDragOver(true) }}
@@ -1123,8 +1132,19 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               keeps the inline dropdown (which auto-opens upward here). Music's
               picker is not here at all: it moved above the prompt box, where its
               delivery toggle is (see the note up there). */}
+          {/* The model row is a TWO-UP: the picker, and the how-many stepper
+              beside it at the same 58px picker-row height. The count used to
+              ride in the settings row below, where a video model that declares
+              every dimension it has (Seedance: resolution, aspect, duration,
+              audio) already fills the line — a fifth pill wrapped that row onto
+              a third line and the band grew by 56px every time. The count is
+              also the one control there that isn't a property of the OUTPUT:
+              resolution, aspect, duration and audio all describe the clip, and
+              this describes the run. It belongs beside the model, which is the
+              other thing the run is. */}
           {state.mode !== 'music' && (
-          <div className="mb-2">
+          <div className="mb-2 flex items-center gap-2">
+            <div className="min-w-0 flex-1">
             {state.mode === 'video' ? (
               <>
                 {/* Trigger — provider logo + name + star + "% off", an arrow
@@ -1179,13 +1199,33 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 onChange={(modelId) => onChange({ ...state, modelId })}
               />
             )}
+            </div>
+            {/* How many. Playground is where a prompt gets TRIED, so a run of
+                one is the wrong unit most of the time. `stacked` because at
+                58px a number and its word side by side float mid-pill, and the
+                word is what makes a bare stepper on a model row read as a
+                count rather than as a nudge on the model itself. */}
+            <BatchCountStepper
+              stacked
+              size="xl"
+              accent="playground"
+              noun={state.mode === 'video' ? 'clip' : 'image'}
+              label={state.mode === 'video' ? 'clips' : 'images'}
+              value={batchCount}
+              onChange={(n) => onChange({ ...state, batchCount: n })}
+              creditsFor={creditsForRun}
+            />
           </div>
           )}
-          {/* Output settings — resolution / aspect / duration / audio. Music has
-              none (its delivery toggle lives above the prompt box), so the row
-              isn't rendered there rather than rendered empty with its own margin
-              under it. Sits just above Generate; dropdowns open upward. */}
-          {state.mode !== 'music' && (
+          {/* Output settings — resolution / aspect / duration / audio, all of
+              them properties of the thing being made. Music has none (its
+              delivery toggle lives above the prompt box) and so does a model
+              that declares no constraints, and the row is skipped in both
+              cases rather than rendered empty with its own margin under it —
+              which it now can be, since the batch stepper moved up to the model
+              row and no longer holds the line open on its own. Sits just above
+              Generate; dropdowns open upward. */}
+          {hasOutputSettings && (
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
           {state.mode === 'video' && model?.videoConstraints && (
             <>
@@ -1293,19 +1333,6 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             </>
           )}
 
-          {/* How many. Playground is where a prompt gets TRIED, so a run of one
-              is the wrong unit most of the time. The row itself is already
-              image/video-only — Suno returns a pair of tracks for one call, so
-              music has nothing to count. */}
-          <BatchCountStepper
-            grow
-            size="lg"
-            accent="playground"
-            noun={state.mode === 'video' ? 'clip' : 'image'}
-            value={batchCount}
-            onChange={(n) => onChange({ ...state, batchCount: n })}
-            creditsFor={creditsForRun}
-          />
           </div>
           )}
           <button
