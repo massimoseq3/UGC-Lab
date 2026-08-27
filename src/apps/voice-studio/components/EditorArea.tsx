@@ -256,7 +256,7 @@ export default function EditorArea({
           // Stays live while a voiceover renders — a second click queues
           // another one alongside it. The progress bar above is the feedback.
           disabled={!canGenerate || overLimit}
-          className="flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-4 py-4 md:flex-none md:px-10 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex min-w-0 flex-1 items-center justify-center gap-2.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-voice-500 px-4 py-4 md:flex-none md:px-10 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] btn-soft-shadow transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Mic className="h-4 w-4" strokeWidth={2.5} />
           {/* The noun is desktop-only. A 375px row leaves this button ~150px

@@ -956,7 +956,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                 <button
                   onClick={() => { for (let i = 0; i < takeCount; i++) handleGenerateImage() }}
                   disabled={!cardState.editablePrompt.trim()}
-                  className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex w-full items-center justify-center gap-2.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <ImageIcon className="h-4 w-4" />
                   {takeCount === 1 ? 'Generate Image' : `Generate ${takeCount} Images`}
@@ -971,7 +971,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                 <button
                   onClick={() => { for (let i = 0; i < takeCount; i++) handleGenerateVideo(videoModelId) }}
                   disabled={!cardState.editablePrompt.trim()}
-                  className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex w-full items-center justify-center gap-2.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <VideoIcon className="h-4 w-4" />
                   {takeCount === 1 ? 'Generate Video' : `Generate ${takeCount} Videos`}
@@ -987,7 +987,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                   onClick={() => { for (let i = 0; i < takeCount; i++) handleAnimate(effectiveAnimateFrame, videoModelId) }}
                   disabled={!cardState.editablePrompt.trim() || !effectiveAnimateFrame}
                   title={!effectiveAnimateFrame ? 'Generate an image first, then animate it' : undefined}
-                  className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="flex w-full items-center justify-center gap-2.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Film className="h-4 w-4" />
                   {takeCount === 1 ? 'Animate' : `Animate ${takeCount}×`}

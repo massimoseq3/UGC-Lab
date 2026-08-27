@@ -869,7 +869,7 @@ export default function ScenesView({
             type="button"
             onClick={() => requestVideoBatch(allKeys, 'All scenes', true)}
             title="Generate clips across all scenes — one option per line, or every variation"
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400"
+            className="flex shrink-0 items-center gap-1.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110"
           >
             <VideoIcon className="h-3.5 w-3.5" />
             <span className="md:hidden">All videos</span>

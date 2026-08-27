@@ -61,7 +61,7 @@ export default function Dock() {
       >
         {/* overflow-x-auto keeps the dock usable on narrow screens; md+ fits
             everything so overflow stays visible. */}
-        <nav ref={navRef} className="pointer-events-auto flex max-w-full items-start gap-0.5 overflow-x-auto overscroll-x-contain scrollbar-hide rounded-[26px] border border-ink/10 bg-surface-1/75 px-2 pb-1 pt-1.5 shadow-2xl shadow-black/25 backdrop-blur-2xl md:overflow-visible md:px-2.5 md:pt-2 light:bg-white/75">
+        <nav ref={navRef} className="pointer-events-auto flex max-w-full items-start gap-0.5 overflow-x-auto overscroll-x-contain scrollbar-hide rounded-[26px] border border-ink/10 bg-surface-1/75 px-2 pb-1 pt-1.5 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.14)] backdrop-blur-2xl backdrop-saturate-150 md:overflow-visible md:px-2.5 md:pt-2 light:bg-white/75 light:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.9)]">
           {groups.map((apps, i) => (
             <Fragment key={apps[0].category}>
               {i > 0 && <DockDivider />}
@@ -152,8 +152,10 @@ function DockItem({ label, title, appId, active, running, busy, accent, onClick,
   )
 }
 
-// Colorful macOS-app-icon-style tile: flat accent fill with a soft top
-// sheen and an inset highlight ring so it reads as a "real" app icon.
+// Colorful macOS-app-icon-style tile, lit as a piece of frosted glass: the
+// accent is the fill, `glass-fill` (index.css) lays the diffuse bloom and the
+// body gradient over it, and the tile's own rims and accent glow finish it.
+// The same class dresses every Generate button, so the two stay in step.
 function DockAppTile({
   app,
   active,
@@ -201,14 +203,24 @@ function DockAppTile({
           />
         )}
         <span
-          className="relative z-10 flex h-12 w-12 items-center justify-center overflow-hidden rounded-[14px] shadow-sm shadow-black/10"
-          style={{ backgroundColor: app.accent }}
+          className="glass-fill relative z-10 flex h-12 w-12 items-center justify-center overflow-hidden rounded-[14px]"
+          style={{
+            // The accent is the fill; `glass-fill` frosts it. Keeping the flat
+            // colour here rather than baking a gradient in is what lets the
+            // dock and every Generate button share one definition of glass.
+            backgroundColor: app.accent,
+            // A contact shadow, a whisper of the tile's own colour on the dock
+            // below it, then the two rims. Both are lit, and the shaded band
+            // sits just ABOVE the bottom one (glass-fill's last stop): light
+            // entering the top of a solid piece of glass exits along its far
+            // edge, so a dark bottom rim reads as a printed sticker.
+            boxShadow: `0 1px 2px rgba(0,0,0,0.2), 0 6px 14px -10px color-mix(in oklab, ${app.accent} 60%, transparent), inset 0 1px 0 rgba(255,255,255,0.32), inset 0 -1px 0 rgba(255,255,255,0.14)`,
+          }}
         >
-          <span className="absolute inset-0 bg-gradient-to-b from-white/30 via-white/5 to-transparent" />
-          <span className="absolute inset-0 rounded-[14px] ring-1 ring-inset ring-white/20" />
+          <span className="absolute inset-0 rounded-[14px] ring-1 ring-inset ring-white/15" />
           <Icon
             className="relative h-[22px] w-[22px]"
-            style={{ color: iconColor }}
+            style={{ color: iconColor, filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.18))' }}
             strokeWidth={1.9}
           />
         </span>
@@ -226,10 +238,11 @@ function DockAppTile({
 }
 
 // Neutral glass tile for the utility cluster (credits / theme / settings /
-// account) so they read as chrome, not apps.
+// account) so they read as chrome, not apps. Same `glass-fill` as an app tile,
+// just over ink rather than an accent.
 function UtilityTile({ children }: { children: ReactNode }) {
   return (
-    <span className="relative flex h-12 w-12 items-center justify-center rounded-[14px] bg-ink/[0.07] ring-1 ring-inset ring-ink/10 transition-colors duration-300 group-hover:bg-ink/[0.1]">
+    <span className="glass-fill relative flex h-12 w-12 items-center justify-center overflow-hidden rounded-[14px] bg-ink/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] ring-1 ring-inset ring-ink/10 transition-colors duration-300 group-hover:bg-ink/[0.12] light:shadow-[inset_0_1px_0_rgba(255,255,255,0.6),inset_0_-1px_0_rgba(255,255,255,0.3)]">
       {children}
     </span>
   )

@@ -38,12 +38,12 @@ const ACCENT: Record<Accent, { frame: string; check: string; cta: string }> = {
   broll: {
     frame: 'border-broll-500/70 ring-2 ring-broll-500/40',
     check: 'border-broll-300 bg-broll-500 text-white',
-    cta: 'bg-broll-500 hover:bg-broll-400',
+    cta: 'bg-broll-500',
   },
   playground: {
     frame: 'border-playground-500/70 ring-2 ring-playground-500/40',
     check: 'border-playground-300 bg-playground-500 text-white',
-    cta: 'bg-playground-500 hover:bg-playground-400',
+    cta: 'bg-playground-500',
   },
 }
 
@@ -175,7 +175,7 @@ export default function ClipDownloadModal({
             type="button"
             onClick={() => void download()}
             disabled={zipping || picked.size === 0}
-            className={`flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${tint.cta}`}
+            className={`flex items-center gap-1.5 glass-fill glass-fill-soft hover:brightness-110 disabled:hover:brightness-100 rounded-full border border-white/15 px-4 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all disabled:cursor-not-allowed disabled:opacity-40 ${tint.cta}`}
           >
             {zipping ? <Spinner className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
             {zipping ? 'Zipping…' : `Download ${picked.size} clip${picked.size === 1 ? '' : 's'}`}
