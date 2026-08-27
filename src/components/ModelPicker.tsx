@@ -96,6 +96,11 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
   // over a hairline. The recommended star still shows inline on the models that
   // earn it.
   const flatList = task === 'image' || task === 'tts'
+  // TTS is metered on the script you actually send (see `geminiTtsCredits`), so
+  // a row can only quote the cost of a nominal 1000 characters — a number that
+  // is neither what this run costs nor different between the two entries, since
+  // they share one rate card. The Generate button prices the real script.
+  const hideCredits = task === 'tts'
   const recommended = flatList ? [] : models.filter((m) => m.tags.includes('recommended'))
   const fallback = getDefaultModel(appId, task, mode)
   const resolved = value ?? persisted ?? fallback?.id
@@ -210,6 +215,7 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
                   muted={muted}
                   accent={accent}
                   costParams={{ imageCount: 1, ...costParams }}
+                  noCredits={hideCredits}
                   onClick={() => pick(m.id)}
                 />
               )
@@ -225,6 +231,7 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
                   muted={muted}
                   accent={accent}
                   costParams={{ imageCount: 1, ...costParams }}
+                  noCredits={hideCredits}
                   onClick={() => pick(m.id)}
                 />
               )
@@ -249,6 +256,9 @@ interface ModelRowProps {
   muted?: boolean
   accent: string
   costParams: CostEstimateParams
+  // Drop the credit estimate from the row's meta line. For a task whose price
+  // can't be known at pick time — see `hideCredits` at the call site.
+  noCredits?: boolean
   onClick: () => void
 }
 
@@ -268,7 +278,7 @@ function creditRange(modelId: string, tiers: string[] | undefined, costParams: C
 // tag words, a quiet metadata sub-line (resolution range · [duration] ·
 // credits), and an accent-tinted selected state with an accent check. The
 // slide-in and this dropdown are one visual family; only the container differs.
-function ModelRow({ model, active, muted, accent, costParams, onClick }: ModelRowProps) {
+function ModelRow({ model, active, muted, accent, costParams, noCredits, onClick }: ModelRowProps) {
   const isRecommended = model.tags.includes('recommended')
   // Discount vs the provider's official API — only for models with a verified
   // official rate in the registry (see ModelEntry.official).
@@ -287,7 +297,7 @@ function ModelRow({ model, active, muted, accent, costParams, onClick }: ModelRo
       : 'per clip'
     : null
   // Lead with the cheapest tier ("from N credits") rather than a low–high span.
-  const credits = creditRange(model.id, res, costParams)
+  const credits = noCredits ? null : creditRange(model.id, res, costParams)
   const meta = [duration, credits].filter(Boolean).join(' · ')
 
   return (
