@@ -31,6 +31,7 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(item.duration || 0)
+  const [scrubbing, setScrubbing] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const animRef = useRef<number>(0)
   const trackRef = useRef<HTMLDivElement>(null)
@@ -133,15 +134,41 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
     setCurrentTime(audio.currentTime)
   }
 
-  const seekFromEvent = (e: React.MouseEvent | React.PointerEvent) => {
+  // Seek from a pointer position on the track. Shared by the press and every
+  // move of a drag, so a click and a scrub are the same code path.
+  const seekToClientX = (clientX: number) => {
     const audio = audioRef.current
     if (!audio || !trackRef.current) return
     const dur = audio.duration || duration
     if (!dur) return
     const rect = trackRef.current.getBoundingClientRect()
-    const fraction = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
+    const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
     audio.currentTime = fraction * dur
     setCurrentTime(audio.currentTime)
+  }
+
+  // Drag-to-scrub. Pointer capture is what makes it usable: the track is a
+  // ~150px sliver in a row full of buttons, and without capture the drag dies
+  // the moment the pointer leaves it — which on a 6-second read is instantly.
+  // Captured, the pointer keeps reporting to the track wherever it travels,
+  // including outside the window.
+  const startScrub = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setScrubbing(true)
+    seekToClientX(e.clientX)
+  }
+
+  const moveScrub = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+    seekToClientX(e.clientX)
+  }
+
+  const endScrub = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId)
+    }
+    setScrubbing(false)
   }
 
   const handleDownload = async () => {
@@ -218,17 +245,31 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
           without the margin it lands on top of the elapsed-time label. */}
       <div
         ref={trackRef}
-        onClick={seekFromEvent}
-        className="group relative mx-1 h-1.5 min-w-[56px] flex-1 cursor-pointer rounded-full bg-ink/[0.08]"
+        onPointerDown={startScrub}
+        onPointerMove={moveScrub}
+        onPointerUp={endScrub}
+        onPointerCancel={endScrub}
+        className="group relative mx-1 -my-2 flex min-w-[56px] flex-1 cursor-pointer touch-none items-center py-2"
       >
-        <div
-          className="absolute inset-y-0 left-0 rounded-full bg-ink-100"
-          style={{ width: `${progressPct}%` }}
-        />
-        <div
-          className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink-100 opacity-0 shadow transition-opacity group-hover:opacity-100 touch:opacity-100"
-          style={{ left: `${progressPct}%` }}
-        />
+        {/* The bar is 6px; the grab area is the `py-2` around it (`-my-2` keeps
+            that off the row's height). A hit target the height of the line
+            itself is a click you have to aim, and a drag you can't start. */}
+        <div className="relative h-1.5 w-full rounded-full bg-ink/[0.08]">
+          {/* Played portion in the app's own blue rather than the ink ramp —
+              `ink-100` is near-black in light mode, which read as a dead bar
+              instead of the accent the play button beside it wears. `voice-500`
+              is the literal accent and doesn't flip between themes. */}
+          <div
+            className="absolute inset-y-0 left-0 rounded-full bg-voice-500"
+            style={{ width: `${progressPct}%` }}
+          />
+          <div
+            className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-voice-500 shadow transition-opacity group-hover:opacity-100 touch:opacity-100 ${
+              scrubbing ? 'opacity-100' : 'opacity-0'
+            }`}
+            style={{ left: `${progressPct}%` }}
+          />
+        </div>
       </div>
 
       <span className="min-w-[32px] shrink-0 text-[11px] tabular-nums text-ink-500">
