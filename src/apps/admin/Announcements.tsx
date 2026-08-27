@@ -71,7 +71,10 @@ export default function Announcements() {
 
   const { rows: members } = useMembers()
   // Admins are members too, but they're not the audience the receipt is about.
-  const audience = members.filter((m) => !m.disabled_at && !m.is_admin).length
+  // Neither is anyone locked out — a lapsed or disabled member never reaches
+  // the Dashboard the announcement shows on, so counting them would make the
+  // "seen by 38 / 62" receipt permanently short of its own denominator.
+  const audience = members.filter((m) => !m.disabled_at && !m.lapsed_at && !m.is_admin).length
 
   async function refresh(): Promise<void> {
     setLoading(true)

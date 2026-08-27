@@ -1,17 +1,23 @@
 import { useState } from 'react'
 import { AlertCircle, CheckCircle2, Lock, ExternalLink, X } from 'lucide-react'
 import Spinner from '../Spinner'
-import AppLogo from '../AppLogo'
-import AppBackground from '../AppBackground'
+import AuthShell, { AuthField } from './AuthShell'
 import { useAuthStore } from '../../stores/authStore'
 import { POLICY_VERSION } from '../../legal/version'
-import { SKOOL_COMMUNITY_URL } from '../../utils/constants'
+import { SKOOL_ACCESS_CODE_URL, SKOOL_COMMUNITY_URL } from '../../utils/constants'
 
-type Mode = 'login' | 'signup'
+type Mode = 'login' | 'signup' | 'forgot'
+
+const SUBTITLES: Record<Mode, string> = {
+  login: 'Sign in to your workspace',
+  signup: 'Create your account',
+  forgot: 'Reset your password',
+}
 
 export default function AuthScreen() {
   const signIn = useAuthStore((s) => s.signIn)
   const signUp = useAuthStore((s) => s.signUp)
+  const requestPasswordReset = useAuthStore((s) => s.requestPasswordReset)
   const acceptPolicies = useAuthStore((s) => s.acceptPolicies)
   const accessRevoked = useAuthStore((s) => s.accessRevoked)
   const clearAccessRevoked = useAuthStore((s) => s.clearAccessRevoked)
@@ -27,16 +33,39 @@ export default function AuthScreen() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [needsConfirm, setNeedsConfirm] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
+
+  function switchMode(next: Mode) {
+    setMode(next)
+    setError(null)
+    setNeedsConfirm(false)
+    setResetSent(false)
+    if (next !== 'signup') {
+      setFirstName('')
+      setLastName('')
+      setSignupCode('')
+    }
+  }
+
+  const ready =
+    mode === 'forgot'
+      ? !!email.trim()
+      : !!email.trim() && !!password &&
+        (mode === 'login' || (!!firstName.trim() && !!lastName.trim() && !!signupCode.trim()))
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setNeedsConfirm(false)
-    if (!email.trim() || !password) return
-    if (mode === 'signup' && (!firstName.trim() || !lastName.trim() || !signupCode.trim())) return
+    setResetSent(false)
+    if (!ready) return
     setBusy(true)
     try {
-      if (mode === 'login') {
+      if (mode === 'forgot') {
+        const res = await requestPasswordReset(email)
+        if (!res.ok) setError(res.error)
+        else setResetSent(true)
+      } else if (mode === 'login') {
         const res = await signIn(email, password)
         // A revoked account surfaces via the "members only" popup (driven by
         // accessRevoked in the store), not the inline error row.
@@ -58,197 +87,179 @@ export default function AuthScreen() {
   }
 
   return (
-    <div className="relative h-dvh w-screen overflow-hidden bg-surface-0 text-ink antialiased">
-      <AppBackground />
-
-      <div className="relative z-10 flex h-full w-full items-center justify-center px-6">
-        <div className="w-full max-w-sm space-y-6">
-          {/* Brand */}
-          <div className="flex flex-col items-center gap-2">
-            <AppLogo className="h-12 w-12" />
-            <div className="space-y-1 text-center">
-              <h1 className="text-2xl font-bold tracking-tight text-ink-100">UGC OS</h1>
-              <p className="text-sm text-ink-500">
-                {mode === 'login' ? 'Sign in to your workspace' : 'Create your account'}
-              </p>
-            </div>
+    <AuthShell subtitle={SUBTITLES[mode]}>
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-3 rounded-xl border border-ink/10 bg-ink/[0.03] p-5 backdrop-blur-xl"
+      >
+        {mode === 'signup' && (
+          <div className="grid grid-cols-2 gap-3">
+            <AuthField
+              label="First name"
+              type="text"
+              autoComplete="given-name"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+              placeholder="Jane"
+            />
+            <AuthField
+              label="Surname"
+              type="text"
+              autoComplete="family-name"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
+              placeholder="Doe"
+            />
           </div>
+        )}
 
-          {/* Card */}
-          <form
-            onSubmit={handleSubmit}
-            className="space-y-3 rounded-xl border border-ink/10 bg-ink/[0.03] p-5 backdrop-blur-xl"
-          >
-            {mode === 'signup' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-500">
-                    First name
-                  </label>
-                  <input
-                    type="text"
-                    autoComplete="given-name"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                    className="w-full rounded-lg border border-ink/10 bg-ink/5 px-3 py-2.5 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
-                    placeholder="Jane"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-500">
-                    Surname
-                  </label>
-                  <input
-                    type="text"
-                    autoComplete="family-name"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    required
-                    className="w-full rounded-lg border border-ink/10 bg-ink/5 px-3 py-2.5 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
-                    placeholder="Doe"
-                  />
-                </div>
-              </div>
+        <AuthField
+          label="Email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          placeholder="you@example.com"
+          hint={mode === 'forgot' ? 'We’ll send a link to set a new one.' : undefined}
+        />
+
+        {mode !== 'forgot' && (
+          <div>
+            <AuthField
+              label="Password"
+              type="password"
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={8}
+              placeholder={mode === 'login' ? '••••••••' : 'Min 8 characters'}
+            />
+            {mode === 'login' && (
+              <button
+                type="button"
+                onClick={() => switchMode('forgot')}
+                className="mt-1.5 text-[11px] text-ink-500 transition-colors hover:text-ink-300"
+              >
+                Forgot your password?
+              </button>
             )}
-            <div>
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-500">
-                Email
-              </label>
-              <input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full rounded-lg border border-ink/10 bg-ink/5 px-3 py-2.5 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
-                placeholder="you@example.com"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-500">
-                Password
-              </label>
-              <input
-                type="password"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={8}
-                className="w-full rounded-lg border border-ink/10 bg-ink/5 px-3 py-2.5 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
-                placeholder={mode === 'login' ? '••••••••' : 'Min 8 characters'}
-              />
-            </div>
+          </div>
+        )}
 
-            {mode === 'signup' && (
-              <div>
-                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-500">
-                  Access code
-                </label>
-                <input
-                  type="text"
-                  autoComplete="off"
-                  value={signupCode}
-                  onChange={(e) => setSignupCode(e.target.value)}
-                  required
-                  className="w-full rounded-lg border border-ink/10 bg-ink/5 px-3 py-2.5 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
-                  placeholder="Code from the community"
-                />
-                <p className="mt-1 text-[11px] text-ink-600">
-                  Posted in the Skool community — ask there if you don't have it.
-                </p>
-              </div>
-            )}
+        {mode === 'signup' && (
+          <AuthField
+            label="Access code"
+            type="text"
+            autoComplete="off"
+            value={signupCode}
+            onChange={(e) => setSignupCode(e.target.value)}
+            required
+            placeholder="Code from the community"
+            hint={
+              <a
+                href={SKOOL_ACCESS_CODE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-ink-400 underline transition-colors hover:text-ink-200"
+              >
+                Get the code on Skool
+                <ExternalLink className="h-2.5 w-2.5" />
+              </a>
+            }
+          />
+        )}
 
-            {error && (
-              <div className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 light:text-red-700">
-                <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
+        {error && (
+          <div className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-2.5 py-2 text-[11px] text-red-300 light:text-red-700">
+            <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
 
-            {needsConfirm && (
-              <div className="flex items-start gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-2 text-[11px] text-emerald-300 light:text-emerald-700">
-                <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0" />
-                <span>Check your inbox to confirm your email, then sign in.</span>
-              </div>
-            )}
+        {needsConfirm && (
+          <div className="flex items-start gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-2 text-[11px] text-emerald-300 light:text-emerald-700">
+            <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0" />
+            <span>Check your inbox to confirm your email, then sign in.</span>
+          </div>
+        )}
 
+        {resetSent && (
+          <div className="flex items-start gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-2 text-[11px] text-emerald-300 light:text-emerald-700">
+            <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0" />
+            {/* Deliberately says "if" — confirming which addresses have an
+                account would answer that question for anyone who asked. */}
+            <span>If that email has an account, a reset link is on its way. The link lasts an hour.</span>
+          </div>
+        )}
+
+        <button
+          type="submit"
+          disabled={busy || !ready}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink py-2.5 text-sm font-medium text-ink-900 transition-colors hover:bg-ink-100 disabled:opacity-60"
+        >
+          {busy && <Spinner className="h-4 w-4" />}
+          {mode === 'login' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Send reset link'}
+        </button>
+
+        {mode === 'signup' && (
+          <p className="pt-1 text-center text-[11px] leading-snug text-ink-500">
+            By creating an account, you agree to our{' '}
+            <a href="/legal/terms" target="_blank" rel="noreferrer" className="text-ink-300 underline">Terms</a>,{' '}
+            <a href="/legal/privacy" target="_blank" rel="noreferrer" className="text-ink-300 underline">Privacy Policy</a>, and{' '}
+            <a href="/legal/aup" target="_blank" rel="noreferrer" className="text-ink-300 underline">Acceptable Use Policy</a>.
+          </p>
+        )}
+      </form>
+
+      <div className="text-center text-[12px] text-ink-500">
+        {mode === 'login' ? (
+          <>
+            New to UGC OS?{' '}
             <button
-              type="submit"
-              disabled={busy || !email.trim() || !password || (mode === 'signup' && (!firstName.trim() || !lastName.trim() || !signupCode.trim()))}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink py-2.5 text-sm font-medium text-ink-900 transition-colors hover:bg-ink-100 disabled:opacity-60"
+              type="button"
+              onClick={() => switchMode('signup')}
+              className="text-ink-300 transition-colors hover:text-ink"
             >
-              {busy && <Spinner className="h-4 w-4" />}
-              {mode === 'login' ? 'Sign in' : 'Create account'}
+              Create an account
             </button>
-
-            {mode === 'signup' && (
-              <p className="pt-1 text-center text-[11px] leading-snug text-ink-500">
-                By creating an account, you agree to our{' '}
-                <a href="/legal/terms" target="_blank" rel="noreferrer" className="text-ink-300 underline">Terms</a>,{' '}
-                <a href="/legal/privacy" target="_blank" rel="noreferrer" className="text-ink-300 underline">Privacy Policy</a>, and{' '}
-                <a href="/legal/aup" target="_blank" rel="noreferrer" className="text-ink-300 underline">Acceptable Use Policy</a>.
-              </p>
-            )}
-          </form>
-
-          <div className="text-center text-[12px] text-ink-500">
-            {mode === 'login' ? (
-              <>
-                New to UGC OS?{' '}
-                <button
-                  type="button"
-                  onClick={() => { setMode('signup'); setError(null); setNeedsConfirm(false) }}
-                  className="text-ink-300 transition-colors hover:text-ink"
-                >
-                  Create an account
-                </button>
-              </>
-            ) : (
-              <>
-                Already have an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => { setMode('login'); setError(null); setNeedsConfirm(false); setFirstName(''); setLastName(''); setSignupCode('') }}
-                  className="text-ink-300 transition-colors hover:text-ink"
-                >
-                  Sign in
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Access is gated by the Skool allowlist, so a non-member who finds
-              the URL can't sign up — send them to the community instead. */}
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-center text-[11px] text-ink-600">
-              Access is limited to members of the Skool community.
-            </p>
-            <a
-              href={SKOOL_COMMUNITY_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/5 px-4 py-2 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/10 hover:text-ink"
+          </>
+        ) : (
+          <>
+            {mode === 'signup' ? 'Already have an account?' : 'Remembered it?'}{' '}
+            <button
+              type="button"
+              onClick={() => switchMode('login')}
+              className="text-ink-300 transition-colors hover:text-ink"
             >
-              Join the community
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
+              Sign in
+            </button>
+          </>
+        )}
+      </div>
 
-          <div className="flex items-center justify-center gap-3 text-[11px] text-ink-600">
-            <a href="/legal/terms" className="transition-colors hover:text-ink-300">Terms</a>
-            <span aria-hidden>·</span>
-            <a href="/legal/privacy" className="transition-colors hover:text-ink-300">Privacy</a>
-            <span aria-hidden>·</span>
-            <a href="/legal/aup" className="transition-colors hover:text-ink-300">AUP</a>
-          </div>
-        </div>
+      {/* Access is gated by the Skool allowlist, so a non-member who finds
+          the URL can't sign up — send them to the community instead. */}
+      <div className="flex flex-col items-center gap-2">
+        <p className="text-center text-[11px] text-ink-600">
+          Access is limited to members of the Skool community.
+        </p>
+        <a
+          href={SKOOL_COMMUNITY_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/5 px-4 py-2 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/10 hover:text-ink"
+        >
+          Join the community
+          <ExternalLink className="h-3 w-3" />
+        </a>
       </div>
 
       {accessRevoked && <MembersOnlyModal onClose={clearAccessRevoked} />}
-    </div>
+    </AuthShell>
   )
 }
 

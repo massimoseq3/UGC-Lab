@@ -5,7 +5,7 @@ import { APP_REGISTRY } from '../../utils/constants'
 import { formatDuration } from '../../utils/usage'
 import AppGlyph from './AppGlyph'
 import { appName, appTint } from './appDisplay'
-import { useMembers, formatBytes, formatRelative, memberName, memberTopApp, totalSeconds, isInactive, isActivated, type MemberRow } from './useMembers'
+import { useMembers, formatBytes, formatRelative, memberName, memberTopApp, totalSeconds, isInactive, isActivated, memberStatus, type MemberRow } from './useMembers'
 
 const DAY = 24 * 60 * 60_000
 
@@ -42,15 +42,21 @@ export default function Insights() {
   const [usageWindow, setUsageWindow] = useState<UsageWindow>('30d')
 
   const stats = useMemo(() => {
-    let active = 0, inactive = 0, disabled = 0, bytes = 0, gens7d = 0
+    // `active` means "can still sign in", so the quiet-but-not-locked rows are
+    // counted in BOTH active and inactive. Lapsed and disabled are the two that
+    // genuinely can't — a lapsed member reading as active is the miscount this
+    // status was added to make visible.
+    let active = 0, inactive = 0, lapsed = 0, disabled = 0, bytes = 0, gens7d = 0
     for (const r of rows) {
-      if (r.disabled_at) disabled++
-      else if (isInactive(r)) { inactive++; active++ }
+      const status = memberStatus(r)
+      if (status === 'disabled') disabled++
+      else if (status === 'lapsed') lapsed++
+      else if (status === 'inactive') { inactive++; active++ }
       else active++
       bytes += r.total_bytes
       gens7d += r.assets_last_7d
     }
-    return { total: rows.length, active, inactive, disabled, bytes, gens7d }
+    return { total: rows.length, active, inactive, lapsed, disabled, bytes, gens7d }
   }, [rows])
 
   // Cumulative members by month (YYYY-MM) from created_at.
@@ -146,8 +152,13 @@ export default function Insights() {
   const growth = useMemo(() => {
     const newThisWeek = rows.filter((r) => withinDays(r.created_at, 0, 7, fetchedAt)).length
     const newLastWeek = rows.filter((r) => withinDays(r.created_at, 7, 14, fetchedAt)).length
-    const disabledThisWeek = rows.filter((r) => withinDays(r.disabled_at, 0, 7, fetchedAt)).length
-    return { newThisWeek, newLastWeek, disabledThisWeek, net: newThisWeek - disabledThisWeek }
+    // Both locks count as churn: a cancellation is the more common way out of
+    // the community, and leaving it out of the net figure would report a week
+    // of departures as flat growth.
+    const lostThisWeek = rows.filter(
+      (r) => withinDays(r.disabled_at, 0, 7, fetchedAt) || withinDays(r.lapsed_at, 0, 7, fetchedAt),
+    ).length
+    return { newThisWeek, newLastWeek, lostThisWeek, net: newThisWeek - lostThisWeek }
   }, [rows, fetchedAt])
 
   if (loading) {
@@ -235,7 +246,7 @@ export default function Insights() {
           <SignupsChart data={signups} />
         </Panel>
         <Panel title="Status mix" hint="share of all members">
-          <StatusDonut active={stats.active - stats.inactive} inactive={stats.inactive} disabled={stats.disabled} />
+          <StatusDonut active={stats.active - stats.inactive} inactive={stats.inactive} lapsed={stats.lapsed} disabled={stats.disabled} />
         </Panel>
         <Panel title="Bank usage" hint="total assets created across all members">
           <BarList items={bankTotals.map((b) => ({ label: b.label, value: b.value, color: b.color }))} />
@@ -260,7 +271,7 @@ export default function Insights() {
 }
 
 // Signups this week vs last + churn, with a directional delta on signups.
-function GrowthStrip({ growth }: { growth: { newThisWeek: number; newLastWeek: number; disabledThisWeek: number; net: number } }) {
+function GrowthStrip({ growth }: { growth: { newThisWeek: number; newLastWeek: number; lostThisWeek: number; net: number } }) {
   const delta = growth.newThisWeek - growth.newLastWeek
   const DeltaIcon = delta > 0 ? TrendingUp : delta < 0 ? TrendingDown : null
   const deltaColor = delta > 0 ? 'text-emerald-400 light:text-emerald-600' : delta < 0 ? 'text-red-400 light:text-red-600' : 'text-ink-500'
@@ -277,8 +288,8 @@ function GrowthStrip({ growth }: { growth: { newThisWeek: number; newLastWeek: n
         </div>
       </div>
       <div>
-        <div className="flex items-center gap-1.5 text-[11px] text-ink-500"><Ban className="h-3.5 w-3.5" /> Disabled this week</div>
-        <div className="mt-1 text-2xl font-semibold tracking-tight text-ink-100">{growth.disabledThisWeek}</div>
+        <div className="flex items-center gap-1.5 text-[11px] text-ink-500"><Ban className="h-3.5 w-3.5" /> Lost this week</div>
+        <div className="mt-1 text-2xl font-semibold tracking-tight text-ink-100">{growth.lostThisWeek}</div>
       </div>
       <div>
         <div className="flex items-center gap-1.5 text-[11px] text-ink-500">Net change</div>
@@ -533,11 +544,15 @@ function SignupsChart({ data }: { data: Array<{ month: string; total: number; ad
 }
 
 // Three-segment donut: active / inactive / disabled.
-function StatusDonut({ active, inactive, disabled }: { active: number; inactive: number; disabled: number }) {
-  const total = active + inactive + disabled
+function StatusDonut({ active, inactive, lapsed, disabled }: { active: number; inactive: number; lapsed: number; disabled: number }) {
+  const total = active + inactive + lapsed + disabled
+  // Lapsed is violet rather than another amber: a donut has no glyphs, and two
+  // shades of amber beside each other say "roughly the same thing" when one of
+  // these two can still sign in and the other can't.
   const segments = [
     { label: 'Active', value: active, color: '#10b981' },
     { label: 'Inactive', value: inactive, color: '#f59e0b' },
+    { label: 'Lapsed', value: lapsed, color: '#8b5cf6' },
     { label: 'Disabled', value: disabled, color: '#ef4444' },
   ]
   const r = 60, C = 2 * Math.PI * r
