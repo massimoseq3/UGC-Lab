@@ -114,19 +114,29 @@ export default function SolarSystem({ className = '' }: { className?: string }) 
                     // planet on the next ring out.
                     className="group pointer-events-auto relative flex h-9 w-9 items-center justify-center rounded-full outline-none transition-transform duration-200 before:absolute before:-inset-1 before:rounded-full before:content-[''] hover:scale-[1.18] focus-visible:scale-[1.18]"
                   >
+                    {/* Hover halo, and it sits BEHIND the sphere — as a later
+                        sibling it painted over the planet's own face instead,
+                        so hovering flattened a shaded ball into a fuzzy disc of
+                        flat accent and took the rim light with it. It is also a
+                        radial gradient rather than a `blur()` of a solid disc
+                        (the same idiom DesktopIcons' tile glow uses): the button
+                        scales on the very same hover, and scaling a filtered
+                        layer re-rasters the blur every frame of the transition —
+                        the one thing the blob-drift note in index.css says not
+                        to do. A gradient is painted once and composited. */}
+                    <span
+                      aria-hidden
+                      className="absolute -inset-4 rounded-full opacity-0 transition-opacity duration-200 group-hover:opacity-90 group-focus-visible:opacity-90"
+                      style={{ backgroundImage: `radial-gradient(circle, ${app.accent} 48%, transparent 82%)` }}
+                    />
                     {/* Lit from the sun's side — top-left, where the sun is for
                         a planet drawn at the top of its orbit. */}
                     <span
-                      className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/20 transition-shadow duration-200"
+                      className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/20"
                       style={{
                         backgroundImage: `radial-gradient(circle at 34% 28%, color-mix(in oklab, ${app.accent} 55%, white), ${app.accent} 58%, color-mix(in oklab, ${app.accent} 72%, black))`,
-                        boxShadow: `0 2px 8px -2px rgba(0,0,0,0.5), 0 0 0 0 ${app.accent}`,
+                        boxShadow: '0 2px 8px -2px rgba(0,0,0,0.5)',
                       }}
-                    />
-                    <span
-                      aria-hidden
-                      className="absolute -inset-1.5 rounded-full opacity-0 blur-[6px] transition-opacity duration-200 group-hover:opacity-70 group-focus-visible:opacity-70"
-                      style={{ backgroundColor: app.accent }}
                     />
                     <Icon
                       className="relative h-[15px] w-[15px] text-white [filter:drop-shadow(0_1px_1px_rgba(0,0,0,0.35))]"
