@@ -313,9 +313,11 @@ export default function VoiceStudio() {
           />
         </div>
 
-        {/* Right — editor, with the player docked under it. The player belongs
-            to this column, not to the window: stretched across the bottom it
-            cut the side panel off short and left dead space under History. */}
+        {/* Right — editor, with the player riding the generate row inside it.
+            The player belongs to this column, not to the window: stretched
+            across the bottom it cut the side panel off short and left dead
+            space under History. It's a child of the generate row now rather
+            than a band beneath it — see EditorArea's footer note. */}
         <div className={paneClass(pane === 'editor', 'md:flex-1 md:overflow-hidden')}>
           <div className="flex min-h-0 flex-1 flex-col">
             <EditorArea
@@ -334,17 +336,18 @@ export default function VoiceStudio() {
               isEnhancing={isEnhancing}
               highlightField={highlightField}
               error={error}
+              // Appears in the generate row once a generation lands.
+              player={
+                activePlayerItem && (
+                  <BottomPlayer
+                    item={activePlayerItem}
+                    onClose={() => setActivePlayerItem(null)}
+                    onShowDetails={setDetailsItem}
+                  />
+                )
+              }
             />
           </div>
-
-          {/* Player — slides in once a generation lands */}
-          {activePlayerItem && (
-            <BottomPlayer
-              item={activePlayerItem}
-              onClose={() => setActivePlayerItem(null)}
-              onShowDetails={setDetailsItem}
-            />
-          )}
         </div>
       </div>
 

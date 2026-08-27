@@ -137,14 +137,14 @@ export default function HistoryDetailsView({ item, onClose, onRestoreText, onRes
         <div className="mt-5 grid grid-cols-2 gap-2">
           <button
             onClick={togglePlay}
-            className="flex items-center justify-center gap-2 rounded-xl border border-ink/10 bg-ink/[0.02] px-3 py-2.5 text-sm font-medium text-ink-200 transition-colors hover:bg-ink/[0.05]"
+            className="flex items-center justify-center gap-2 rounded-full border border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-sm font-medium text-ink-200 transition-colors hover:bg-ink/[0.05]"
           >
             {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
             {isPlaying ? 'Pause' : 'Play'}
           </button>
           <button
             onClick={handleRestoreText}
-            className="flex items-center justify-center gap-2 rounded-xl border border-ink/10 bg-ink/[0.02] px-3 py-2.5 text-sm font-medium text-ink-200 transition-colors hover:bg-ink/[0.05]"
+            className="flex items-center justify-center gap-2 rounded-full border border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-sm font-medium text-ink-200 transition-colors hover:bg-ink/[0.05]"
           >
             <RotateCcw className="h-4 w-4" />
             Add text to edit
@@ -153,7 +153,7 @@ export default function HistoryDetailsView({ item, onClose, onRestoreText, onRes
 
         <button
           onClick={handleDownload}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-ink/10 bg-ink/[0.02] px-3 py-2.5 text-sm font-medium text-ink-200 transition-colors hover:bg-ink/[0.05]"
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-sm font-medium text-ink-200 transition-colors hover:bg-ink/[0.05]"
         >
           <Download className="h-4 w-4" />
           Download audio
@@ -174,7 +174,7 @@ export default function HistoryDetailsView({ item, onClose, onRestoreText, onRes
 
           <button
             onClick={handleRestoreSettings}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-ink/10 bg-ink/[0.02] px-3 py-2.5 text-sm font-medium text-ink-200 transition-colors hover:bg-ink/[0.05]"
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-full border border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-sm font-medium text-ink-200 transition-colors hover:bg-ink/[0.05]"
           >
             <RotateCcw className="h-4 w-4" />
             Restore settings

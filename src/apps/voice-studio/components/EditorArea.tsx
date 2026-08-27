@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { FileText, Mic, AlertCircle, RefreshCw, X, ChevronRight, Coins, Sparkles } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import type { Script } from '../../../stores/types'
@@ -35,6 +36,12 @@ interface EditorAreaProps {
   isEnhancing: boolean
   highlightField?: string | null
   error?: string | null
+  // The playback bar for the latest voiceover, rendered INSIDE the generate
+  // row rather than as a band under it — the button leaves most of that row
+  // empty on a desktop, and a second full-width strip for a control that fits
+  // beside it is a strip the script box could have had. Absent until a
+  // generation lands.
+  player?: ReactNode
 }
 
 export default function EditorArea({
@@ -53,6 +60,7 @@ export default function EditorArea({
   isEnhancing,
   highlightField,
   error,
+  player,
 }: EditorAreaProps) {
   const charCount = scriptText.length
   const overLimit = charCount > MAX_CHARACTERS
@@ -220,8 +228,14 @@ export default function EditorArea({
           the button's own label was what gave way ("Generat…"). The pane owns
           its own height (the phone shows one pane at a time), so this is an
           ordinary last row in the column — it used to be `fixed`, which is
-          what laid that count across the button in the first place. */}
-      <div className={`flex shrink-0 items-stretch gap-2 border-t border-ink/5 px-5 py-3 ${isGenerating ? 'md:mt-0' : 'md:mt-4'}`}>
+          what laid that count across the button in the first place.
+
+          The PLAYER is the row's third item and takes whatever the button
+          leaves (`flex-1` on its side, `md:flex-none` on the button). It's
+          `flex-wrap` so that on a phone — where the two existing items already
+          fill the line — the player drops to its own line underneath instead
+          of squeezing them, which is where it used to live full-time. */}
+      <div className={`flex shrink-0 flex-wrap items-stretch gap-2 border-t border-ink/5 px-5 py-3 ${isGenerating ? 'md:mt-0' : 'md:mt-4'}`}>
         <BatchCountStepper
           size="fill"
           stacked
@@ -242,7 +256,7 @@ export default function EditorArea({
           // Stays live while a voiceover renders — a second click queues
           // another one alongside it. The progress bar above is the feedback.
           disabled={!canGenerate || overLimit}
-          className="flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-4 py-4 md:flex-none md:px-16 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-4 py-4 md:flex-none md:px-10 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Mic className="h-4 w-4" strokeWidth={2.5} />
           {/* The noun is desktop-only. A 375px row leaves this button ~150px
@@ -262,6 +276,7 @@ export default function EditorArea({
             </span>
           )}
         </button>
+        {player}
       </div>
     </div>
   )
