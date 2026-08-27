@@ -437,7 +437,7 @@ export default function AllowlistEditor() {
   return (
     <div className="space-y-4">
       {/* Global enforcement toggle */}
-      <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-4">
+      <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-4 max-sm:p-3">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="text-[13px] font-medium text-ink-100">Allowlist enforcement</div>
@@ -477,7 +477,7 @@ export default function AllowlistEditor() {
 
       {/* Shared signup access code. Never shipped to the browser — the signup
           form posts what the member typed and the trigger compares. */}
-      <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-4">
+      <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-4 max-sm:p-3">
         <div className="text-[13px] font-medium text-ink-100">Signup access code</div>
         <p className="mt-0.5 text-[12px] text-ink-500">
           {!codeSupported
@@ -547,8 +547,9 @@ export default function AllowlistEditor() {
           onChange={onFileChosen}
           className="hidden"
         />
-        <button onClick={load} className="flex items-center gap-1.5 rounded-md border border-ink/10 px-2.5 py-2 text-[11px] text-ink-300 transition-colors hover:bg-ink/[0.05]">
+        <button onClick={load} title="Reload the list" className="flex items-center gap-1.5 rounded-lg border border-ink/10 px-2.5 py-2 text-[11px] text-ink-300 transition-colors hover:bg-ink/[0.05]">
           <RefreshCw className="h-3 w-3" />
+          <span className="md:hidden">Refresh</span>
         </button>
       </div>
 
@@ -567,7 +568,41 @@ export default function AllowlistEditor() {
           {slowHint && <span className="text-[11px]">Still loading… will time out if it stalls.</span>}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-ink/10">
+        <>
+        {/* An email is most of this table's width and doesn't shorten, so a
+            phone gets one row per entry stacked instead of four columns. */}
+        <div className="divide-y divide-ink/5 overflow-hidden rounded-lg border border-ink/10 md:hidden">
+          {rows.length === 0 && (
+            <p className="px-3 py-6 text-center text-[12px] text-ink-500">
+              Empty — Zapier zap not yet wired, or no members yet.
+            </p>
+          )}
+          {rows.map((r) => {
+            const fullName = [r.first_name, r.last_name].filter(Boolean).join(' ')
+            return (
+              <div key={r.email} className="flex items-start gap-2 p-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12px] text-ink-200">
+                    {fullName || <span className="text-ink-600">—</span>}
+                  </div>
+                  <div className="break-all text-[12px] text-ink-300">{r.email}</div>
+                  <div className="mt-0.5 text-[11px] text-ink-500">
+                    {r.source} · {new Date(r.added_at).toLocaleDateString()}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleDelete(r.email)}
+                  className="shrink-0 rounded-lg p-2 text-ink-500 transition-colors hover:bg-red-500/10 hover:text-red-300 light:hover:text-red-700"
+                  title="Remove"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        <div className="hidden overflow-hidden rounded-lg border border-ink/10 md:block">
           <table className="w-full text-[12px]">
             <thead className="bg-ink/[0.03] text-[11px] uppercase tracking-wider text-ink-500">
               <tr>
@@ -607,6 +642,7 @@ export default function AllowlistEditor() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {preview && (
