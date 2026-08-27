@@ -69,7 +69,7 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
       </button>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink-950/95 shadow-2xl"
+        className="flex h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink-950/95 shadow-2xl max-md:h-[calc(100dvh-1rem)]"
       >
         {children}
       </div>
@@ -275,10 +275,14 @@ export function ContinuousFrameModal({
 
   return (
     <ModalShell onClose={onClose}>
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-2">
+      {/* One scroller on a phone, two columns on a desktop. Stacked, the two
+        halves used to be a pair of ~45dvh scroll windows — the workspace in
+        one slot and its own outputs in another, neither tall enough to work
+        in. Now the modal is one page: the setup, then what it made. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-2 md:overflow-hidden">
         {/* LEFT — model + refs + prompt over a pinned Generate footer */}
-        <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 md:border-b-0 md:border-r">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 max-md:shrink-0 md:border-b-0 md:border-r">
+          <div className="flex min-h-0 flex-1 flex-col max-md:flex-none md:overflow-y-auto">
             <div className="flex grow flex-col gap-3 px-5 pb-1 pt-3">
               {/* Output-type tab — Image builds the keyframe; Animate image-to-
                   video's the chosen still on its own (a standalone clip, not
@@ -630,7 +634,7 @@ export function ContinuousFrameModal({
         </div>
 
         {/* RIGHT — header + image gallery */}
-        <div className="col-span-1 flex min-h-0 flex-col overflow-hidden">
+        <div className="col-span-1 flex min-h-0 flex-col max-md:shrink-0 md:overflow-hidden">
           <div className="flex flex-col gap-3 px-5 pt-3">
             {/* Serif number + a stacked column (concept pill over the quote),
                 mirroring the main storyboard rows. h-12 keeps the top bar tight. */}
@@ -671,7 +675,7 @@ export function ContinuousFrameModal({
             <div className="-mx-5 -mt-1 border-b border-ink/5" />
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="min-h-0 flex-1 px-5 py-4 max-md:flex-none md:overflow-y-auto">
             {frameTab === 'image' ? (
               cardState.images.length === 0 && cardState.inFlightImages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
@@ -971,10 +975,14 @@ export function ContinuousClipModal({
 
   return (
     <ModalShell onClose={onClose}>
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-2">
+      {/* One scroller on a phone, two columns on a desktop. Stacked, the two
+        halves used to be a pair of ~45dvh scroll windows — the workspace in
+        one slot and its own outputs in another, neither tall enough to work
+        in. Now the modal is one page: the setup, then what it made. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:grid md:grid-cols-2 md:overflow-hidden">
         {/* LEFT — model + endpoints + motion prompt over a pinned Generate footer */}
-        <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 md:border-b-0 md:border-r">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+        <div className="col-span-1 flex min-h-0 flex-col border-b border-ink/5 max-md:shrink-0 md:border-b-0 md:border-r">
+          <div className="flex min-h-0 flex-1 flex-col max-md:flex-none md:overflow-y-auto">
             <div className="flex grow flex-col gap-3 px-5 pb-1 pt-3">
               {/* Output-type tab — Continuous clips are videos (frames-to-video
                   between two keyframes). Styled as the Line-by-Line toggle,
@@ -1172,7 +1180,7 @@ export function ContinuousClipModal({
         </div>
 
         {/* RIGHT — header + video gallery */}
-        <div className="col-span-1 flex min-h-0 flex-col overflow-hidden">
+        <div className="col-span-1 flex min-h-0 flex-col max-md:shrink-0 md:overflow-hidden">
           <div className="flex flex-col gap-3 px-5 pt-3">
             {/* Serif scene number + a stacked column (Clip pill over the quote),
                 matching the frame modal and the main storyboard rows. */}
@@ -1200,7 +1208,7 @@ export function ContinuousClipModal({
             <div className="-mx-5 -mt-1 border-b border-ink/5" />
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="min-h-0 flex-1 px-5 py-4 max-md:flex-none md:overflow-y-auto">
             {cardState.videos.length === 0 && cardState.inFlightVideos.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                 <VideoIcon className="h-9 w-9 text-ink-800" strokeWidth={1.5} />

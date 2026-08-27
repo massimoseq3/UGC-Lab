@@ -414,7 +414,7 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
         {/* Animate in Playground — rounded pill (matching the Send-to buttons),
             floats over the card bottom on hover, image cards only. */}
         {hasImage && (
-          <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center p-2.5 opacity-0 transition-all group-hover:opacity-100">
+          <div className="absolute inset-x-0 bottom-0 z-20 flex justify-center p-2.5 opacity-0 transition-all group-hover:opacity-100 touch:opacity-100">
             <button
               onClick={handleAnimate}
               title="Open Playground in video mode with this image as the start frame"

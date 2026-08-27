@@ -20,7 +20,6 @@ import GeneratingTile from './GeneratingTile'
 import { buildJsonPrompt, buildImagePrompt } from '../services/generateCharacter'
 import { pickInfluencerName, sheetNameFrom, uniqueBankName, variantNameFrom } from './nameGenerator'
 import { downloadImage } from '../../../utils/downloadImage'
-import CollapsingBar from '../../../components/CollapsingBar'
 
 // List-view size-slider bounds. The raw value only drives the slider fill % and
 // the media frame's aspect ratio (see `mediaAspect`); it's no longer a pixel
@@ -201,62 +200,59 @@ export default memo(function GalleryPanel({
           Renders even when the gallery is empty: every other app keeps a
           h-[57px] bar on BOTH panes, so hiding it here left the two columns'
           divider lines out of alignment on a fresh visit. */}
-      {/* Rolls up on a phone while the gallery is scrolled — see CollapsingBar. */}
-      <CollapsingBar>
-        <div className="flex h-[57px] shrink-0 items-center justify-end gap-3 border-b border-ink/5 px-4">
-          {!isEmpty && (
-            <>
-              {/* Single view only: empty the frame back to "Awaiting generation".
-                  Nothing is deleted — the history is one toggle away, and the next
-                  generation fills the frame again. */}
-              {/* Only while a character is pinned to the stage — the way back to
-                  "whatever I just made", so a pin is never a state the member is
-                  stuck in wondering why new work isn't showing. */}
-              {viewMode === 'single' && pinnedItem && (
-                <button
-                  type="button"
-                  title="Show the newest character instead"
-                  onClick={() => setPin(null)}
-                  className="flex h-9 items-center gap-1.5 rounded-full border border-influencers-500/30 bg-influencers-500/10 px-3 text-[11px] font-medium text-influencers-300 transition-colors hover:bg-influencers-500/20"
-                >
-                  <History className="h-3.5 w-3.5" />
-                  Newest
-                </button>
-              )}
-              {viewMode === 'single' && !frameCleared && (
-                <button
-                  type="button"
-                  title="Clear the frame"
-                  onClick={() => setClearedId(newestId)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
-                >
-                  <Plus className="h-4 w-4" />
-                </button>
-              )}
-              {viewMode === 'list' && (
-                <div className="flex items-center gap-2.5" title="Card size">
-                  <Maximize2 className="h-3.5 w-3.5 text-ink-500" />
-                  <input
-                    type="range"
-                    min={LIST_CARD_MIN}
-                    max={LIST_CARD_MAX}
-                    step={10}
-                    value={listCardHeight}
-                    onChange={(e) => setListCardHeight(Number(e.target.value))}
-                    className="slider-thin w-28"
-                    style={{
-                      ['--slider-pct' as string]: `${cardPct}%`,
-                      ['--slider-fill' as string]: 'var(--color-influencers-500)',
-                    }}
-                    aria-label="List card size"
-                  />
-                </div>
-              )}
-              <ViewToggle value={viewMode} onChange={setViewMode} />
-            </>
-          )}
-        </div>
-      </CollapsingBar>
+      <div className="flex h-[57px] shrink-0 items-center justify-end gap-3 border-b border-ink/5 px-4">
+        {!isEmpty && (
+          <>
+            {/* Single view only: empty the frame back to "Awaiting generation".
+                Nothing is deleted — the history is one toggle away, and the next
+                generation fills the frame again. */}
+            {/* Only while a character is pinned to the stage — the way back to
+                "whatever I just made", so a pin is never a state the member is
+                stuck in wondering why new work isn't showing. */}
+            {viewMode === 'single' && pinnedItem && (
+              <button
+                type="button"
+                title="Show the newest character instead"
+                onClick={() => setPin(null)}
+                className="flex h-9 items-center gap-1.5 rounded-full border border-influencers-500/30 bg-influencers-500/10 px-3 text-[11px] font-medium text-influencers-300 transition-colors hover:bg-influencers-500/20"
+              >
+                <History className="h-3.5 w-3.5" />
+                Newest
+              </button>
+            )}
+            {viewMode === 'single' && !frameCleared && (
+              <button
+                type="button"
+                title="Clear the frame"
+                onClick={() => setClearedId(newestId)}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            )}
+            {viewMode === 'list' && (
+              <div className="flex items-center gap-2.5" title="Card size">
+                <Maximize2 className="h-3.5 w-3.5 text-ink-500" />
+                <input
+                  type="range"
+                  min={LIST_CARD_MIN}
+                  max={LIST_CARD_MAX}
+                  step={10}
+                  value={listCardHeight}
+                  onChange={(e) => setListCardHeight(Number(e.target.value))}
+                  className="slider-thin w-28"
+                  style={{
+                    ['--slider-pct' as string]: `${cardPct}%`,
+                    ['--slider-fill' as string]: 'var(--color-influencers-500)',
+                  }}
+                  aria-label="List card size"
+                />
+              </div>
+            )}
+            <ViewToggle value={viewMode} onChange={setViewMode} />
+          </>
+        )}
+      </div>
 
       {isEmpty ? (
         // Same graph-paper stage the Single view and the other apps' output
@@ -1120,7 +1116,7 @@ function HistoryTile({
           made this one?" is the question you ask about the tile under the
           pointer. Steps aside for the inline name input like the stack does. */}
       {a.nameDraft === null && (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end bg-gradient-to-t from-black/70 to-transparent p-2 pt-6 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end bg-gradient-to-t from-black/70 to-transparent p-2 pt-6 opacity-0 transition-opacity duration-200 group-hover:opacity-100 touch:opacity-100">
           <span className="truncate text-[10px] font-medium text-white/80">
             {getModel(item.modelId)?.displayName ?? item.modelId}
           </span>

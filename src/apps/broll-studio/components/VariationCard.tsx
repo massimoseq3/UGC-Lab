@@ -1074,18 +1074,24 @@ export default function VariationCard(props: VariationCardProps) {
               added option. Centred so the top-left corner belongs to a video
               cover's play/mute controls; fades on hover because the top-right
               action stack and (when playing) the mute button both reach into
-              its lane on a narrow card. */}
+              its lane on a narrow card.
+
+              On a touch screen it sits a row LOWER (`touch:top-11`). There the
+              action stack's doorway is permanent rather than a hover state, so
+              the play button, this chip and that button were three things
+              sharing one 103px strip on a three-across storyboard. Below them
+              it keeps its full width and collides with nothing. */}
           {isManual ? (
             // No `light:` override here: the ink ramp already mirrors per theme,
             // so ink-300 is the readable tint in both. Adding light:text-ink-700
             // double-flipped it to near-white on the pale pill and the word
             // vanished in light mode.
-            <span className={`pointer-events-none absolute left-1/2 top-2 z-10 max-w-[60%] -translate-x-1/2 truncate rounded-full border border-ink/15 bg-ink/10 px-2 py-0.5 text-[10px] font-medium tracking-tight text-ink-300 transition-opacity ${videoControlsExpanded ? 'opacity-0' : ''}`}>
+            <span className={`pointer-events-none absolute left-1/2 top-2 z-10 max-w-[60%] -translate-x-1/2 truncate rounded-full touch:top-11 border border-ink/15 bg-ink/10 px-2 py-0.5 text-[10px] font-medium tracking-tight text-ink-300 transition-opacity ${videoControlsExpanded ? 'opacity-0' : ''}`}>
               Custom
             </span>
           ) : (
             <span
-              className={`pointer-events-none absolute left-1/2 top-2 z-10 max-w-[60%] -translate-x-1/2 truncate rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-tight transition-opacity ${videoControlsExpanded ? 'opacity-0' : ''} ${tagChipStyle(variation.tag)}`}
+              className={`pointer-events-none absolute left-1/2 top-2 z-10 max-w-[60%] -translate-x-1/2 truncate rounded-full touch:top-11 border px-2 py-0.5 text-[10px] font-medium tracking-tight transition-opacity ${videoControlsExpanded ? 'opacity-0' : ''} ${tagChipStyle(variation.tag)}`}
             >
               {tagText}
             </span>

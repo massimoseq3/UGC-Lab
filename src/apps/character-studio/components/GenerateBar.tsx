@@ -72,10 +72,13 @@ export default function GenerateBar({
   const creditsLabel = formatCredits(creditsFor(count))
 
   return (
-    // Opaque bg on mobile (not /95 + blur): backdrop-filter doesn't re-blur
-    // inside the already-blurred window frame, so any alpha let the form
-    // underneath ghost through the sticky bar.
-    <div className="sticky bottom-0 z-10 min-w-0 space-y-2 border-t border-ink/5 bg-surface-0 p-3 md:static md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
+    // Static at every width. It was `sticky bottom-0` on a phone until August
+    // 2026 (Massimo's call): a pinned band stood over the 28 fields it belongs
+    // to and ate most of a short column, and the flow it protected wasn't worth
+    // it — you fill the form top to bottom and Generate is where you arrive.
+    // The opaque fill stays: it's still a band with a hairline over it, and
+    // backdrop-filter has never re-blurred usefully here.
+    <div className="min-w-0 space-y-2 border-t border-ink/5 bg-surface-0 p-3 md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
       {error && (
         <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
           <p className="text-xs leading-relaxed text-red-300 light:text-red-700">{error}</p>
@@ -97,8 +100,12 @@ export default function GenerateBar({
           halves: the picker fills the left half (matching the preset pill above),
           the two chips share the right half. The footer chips open upward;
           resolution shows its credit cost. */}
-      <div className="flex items-center gap-2">
-        <div className="min-w-0 flex-1">
+      {/* Wraps on a phone: the right half holds THREE controls (resolution,
+          aspect, and a −/+ stepper that needs ~90px to be pressable), and half
+          of a 351px column can't seat them — the stepper's minus button fell
+          off the edge. Model on its own line, the three chips under it. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-0 flex-1 max-md:basis-full">
           <ModelPicker
             appId="character-studio"
             task="image"
@@ -107,7 +114,7 @@ export default function GenerateBar({
             costParams={{ imageCount: 1, resolution }}
           />
         </div>
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2 max-md:basis-full">
           <ConstraintChip
             grow
             size="lg"

@@ -36,6 +36,10 @@ const MOBILE_QUERY = '(max-width: 767px)'
 const HIDE_TRAVEL_PX = 28
 const SHOW_TRAVEL_PX = 14
 const TOP_ZONE_PX = 32
+// Apps the dock never gets out of the way for. Edit is one screen of download
+// page: collapsing the dock hands it ~108px it has no use for, and what the
+// member sees is the page jumping under a thumb that was only nudging it.
+const NEVER_HIDE_IN = new Set(['edit-studio', 'dashboard'])
 const SETTLE_MS = 260
 // The chrome is worth ~144px. A scroller with less overflow than that gains
 // nothing by hiding it — and hiding it can leave the list too short to scroll
@@ -51,7 +55,10 @@ export function useChromeAutoHide(): void {
     useChromeStore.getState().setHidden(false)
   }, [activeApp])
 
+  const enabled = !!activeApp && !NEVER_HIDE_IN.has(activeApp)
+
   useEffect(() => {
+    if (!enabled) return
     const mq = window.matchMedia(MOBILE_QUERY)
     const setHidden = useChromeStore.getState().setHidden
     // Per-scroller, so two columns in the same app can't read each other's
@@ -114,5 +121,5 @@ export function useChromeAutoHide(): void {
       window.removeEventListener('scroll', onScroll, true)
       mq.removeEventListener('change', onQueryChange)
     }
-  }, [])
+  }, [enabled])
 }

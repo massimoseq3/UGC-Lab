@@ -223,7 +223,7 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
               style={{ width: `${progressPct}%` }}
             />
             <div
-              className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink-100 opacity-0 shadow transition-opacity group-hover:opacity-100"
+              className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-ink-100 opacity-0 shadow transition-opacity group-hover:opacity-100 touch:opacity-100"
               style={{ left: `${progressPct}%` }}
             />
           </div>

@@ -18,6 +18,7 @@ import { humanizeError } from '../../utils/friendlyError'
 import { applyMinViews, isPreviewable, mergeResults, runSearch, sortResults } from './services/search'
 import { downloadResultVideo, fetchResultTranscript, saveResultVideoToDisk, saveThumbnail } from './services/handoff'
 import { DEFAULT_FILTERS, type DiscoverFilters, type DiscoverPlatform, type DiscoverResult, type DiscoverSort, type DiscoverView } from './types'
+import CollapsingBar from '../../components/CollapsingBar'
 
 // Outliers — search TikTok and the Meta Ad Library for ads worth stealing,
 // then hand one straight to the Ad Analyzer or to Scripts.
@@ -637,80 +638,84 @@ export default function Discover() {
         )}
       </header>
 
+      {/* Sort and the platform filters roll up while the grid is read — see
+          CollapsingBar. */}
       {!isVault && apiKey && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink/5 px-4 py-2.5">
-          <FilterSelect
-            label="Sort"
-            value={activeSort}
-            options={sortOptions}
-            onChange={(sort) => setFilters((f) => ({ ...f, sort }))}
-          />
-          {isTikTok ? (
-            <>
-              <FilterSelect
-                label="Posted"
-                value={filters.datePosted}
-                options={DATE_OPTIONS}
-                onChange={(datePosted) => setFilters((f) => ({ ...f, datePosted }))}
-              />
-              <FilterSelect
-                label="Min views"
-                value={String(filters.minViews)}
-                options={MIN_VIEW_OPTIONS.map((v) => ({
-                  value: String(v),
-                  label: v === 0 ? 'Any' : `${minViewsLabel(v)}+`,
-                }))}
-                onChange={(v) => setFilters((f) => ({ ...f, minViews: Number(v) }))}
-              />
-            </>
-          ) : (
-            <>
-              <FilterSelect
-                label="Country"
-                value={filters.country}
-                options={[
-                  { value: 'US', label: 'United States' },
-                  { value: 'GB', label: 'United Kingdom' },
-                  { value: 'CA', label: 'Canada' },
-                  { value: 'AU', label: 'Australia' },
-                  { value: 'DE', label: 'Germany' },
-                ]}
-                onChange={(country) => setFilters((f) => ({ ...f, country }))}
-              />
-              <FilterSelect
-                label="Media"
-                value={filters.mediaType}
-                options={[
-                  { value: 'VIDEO', label: 'Videos' },
-                  { value: 'IMAGE', label: 'Images' },
-                  { value: 'ALL', label: 'All' },
-                ]}
-                onChange={(mediaType) => setFilters((f) => ({ ...f, mediaType }))}
-              />
-              <FilterSelect
-                label="Status"
-                value={filters.activeOnly ? 'active' : 'all'}
-                options={[
-                  { value: 'active', label: 'Active only' },
-                  { value: 'all', label: 'All ads' },
-                ]}
-                onChange={(v) => setFilters((f) => ({ ...f, activeOnly: v === 'active' }))}
-              />
-              {/* The only lever Meta's API gives over its own loose matching —
-                  by default it scores relevance its own way and matches
-                  advertiser names, so a product search returns unrelated ads. */}
-              <FilterSelect
-                label="Match"
-                value={filters.exactPhrase ? 'exact' : 'broad'}
-                options={[
-                  { value: 'broad', label: 'Broad' },
-                  { value: 'exact', label: 'Exact phrase' },
-                ]}
-                onChange={(v) => setFilters((f) => ({ ...f, exactPhrase: v === 'exact' }))}
-              />
-            </>
-          )}
-        </div>
+        <CollapsingBar>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink/5 px-4 py-2.5">
+            <FilterSelect
+              label="Sort"
+              value={activeSort}
+              options={sortOptions}
+              onChange={(sort) => setFilters((f) => ({ ...f, sort }))}
+            />
+            {isTikTok ? (
+              <>
+                <FilterSelect
+                  label="Posted"
+                  value={filters.datePosted}
+                  options={DATE_OPTIONS}
+                  onChange={(datePosted) => setFilters((f) => ({ ...f, datePosted }))}
+                />
+                <FilterSelect
+                  label="Min views"
+                  value={String(filters.minViews)}
+                  options={MIN_VIEW_OPTIONS.map((v) => ({
+                    value: String(v),
+                    label: v === 0 ? 'Any' : `${minViewsLabel(v)}+`,
+                  }))}
+                  onChange={(v) => setFilters((f) => ({ ...f, minViews: Number(v) }))}
+                />
+              </>
+            ) : (
+              <>
+                <FilterSelect
+                  label="Country"
+                  value={filters.country}
+                  options={[
+                    { value: 'US', label: 'United States' },
+                    { value: 'GB', label: 'United Kingdom' },
+                    { value: 'CA', label: 'Canada' },
+                    { value: 'AU', label: 'Australia' },
+                    { value: 'DE', label: 'Germany' },
+                  ]}
+                  onChange={(country) => setFilters((f) => ({ ...f, country }))}
+                />
+                <FilterSelect
+                  label="Media"
+                  value={filters.mediaType}
+                  options={[
+                    { value: 'VIDEO', label: 'Videos' },
+                    { value: 'IMAGE', label: 'Images' },
+                    { value: 'ALL', label: 'All' },
+                  ]}
+                  onChange={(mediaType) => setFilters((f) => ({ ...f, mediaType }))}
+                />
+                <FilterSelect
+                  label="Status"
+                  value={filters.activeOnly ? 'active' : 'all'}
+                  options={[
+                    { value: 'active', label: 'Active only' },
+                    { value: 'all', label: 'All ads' },
+                  ]}
+                  onChange={(v) => setFilters((f) => ({ ...f, activeOnly: v === 'active' }))}
+                />
+                {/* The only lever Meta's API gives over its own loose matching —
+                    by default it scores relevance its own way and matches
+                    advertiser names, so a product search returns unrelated ads. */}
+                <FilterSelect
+                  label="Match"
+                  value={filters.exactPhrase ? 'exact' : 'broad'}
+                  options={[
+                    { value: 'broad', label: 'Broad' },
+                    { value: 'exact', label: 'Exact phrase' },
+                  ]}
+                  onChange={(v) => setFilters((f) => ({ ...f, exactPhrase: v === 'exact' }))}
+                />
+              </>
+            )}
+          </div>
+        </CollapsingBar>
       )}
 
       {/* The vault renders its own filter row and grid as a fragment, so both

@@ -83,7 +83,7 @@ export function ImageTile({
         type="button"
         onClick={onRemove}
         title="Remove"
-        className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity hover:bg-black/75 group-hover:opacity-100"
+        className="absolute right-0.5 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition-opacity hover:bg-black/75 group-hover:opacity-100 touch:opacity-100"
       >
         <X className="h-3 w-3" />
       </button>

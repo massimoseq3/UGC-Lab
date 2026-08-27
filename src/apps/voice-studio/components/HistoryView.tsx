@@ -329,7 +329,7 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
                         {/* Hover-only action cluster: Show details / Download */}
                         <div
                           className={`flex items-center gap-0.5 transition-opacity ${
-                            isActive || isLoaded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                            isActive || isLoaded ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 touch:opacity-100'
                           }`}
                         >
                           <button

@@ -204,7 +204,7 @@ export function ModalGallery({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-3">
+    <div className="flex-1 px-4 py-3 md:overflow-y-auto">
       {/* Two-column GRID, not CSS multi-column (August 2026). These three lists
           were `columns-2 [column-fill:_balance]` with `break-inside-avoid` on
           each tile, and multi-column balances its columns from the heights it

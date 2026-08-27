@@ -39,7 +39,10 @@ export default function LoadPresetDropdown({ onLoadProfile }: LoadPresetDropdown
         </span>
         {/* 13px — the B-Roll reference-row title size, so a picker row reads
             the same weight in every app. No hint line: the title says it. */}
-        <div className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-300">Load Character Preset</div>
+        <div className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-300">
+          <span className="lg:hidden">Load Preset</span>
+          <span className="hidden lg:inline">Load Character Preset</span>
+        </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
       </button>
 
