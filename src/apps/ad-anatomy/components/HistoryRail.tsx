@@ -48,7 +48,7 @@ export default function HistoryRail({ items, selectedId, onSelect, onDelete, onN
       <div className="flex shrink-0 items-center gap-2 p-3 md:h-[57px] md:border-b md:border-ink/5 md:px-3 md:py-0">
         <button
           onClick={onNew}
-          className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/15 bg-[#FF5257] px-4 py-2.5 text-[13px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-colors hover:bg-[#FF5257]/90 md:w-full md:py-2"
+ className="flex shrink-0 items-center justify-center gap-2 glass-fill glass-fill-soft rounded-full border border-white/15 bg-[#FF5257] px-4 py-2.5 text-[13px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] btn-soft-shadow transition-all hover:brightness-110 md:w-full md:py-2"
         >
           <Plus className="h-4 w-4" strokeWidth={2.5} />
           New Analysis

@@ -509,7 +509,7 @@ export function ContinuousFrameModal({
                 <button
                   onClick={() => { for (let i = 0; i < takeCount; i++) onGenerate() }}
                   disabled={!cardState.editablePrompt.trim()}
-                  className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+ className="flex w-full items-center justify-center gap-2.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <ImageIcon className="h-4 w-4" />
                   {takeCount === 1 ? 'Generate Image' : `Generate ${takeCount} Images`}
@@ -617,7 +617,7 @@ export function ContinuousFrameModal({
                   // parallel like every other B-Roll generation.
                   disabled={!startImageUrl || !animateCapable}
                   title={!startImageUrl ? 'Generate an image first, then animate it' : !animateCapable ? 'This model can’t animate a single still — pick another' : undefined}
-                  className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+ className="flex w-full items-center justify-center gap-2.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Film className="h-4 w-4" />
                   {takeCount === 1 ? 'Animate' : `Animate ${takeCount}×`}
@@ -1165,7 +1165,7 @@ export function ContinuousClipModal({
               onClick={() => { for (let i = 0; i < takeCount; i++) onGenerate() }}
               // Not gated on a render in flight — clips queue in parallel.
               disabled={!framesReady || !cardState.editablePrompt.trim()}
-              className="flex w-full items-center justify-center gap-2.5 rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-all hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+ className="flex w-full items-center justify-center gap-2.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <VideoIcon className="h-4 w-4" />
               {takeCount === 1 ? 'Generate Video' : `Generate ${takeCount} Videos`}

@@ -1235,7 +1235,7 @@ export default function ContinuousView({
             // stop the member firing the rest.
             disabled={readyClipIndices.length === 0}
             title="Generate every clip whose two keyframes are picked"
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] transition-colors hover:bg-broll-400 disabled:cursor-not-allowed disabled:opacity-40"
+ className="flex shrink-0 items-center gap-1.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-broll-500 px-3.5 py-1.5 text-[11px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <VideoIcon className="h-3.5 w-3.5" />
             Generate all videos
