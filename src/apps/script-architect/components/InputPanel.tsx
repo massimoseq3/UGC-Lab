@@ -488,7 +488,10 @@ export default function InputPanel({
   )
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    // On a phone the WHOLE column is one scroller and the Generate band is the
+    // last thing in it, not a footer standing over the fields — see the note on
+    // the band below.
+    <div className="flex h-full min-h-0 flex-col max-md:overflow-y-auto">
       {/* Mode toggle — rounded segmented pill, mirrored by the Output/History
           toggle in the right panel so both strips share the same baseline. */}
       {/* Full-width divider in the subtle vertical-divider tone (border-ink/5).
@@ -524,7 +527,7 @@ export default function InputPanel({
           pasted in. Measured: the last box sat 2.5px off the band at scroll-top
           (reading as touching), 8.5px scrolled to the bottom. A gap that
           changes as you scroll isn't a gap. On the band it can't scroll away. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-0 pt-3">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 pb-0 pt-3 max-md:flex-none max-md:overflow-visible">
         {mode === 'write' ? (
           <>
             {/* Output sub-mode toggle — governs the form below (which style
@@ -877,15 +880,26 @@ export default function InputPanel({
           already-blurred window frame, so any alpha lets content ghost through.
           No rule above it: the brief box ends where its own toolbar ends, so a
           hairline there just fenced off controls that belong to the same column. */}
+      {/* Not pinned on a phone (August 2026, Massimo's call): a fixed band cost
+          ~150px of a ~700px column and stood over the fields it belongs to. You
+          fill the form top to bottom and Generate is where you arrive. It stays
+          a footer from `md` up, where the column has the height to spare. */}
       <div className="shrink-0 bg-surface-0 px-5 pb-3 pt-2 md:bg-transparent">
-        {/* ONE row above Generate: who writes it, how long it runs, how many
-            come back. The model takes HALF and the two chips a quarter each
-            (`flex-[2]` against `flex-1`, both zero-basis, so the ratio holds
-            whatever is in them). Equal thirds was tried first and the model row
-            is the one control here with something to say — at a third it read
-            "GPT 5.6…" over "The Scrip…", while the chips had spare room around
-            two words. All at 58px, the picker-row height the column's other
-            rows share.
+        {/* ONE row above Generate on a desktop: who writes it, how long it runs,
+            how many come back. The model takes HALF and the two chips a quarter
+            each (`flex-[2]` against `flex-1`, both zero-basis, so the ratio
+            holds whatever is in them). Equal thirds was tried first and the
+            model row is the one control here with something to say — at a third
+            it read "GPT 5.6…" over "The Scrip…", while the chips had spare room
+            around two words. All at 58px, the picker-row height the column's
+            other rows share.
+
+            TWO rows on a phone: the model takes the full width (`basis-full`)
+            and the two pearls sit side by side under it. Half of a 335px column
+            is 167px for a control whose whole job is naming the model that
+            writes your script, and the name is the half that was being cut.
+            The chips take `basis-0` there so they split the second row evenly
+            rather than inheriting the desktop ratio.
             They were a chip band stacked over the model row, which made two
             rows out of one decision each. Both chips are pearls rather than
             fields: the pair was two full-width `SegmentedToggle` slabs, then
@@ -893,8 +907,8 @@ export default function InputPanel({
             control nobody sweeps through. Each hides on its own — Hooks have no
             duration, the blueprint rewrite has no count. Everything here opens
             UPWARD: a downward menu covers the button you're heading for. */}
-        <div className="mb-2 flex items-stretch gap-1.5">
-          <ScriptModelRow appId="script-architect" className="min-w-0 flex-[2]" />
+        <div className="mb-2 flex flex-wrap items-stretch gap-1.5">
+          <ScriptModelRow appId="script-architect" className="min-w-0 flex-[2] max-md:basis-full" />
           {showLength && (
             // The clock carries the meaning the old dim "Length" label did —
             // "15s" alone doesn't say what it measures, and a chip has no
@@ -904,7 +918,7 @@ export default function InputPanel({
             // It sits in the MIDDLE of the row, so its menu anchors left and
             // has room either side; the count on the right is the one that has
             // to hang its menu off the panel edge.
-            <div className="flex min-w-0 flex-1">
+            <div className="flex min-w-0 flex-1 max-md:basis-0">
               <ConstraintChip
                 grow
                 size="xl"
@@ -928,7 +942,7 @@ export default function InputPanel({
               />
             </div>
           )}
-          {showCount && <div className="flex min-w-0 flex-1">{countChip}</div>}
+          {showCount && <div className="flex min-w-0 flex-1 max-md:basis-0">{countChip}</div>}
         </div>
         {/* `disabled:hover:bg-scripts-500` — a disabled button must not answer
             the pointer. `:hover` still matches one, so the blocker state
