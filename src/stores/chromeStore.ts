@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
-// Whether the app chrome (menu bar, dock, the phone-only pane tabs and the
-// history filter bars) is currently collapsed out of the way.
+// Whether the app chrome — the menu bar and the dock, and nothing inside an
+// app — is currently rolled out of the way.
 //
 // Phone-only, and deliberately NOT persisted: it's a scroll gesture's state,
 // not a preference. `useChromeAutoHide` is the only writer.

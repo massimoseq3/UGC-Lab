@@ -31,12 +31,19 @@ export default function MobilePaneTabs<T extends string>({
   accent = 'ink',
 }: MobilePaneTabsProps<T>) {
   return (
-    // Deliberately NOT a CollapsingBar. It was one for a day (August 2026) and
-    // came straight back out: this bar is how you get to the other half of the
-    // app, so rolling it away on a scroll hides the navigation rather than the
-    // clutter. What scrolls away is the SEARCH AND FILTER row under it — see
-    // CollapsingBar's own note.
-    <div className="shrink-0 border-b border-ink/5 px-2 py-1.5 md:hidden">
+    // Nothing in an app rolls away on a scroll any more (August 2026): this
+    // bar never did, the search and filter rows that used to now don't either.
+    // A bar that collapses on the way down and unrolls on the way back up
+    // moves the list under the thumb that was reading it, and the one thing
+    // that still gets out of the way — the dock — does it from OUTSIDE the
+    // pane, where nothing it uncovers can shift. See useChromeAutoHide.
+    // `px-5` is the app-wide panel inset, and this bar takes it because it is
+    // almost never alone: under it sits a panel header at `px-5` (Playground's
+    // Image/Video/Music, B-Roll's Line-by-Line/Continuous, the Ad Analyzer's
+    // section jump) over a body at `px-5`. At `px-2` it stood 12px proud of
+    // every one of them and the two stacked pills read as two widths of the
+    // same control.
+    <div className="shrink-0 border-b border-ink/5 px-5 py-1.5 md:hidden">
       <SegmentedToggle options={options} value={value} onChange={onChange} accent={accent} dense />
     </div>
   )

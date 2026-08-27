@@ -7,6 +7,14 @@ import { usageDayId } from '../../utils/usage'
 // amber. Empty days stay in quiet ink so the accent only ever encodes data.
 
 const WEEKS = 26
+// How many of those columns survive on a phone. Below `sm` the grid shares a
+// bento row with the streak ring and has ~128px to draw in, so the cells shrink
+// to 8px and the oldest columns are dropped rather than squeezed — a quarter of
+// history at a readable size beats half a year as a smudge. CSS-only: every
+// column still renders and the extra ones take `max-sm:hidden`, so there is no
+// media query in JS and the desktop grid is untouched by construction.
+const PHONE_WEEKS = 12
+const phoneHidden = (i: number) => (i < WEEKS - PHONE_WEEKS ? 'max-sm:hidden' : '')
 
 // Sequential intensity ramp — thresholds chosen so a casual day (1–2 gens)
 // already lights up while heavy batch days still read distinctly darker.
@@ -102,24 +110,24 @@ export default function ActivityHeatmap({ days }: { days: UsageDay[] }) {
     <div className="min-w-0 overflow-x-auto pb-1">
       <div className="inline-flex flex-col gap-1.5">
         {/* Month labels row */}
-        <div className="flex gap-[3px]">
+        <div className="flex gap-[2px] sm:gap-[3px]">
           {weeks.map((week, i) => (
-            <span key={i} className="w-[11px] shrink-0 overflow-visible whitespace-nowrap text-[9px] leading-none text-ink-500">
+            <span key={i} className={`w-2 shrink-0 overflow-visible whitespace-nowrap text-[9px] leading-none text-ink-500 sm:w-[11px] ${phoneHidden(i)}`}>
               {week.monthLabel ?? ''}
             </span>
           ))}
         </div>
-        <div className="flex gap-[3px]">
+        <div className="flex gap-[2px] sm:gap-[3px]">
           {weeks.map((week, i) => (
-            <div key={i} className="flex flex-col gap-[3px]">
+            <div key={i} className={`flex flex-col gap-[2px] sm:gap-[3px] ${phoneHidden(i)}`}>
               {week.days.map((day) =>
                 day.future ? (
-                  <span key={day.id} className="h-[11px] w-[11px] rounded-[3px]" />
+                  <span key={day.id} className="h-2 w-2 rounded-[2px] sm:h-[11px] sm:w-[11px] sm:rounded-[3px]" />
                 ) : (
                   <span
                     key={day.id}
                     title={day.label}
-                    className={`h-[11px] w-[11px] rounded-[3px] ${levelClass(day.count)}`}
+                    className={`h-2 w-2 rounded-[2px] sm:h-[11px] sm:w-[11px] sm:rounded-[3px] ${levelClass(day.count)}`}
                   />
                 ),
               )}

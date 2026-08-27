@@ -136,11 +136,25 @@ export default function EditorArea({
           <div className="h-px flex-1 bg-ink/[0.07]" />
         </div>
 
-        {/* Action row — the "New" reset always, plus Enhance once there's a
-            script. Enhance rewrites it with square-bracket expression tags
-            (e.g. [warmly], [excited]) so the read is emotive: it only inserts
-            direction, never changes the spoken words. */}
-        <div className="mb-2 flex items-center justify-end gap-2">
+        {/* Action row — the character count on the left, then the "New" reset
+            and Enhance once there's a script. Enhance rewrites it with
+            square-bracket expression tags (e.g. [warmly], [excited]) so the
+            read is emotive: it only inserts direction, never changes the
+            spoken words.
+
+            The count lives HERE, over the box it counts, rather than in the
+            footer beside Generate. In the footer it was a third thing
+            competing for a 375px row with a batch stepper and a button, and
+            what gave way was the button's own label ("Generat…"). It also
+            belongs to the script: it moves as you type, and this is the panel
+            you're typing in. */}
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className={`shrink-0 text-[11px] tabular-nums ${overLimit ? 'text-red-400 light:text-red-600' : 'text-ink-500'}`}>
+            <span className={overLimit ? 'text-red-300 light:text-red-700' : 'text-ink-300'}>{charCount.toLocaleString()}</span>
+            <span> / {MAX_CHARACTERS.toLocaleString()}</span>
+            <span className="hidden md:inline"> characters</span>
+          </div>
+          <div className="flex min-w-0 items-center gap-2">
           <ClearAllButton onClear={onClearInputs} label="New" />
           {canGenerate && (
             <button
@@ -156,6 +170,7 @@ export default function EditorArea({
               {isEnhancing ? 'Enhancing…' : 'Enhance'}
             </button>
           )}
+          </div>
         </div>
 
         {/* Textarea — borderless, full-bleed, minimal aesthetic */}
@@ -192,63 +207,61 @@ export default function EditorArea({
         </div>
       )}
 
-      {/* Footer row — the pane owns its own height now (the phone shows one
-          pane at a time), so this is an ordinary last row in the column rather
-          than a fixed bar over the window. It used to be `fixed`, which is what
-          laid the character count across the Generate button on a phone. */}
-      <div className={`flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-ink/5 px-5 py-3 ${isGenerating ? 'md:mt-0' : 'md:mt-4'}`}>
-        {/* Left — the count and the button that spends it, nothing else. */}
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          {/* How many voiceovers one press makes, then the button that makes
-              them — a count reads as a setting on the way to Generate, so it
-              sits on the approach to it rather than trailing behind. The pair
-              is `items-stretch` and the stepper takes `size='fill'`, so it is
-              exactly the button's height by construction rather than by a
-              matching magic number. It's a property of THIS press, like the
-              button's own cost pill, not a saved delivery setting. */}
-          <div className="flex min-w-0 flex-1 items-stretch gap-2 md:flex-none">
-            <BatchCountStepper
-              size="fill"
-              stacked
-              accent="voice"
-              noun="voiceover"
-              label="Voiceovers"
-              max={VOICE_BATCH_MAX}
-              value={count}
-              onChange={onBatchCountChange}
-              creditsFor={charCount > 0 ? creditsFor : undefined}
-            />
-            <button
-              onClick={onGenerate}
-              // Stays live while a voiceover renders — a second click queues
-              // another one alongside it. The progress bar above is the feedback.
-              disabled={!canGenerate || overLimit}
-              className="flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-6 py-4 md:flex-none md:px-16 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <Mic className="h-4 w-4" strokeWidth={2.5} />
-              <span className="truncate">{count === 1 ? 'Generate Voiceover' : `Generate ${count} Voiceovers`}</span>
-              {creditsLabel && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
-                  <Coins className="h-3 w-3" strokeWidth={2} />
-                  {creditsLabel}
-                </span>
-              )}
-            </button>
-          </div>
-        </div>
+      {/* Footer row — how many voiceovers one press makes, then the button
+          that makes them, and NOTHING else. A count reads as a setting on the
+          way to Generate, so it sits on the approach to it rather than
+          trailing behind; the row is `items-stretch` and the stepper takes
+          `size='fill'`, so it is exactly the button's height by construction
+          rather than by a matching magic number. It's a property of THIS
+          press, like the button's own cost pill, not a saved setting.
 
-        {/* Right — the character count, and only that. The model name used to
-            sit stacked under it as fine print; the left panel's picker names it
-            now, at the top of the settings it belongs to, and one footer saying
-            it twice is one too many. The word "characters" stays desktop-only:
-            on a phone it wraps to a second line beside the button. */}
-        <div className="flex shrink-0 items-center">
-          <div className={`text-sm tabular-nums ${overLimit ? 'text-red-400 light:text-red-600' : 'text-ink-400'}`}>
-            <span className={overLimit ? 'text-red-300 light:text-red-700' : 'text-ink-200'}>{charCount.toLocaleString()}</span>
-            <span className="text-ink-500"> / {MAX_CHARACTERS.toLocaleString()}</span>
-            <span className="hidden text-ink-500 md:inline"> characters</span>
-          </div>
-        </div>
+          The character count used to ride this row's right edge and now sits
+          above the script box it counts: three things on a 375px line meant
+          the button's own label was what gave way ("Generat…"). The pane owns
+          its own height (the phone shows one pane at a time), so this is an
+          ordinary last row in the column — it used to be `fixed`, which is
+          what laid that count across the button in the first place. */}
+      <div className={`flex shrink-0 items-stretch gap-2 border-t border-ink/5 px-5 py-3 ${isGenerating ? 'md:mt-0' : 'md:mt-4'}`}>
+        <BatchCountStepper
+          size="fill"
+          stacked
+          accent="voice"
+          noun="voiceover"
+          label="Voiceovers"
+          // The word is desktop-only: the button beside it already says
+          // "Generate 2 Voiceovers", and carrying it twice on a phone left the
+          // button ~170px to say it in — which is what clipped it to "Generat…".
+          labelClassName="max-md:hidden"
+          max={VOICE_BATCH_MAX}
+          value={count}
+          onChange={onBatchCountChange}
+          creditsFor={charCount > 0 ? creditsFor : undefined}
+        />
+        <button
+          onClick={onGenerate}
+          // Stays live while a voiceover renders — a second click queues
+          // another one alongside it. The progress bar above is the feedback.
+          disabled={!canGenerate || overLimit}
+          className="flex min-w-0 flex-1 items-center justify-center gap-2.5 rounded-full border border-white/15 bg-voice-500 px-4 py-4 md:flex-none md:px-16 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-all hover:bg-voice-400 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <Mic className="h-4 w-4" strokeWidth={2.5} />
+          {/* The noun is desktop-only. A 375px row leaves this button ~150px
+              for its label, and "Generate 3 Voiceovers" plus the credits pill
+              wants twice that — so what goes is the word three other things on
+              screen already say (the app, the pane tab, the stepper's own
+              label above md). The NUMBER stays: it's what this press spends,
+              and it rides the button beside the price like everywhere else. */}
+          <span className="truncate">
+            Generate{count > 1 ? ` ${count}` : ''}
+            <span className="hidden md:inline">{count === 1 ? ' Voiceover' : ' Voiceovers'}</span>
+          </span>
+          {creditsLabel && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
+              <Coins className="h-3 w-3" strokeWidth={2} />
+              {creditsLabel}
+            </span>
+          )}
+        </button>
       </div>
     </div>
   )

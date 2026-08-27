@@ -197,7 +197,7 @@ function ModelCard({ item, onEdit, onDelete }: { item: Model; onEdit: () => void
   return (
     <div
       onClick={onEdit}
-      className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow ${landscape ? 'col-span-2 sm:col-span-3' : ''}`}
+      className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow ${landscape ? 'col-span-3' : ''}`}
     >
       <div className={`relative w-full ${landscape ? 'aspect-video' : 'aspect-[9/16]'}`}>
         {resolvedImage ? (
@@ -825,8 +825,13 @@ function ModelsList({ items, onEdit, onDelete, sort }: { items: Model[]; onEdit:
   const sorted = useMemo(() => sortByOrder(items, sort, (m) => m.name), [items, sort])
   // Grid (not masonry) so landscape sheets can span three portrait columns via
   // col-span. `grid-flow-row-dense` packs the gaps a wide card would leave.
+  // THREE across on a phone, where every other bank tab is two: a character
+  // card is a portrait thumbnail and a name, so it reads fine at a third of a
+  // 375px screen — and this is the tab you scroll looking for a face, where
+  // half again as many faces per screen is the whole job. A landscape sheet
+  // takes all three columns wherever it lands, phone included.
   return (
-    <div className="grid grid-flow-row-dense grid-cols-2 items-start gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+    <div className="grid grid-flow-row-dense grid-cols-3 items-start gap-3 lg:grid-cols-4 xl:grid-cols-6">
       {sorted.map((m) => (
         <ModelCard key={m.id} item={m} onEdit={() => onEdit(m.id)} onDelete={() => onDelete(m.id)} />
       ))}

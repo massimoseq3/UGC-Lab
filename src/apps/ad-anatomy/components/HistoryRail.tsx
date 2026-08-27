@@ -4,7 +4,6 @@ import type { AdAnatomyHistoryItem } from '../../../stores/types'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
 import { TileDeleteButton } from '../../../components/tileActions'
-import CollapsingBar from '../../../components/CollapsingBar'
 
 interface HistoryRailProps {
   items: AdAnatomyHistoryItem[]
@@ -43,28 +42,27 @@ export default function HistoryRail({ items, selectedId, onSelect, onDelete, onN
           On md+ the button sits in its own h-[57px] band so the rail's first
           hairline lines up with the results column's sticky header (the
           app-wide panel-header spec); the search drops to a second row below.
-          On phones the whole thing is one compact row and the band collapses. */}
-      {/* Rolls up on a phone while the list is scrolled — see CollapsingBar. */}
-      <CollapsingBar>
-        <div className="flex shrink-0 items-center gap-2 p-3 md:h-[57px] md:border-b md:border-ink/5 md:px-3 md:py-0">
-          <button
-            onClick={onNew}
-            className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/15 bg-[#FF5257] px-4 py-2.5 text-[13px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-colors hover:bg-[#FF5257]/90 md:w-full md:py-2"
-          >
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
-            New Analysis
-          </button>
-          <div className="relative min-w-0 flex-1 md:hidden">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search analyses..."
-              className="w-full rounded-full border border-ink/10 bg-transparent py-1.5 pl-9 pr-3 text-[12px] text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-[#FF5257]/40"
-            />
-          </div>
+          On phones the band has no fixed height and the whole thing is one
+          compact row. It stays put on a scroll — nothing inside an app rolls
+          away any more (see the root CLAUDE.md); only the dock does. */}
+      <div className="flex shrink-0 items-center gap-2 p-3 md:h-[57px] md:border-b md:border-ink/5 md:px-3 md:py-0">
+        <button
+          onClick={onNew}
+          className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-white/15 bg-[#FF5257] px-4 py-2.5 text-[13px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.1)] btn-soft-shadow transition-colors hover:bg-[#FF5257]/90 md:w-full md:py-2"
+        >
+          <Plus className="h-4 w-4" strokeWidth={2.5} />
+          New Analysis
+        </button>
+        <div className="relative min-w-0 flex-1 md:hidden">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search analyses..."
+            className="w-full rounded-full border border-ink/10 bg-transparent py-1.5 pl-9 pr-3 text-[12px] text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-[#FF5257]/40"
+          />
         </div>
-      </CollapsingBar>
+      </div>
       <div className="relative hidden shrink-0 border-b border-ink/5 px-3 py-2.5 md:block">
         <Search className="absolute left-6 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
         <input

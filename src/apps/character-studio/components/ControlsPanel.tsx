@@ -206,16 +206,18 @@ export default function ControlsPanel({
   const scenePrompt = buildScenePrompt(profile)
 
   return (
-    // On a phone the whole column is one scroller and the Generate bar is the
-    // last thing in it, not a band pinned over the fields — see the note above
-    // the GenerateBar below.
-    <div className="flex h-full min-h-0 min-w-0 flex-col max-md:overflow-y-auto">
+    // On a phone everything below the tab toggle is one scroller and the
+    // Generate bar is the last thing in it, not a band pinned over the fields —
+    // see the note above the GenerateBar below.
+    <div className="flex h-full min-h-0 min-w-0 flex-col">
       {/* Rounded segmented toggle — filled so all tabs share the column with no
           horizontal scroll. The h-[57px] band + bottom hairline is the app-wide
           panel-header spec (Scripts, B-Roll, Bank, Playground, Ad Analyzer and
           Voiceovers all use it), so the left and right columns' divider lines
-          land on the same pixel. */}
-      <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-2">
+          land on the same pixel — and `px-5` is the other half of that spec, so
+          on a phone this pill shares its left edge with the pane tabs above it.
+          It was `px-2`, from back when this toggle carried five tabs. */}
+      <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
         <SegmentedToggle<TabId>
           className="h-10 !p-1"
           value={activeTab}
@@ -228,173 +230,181 @@ export default function ControlsPanel({
         />
       </div>
 
-      {/* Preset loader + reference-photo autofill — a FIXED band under the tab
-          toggle, outside the scroll container entirely. It used to be a
-          `sticky top-0` child of the scroller, which pins it only once the
-          scroll has started: at scroll-top it sat in normal flow and every
-          rubber-band / trackpad overscroll floated it, so the two rows read as
-          loose rather than as part of the panel's chrome. A row that must never
-          move doesn't belong in the thing that moves. */}
-      <div className="shrink-0 px-4 pb-2 pt-2">
-        {/* Side by side at every width. They were stacked under `sm` because
-            two picker rows sharing a phone-width column truncated to
-            "Load Cha…" / "Extract C…", which names neither — but the fix for a
-            label that doesn't fit is a shorter label, not a second row of
-            chrome on the screen with the least of it. Each row carries a short
-            name and swaps to the full one at `lg`, which is the first width
-            where this column is wide enough to read it. */}
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <LoadPresetDropdown onLoadProfile={onProfileChange} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <PhotoExtractZone
-              analyzingCount={analyzingCount}
-              extractError={extractError}
-              applied={referenceApplied}
-              thumbnail={extractedThumb}
-              onPhotoDrop={onPhotoDrop}
-              onReset={onResetExtract}
-              onOpenLibrary={onOpenLibrary}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Scrollable parameter fields. Every
-          tab's groups render on one page — each group sits in its own card, and
-          the top toggle scroll-jumps between tab blocks (Ad Analyzer pattern).
-          Both edges feather out — under the Generate bar and under the pinned
-          band above — so fields dissolve at the boundary instead of cutting off
-          mid-row, which reads as a render glitch. */}
-      {/* On a phone this stops being a scroller of its own and simply grows —
-          the column above scrolls. The feathered edges go with it: they mark
-          where content passes under pinned chrome, and on a phone there is
-          none to pass under. */}
-      <div
-        ref={scrollRef}
-        className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4 pb-4 [mask-image:linear-gradient(to_bottom,transparent_0,black_0.5rem,black_calc(100%-1.5rem),transparent_100%)] max-md:flex-none max-md:overflow-visible max-md:[mask-image:none]"
-      >
-        <div className="flex flex-col gap-4 pt-2">
-          {TABS.map((tab, tabIndex) => (
-            <div
-              key={tab.id}
-              ref={(el) => { tabRefs.current[tab.id] = el }}
-              data-tab={tab.id}
-              className="flex scroll-mt-20 flex-col gap-4"
-            >
-              {/* Tab divider — a centered preset button on a full-width line
-                  (mirrors the History date pills), marking each tab's block. The
-                  centered button doubles as the scoped preset picker; Clear sits
-                  on the left and the scoped Copy on the right of every divider.
-                  The left pill reads "New", not "Clear": it resets the input
-                  fields only — every generated character stays in the gallery
-                  and in history. */}
-              <TabDivider
-                left={<ClearAllButton onClear={onClear} label="New" className="!py-1 !text-[11px]" />}
-                center={
-                  tabIndex === 0 ? (
-                    <PresetPillButton
-                      label="Physical Presets"
-                      title="Load only the physical fields from a preset"
-                      icon={TAB_ICONS.physical}
-                      onClick={() => setPhysicalPresetOpen(true)}
-                    />
-                  ) : (
-                    <PresetPillButton
-                      label="Scene & Pose Presets"
-                      title="Load only the scene & pose fields from a preset"
-                      icon={TAB_ICONS.scene}
-                      onClick={() => setScenePresetOpen(true)}
-                    />
-                  )
-                }
-                right={
-                  tabIndex === 0 ? (
-                    <CopyPromptButton text={physicalPrompt} label="Copy Physical" title="Copy the physical fields as a prompt" />
-                  ) : (
-                    <CopyPromptButton text={scenePrompt} label="Copy Scene & Pose" title="Copy the scene & pose fields as a prompt" />
-                  )
-                }
-              />
-              {tab.groups.map((group) => {
-                const GroupIcon = group.icon
-                return (
-                  <div key={group.id} className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-4 card-soft-shadow">
-                    {/* Section subheading — a centered icon + title-case label,
-                        then a hairline rule. */}
-                    <div className="mb-3 flex items-center justify-center gap-1.5">
-                      {GroupIcon && <GroupIcon className="h-3.5 w-3.5 text-ink-100" />}
-                      <h4 className="text-sm font-semibold tracking-tight text-ink-100">{group.label}</h4>
-                    </div>
-                    <div className="mb-4 border-t border-ink/10" />
-                    {/* Two-column grid: short one-word fields (gender, age, eye
-                        color…) pack two per row; `wide` fields (free-text /
-                        sentence-length presets) span the full row via col-span-2.
-                        Field order in types.ts keeps the wide ones grouped so no
-                        half field is left stranded next to an empty cell. */}
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-4">
-                      {group.fields.map((field) => (
-                        <div key={field.key} className={field.wide ? 'col-span-2' : 'min-w-0'}>
-                          <ChipField
-                            label={field.label}
-                            value={profile[field.key] ?? ''}
-                            onChange={(v) => setField(field.key, v)}
-                            placeholder={field.placeholder}
-                            defaultLocked={field.key === 'cameraDevice'}
-                            suggestions={field.suggestions ?? field.chips}
-                            wideMenu={field.wideMenu}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
+      {/* The phone's scroll port. It starts BELOW the toggle above, which is
+          why that toggle is a sibling of this box and not its first child: the
+          panel root used to be the scroller, so the tab bar scrolled away with
+          the fields and the member lost the way back to the other tab halfway
+          down a form. Above `md` this is a plain wrapper and the column below
+          scrolls on its own. */}
+      <div className="flex min-h-0 flex-1 flex-col max-md:overflow-y-auto">
+        {/* Preset loader + reference-photo autofill — a FIXED band under the tab
+            toggle, outside the scroll container entirely. It used to be a
+            `sticky top-0` child of the scroller, which pins it only once the
+            scroll has started: at scroll-top it sat in normal flow and every
+            rubber-band / trackpad overscroll floated it, so the two rows read as
+            loose rather than as part of the panel's chrome. A row that must never
+            move doesn't belong in the thing that moves. */}
+        <div className="shrink-0 px-5 pb-2 pt-2">
+          {/* Side by side at every width. They were stacked under `sm` because
+              two picker rows sharing a phone-width column truncated to
+              "Load Cha…" / "Extract C…", which names neither — but the fix for a
+              label that doesn't fit is a shorter label, not a second row of
+              chrome on the screen with the least of it. Each row carries a short
+              name and swaps to the full one at `lg`, which is the first width
+              where this column is wide enough to read it. */}
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <LoadPresetDropdown onLoadProfile={onProfileChange} />
             </div>
-          ))}
+            <div className="min-w-0 flex-1">
+              <PhotoExtractZone
+                analyzingCount={analyzingCount}
+                extractError={extractError}
+                applied={referenceApplied}
+                thumbnail={extractedThumb}
+                onPhotoDrop={onPhotoDrop}
+                onReset={onResetExtract}
+                onOpenLibrary={onOpenLibrary}
+              />
+            </div>
+          </div>
         </div>
+
+        {/* Scrollable parameter fields. Every
+            tab's groups render on one page — each group sits in its own card, and
+            the top toggle scroll-jumps between tab blocks (Ad Analyzer pattern).
+            Both edges feather out — under the Generate bar and under the pinned
+            band above — so fields dissolve at the boundary instead of cutting off
+            mid-row, which reads as a render glitch. */}
+        {/* On a phone this stops being a scroller of its own and simply grows —
+            the column above scrolls. The feathered edges go with it: they mark
+            where content passes under pinned chrome, and on a phone there is
+            none to pass under. */}
+        <div
+          ref={scrollRef}
+          className="min-h-0 min-w-0 flex-1 overflow-y-auto px-5 pb-4 [mask-image:linear-gradient(to_bottom,transparent_0,black_0.5rem,black_calc(100%-1.5rem),transparent_100%)] max-md:flex-none max-md:overflow-visible max-md:[mask-image:none]"
+        >
+          <div className="flex flex-col gap-4 pt-2">
+            {TABS.map((tab, tabIndex) => (
+              <div
+                key={tab.id}
+                ref={(el) => { tabRefs.current[tab.id] = el }}
+                data-tab={tab.id}
+                className="flex scroll-mt-20 flex-col gap-4"
+              >
+                {/* Tab divider — a centered preset button on a full-width line
+                    (mirrors the History date pills), marking each tab's block. The
+                    centered button doubles as the scoped preset picker; Clear sits
+                    on the left and the scoped Copy on the right of every divider.
+                    The left pill reads "New", not "Clear": it resets the input
+                    fields only — every generated character stays in the gallery
+                    and in history. */}
+                <TabDivider
+                  left={<ClearAllButton onClear={onClear} label="New" className="!py-1 !text-[11px]" />}
+                  center={
+                    tabIndex === 0 ? (
+                      <PresetPillButton
+                        label="Physical Presets"
+                        title="Load only the physical fields from a preset"
+                        icon={TAB_ICONS.physical}
+                        onClick={() => setPhysicalPresetOpen(true)}
+                      />
+                    ) : (
+                      <PresetPillButton
+                        label="Scene & Pose Presets"
+                        title="Load only the scene & pose fields from a preset"
+                        icon={TAB_ICONS.scene}
+                        onClick={() => setScenePresetOpen(true)}
+                      />
+                    )
+                  }
+                  right={
+                    tabIndex === 0 ? (
+                      <CopyPromptButton text={physicalPrompt} label="Copy Physical" title="Copy the physical fields as a prompt" />
+                    ) : (
+                      <CopyPromptButton text={scenePrompt} label="Copy Scene & Pose" title="Copy the scene & pose fields as a prompt" />
+                    )
+                  }
+                />
+                {tab.groups.map((group) => {
+                  const GroupIcon = group.icon
+                  return (
+                    <div key={group.id} className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-4 card-soft-shadow">
+                      {/* Section subheading — a centered icon + title-case label,
+                          then a hairline rule. */}
+                      <div className="mb-3 flex items-center justify-center gap-1.5">
+                        {GroupIcon && <GroupIcon className="h-3.5 w-3.5 text-ink-100" />}
+                        <h4 className="text-sm font-semibold tracking-tight text-ink-100">{group.label}</h4>
+                      </div>
+                      <div className="mb-4 border-t border-ink/10" />
+                      {/* Two-column grid: short one-word fields (gender, age, eye
+                          color…) pack two per row; `wide` fields (free-text /
+                          sentence-length presets) span the full row via col-span-2.
+                          Field order in types.ts keeps the wide ones grouped so no
+                          half field is left stranded next to an empty cell. */}
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-4">
+                        {group.fields.map((field) => (
+                          <div key={field.key} className={field.wide ? 'col-span-2' : 'min-w-0'}>
+                            <ChipField
+                              label={field.label}
+                              value={profile[field.key] ?? ''}
+                              onChange={(v) => setField(field.key, v)}
+                              placeholder={field.placeholder}
+                              defaultLocked={field.key === 'cameraDevice'}
+                              suggestions={field.suggestions ?? field.chips}
+                              wideMenu={field.wideMenu}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Action footer — model picker, chips, Generate, and a tight Clear All
+            sit at the foot of the controls column, directly under all the inputs
+            that feed them.
+
+            Pinned from `md` up only (August 2026, Massimo's call). On a phone a
+            fixed band stood over the 28 fields it belongs to and cost most of a
+            short column; you fill the form top to bottom, and Generate is where
+            you arrive. */}
+        <GenerateBar
+          error={error}
+          onGenerate={onGenerate}
+          canGenerate={canGenerate}
+          aspectRatio={profile.aspectRatio || '9:16'}
+          onAspectRatioChange={(value) => onProfileChange({ ...profile, aspectRatio: value })}
+          resolution={resolution}
+          onResolutionChange={onResolutionChange}
+          sheetMode={sheetMode}
+          onSheetModeChange={onSheetModeChange}
+          batchCount={batchCount}
+          onBatchCountChange={onBatchCountChange}
+          inFlightCount={inFlightCount}
+        />
+
+        {/* Scoped preset pickers — same slide-over as the footer's full picker,
+            but each merges only its tab's fields onto the current form. */}
+        <PresetPickerModal
+          open={physicalPresetOpen}
+          onClose={() => setPhysicalPresetOpen(false)}
+          onPick={(incoming) => applyScopedPreset(incoming, PHYSICAL_KEYS)}
+          title="Physical Presets"
+          subtitle="Fill only the physical fields"
+        />
+        <PresetPickerModal
+          open={scenePresetOpen}
+          onClose={() => setScenePresetOpen(false)}
+          onPick={(incoming) => applyScopedPreset(incoming, SCENE_KEYS)}
+          title="Scene & Pose Presets"
+          subtitle="Fill only the scene & pose fields"
+        />
       </div>
-
-      {/* Action footer — model picker, chips, Generate, and a tight Clear All
-          sit at the foot of the controls column, directly under all the inputs
-          that feed them.
-
-          Pinned from `md` up only (August 2026, Massimo's call). On a phone a
-          fixed band stood over the 28 fields it belongs to and cost most of a
-          short column; you fill the form top to bottom, and Generate is where
-          you arrive. */}
-      <GenerateBar
-        error={error}
-        onGenerate={onGenerate}
-        canGenerate={canGenerate}
-        aspectRatio={profile.aspectRatio || '9:16'}
-        onAspectRatioChange={(value) => onProfileChange({ ...profile, aspectRatio: value })}
-        resolution={resolution}
-        onResolutionChange={onResolutionChange}
-        sheetMode={sheetMode}
-        onSheetModeChange={onSheetModeChange}
-        batchCount={batchCount}
-        onBatchCountChange={onBatchCountChange}
-        inFlightCount={inFlightCount}
-      />
-
-      {/* Scoped preset pickers — same slide-over as the footer's full picker,
-          but each merges only its tab's fields onto the current form. */}
-      <PresetPickerModal
-        open={physicalPresetOpen}
-        onClose={() => setPhysicalPresetOpen(false)}
-        onPick={(incoming) => applyScopedPreset(incoming, PHYSICAL_KEYS)}
-        title="Physical Presets"
-        subtitle="Fill only the physical fields"
-      />
-      <PresetPickerModal
-        open={scenePresetOpen}
-        onClose={() => setScenePresetOpen(false)}
-        onPick={(incoming) => applyScopedPreset(incoming, SCENE_KEYS)}
-        title="Scene & Pose Presets"
-        subtitle="Fill only the scene & pose fields"
-      />
     </div>
   )
 }

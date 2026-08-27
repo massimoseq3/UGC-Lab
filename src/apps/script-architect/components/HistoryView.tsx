@@ -5,7 +5,6 @@ import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history
 import { WRITE_STYLE_META, HOOK_CATEGORY_META, isHookCategoryChoice, parseHooks, hooksPlainText } from '../types'
 import { TileActionStack, TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
-import CollapsingBar from '../../../components/CollapsingBar'
 
 const isHooksItem = (item: ScriptHistoryItem) => item.mode === 'write' && item.writeFormat === 'hooks'
 
@@ -91,20 +90,17 @@ export default function HistoryView({ items, activeId, onSelect, onDelete }: His
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      {/* Rolls up while the list is being scrolled — see CollapsingBar. */}
-      <CollapsingBar>
-        <div className="border-b border-ink/5 px-5 py-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search history..."
-              className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-sm text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-scripts-500/40"
-            />
-          </div>
+      <div className="border-b border-ink/5 px-5 py-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search history..."
+            className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-sm text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-scripts-500/40"
+          />
         </div>
-      </CollapsingBar>
+      </div>
 
       <div className="flex-1 overflow-y-auto">
         {groups.length === 0 ? (
