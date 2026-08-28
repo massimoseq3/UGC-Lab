@@ -60,8 +60,17 @@ export function isStaleChunkError(error: unknown): boolean {
     /importing a module script failed/i.test(message) ||
     /loading chunk \S+ failed/i.test(message) ||
     /chunkloaderror/i.test(message) ||
+    /failed to load module script/i.test(message) ||
     // "Expected a JavaScript module script but the server responded with a
     // MIME type of text/html" — the SPA-rewrite shape above.
-    (/module script/i.test(message) && /mime type/i.test(message))
+    (/module script/i.test(message) && /mime type/i.test(message)) ||
+    // WebKit words the same rewrite differently and mentions no module at all:
+    // "'text/html' is not a valid JavaScript MIME type."
+    /is not a valid javascript mime type/i.test(message) ||
+    // And when it gets far enough to PARSE the index.html it was handed, the
+    // first thing it meets is the doctype: "SyntaxError: Unexpected token '<'".
+    // Pinned to SyntaxError so it can't swallow an unrelated throw — a `<` at
+    // the head of something being executed as a script is HTML, every time.
+    /syntaxerror[\s\S]*unexpected token '</i.test(message)
   )
 }

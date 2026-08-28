@@ -2,7 +2,7 @@ import { Component } from 'react'
 import type { ErrorInfo, ReactNode } from 'react'
 import AppErrorScreen from './AppErrorScreen'
 import { isStaleChunkError } from '../utils/appVersion'
-import { markUpdateAvailable } from '../stores/updateStore'
+import { markUpdateAvailable, isUpdateAvailable } from '../stores/updateStore'
 
 /**
  * The reason nothing in this app goes white any more.
@@ -34,12 +34,24 @@ export default class AppErrorBoundary extends Component<Props, State> {
   state: State = { failed: false, stale: false }
 
   static getDerivedStateFromError(error: unknown): State {
-    return { failed: true, stale: isStaleChunkError(error) }
+    // Two ways to know this is a deploy rather than a bug. The error's own
+    // wording is the direct one — but it is BROWSER wording, it differs per
+    // engine and per host, and a shape we haven't seen yet lands the member on
+    // "Something went wrong" for what is only an update (reported on Safari,
+    // August 2026). So the second signal decides it too: if the version poll
+    // has ALREADY established that a newer build is live, this tab is running
+    // stale code, and an error thrown by a pane it just tried to open is that
+    // and nothing else. Reload is the answer to both, and the honest copy for
+    // an out-of-date tab is the update one.
+    return { failed: true, stale: isStaleChunkError(error) || isUpdateAvailable() }
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     // A stale chunk here is proof of a deploy, whether or not the version poll
-    // has come round yet — so arm the notice for the rest of the app too.
+    // has come round yet — so arm the notice for the rest of the app too. Only
+    // the error's own wording arms it: the flag being already set is enough to
+    // READ this error as an update, but a genuine bug must never be the thing
+    // that tells everyone to reload.
     if (isStaleChunkError(error)) markUpdateAvailable()
     console.error('Caught by AppErrorBoundary:', error, info.componentStack)
   }
