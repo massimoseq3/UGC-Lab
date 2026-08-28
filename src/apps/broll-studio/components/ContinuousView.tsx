@@ -1192,18 +1192,38 @@ export default function ContinuousView({
           Line-by-Line strip for why (a glass sticky bar lagged its own
           scroller on the way back up and read as coming loose). It never
           scrolled away, so nothing is lost but the blur-under. */}
-      {/* The strip is the BATCH BUTTONS and nothing else, centred — see the note
-          on the Line-by-Line strip, which this one mirrors. The meta pills used
-          to share the line and lost the squeeze to buttons that can't shrink,
-          painting over the first of them on a narrow window; they sit under the
-          separator now, at the top of the storyboard they describe. This strip
-          had it worse than its twin — four pills against the other's two. */}
+      {/* The strip is the BATCH BUTTONS and nothing else, centred. The meta
+          pills used to share the line and lost the squeeze to buttons that
+          can't shrink, painting over the first of them on a narrow window; they
+          sit under the separator now, at the top of the storyboard they
+          describe. This strip had it worse than its twin — four pills against
+          the other's two.
+
+          NOTE: the Line-by-Line strip no longer mirrors this one (August 2026).
+          It went to style-pill-left / actions-right on one always-scrolling
+          line, with its three generate passes behind a single "Generate all"
+          menu — the shape that finally made a meta pill and the buttons coexist.
+          This strip was left as it was because its actions are a different set;
+          bringing it across is the obvious follow-up, and until then the two
+          tabs of one panel do dress the same job two ways. */}
       <div className="relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 px-5 py-3.5">
-        {/* One CENTRED line that scrolls when the pills outrun the panel — see
-            the note on the Line-by-Line strip for the `w-max min-w-full` shape
-            and why a plain `justify-center` inside a scroll port strands the
-            first pill off the left edge. */}
-        <div className="-mx-5 w-full overflow-x-auto scrollbar-hide px-5">
+        {/* One CENTRED line that scrolls when the pills outrun the panel. The
+            `w-max min-w-full` shape is what allows both: at `min-w-full` the row
+            is exactly the port when it fits (so centring does the work) and
+            exactly its content when it doesn't (so centring is a no-op and the
+            scroll starts at pill one). A plain `justify-center` inside a scroll
+            port centres the overflow too, stranding the first pill off the left
+            edge with no way to scroll back to it. */}
+        {/* NOT `w-full` alongside `-mx-5`: `width: 100%` resolves against the
+            strip's CONTENT box, so the port came out 40px narrower than the
+            strip and the negative margin then spent all of it on the left —
+            the row started at the panel's inset and ended 40px shy of it. With
+            the width left `auto` the block fills its container and the two
+            negative margins widen it by exactly the padding they cancel, so the
+            port spans the strip and `px-5` puts both ends back on the panel's
+            own inset. Invisible while the row was centred (it just shifted the
+            centre 20px left); it shows the moment anything is right-aligned. */}
+        <div className="-mx-5 overflow-x-auto scrollbar-hide px-5">
         {/* The generate steps are ONE tinted family in graded depths, lightest
             first — the same ramp as the Line-by-Line strip, so the two tabs of
             one panel don't dress the same job two ways. Download clips stays

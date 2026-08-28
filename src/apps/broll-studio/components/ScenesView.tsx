@@ -1,6 +1,6 @@
-import { memo, useCallback, useEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Film, AlertCircle, Plus, Images, X, Palette, ChevronRight, Download, Video as VideoIcon, Clapperboard, Coins, Pencil, Check } from 'lucide-react'
+import { Film, AlertCircle, Plus, Images, X, Palette, Download, Video as VideoIcon, Clapperboard, Coins, Pencil, Check, ChevronRight, ChevronDown, Sparkles } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage, BatchVideoSettings } from '../types'
 import type { Product, Model } from '../../../stores/types'
@@ -26,6 +26,7 @@ import { humanizeError } from '../../../utils/friendlyError'
 import ClipDownloadModal, { type ClipDownloadEntry } from '../../../components/ClipDownloadModal'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
+import AnchoredPopover from '../../../components/video/AnchoredPopover'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
 
 interface ScenesViewProps {
@@ -217,6 +218,10 @@ export default function ScenesView({
   const [batchColumn, setBatchColumn] = useState<BatchColumn>('all')
   const [includeExisting, setIncludeExisting] = useState(false)
   const [downloadOpen, setDownloadOpen] = useState(false)
+  // The batch menu: one "Generate all" opening the three passes, rather than
+  // three pills competing on the bar. See the note where it renders.
+  const generateAllRef = useRef<HTMLButtonElement>(null)
+  const [generateAllOpen, setGenerateAllOpen] = useState(false)
   // The confirm dialog portals to document.body, so it would outlive an app
   // switch — dismiss it when the user docks away.
   useCloseOnAppSwitch(!!batchConfirm, () => setBatchConfirm(null))
@@ -797,94 +802,141 @@ export default function ScenesView({
           over a panel background that never moves is a backdrop root's cost for
           no picture. `relative z-20` so a card's own positioned hover chrome
           can't paint over it. */}
-      {/* The strip is the BATCH BUTTONS and nothing else, centred (August 2026,
-          Massimo's call). The scene count and the style pill shared this line
-          for a year, meta left and buttons right, and the two fought over it:
-          the buttons can't shrink (`shrink-0`, and a batch pill you can't read
-          is a batch you won't press), so the meta took the squeeze — and once
-          it was past its own min-content the count and the style pill PAINTED
-          OVER the first button. Reported at 900px, where the port is ~590px
-          against 592px of pills; the older `flex-wrap` shape had answered the
-          same shortage by dropping the whole button group to a second line,
-          which made the strip two rows tall on some windows and one on others.
-          The meta moved below the separator instead, into the storyboard it
-          describes — see the note there. What's left can never collide with
-          anything, because nothing else is on the line. */}
-      <div className="relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 px-5 py-3.5">
-        {/* Batch actions, in the order the work happens — images, then the
-            animate pass, then videos, then the export. Same shape and styling
-            as Continuous' top strip. ONE line at every width, centred, and it
-            SCROLLS when the four pills outrun the panel — four pills wrapped to
-            two or three rows on a phone, which is 40px of chrome per extra row
-            on the screen with the least of it, and the work reads as a sequence
-            anyway, so swiping along it is closer to what it is than stacking
-            it. `-mx-5 px-5` so the row scrolls edge to edge while its first and
-            last pills still sit on the panel's own inset.
-            `w-max min-w-full` on the inner row is what lets it be centred AND
-            scrollable: a plain `justify-center` inside a scroll port centres the
-            overflow too, which puts the first pill off the left edge with no way
-            to scroll back to it. At `min-w-full` the row is exactly the port
-            when it fits (so centring does the work) and exactly its content when
-            it doesn't (so centring is a no-op and the scroll starts at pill
-            one). */}
-        <div className="-mx-5 w-full overflow-x-auto scrollbar-hide px-5">
-        <div className="flex w-full flex-wrap items-center justify-center gap-2 md:w-max md:min-w-full md:flex-nowrap md:whitespace-nowrap">
-          {/* The three generate steps are ONE tinted family in three depths —
-              images lightest, animate medium, videos darkest (August 2026,
-              Massimo's call) — so the row reads as one sequence getting more
-              expensive rather than as two grey buttons around a solid CTA.
-              Videos used to be the app's `glass-fill` accent CTA, which made it
-              the loudest thing in the panel and read as THE button rather than
-              as the last of three. Download clips stays neutral: it's the
-              export, not a generate step, and it spends nothing. */}
+      {/* ONE line, at EVERY width: what the storyboard IS on the left, what you
+          can do to it on the right (August 2026, Massimo's call).
+
+          That was the old shape and it used to break — the buttons are
+          `shrink-0` (a batch pill you can't read is a batch you won't press), so
+          the meta took every squeeze, and past its own min-content the count and
+          the style pill PAINTED OVER the first button; reported at 900px, where
+          the port is ~590px against 592px of pills. It was answered first by
+          wrapping (a strip two rows tall on some windows and one on others) and
+          then by moving the meta out of the bar entirely, down into the
+          storyboard. What makes it work now is that NOTHING on the line shrinks
+          and the line itself scrolls: every pill is `shrink-0`, the meta
+          included, so the collision it kept losing simply can't be expressed.
+
+          `w-max min-w-full` is the whole trick. When the content fits, the row
+          is exactly the port, so the `flex-1` spacer opens up and pushes the
+          buttons to the right edge; when it doesn't, the row is exactly its
+          content, the spacer collapses to nothing, and the meta and buttons sit
+          shoulder to shoulder in one swipeable line that starts at the scene
+          count. `-mx-5 px-5` so it scrolls edge to edge while its first and last
+          pills still sit on the panel's own inset. */}
+      <div className="relative z-20 shrink-0 border-b border-ink/5 px-5 py-3.5">
+        {/* NOT `w-full` alongside `-mx-5`: `width: 100%` resolves against the
+            strip's CONTENT box, so the port came out 40px narrower than the
+            strip and the negative margin then spent all of it on the left —
+            the row started at the panel's inset and ended 40px shy of it. With
+            the width left `auto` the block fills its container and the two
+            negative margins widen it by exactly the padding they cancel, so the
+            port spans the strip and `px-5` puts both ends back on the panel's
+            own inset. Invisible while the row was centred (it just shifted the
+            centre 20px left); it shows the moment anything is right-aligned. */}
+        <div className="-mx-5 overflow-x-auto scrollbar-hide px-5">
+        <div className="flex w-max min-w-full flex-nowrap items-center gap-2 whitespace-nowrap">
+          {/* The look every clip in this storyboard renders in — the one piece
+              of meta left on the line. It is CUT TO THE BATCH PILLS' OWN SIZE
+              (same padding, same 11px, same 3.5 glyph), because a smaller chip
+              at the head of a row of buttons reads as a fragment of one rather
+              than as the thing the row is about. The scene count stood beside
+              it and came out (August 2026, Massimo's call): the storyboard it
+              counts is directly underneath, numbered.
+
+              `shrink-0` like everything else on the line, with the NAME capped
+              instead — a custom style can be titled anything, and an uncapped
+              one would push the batch buttons off the end of a bar that fits. */}
           <button
             type="button"
-            onClick={() => requestBatch(allKeys, 'All scenes', true)}
-            title="Generate images across all scenes — one option per line, or every variation"
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/15 bg-broll-500/[0.05] px-3.5 py-1.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/30 hover:bg-broll-500/[0.12]"
+            onClick={onChangeStyle}
+            title="Change the visual style every clip renders in"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
           >
-            <Images className="h-3.5 w-3.5" />
-            {/* Two spans, no JS media query: at 375px the three full labels are
-                wider than the screen, so the row cut the last pill in half at
-                the bezel and read as clipped rather than as a scroller. Short
-                labels fit all three on one line; a fourth (Download clips) puts
-                the row back into a swipe, which is what it was built for.
-                They switch at `lg`, not `md` (August 2026): the full four are
-                592px against a right panel that is 498px at a 768px window and
-                590px at 900, so the band just above the phone breakpoint was
-                where the row overflowed WORST — and there the swipe reads as a
-                clipped pill rather than as something to drag. At 1024 the panel
-                is 677px and the full labels fit with room to spare. */}
-            <span className="lg:hidden">All images</span>
-            <span className="max-lg:hidden">Generate all images</span>
+            <Palette className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+            <span className="max-w-[180px] truncate">{result.styleBrief ? (result.styleName?.trim() || 'Custom style') : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={2.5} />
           </button>
-          {/* Animate — the step straight after Generate-all-images, and only
-              offered once there's a still to animate. It's scoped to the cards
-              that HAVE one, so nothing renders from a prompt the member hasn't
-              seen a frame of (which is what the plain video batch beside it
-              would also do). */}
-          {animatableKeys.length > 0 && (
-            <button
-              type="button"
-              onClick={() => requestVideoBatch(allKeys, 'All stills', true, true)}
-              title="Animate every card that already has a still — nothing renders from a prompt alone"
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/30 bg-broll-500/[0.13] px-3.5 py-1.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.21]"
-            >
-              <Clapperboard className="h-3.5 w-3.5" />
-              <span className="lg:hidden">Animate</span>
-              <span className="max-lg:hidden">Animate all stills</span>
-            </button>
-          )}
+          {/* Holds the two ends apart while there is room, and disappears the
+              moment there isn't — `flex-1` contributes nothing to `w-max`. */}
+          <span className="flex-1" aria-hidden />
+          {/* ONE "Generate all", opening the three passes as a menu (August
+              2026, Massimo's call). They were three pills side by side —
+              images, the animate pass, videos — tinted as one family in three
+              depths so the row read as a sequence getting more expensive. What
+              that cost is the whole bar: three long labels are ~450px, which is
+              most of the panel at every width the right pane actually gets, and
+              it is why the labels had to shorten below `lg` and why the row had
+              to scroll on a phone at all. The passes are also mutually
+              exclusive in practice — you run one, wait for it, then run the
+              next — so they are a choice, not four things to reach for.
+
+              The menu is the same anchored popover the constraint chips use, so
+              it escapes the strip's own clip and can't be cut off by the scroll
+              port it sits in. */}
           <button
+            ref={generateAllRef}
             type="button"
-            onClick={() => requestVideoBatch(allKeys, 'All scenes', true)}
-            title="Generate clips across all scenes — one option per line, or every variation"
+            onClick={() => setGenerateAllOpen((v) => !v)}
+            title="Run a generation pass across every scene"
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/50 bg-broll-500/[0.24] px-3.5 py-1.5 text-[11px] font-medium text-broll-200 transition-colors hover:border-broll-500/65 hover:bg-broll-500/[0.32]"
           >
-            <VideoIcon className="h-3.5 w-3.5" />
-            <span className="lg:hidden">All videos</span>
-            <span className="max-lg:hidden">Generate all videos</span>
+            <Sparkles className="h-3.5 w-3.5" />
+            <span>Generate all</span>
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 opacity-70 transition-transform duration-200 ${generateAllOpen ? 'rotate-180' : ''}`}
+              strokeWidth={2.5}
+            />
           </button>
+          <AnchoredPopover
+            anchorRef={generateAllRef}
+            open={generateAllOpen}
+            onClose={() => setGenerateAllOpen(false)}
+            width={214}
+            estimatedHeight={animatableKeys.length > 0 ? 122 : 86}
+            className="overflow-hidden rounded-2xl border border-ink/10 bg-surface-2 p-1 shadow-xl"
+          >
+            {/* In the order the work happens: stills, then the animate pass
+                over whatever has one, then clips from the prompts. */}
+            <button
+              type="button"
+              onClick={() => {
+                setGenerateAllOpen(false)
+                requestBatch(allKeys, 'All scenes', true)
+              }}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
+            >
+              <Images className="h-3.5 w-3.5 shrink-0 text-broll-300" />
+              Generate all images
+            </button>
+            {/* Only once there's a still to animate — nothing should render
+                from a prompt the member hasn't seen a frame of. */}
+            {animatableKeys.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setGenerateAllOpen(false)
+                  requestVideoBatch(allKeys, 'All stills', true, true)
+                }}
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
+              >
+                <Clapperboard className="h-3.5 w-3.5 shrink-0 text-broll-300" />
+                Animate all stills
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setGenerateAllOpen(false)
+                requestVideoBatch(allKeys, 'All scenes', true)
+              }}
+              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
+            >
+              <VideoIcon className="h-3.5 w-3.5 shrink-0 text-broll-300" />
+              Generate all videos
+            </button>
+          </AnchoredPopover>
+          {/* Download clips stays its own pill and stays neutral: it's the
+              export, not a generate pass, and it spends nothing. */}
           {allClipEntries.length > 0 && (
             <button
               type="button"
@@ -893,8 +945,12 @@ export default function ScenesView({
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
             >
               <Download className="h-3.5 w-3.5" />
-              <span className="lg:hidden">{`Clips (${allClipEntries.length})`}</span>
-              <span className="max-lg:hidden">{`Download clips (${allClipEntries.length})`}</span>
+              {/* One label at every width now. It carried a short `lg:hidden`
+                  twin back when four long pills shared this line and overflowed
+                  worst just above the phone breakpoint; with the three generate
+                  passes behind one menu, the bar is a style pill and two
+                  buttons and the full label fits. */}
+              <span>{`Download clips (${allClipEntries.length})`}</span>
             </button>
           )}
         </div>
@@ -904,38 +960,6 @@ export default function ScenesView({
           between the bar and the first scene now belongs to the scrolling
           content, which is where it was already being drawn. */}
       <div className="flex-1 overflow-y-auto px-5 pb-4 pt-5">
-      {/* How many scenes, and the look they all render in — BELOW the strip's
-          separator, at the top of the storyboard rather than in the bar above
-          it. It scrolls away with the storyboard, which is right: you read it
-          once on arrival.
-
-          The style pill is the app's PICKER for the look (August 2026): it left
-          the input column, where it was a required row that made you commit to a
-          look before you'd seen a single shot. Re-styling costs nothing — the
-          style block rides outside the card prompts and is appended at fire time
-          — so the honest place to choose it is here, in front of the frames it
-          applies to, with UGC Realism as the fold-to default. The count stays
-          desktop-only (on a phone it captions a storyboard you can already see);
-          the pill does NOT, because it's now a control and the only other way to
-          reach it is a card's detail modal. */}
-      <div className="mb-8 flex min-w-0 max-w-full items-center justify-center gap-2">
-        {/* Small-caps and dim — the count is a caption for the storyboard below
-            it, so it takes the same eyebrow treatment as the style pill beside
-            it rather than reading as a heading. */}
-        <span className="hidden shrink-0 text-[11px] font-semibold uppercase tracking-wider text-ink-500 md:inline">
-          {result.scenes.length} Scene{result.scenes.length === 1 ? '' : 's'}
-        </span>
-        <button
-          type="button"
-          onClick={onChangeStyle}
-          title="Change the look every clip renders in"
-          className="inline-flex min-w-0 items-center gap-1 rounded-full border border-broll-500/25 bg-broll-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
-        >
-          <Palette className="h-3 w-3 shrink-0" strokeWidth={2} />
-          <span className="truncate">{result.styleBrief ? (result.styleName?.trim() || 'Custom style') : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
-          <ChevronRight className="h-3 w-3 shrink-0 opacity-70" strokeWidth={2.5} />
-        </button>
-      </div>
       <div className="flex flex-col gap-10">
         {result.scenes.map((scene) => (
           <SceneSection
