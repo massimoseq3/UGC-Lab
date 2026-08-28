@@ -34,6 +34,14 @@ export function markUpdateAvailable() {
   useUpdateStore.getState().markAvailable()
 }
 
+/**
+ * Same flag, read outside React — for `AppErrorBoundary`, whose
+ * `getDerivedStateFromError` is static and can't use a hook.
+ */
+export function isUpdateAvailable(): boolean {
+  return useUpdateStore.getState().available
+}
+
 export function reloadForUpdate() {
   try {
     sessionStorage.setItem(RELOADED_KEY, '1')
