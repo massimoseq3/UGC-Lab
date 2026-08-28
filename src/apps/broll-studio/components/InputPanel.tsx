@@ -318,7 +318,7 @@ export default function InputPanel({
               everything the storyboard is built FROM. Its centred header carries
               the panel's two utilities on its edges (Influencers' TabDivider
               shape), which is what the old left-aligned label row did with an
-              extra row of its own: Import prompts on the left, New on the right.
+              extra row of its own: Import on the left, New on the right.
               Every row inside puts its status dot at its own left edge, so they
               stack into one column that answers "what's still missing" without
               reading a word. */}
@@ -331,7 +331,11 @@ export default function InputPanel({
               /* Bring your own prompts — write them in Claude (or anywhere) and
                  paste them in, instead of paying for the prompt-writing call.
                  Sized and styled as ClearAllButton's twin so the two read as one
-                 pair of panel-level utilities. */
+                 pair of panel-level utilities — and named with ONE word for the
+                 same reason "New" is: these sit on a card header's edges, and in
+                 a narrow column "Import prompts" wrapped to two lines while the
+                 word beside it took one. The popup it opens is still titled
+                 Import prompts, which is where the second word belongs. */
               <button
                 type="button"
                 onClick={onImportPrompts}
@@ -339,7 +343,7 @@ export default function InputPanel({
                 className="flex items-center gap-1 rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500 transition-colors hover:bg-ink/[0.06] hover:text-ink-300"
               >
                 <FileInput className="h-2.5 w-2.5" strokeWidth={2.5} />
-                Import prompts
+                Import
               </button>
             }
             right={<ClearAllButton onClear={onClearInputs} label="New" />}
