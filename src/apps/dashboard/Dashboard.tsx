@@ -239,7 +239,7 @@ export default function Dashboard() {
               </Widget>
 
               {/* Activity */}
-              <Widget index={slot(3)} className="col-span-6 max-sm:items-center max-sm:text-center lg:col-span-7">
+              <Widget index={slot(3)} className="col-span-6 max-sm:items-center max-sm:text-center lg:col-span-5">
                 <div className="flex w-full items-center justify-between gap-3 max-sm:justify-center">
                   <WidgetLabel icon={CalendarCheck} label="Activity" />
                   {/* Nothing at all before there is activity (August 2026,
@@ -262,48 +262,52 @@ export default function Dashboard() {
                 </div>
               </Widget>
 
-              {/* The row ends in two shortcuts, and each gets a column of its
-                  own at every width (August 2026, Massimo's call). They were
-                  STACKED in one three-column slot on the desktop: a column each
-                  would have left ~113px per card, and Activity couldn't give up
-                  the width because its 26-week grid needs ~361px and anything
-                  narrower puts a scrollbar inside it. Dropping the heatmap's
-                  legend is what paid for the change — Activity holds the grid
-                  comfortably at seven columns, and the ~145px each card gains is
-                  a tile you can title. See SHORTCUT_TILE in Widget.tsx for the
-                  card shape that follows from it. */}
-              <div className="col-span-12 grid grid-cols-2 gap-3.5 lg:col-span-5">
-                <AnnouncementsTile index={slot(4)} />
+              {/* The row ends in two shortcuts, each with a column of its own
+                  and each SIZED TO THE WIDGET ABOVE IT (August 2026, Massimo's
+                  call): Announcements takes Money saved's four columns and
+                  Academy takes Streak's three, so the desktop's two rows share
+                  one set of gridlines instead of two unrelated splits. They were
+                  stacked in a single three-column slot until then, because the
+                  heatmap drew at a fixed 361px and Activity couldn't give up the
+                  width to fund them. Making the grid FILL its tile (see
+                  ActivityHeatmap) is what removed that constraint — there is no
+                  longer a width Activity has to have. See SHORTCUT_TILE in
+                  Widget.tsx for the card shape.
 
-                {/* Academy */}
-                <a
-                  href={AI_UGC_ACADEMY_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={riseStyle(slot(5))}
-                  // Shape shared with AnnouncementsTile — SHORTCUT_TILE, Widget.tsx.
-                  className={`${SHORTCUT_TILE} ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
-                >
-                  <span className={SHORTCUT_TILE_DISC}>
-                    <GraduationCap className={`text-dashboard-400 ${SHORTCUT_TILE_GLYPH}`} strokeWidth={1.75} />
+                  Below `lg` both are `col-span-6`, which is the same two-across
+                  bento row they have always been — they don't need a wrapper to
+                  get it, and without one they can differ from each other above
+                  `lg`. */}
+              <AnnouncementsTile index={slot(4)} className="col-span-6 lg:col-span-4" />
+
+              {/* Academy */}
+              <a
+                href={AI_UGC_ACADEMY_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={riseStyle(slot(5))}
+                // Shape shared with AnnouncementsTile — SHORTCUT_TILE, Widget.tsx.
+                className={`col-span-6 lg:col-span-3 ${SHORTCUT_TILE} ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
+              >
+                <span className={SHORTCUT_TILE_DISC}>
+                  <GraduationCap className={`text-dashboard-400 ${SHORTCUT_TILE_GLYPH}`} strokeWidth={1.75} />
+                </span>
+                <span className={SHORTCUT_TILE_TEXT}>
+                  <span className={SHORTCUT_TILE_TITLE} style={DISPLAY_FONT}>
+                    AI UGC Academy
                   </span>
-                  <span className={SHORTCUT_TILE_TEXT}>
-                    <span className={SHORTCUT_TILE_TITLE} style={DISPLAY_FONT}>
-                      AI UGC Academy
-                    </span>
-                    <span className={`${SHORTCUT_TILE_SUB} text-ink-500`}>Trainings</span>
-                  </span>
-                  {/* Out of flow — in it, the arrow costs the title 28px it
-                      doesn't have. Gone entirely below `sm`, where the tile is
-                      half a phone's width: out of flow it doesn't reserve the
-                      space either, so it simply landed on the last letter of
-                      the title. The card is the link with or without it. */}
-                  <ArrowUpRight
-                    className="absolute right-3 top-3 hidden h-3.5 w-3.5 text-ink-600 transition-colors group-hover:text-dashboard-400 sm:block"
-                    strokeWidth={2}
-                  />
-                </a>
-              </div>
+                  <span className={`${SHORTCUT_TILE_SUB} text-ink-500`}>Trainings</span>
+                </span>
+                {/* Out of flow — in it, the arrow costs the title 28px it
+                    doesn't have. Gone entirely below `sm`, where the tile is
+                    half a phone's width: out of flow it doesn't reserve the
+                    space either, so it simply landed on the last letter of
+                    the title. The card is the link with or without it. */}
+                <ArrowUpRight
+                  className="absolute right-3 top-3 hidden h-3.5 w-3.5 text-ink-600 transition-colors group-hover:text-dashboard-400 sm:block"
+                  strokeWidth={2}
+                />
+              </a>
             </div>
           </div>
 
