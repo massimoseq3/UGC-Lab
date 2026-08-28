@@ -162,7 +162,7 @@ function importContinuous(text: string, ctx: ImportContext): ImportOutcome {
     notes.push("No <FINAL_FRAME> block — the last keyframe's concepts were reused as the end frame. Add one for a proper closing image.")
   }
   if (!/<STYLE>/i.test(text)) {
-    notes.push('No <STYLE> block — falling back to the visual style picked in the panel.')
+    notes.push('No <STYLE> block — falling back to the session\'s current visual style.')
   }
   const pastedLines = splitScriptLines(ctx.scriptText).length
   if (pastedLines > 0 && pastedLines !== result.scenes.length) {

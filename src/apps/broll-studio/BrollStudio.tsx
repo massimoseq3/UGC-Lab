@@ -992,22 +992,15 @@ export default function BrollStudio() {
     restyleSession(resolvedStyleId, brief, name)
   }
 
-  const handleClearStyle = () => {
-    setStyleChosen(false)
-    setContinuousStyleBrief(null)
-    setContinuousStyleBankId(null)
-    setContinuousStyleName(null)
-  }
+  // A look can no longer be CLEARED, only swapped: with the left panel's row
+  // gone there is no empty state to return to — an unpicked session simply
+  // renders in the mode's default (UGC Realism / 3D Animated), which is a look
+  // like any other. `handleClearStyle` came out with the row.
 
-  // Whether a look has actually been chosen. A persisted custom brief counts on
-  // its own so sessions saved before `styleChosen` existed don't read as empty.
-  const styleIsPicked = styleChosen || !!continuousStyleBrief?.trim()
-
-  // What the left panel's style row shows.
+  // What the storyboard's caption pill and the import popup call the look.
   const styleLabel = continuousStyleBrief?.trim()
     ? continuousStyleName?.trim() || 'Custom style'
     : getContinuousStyle(resolvedStyleId).label
-  const styleHint = continuousStyleBrief?.trim() || getContinuousStyle(resolvedStyleId).hint
 
   // Add one blank concept box to a single keyframe (the frame row's "Add
   // concept" card). Mirrors Line-by-Line's "Add option": it drops an empty
@@ -1275,12 +1268,6 @@ export default function BrollStudio() {
           onModeChange={setMode}
           lineDelivery={lineDelivery}
           onLineDeliveryChange={setLineDelivery}
-          styleChosen={styleIsPicked}
-          styleLabel={styleLabel}
-          styleHint={styleHint}
-          styleIsCustom={!!continuousStyleBrief?.trim()}
-          onOpenStyle={() => setStyleModalOpen(true)}
-          onClearStyle={handleClearStyle}
         />
       </div>
 
@@ -1376,9 +1363,10 @@ export default function BrollStudio() {
       <StyleModal
         open={styleModalOpen}
         onClose={() => setStyleModalOpen(false)}
-        // Empty until a look is actually chosen, so nothing in the picker reads
-        // as selected while the left panel is still asking for one.
-        styleId={styleIsPicked ? resolvedStyleId : ''}
+        // The look the session renders in, picked or defaulted — the storyboard
+        // is already in it, so the picker ticks it. (It used to pass '' until a
+        // pick was made, back when the left panel was still asking for one.)
+        styleId={resolvedStyleId}
         styleBrief={continuousStyleBrief}
         styleBankId={continuousStyleBankId}
         onPickPreset={handlePickPresetStyle}

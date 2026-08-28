@@ -261,7 +261,8 @@ export default function ImportPromptsModal({
             <Info className="mt-0.5 h-3 w-3 shrink-0" />
             <span>
               Importing replaces the {MODE_LABEL[mode]} storyboard on screen and starts a new history row — the old one
-              stays in History. Visual style stays as picked in the panel ({styleLabel}) and is applied at render time.
+              stays in History. Visual style stays as it is ({styleLabel}) and is applied at render time — change it on the
+              storyboard's own pill afterwards.
             </span>
           </p>
         </div>

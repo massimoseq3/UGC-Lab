@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Film, AlertCircle, Plus, Images, X, Palette, Download, Video as VideoIcon, Clapperboard, Coins, Pencil, Check } from 'lucide-react'
+import { Film, AlertCircle, Plus, Images, X, Palette, ChevronRight, Download, Video as VideoIcon, Clapperboard, Coins, Pencil, Check } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import type { BrollResult, Scene, PromptVariation, CardState, ReferenceImage, BatchVideoSettings } from '../types'
 import type { Product, Model } from '../../../stores/types'
@@ -906,26 +906,35 @@ export default function ScenesView({
       <div className="flex-1 overflow-y-auto px-5 pb-4 pt-5">
       {/* How many scenes, and the look they all render in — BELOW the strip's
           separator, at the top of the storyboard rather than in the bar above
-          it. It's a caption for the work, not a control, and up in the bar it
-          was the thing squeezing the batch buttons off their own line. Down
-          here it scrolls away with the storyboard, which is right: you read it
-          once on arrival. Desktop-only, as it has been — on a phone the count
-          captions a storyboard you can already see and the style is named on
-          every card's own footer, and between them they're 40px of chrome on
-          the screen with the least to give. */}
-      <div className="mb-8 hidden min-w-0 max-w-full items-center justify-center gap-2 md:flex">
+          it. It scrolls away with the storyboard, which is right: you read it
+          once on arrival.
+
+          The style pill is the app's PICKER for the look (August 2026): it left
+          the input column, where it was a required row that made you commit to a
+          look before you'd seen a single shot. Re-styling costs nothing — the
+          style block rides outside the card prompts and is appended at fire time
+          — so the honest place to choose it is here, in front of the frames it
+          applies to, with UGC Realism as the fold-to default. The count stays
+          desktop-only (on a phone it captions a storyboard you can already see);
+          the pill does NOT, because it's now a control and the only other way to
+          reach it is a card's detail modal. */}
+      <div className="mb-8 flex min-w-0 max-w-full items-center justify-center gap-2">
         {/* Small-caps and dim — the count is a caption for the storyboard below
             it, so it takes the same eyebrow treatment as the style pill beside
             it rather than reading as a heading. */}
-        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
+        <span className="hidden shrink-0 text-[11px] font-semibold uppercase tracking-wider text-ink-500 md:inline">
           {result.scenes.length} Scene{result.scenes.length === 1 ? '' : 's'}
         </span>
-        {/* Style pill — parity with Continuous, so the member can see which
-            look every b-roll clip is rendered in. */}
-        <span className="inline-flex min-w-0 items-center gap-1 rounded-full border border-broll-500/25 bg-broll-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-broll-300">
+        <button
+          type="button"
+          onClick={onChangeStyle}
+          title="Change the look every clip renders in"
+          className="inline-flex min-w-0 items-center gap-1 rounded-full border border-broll-500/25 bg-broll-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
+        >
           <Palette className="h-3 w-3 shrink-0" strokeWidth={2} />
           <span className="truncate">{result.styleBrief ? (result.styleName?.trim() || 'Custom style') : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
-        </span>
+          <ChevronRight className="h-3 w-3 shrink-0 opacity-70" strokeWidth={2.5} />
+        </button>
       </div>
       <div className="flex flex-col gap-10">
         {result.scenes.map((scene) => (
