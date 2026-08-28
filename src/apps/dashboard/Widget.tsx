@@ -21,6 +21,47 @@ export const WIDGET_INTERACTIVE =
   'transition-[transform,background-color,border-color,box-shadow] duration-200 ' +
   'hover:-translate-y-0.5 hover:bg-ink/[0.075] hover:border-ink/15 light:hover:bg-white/90'
 
+/* ---- Shortcut tile ----
+   The two cards that end the widget wall — Announcements and Academy — are the
+   same card twice (icon disc, title, sub-line), one a button and one a link, so
+   their shape lives here rather than being written out twice and drifting.
+
+   It has TWO layouts, and which one applies is about the tile's proportions,
+   not the screen's size:
+     · a centred column below `sm` and again from `lg`, where the card is
+       roughly as tall as it is wide — a phone's half-bento square, and the
+       desktop's own column in the wall's second row.
+     · an icon-left row in between, where the pair share one full-width bento
+       row and each card is wide and short.
+   They were stacked in one narrow slot on the desktop until August 2026, on the
+   reasoning that a column each left them too narrow to title and pushed Activity
+   below the width its 26-week grid needs. Dropping the heatmap's legend paid for
+   both (Massimo's call). */
+export const SHORTCUT_TILE =
+  'widget-rise group relative flex items-center gap-2.5 p-3.5 ' +
+  'max-sm:aspect-square max-sm:flex-col max-sm:justify-center max-sm:gap-3 max-sm:text-center ' +
+  'lg:flex-col lg:justify-center lg:gap-3 lg:text-center'
+
+/** The tile's accent glyph disc — bigger in both centred layouts. */
+export const SHORTCUT_TILE_DISC =
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-dashboard-500/15 ' +
+  'max-sm:h-11 max-sm:w-11 max-sm:rounded-[15px] lg:h-11 lg:w-11 lg:rounded-[15px]'
+
+/** The glyph inside that disc. */
+export const SHORTCUT_TILE_GLYPH = 'h-[18px] w-[18px] max-sm:h-6 max-sm:w-6 lg:h-6 lg:w-6'
+
+/** The text column beside (or under) the disc. */
+export const SHORTCUT_TILE_TEXT = 'min-w-0 flex-1 max-sm:flex-none lg:flex-none'
+
+/* Truncation is for the ROW layout only. There the card is half a row tall and
+   a wrapped second title line pushes the sub-line clean out of the box; in
+   either centred layout the card has the height for two lines and none of the
+   width to lose to an ellipsis, so `lg:` puts the wrapping back. */
+const SHORTCUT_TILE_WRAP = 'sm:truncate lg:overflow-visible lg:text-clip lg:whitespace-normal'
+export const SHORTCUT_TILE_TITLE =
+  `block text-[15px] italic font-normal leading-tight tracking-tight text-ink-50 ${SHORTCUT_TILE_WRAP}`
+export const SHORTCUT_TILE_SUB = `mt-0.5 block text-[11px] leading-snug ${SHORTCUT_TILE_WRAP}`
+
 /** Display face for every figure on the desktop — the app's Instrument Serif. */
 export const DISPLAY_FONT = { fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }
 

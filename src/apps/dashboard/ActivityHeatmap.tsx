@@ -18,6 +18,12 @@ const phoneHidden = (i: number) => (i < WEEKS - PHONE_WEEKS ? 'max-sm:hidden' : 
 
 // Sequential intensity ramp — thresholds chosen so a casual day (1–2 gens)
 // already lights up while heavy batch days still read distinctly darker.
+//
+// There is no printed key. A `HeatmapLegend` ("Less ▪▪▪▪ More") sat beside the
+// grid at `xl` and came out in August 2026 (Massimo's call): darker means more
+// is the one thing about this picture nobody has to be told, and the ~110px it
+// held is what let the Announcements and Academy cards take a column each in
+// the row beside it.
 const LEVELS: Array<{ min: number; className: string }> = [
   { min: 12, className: 'bg-dashboard-500' },
   { min: 6, className: 'bg-dashboard-500/70' },
@@ -140,19 +146,6 @@ export default function ActivityHeatmap({ days }: { days: UsageDay[] }) {
           ))}
         </div>
       </div>
-    </div>
-  )
-}
-
-/** Reads the intensity ramp: quiet day → batch day. Sits beside the grid. */
-export function HeatmapLegend() {
-  return (
-    <div className="hidden shrink-0 items-center gap-1.5 pb-1 text-[10px] text-ink-600 xl:flex">
-      <span>Less</span>
-      {[...LEVELS].reverse().map((level) => (
-        <span key={level.min} className={`h-2.5 w-2.5 rounded-[3px] ${level.className}`} />
-      ))}
-      <span>More</span>
     </div>
   )
 }

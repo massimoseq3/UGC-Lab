@@ -7,14 +7,26 @@ import { isCloudEnabled } from '../../lib/supabase'
 import { creditsToUsd } from '../../utils/models'
 import { computeUsageMetrics, dailyMinutesSaved, usageDayStart } from '../../utils/usage'
 import { AI_UGC_ACADEMY_URL } from '../../utils/constants'
-import ActivityHeatmap, { HeatmapLegend } from './ActivityHeatmap'
+import ActivityHeatmap from './ActivityHeatmap'
 import AnnouncementsTile from './AnnouncementsTile'
 import ConnectKeyCard from './ConnectKeyCard'
 import DesktopWallpaper from '../../components/DesktopWallpaper'
-import DesktopIcons from './DesktopIcons'
 import SolarSystem from './SolarSystem'
 import StreakRing from './StreakRing'
-import Widget, { WidgetLabel, WidgetFigure, WIDGET_SHELL, WIDGET_INTERACTIVE, DISPLAY_FONT, riseStyle } from './Widget'
+import Widget, {
+  WidgetLabel,
+  WidgetFigure,
+  WIDGET_SHELL,
+  WIDGET_INTERACTIVE,
+  DISPLAY_FONT,
+  riseStyle,
+  SHORTCUT_TILE,
+  SHORTCUT_TILE_DISC,
+  SHORTCUT_TILE_GLYPH,
+  SHORTCUT_TILE_TEXT,
+  SHORTCUT_TILE_TITLE,
+  SHORTCUT_TILE_SUB,
+} from './Widget'
 
 // Dashboard — the workspace's "what you're getting out of this" screen and the
 // default landing page, staged as a desk in deep space: a starfield wallpaper,
@@ -227,36 +239,40 @@ export default function Dashboard() {
               </Widget>
 
               {/* Activity */}
-              <Widget index={slot(3)} className="col-span-6 max-sm:items-center max-sm:text-center lg:col-span-9">
+              <Widget index={slot(3)} className="col-span-6 max-sm:items-center max-sm:text-center lg:col-span-7">
                 <div className="flex w-full items-center justify-between gap-3 max-sm:justify-center">
                   <WidgetLabel icon={CalendarCheck} label="Activity" />
-                  {/* The empty grid is 26 weeks of blank cells; without a caption
-                      it reads as a broken widget rather than a waiting one. */}
-                  <p className={`max-w-full truncate text-[11px] text-ink-500 ${hasActivity ? 'hidden sm:block' : ''}`}>
-                    {hasActivity
-                      ? `${metrics.totalGenerations.toLocaleString()} generations · ${metrics.activeDays.toLocaleString()} active days${sinceLabel ? ` since ${sinceLabel}` : ''}`
-                      : 'Every generation lights up a day'}
-                  </p>
+                  {/* Nothing at all before there is activity (August 2026,
+                      Massimo's call). The empty grid used to carry "Every
+                      generation lights up a day" here, on the reasoning that 26
+                      weeks of blank cells read as a broken widget rather than a
+                      waiting one — but the label already says Activity and the
+                      empty grid says there hasn't been any, so the line was
+                      narrating the picture underneath it. */}
+                  {hasActivity && (
+                    <p className="hidden max-w-full truncate text-[11px] text-ink-500 sm:block">
+                      {`${metrics.totalGenerations.toLocaleString()} generations · ${metrics.activeDays.toLocaleString()} active days${sinceLabel ? ` since ${sinceLabel}` : ''}`}
+                    </p>
+                  )}
                 </div>
                 {/* Centred as a block on a phone, where the tile is half a
-                    screen and the legend isn't rendered anyway; from `sm` the
-                    grid and its legend sit at the two edges as before. */}
-                <div className="mt-auto flex w-full items-end justify-between gap-5 pt-3 max-sm:justify-center">
+                    screen; from `sm` the grid sits at the tile's left edge. */}
+                <div className="mt-auto flex w-full items-end pt-3 max-sm:justify-center">
                   <ActivityHeatmap days={usageDays} />
-                  <HeatmapLegend />
                 </div>
               </Widget>
 
-              {/* The row's last three columns hold two shortcuts, stacked.
-                  They can't sit side by side: the slot is ~177px, which halves
-                  into squares too narrow for either title — and they can't take
-                  a column each either, because the 26-week heatmap needs ~364px
-                  and Activity dropping below nine columns puts a scrollbar
-                  inside it. Stacked, both get the full width at half the height,
-                  and the wall stays two rows. On a phone they are SIDE BY SIDE
-                  instead — the bento's third row is theirs alone, so each gets
-                  a square of its own rather than half of one. */}
-              <div className="col-span-12 grid grid-cols-2 gap-3.5 lg:col-span-3 lg:grid-cols-1">
+              {/* The row ends in two shortcuts, and each gets a column of its
+                  own at every width (August 2026, Massimo's call). They were
+                  STACKED in one three-column slot on the desktop: a column each
+                  would have left ~113px per card, and Activity couldn't give up
+                  the width because its 26-week grid needs ~361px and anything
+                  narrower puts a scrollbar inside it. Dropping the heatmap's
+                  legend is what paid for the change — Activity holds the grid
+                  comfortably at seven columns, and the ~145px each card gains is
+                  a tile you can title. See SHORTCUT_TILE in Widget.tsx for the
+                  card shape that follows from it. */}
+              <div className="col-span-12 grid grid-cols-2 gap-3.5 lg:col-span-5">
                 <AnnouncementsTile index={slot(4)} />
 
                 {/* Academy */}
@@ -265,24 +281,17 @@ export default function Dashboard() {
                   target="_blank"
                   rel="noopener noreferrer"
                   style={riseStyle(slot(5))}
-                  className={`widget-rise group relative flex items-center gap-2.5 p-3.5 max-sm:aspect-square max-sm:flex-col max-sm:justify-center max-sm:gap-3 max-sm:text-center ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
+                  // Shape shared with AnnouncementsTile — SHORTCUT_TILE, Widget.tsx.
+                  className={`${SHORTCUT_TILE} ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
                 >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-dashboard-500/15 max-sm:h-11 max-sm:w-11 max-sm:rounded-[15px]">
-                    <GraduationCap className="h-[18px] w-[18px] text-dashboard-400 max-sm:h-6 max-sm:w-6" strokeWidth={1.75} />
+                  <span className={SHORTCUT_TILE_DISC}>
+                    <GraduationCap className={`text-dashboard-400 ${SHORTCUT_TILE_GLYPH}`} strokeWidth={1.75} />
                   </span>
-                  <span className="min-w-0 flex-1 max-sm:flex-none">
-                    {/* Truncating rather than wrapping FROM `sm`: there the card
-                        is half a row tall, so a second title line pushes the
-                        sub-line out of the box entirely. The phone's square has
-                        the height for two lines and none of the width to lose
-                        to an ellipsis. */}
-                    <span
-                      className="block text-[15px] italic font-normal leading-tight tracking-tight text-ink-50 sm:truncate"
-                      style={DISPLAY_FONT}
-                    >
+                  <span className={SHORTCUT_TILE_TEXT}>
+                    <span className={SHORTCUT_TILE_TITLE} style={DISPLAY_FONT}>
                       AI UGC Academy
                     </span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-ink-500 sm:truncate">Trainings</span>
+                    <span className={`${SHORTCUT_TILE_SUB} text-ink-500`}>Trainings</span>
                   </span>
                   {/* Out of flow — in it, the arrow costs the title 28px it
                       doesn't have. Gone entirely below `sm`, where the tile is
@@ -296,16 +305,6 @@ export default function Dashboard() {
                 </a>
               </div>
             </div>
-
-            {/* Below lg the icons can't sit in a right-hand column, so they run
-                as a grid under the widgets — and the column count DIVIDES the
-                nine apps rather than merely fitting them. Four across left a
-                4/4/1 wall with one crab stranded on a line of its own, and
-                eight across (the old `sm`) did the same with 8/1. Three is a
-                square block on a phone; nine is one clean row from `sm`, where
-                there's 66px+ per cell for a 56px tile. Adding a tenth app means
-                revisiting BOTH numbers. */}
-            <DesktopIcons className="grid grid-cols-3 gap-x-2 gap-y-3 pt-1 sm:grid-cols-9 xl:hidden" />
           </div>
 
           {/* The orrery sits beside the widget wall, centred against it. */}

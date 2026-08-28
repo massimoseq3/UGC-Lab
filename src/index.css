@@ -567,30 +567,32 @@ textarea,
 
 /* ---- Desktop wallpaper ----
    The Dashboard is staged as a macOS desktop — a wallpaper with widgets sitting
-   on it — and Edit shares the same sky. Three soft blooms: neutral light in both
-   top corners, then the crab's gold along the bottom, so it reads as this
-   product's desktop rather than a stock gradient without leading on one app's
-   accent. Both top corners have now been each of the three (the left was once
-   Dashboard emerald, the right B-Roll violet) and both ended up monochrome — an
-   app accent up there competes with the nine accents of the planets orbiting in
-   front of it, which is the one thing on this page that has to read as colour.
+   on it — and Edit shares the same sky. Three soft blooms, and all three are
+   now MONOCHROME: neutral light in both top corners and along the bottom, so
+   the sky reads as this product's desktop rather than a stock gradient without
+   leading on any one app's colour. Each bloom has been an accent and lost it —
+   the top left was Dashboard emerald, the top right B-Roll violet, the bottom
+   the crab's gold (August 2026) — for the same reason every time: an accent in
+   the sky competes with the nine accents of the planets orbiting in front of
+   it, which is the one thing on this page that has to read as colour, and the
+   gold was the last and widest of them, washing the whole lower half warm.
    Monochrome means the light itself, not a grey wash — white in dark mode, a
    soft shadow in light, where a white bloom on a white canvas would be
-   invisible; the top-right is the brighter of the two because it carries the
-   corner on its own where the left sits behind the widgets. Painted as radial
+   invisible; the top-right is the brighter of the two corners because it
+   carries its own where the left sits behind the widgets. Painted as radial
    gradients, not blurred divs: same softness, none of the filter/compositing
    cost of a full-screen blur behind nine backdrop-blurred widgets. */
 .desktop-wallpaper {
   background-image:
     radial-gradient(820px 620px at 2% -12%, rgba(255, 255, 255, 0.07), transparent 70%),
     radial-gradient(680px 560px at 99% 0%, rgba(255, 255, 255, 0.10), transparent 72%),
-    radial-gradient(940px 600px at 52% 116%, rgba(242, 178, 49, 0.14), transparent 70%);
+    radial-gradient(940px 600px at 52% 116%, rgba(255, 255, 255, 0.09), transparent 70%);
 }
 [data-theme="light"] .desktop-wallpaper {
   background-image:
     radial-gradient(760px 560px at 4% -10%, rgba(24, 24, 27, 0.07), transparent 70%),
     radial-gradient(620px 520px at 97% 2%, rgba(24, 24, 27, 0.09), transparent 72%),
-    radial-gradient(880px 560px at 55% 114%, rgba(242, 178, 49, 0.16), transparent 70%);
+    radial-gradient(880px 560px at 55% 114%, rgba(24, 24, 27, 0.08), transparent 70%);
 }
 
 /* Starfield, dark mode only. Two tiled layers of dots at different densities,

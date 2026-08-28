@@ -1200,11 +1200,17 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //   4k:              4s=147 / 6s=168 / 8s=189 / 10s=210   (base + 84)
   //   with a video input, duration is model-decided and billing is flat:
   //                    168 (360p/720p/1080p) or 252 (4k)
-  // No `official` / `market` entry, deliberately: Google publishes no rate for
-  // the Omni Flash tier, and 1.0's ≈$0.10/s estimate is a figure for a
-  // different model — reusing it would invent a discount. Unknown savings
-  // count as zero. kie's +10% top-up bonus is likewise not modelled (it moves
-  // the real cost down, the honest direction to be wrong in).
+  // `official` carries 1.0's ≈$0.10/s estimate from Google's published Omni
+  // rates (Massimo's call, August 2026). It sat empty for a stint on the
+  // reasoning that Google publishes no rate for the Flash tier specifically, so
+  // borrowing 1.0's figure invents a discount — the argument the other way is
+  // that this IS the Omni family one version on, billing on kie's identical
+  // rate card, and a row that shows nothing next to a −34% sibling reads as the
+  // worse deal when it's the same deal. The estimate applies only where 1.0's
+  // does: null for a video input and null for 4k, as there — and null for 360p
+  // too, which is 1.1's own tier and has no per-second equivalent anywhere.
+  // kie's +10% top-up bonus is still not modelled (it moves the real cost down,
+  // the honest direction to be wrong in).
   {
     id: 'google/gemini-omni-flash-1-1',
     displayName: 'Gemini Omni Flash 1.1',
@@ -1230,6 +1236,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
           durationSeconds >= 6 ? 84 : 63
         return is4k ? base + 84 : base
       },
+    },
+    official: {
+      usdFor: ({ durationSeconds = 8, resolution = '720p', videoInput = false }) =>
+        videoInput || resolution === '4k' || resolution === '360p'
+          ? null
+          : 0.10 * durationSeconds,
+      source: 'https://ai.google.dev/gemini-api/docs/pricing',
     },
     videoEndpoint: 'createTask',
     videoConstraints: {
