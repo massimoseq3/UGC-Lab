@@ -24,7 +24,9 @@ import { parsePhotoPick, productPhotoDataUris, productPhotoInstruction } from '.
 // interpolation, so only frames-to-video models are actually selectable — the
 // panel greys the rest via requireMode='frames-to-video' so the user can see
 // (and understand) why they're unavailable. Image-only (Kling Turbo) and
-// frame-less (Gemini Omni, Grok, Seedance 2.5) models are listed but land greyed.
+// frame-less (Gemini Omni 1.0, Grok, Seedance 2.5) models are listed but land
+// greyed — Omni Flash 1.1 is the one in that family with real frame fields, so
+// it is selectable here.
 // Seedance 1.5 Pro is the default — first/last-frame native and materially
 // cheaper per clip than the 2.0 family, at a quality that holds up for this
 // style. The picker lives in the CLIP modal, not the left panel: the model
@@ -43,6 +45,7 @@ export const CONTINUOUS_MODEL_IDS = [
   'wan/3-0-video-prime',
   'wan/2-7',
   'kling/v3-turbo-image-to-video',
+  'google/gemini-omni-flash-1-1',
   'gemini-omni-video',
 ]
 

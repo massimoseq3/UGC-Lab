@@ -1161,7 +1161,7 @@ export default function VariationCard(props: VariationCardProps) {
                 </TileActionButton>
                 {coverKind === 'video' && coverVideo && (
                   <TileActionButton
-                    title="Use in Playground as Gemini Omni source clip"
+                    title="Use in Playground as a source clip"
                     onClick={() => { void sendClipToPlayground(coverVideo) }}
                   >
                     <Film className="h-4 w-4" />

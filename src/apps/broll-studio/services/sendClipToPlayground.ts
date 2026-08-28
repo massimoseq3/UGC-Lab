@@ -1,6 +1,8 @@
-// Hand a generated B-Roll video to Playground as a Gemini Omni source clip —
-// the "regenerate this exact take, but change X" loop (redub the dialogue in
-// Spanish, restyle the setting, …). The asset:// ref passes through as-is:
+// Hand a generated B-Roll video to Playground as a source clip — the
+// "regenerate this exact take, but change X" loop (redub the dialogue in
+// Spanish, restyle the setting, …). WHICH model receives it is Playground's
+// call, not this file's: it owns the `videoSourceClip` branch and the models
+// that take a video input at all. The asset:// ref passes through as-is:
 // Playground's service resolves it at generate time, and unlike an uploaded
 // data URI it survives a refresh.
 
