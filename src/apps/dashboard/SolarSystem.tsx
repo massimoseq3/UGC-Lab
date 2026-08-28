@@ -21,8 +21,12 @@ import { DISPLAY_FONT } from './Widget'
 //   · One caption slot under the system names whatever the cursor is on, crab
 //     and all — the same idiom as the Meet-your-team roster.
 //
-// Fixed 400px because the geometry is in pixels; below xl the Dashboard renders
-// the plain icon grid instead (see DesktopIcons).
+// Fixed 400px because the geometry is in pixels, so below xl it simply doesn't
+// render — and NOTHING replaces it (August 2026, Massimo's call). A `DesktopIcons`
+// grid of the nine crabs stood in for a while and came out: at that width it
+// landed directly above the dock, which is the same nine apps in the same order
+// with the same glyphs, so a phone showed the launcher twice. The orrery is a
+// desktop flourish; the dock is how a small screen opens an app.
 
 const SIZE = 400
 const CENTRE = SIZE / 2
@@ -118,12 +122,12 @@ export default function SolarSystem({ className = '' }: { className?: string }) 
                         sibling it painted over the planet's own face instead,
                         so hovering flattened a shaded ball into a fuzzy disc of
                         flat accent and took the rim light with it. It is also a
-                        radial gradient rather than a `blur()` of a solid disc
-                        (the same idiom DesktopIcons' tile glow uses): the button
-                        scales on the very same hover, and scaling a filtered
-                        layer re-rasters the blur every frame of the transition —
-                        the one thing the blob-drift note in index.css says not
-                        to do. A gradient is painted once and composited. */}
+                        radial gradient rather than a `blur()` of a solid disc:
+                        the button scales on the very same hover, and scaling a
+                        filtered layer re-rasters the blur every frame of the
+                        transition — the one thing the blob-drift note in
+                        index.css says not to do. A gradient is painted once and
+                        composited. */}
                     <span
                       aria-hidden
                       className="absolute -inset-4 rounded-full opacity-0 transition-opacity duration-200 group-hover:opacity-90 group-focus-visible:opacity-90"

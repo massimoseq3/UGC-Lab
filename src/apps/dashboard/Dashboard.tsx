@@ -7,14 +7,21 @@ import { isCloudEnabled } from '../../lib/supabase'
 import { creditsToUsd } from '../../utils/models'
 import { computeUsageMetrics, dailyMinutesSaved, usageDayStart } from '../../utils/usage'
 import { AI_UGC_ACADEMY_URL } from '../../utils/constants'
-import ActivityHeatmap, { HeatmapLegend } from './ActivityHeatmap'
+import ActivityHeatmap from './ActivityHeatmap'
 import AnnouncementsTile from './AnnouncementsTile'
 import ConnectKeyCard from './ConnectKeyCard'
 import DesktopWallpaper from '../../components/DesktopWallpaper'
-import DesktopIcons from './DesktopIcons'
 import SolarSystem from './SolarSystem'
 import StreakRing from './StreakRing'
-import Widget, { WidgetLabel, WidgetFigure, WIDGET_SHELL, WIDGET_INTERACTIVE, DISPLAY_FONT, riseStyle } from './Widget'
+import Widget, {
+  WidgetLabel,
+  WidgetFigure,
+  WidgetDelta,
+  WIDGET_SHELL,
+  WIDGET_INTERACTIVE,
+  DISPLAY_FONT,
+  riseStyle,
+} from './Widget'
 
 // Dashboard — the workspace's "what you're getting out of this" screen and the
 // default landing page, staged as a desk in deep space: a starfield wallpaper,
@@ -162,53 +169,76 @@ export default function Dashboard() {
                 `PHONE_WEEKS` columns of smaller cells (see ActivityHeatmap) —
                 a quarter of the history at a size you can read, rather than
                 half a year squeezed into 128px. */}
-            <div className="grid grid-cols-12 gap-3.5">
-              {/* Time saved */}
-              <Widget index={slot(0)} className="col-span-6 max-sm:items-center max-sm:text-center lg:col-span-5">
-                <WidgetLabel icon={Clock} label="Time saved" />
-                <div className="mt-auto w-full pt-4">
-                  <WidgetFigure
-                    value={formatTimeSaved(metrics.minutesSaved)}
-                    delta={metrics.minutesSavedLast7d > 0 ? `+${formatTimeSaved(metrics.minutesSavedLast7d)} this week` : undefined}
-                  />
-                  {/* Two spans, not two strings: the tail is what wraps a
-                      half-width bento tile onto a third line, and a phone gets
-                      the fact without it. */}
-                  <p className="mt-1.5 text-[12px] leading-snug text-ink-500">
-                    {workdays >= 1 ? (
-                      <>
-                        {`≈ ${workdays < 10 ? Math.round(workdays * 10) / 10 : Math.round(workdays)} workdays`}
-                        <span className="hidden sm:inline"> of production and tool-hopping</span>
-                      </>
-                    ) : hasActivity ? (
-                      `across ${metrics.totalGenerations.toLocaleString()} generation${metrics.totalGenerations === 1 ? '' : 's'}`
-                    ) : (
-                      <>
-                        vs doing it by hand
-                        <span className="hidden sm:inline"> — every asset</span>
-                      </>
-                    )}
+            <div className="grid grid-cols-12 gap-3.5 sm:auto-rows-fr">
+              {/* Activity */}
+              <Widget index={slot(0)} className="col-span-6 items-center text-center lg:col-span-4">
+                <WidgetLabel icon={CalendarCheck} label="Activity" />
+                <div className="mt-auto flex w-full items-end pt-3">
+                  <ActivityHeatmap days={usageDays} />
+                </div>
+                {/* The tally reads UNDER the grid it counts, the way Streak's
+                    record reads under its ring — it sat beside the label in the
+                    header until the wall went to six equal centred tiles, where
+                    a note in that row is what knocks the label off centre. Still
+                    gone below `sm`, where the bento can't spare the line.
+                    There is nothing here before there is activity: "Every
+                    generation lights up a day" held the slot on the reasoning
+                    that 26 weeks of blank cells read as a broken widget rather
+                    than a waiting one, and came out because the label already
+                    says Activity and the empty grid says there hasn't been
+                    any. */}
+                {hasActivity && (
+                  <p className="mt-2 hidden max-w-full truncate text-[11px] text-ink-500 sm:block">
+                    {`${metrics.totalGenerations.toLocaleString()} generations · ${metrics.activeDays.toLocaleString()} active days${sinceLabel ? ` since ${sinceLabel}` : ''}`}
                   </p>
+                )}
+              </Widget>
+              {/* Time saved */}
+              <Widget index={slot(1)} className="col-span-6 items-center text-center lg:col-span-4">
+                <WidgetLabel icon={Clock} label="Time saved" />
+                {/* NOT `mt-auto`: bottom-aligning this block lands the figure
+                    at a different height in each tile, because Money saved's
+                    floor art (a bar plus two captions) is taller than a
+                    sparkline and pushes its block further up. The text stacks
+                    from the label down in both, so hero / caption / delta line
+                    up across the pair, and only the CHART takes `mt-auto`. */}
+                <div className="w-full pt-4">
+                  <WidgetFigure value={formatTimeSaved(metrics.minutesSaved)} />
+                  {/* The workdays line is the figure in a second unit and
+                      nothing else — "≈ 7.6 workdays of production and
+                      tool-hopping" was a sentence explaining a number that
+                      doesn't need explaining, and the ≈ hedged a figure the
+                      widget above it already states exactly. */}
+                  <p className="mt-1.5 text-[12px] leading-snug text-ink-500">
+                    {workdays >= 1
+                      ? `${workdays < 10 ? Math.round(workdays * 10) / 10 : Math.round(workdays)} workdays`
+                      : hasActivity
+                        ? `across ${metrics.totalGenerations.toLocaleString()} generation${metrics.totalGenerations === 1 ? '' : 's'}`
+                        : 'vs doing it by hand'}
+                  </p>
+                  {metrics.minutesSavedLast7d > 0 && (
+                    <WidgetDelta>{`+${formatTimeSaved(metrics.minutesSavedLast7d)} this week`}</WidgetDelta>
+                  )}
+                </div>
+                <div className="mt-auto w-full">
                   <Sparkline values={spark} />
                 </div>
               </Widget>
 
               {/* Money saved */}
-              <Widget index={slot(1)} className="col-span-6 max-sm:items-center max-sm:text-center lg:col-span-4">
-                <WidgetLabel
-                  icon={PiggyBank}
-                  label="Money saved"
-                  note={hasActivity ? `${Math.round(metrics.creditsSpent).toLocaleString()} credits` : undefined}
-                />
-                <div className="mt-auto w-full pt-4">
-                  <WidgetFigure
-                    value={formatUsd(metrics.usdSaved)}
-                    delta={metrics.usdSavedLast7d >= 0.01 ? `+${formatUsd(metrics.usdSavedLast7d)} this week` : undefined}
-                  />
+              <Widget index={slot(2)} className="col-span-6 items-center text-center lg:col-span-4">
+                <WidgetLabel icon={PiggyBank} label="Money saved" />
+                <div className="w-full pt-4">
+                  <WidgetFigure value={formatUsd(metrics.usdSaved)} />
                   <p className="mt-1.5 text-[12px] leading-snug text-ink-500">
                     vs official APIs
                     <span className="hidden sm:inline"> &amp; creator platforms</span>
                   </p>
+                  {metrics.usdSavedLast7d >= 0.01 && (
+                    <WidgetDelta>{`+${formatUsd(metrics.usdSavedLast7d)} this week`}</WidgetDelta>
+                  )}
+                </div>
+                <div className="mt-auto w-full">
                   <SpendBar spent={metrics.kieUsd} elsewhere={metrics.officialUsd} format={formatUsd} />
                 </div>
               </Widget>
@@ -216,7 +246,7 @@ export default function Dashboard() {
               {/* Streak — the ring is the desktop's signature widget. The record
                   it's measured against reads under it rather than in a tile of
                   its own; the ring already draws the comparison. */}
-              <Widget index={slot(2)} className="col-span-6 items-center text-center lg:col-span-3">
+              <Widget index={slot(3)} className="col-span-6 items-center text-center lg:col-span-4">
                 <div className="w-full">
                   <WidgetLabel icon={Flame} label="Streak" />
                 </div>
@@ -226,86 +256,62 @@ export default function Dashboard() {
                 <p className="mt-auto pt-2 text-[11px] leading-snug text-ink-500">{streakNote}</p>
               </Widget>
 
-              {/* Activity */}
-              <Widget index={slot(3)} className="col-span-6 max-sm:items-center max-sm:text-center lg:col-span-9">
-                <div className="flex w-full items-center justify-between gap-3 max-sm:justify-center">
-                  <WidgetLabel icon={CalendarCheck} label="Activity" />
-                  {/* The empty grid is 26 weeks of blank cells; without a caption
-                      it reads as a broken widget rather than a waiting one. */}
-                  <p className={`max-w-full truncate text-[11px] text-ink-500 ${hasActivity ? 'hidden sm:block' : ''}`}>
-                    {hasActivity
-                      ? `${metrics.totalGenerations.toLocaleString()} generations · ${metrics.activeDays.toLocaleString()} active days${sinceLabel ? ` since ${sinceLabel}` : ''}`
-                      : 'Every generation lights up a day'}
-                  </p>
-                </div>
-                {/* Centred as a block on a phone, where the tile is half a
-                    screen and the legend isn't rendered anyway; from `sm` the
-                    grid and its legend sit at the two edges as before. */}
-                <div className="mt-auto flex w-full items-end justify-between gap-5 pt-3 max-sm:justify-center">
-                  <ActivityHeatmap days={usageDays} />
-                  <HeatmapLegend />
-                </div>
-              </Widget>
 
-              {/* The row's last three columns hold two shortcuts, stacked.
-                  They can't sit side by side: the slot is ~177px, which halves
-                  into squares too narrow for either title — and they can't take
-                  a column each either, because the 26-week heatmap needs ~364px
-                  and Activity dropping below nine columns puts a scrollbar
-                  inside it. Stacked, both get the full width at half the height,
-                  and the wall stays two rows. On a phone they are SIDE BY SIDE
-                  instead — the bento's third row is theirs alone, so each gets
-                  a square of its own rather than half of one. */}
-              <div className="col-span-12 grid grid-cols-2 gap-3.5 lg:col-span-3 lg:grid-cols-1">
-                <AnnouncementsTile index={slot(4)} />
+              {/* The row ends in two shortcuts, each with a column of its own
+                  and each SIZED TO THE WIDGET ABOVE IT (August 2026, Massimo's
+                  call): Announcements takes Money saved's four columns and
+                  Academy takes Streak's three, so the desktop's two rows share
+                  one set of gridlines instead of two unrelated splits. They were
+                  stacked in a single three-column slot until then, because the
+                  heatmap drew at a fixed 361px and Activity couldn't give up the
+                  width to fund them. Making the grid FILL its tile (see
+                  ActivityHeatmap) is what removed that constraint — there is no
+                  longer a width Activity has to have. See SHORTCUT_TILE in
+                  Widget.tsx for the card shape.
 
-                {/* Academy */}
-                <a
-                  href={AI_UGC_ACADEMY_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={riseStyle(slot(5))}
-                  className={`widget-rise group relative flex items-center gap-2.5 p-3.5 max-sm:aspect-square max-sm:flex-col max-sm:justify-center max-sm:gap-3 max-sm:text-center ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
-                >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[12px] bg-dashboard-500/15 max-sm:h-11 max-sm:w-11 max-sm:rounded-[15px]">
-                    <GraduationCap className="h-[18px] w-[18px] text-dashboard-400 max-sm:h-6 max-sm:w-6" strokeWidth={1.75} />
+                  Below `lg` both are `col-span-6`, which is the same two-across
+                  bento row they have always been — they don't need a wrapper to
+                  get it, and without one they can differ from each other above
+                  `lg`. */}
+              <AnnouncementsTile index={slot(4)} className="col-span-6 lg:col-span-4" />
+
+              {/* Academy — the wall's one pure LINK, and the one tile with
+                  nothing of the member's own in it, so it keeps the centred
+                  disc-over-title card rather than taking a WidgetLabel header
+                  like the five that report something. Announcements wore this
+                  same shape until it became a log; the shape lived in
+                  Widget.tsx as a shared constant for exactly as long as two
+                  cards wore it. */}
+              <a
+                href={AI_UGC_ACADEMY_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={riseStyle(slot(5))}
+                className={`widget-rise group relative col-span-6 flex flex-col items-center justify-center gap-3 p-4 text-center lg:col-span-4 ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-dashboard-500/15">
+                  <GraduationCap className="h-6 w-6 text-dashboard-400" strokeWidth={1.75} />
+                </span>
+                <span>
+                  <span
+                    className="block text-[15px] italic font-normal leading-tight tracking-tight text-ink-50"
+                    style={DISPLAY_FONT}
+                  >
+                    AI UGC Academy
                   </span>
-                  <span className="min-w-0 flex-1 max-sm:flex-none">
-                    {/* Truncating rather than wrapping FROM `sm`: there the card
-                        is half a row tall, so a second title line pushes the
-                        sub-line out of the box entirely. The phone's square has
-                        the height for two lines and none of the width to lose
-                        to an ellipsis. */}
-                    <span
-                      className="block text-[15px] italic font-normal leading-tight tracking-tight text-ink-50 sm:truncate"
-                      style={DISPLAY_FONT}
-                    >
-                      AI UGC Academy
-                    </span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-ink-500 sm:truncate">Trainings</span>
-                  </span>
-                  {/* Out of flow — in it, the arrow costs the title 28px it
-                      doesn't have. Gone entirely below `sm`, where the tile is
-                      half a phone's width: out of flow it doesn't reserve the
-                      space either, so it simply landed on the last letter of
-                      the title. The card is the link with or without it. */}
-                  <ArrowUpRight
-                    className="absolute right-3 top-3 hidden h-3.5 w-3.5 text-ink-600 transition-colors group-hover:text-dashboard-400 sm:block"
-                    strokeWidth={2}
-                  />
-                </a>
-              </div>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-ink-500">Trainings</span>
+                </span>
+                {/* Out of flow — in it, the arrow costs the title 28px it
+                    doesn't have. Gone entirely below `sm`, where the tile is
+                    half a phone's width: out of flow it doesn't reserve the
+                    space either, so it simply landed on the last letter of
+                    the title. The card is the link with or without it. */}
+                <ArrowUpRight
+                  className="absolute right-3 top-3 hidden h-3.5 w-3.5 text-ink-600 transition-colors group-hover:text-dashboard-400 sm:block"
+                  strokeWidth={2}
+                />
+              </a>
             </div>
-
-            {/* Below lg the icons can't sit in a right-hand column, so they run
-                as a grid under the widgets — and the column count DIVIDES the
-                nine apps rather than merely fitting them. Four across left a
-                4/4/1 wall with one crab stranded on a line of its own, and
-                eight across (the old `sm`) did the same with 8/1. Three is a
-                square block on a phone; nine is one clean row from `sm`, where
-                there's 66px+ per cell for a 56px tile. Adding a tenth app means
-                revisiting BOTH numbers. */}
-            <DesktopIcons className="grid grid-cols-3 gap-x-2 gap-y-3 pt-1 sm:grid-cols-9 xl:hidden" />
           </div>
 
           {/* The orrery sits beside the widget wall, centred against it. */}

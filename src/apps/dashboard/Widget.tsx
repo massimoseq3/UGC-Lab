@@ -47,16 +47,19 @@ export default function Widget({ index = 0, className = '', pad = 'p-4', childre
   )
 }
 
-/** Top-left caption: what this widget measures. Optional value on the right. */
-export function WidgetLabel({ icon: Icon, label, note }: { icon: ElementType; label: string; note?: string }) {
+/** Centred caption: what this widget measures. */
+export function WidgetLabel({ icon: Icon, label }: { icon: ElementType; label: string }) {
   return (
-    // Centred on a PHONE only. From `sm` this is the row it has always been —
-    // icon + label at the left edge, note pushed to the right by `ml-auto` —
-    // because the centring is a bento treatment for a half-width tile, not a
-    // change to the desktop wall. (It doesn't cost the note anything either:
-    // the note only renders from `sm`, so on the phone there is nothing beside
-    // the label to knock it off centre.)
-    <div className="flex w-full items-center gap-1.5 max-sm:justify-center">
+    // Centred at EVERY width (August 2026, Massimo's call). It was a left-edge
+    // row on the desktop and centred only below `sm`, back when the wall was
+    // three tile widths; now that every tile is the same four-column block the
+    // whole wall centres, and a label sitting at the left edge of one of six
+    // identical squares reads as the odd one out.
+    //
+    // It carries no trailing note any more. Money saved's credit count was the
+    // only one, and a note in this row is exactly what a centred label can't
+    // have — `ml-auto` pushes the label off centre by half the note's width.
+    <div className="flex w-full items-center justify-center gap-1.5">
       {/* Monochrome, and sized to the word beside it. It was 15px in the
           dashboard green, which made the glyph the loudest thing in an eyebrow
           whose whole job is to be quiet — and a 15px icon against 11px caps
@@ -76,31 +79,39 @@ export function WidgetLabel({ icon: Icon, label, note }: { icon: ElementType; la
           `0.1em` pushed TIME SAVED / ACTIVITY out to the tile's edges and read
           as stretched rather than as quiet. */}
       <span className="whitespace-nowrap text-[11px] font-medium uppercase tracking-[0.07em] text-ink-300">{label}</span>
-      {/* The note is the first thing to go in a bento tile: at half a phone's
-          width it left "MONEY SAVED" wrapping to two lines to make room for a
-          credit count truncated to "1,261 …", which is neither fact. */}
-      {note && <span className="ml-auto hidden truncate text-[11px] tabular-nums text-ink-600 sm:block">{note}</span>}
     </div>
   )
 }
 
-/** The headline number, with an optional rolling-week delta beside it. */
-export function WidgetFigure({ value, delta, size = 'hero' }: { value: string; delta?: string; size?: 'hero' | 'small' }) {
+/**
+ * The rolling-seven-day delta, as a pill on its own line UNDER the figure and
+ * its caption (Massimo's call, August 2026). It used to sit on the figure's own
+ * baseline, which worked only while the tile was wide enough for both: in a
+ * four-column tile it wrapped under a 56px hero and read as that number's
+ * caption, displacing the real one. Its own line ends the block instead — total,
+ * what the total means, then what the last week added.
+ */
+export function WidgetDelta({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2.5 max-sm:justify-center">
-      <p
-        // The hero shrinks below `sm`, where the tile is half a phone's width:
-        // "459 hrs" at 48px is wider than the box it sits in.
-        className={`italic font-normal tracking-tight text-ink-50 ${size === 'hero' ? 'text-[34px] leading-none sm:text-5xl sm:leading-normal lg:text-[56px] lg:leading-[1.05]' : 'text-[32px] leading-none'}`}
-        style={DISPLAY_FONT}
-      >
-        {value}
-      </p>
-      {delta && (
-        <span className="rounded-full bg-dashboard-500/15 px-2 py-0.5 text-[11px] font-semibold text-dashboard-400 light:bg-dashboard-500/12">
-          {delta}
-        </span>
-      )}
-    </div>
+    // Gone below `sm`, like every other second line in a bento tile: the pill's
+    // own row costs the wall ~26px, and the phone wall has to fit one screen
+    // alongside the dock. The running total is the figure above it either way.
+    <span className="mt-2 hidden rounded-full bg-dashboard-500/15 px-2 py-0.5 text-[11px] font-semibold text-dashboard-400 light:bg-dashboard-500/12 sm:inline-block">
+      {children}
+    </span>
+  )
+}
+
+/** The headline number. */
+export function WidgetFigure({ value, size = 'hero' }: { value: string; size?: 'hero' | 'small' }) {
+  return (
+    <p
+      // The hero shrinks below `sm`, where the tile is half a phone's width:
+      // "459 hrs" at 48px is wider than the box it sits in.
+      className={`italic font-normal tracking-tight text-ink-50 ${size === 'hero' ? 'text-[34px] leading-none sm:text-5xl sm:leading-normal lg:text-[56px] lg:leading-[1.05]' : 'text-[32px] leading-none'}`}
+      style={DISPLAY_FONT}
+    >
+      {value}
+    </p>
   )
 }
