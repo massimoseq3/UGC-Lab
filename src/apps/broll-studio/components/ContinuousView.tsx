@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  Box, AlertCircle, Sparkles, Image as ImageIcon, Video as VideoIcon, Play, Pause, Volume2, VolumeX, Plus, Coins, Check, X, ArrowRight, Download, Copy, Bookmark, Film, ChevronRight, Star, Link2, Link2Off, RefreshCw, Pencil, SplitSquareVertical, Merge, Trash2,
+  Box, AlertCircle, Sparkles, Image as ImageIcon, Video as VideoIcon, Play, Pause, Volume2, VolumeX, Plus, Coins, Check, X, ArrowRight, Download, Copy, Bookmark, Film, ChevronRight, Star, Link2, Link2Off, RefreshCw, Pencil, SplitSquareVertical, Merge, Trash2, Palette,
 } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import GenerationProgress from '../../../components/GenerationProgress'
@@ -1253,18 +1253,37 @@ export default function ContinuousView({
       <div className="flex-1 overflow-y-auto px-5 pb-4 pt-5">
       {/* The storyboard's caption — scene count, look, running time, and how
           many keyframes are picked. Below the separator rather than in the bar
-          above it: it describes the work, it isn't a control, and up there it
-          was what squeezed the batch buttons off their own line. Desktop-only,
-          as it has been. */}
-      <div className="mb-8 hidden min-w-0 max-w-full flex-wrap items-center justify-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400 md:flex">
+          above it: up there it was what squeezed the batch buttons off their own
+          line.
+
+          The look is the one item here that IS a control (August 2026): it left
+          the input column, where it was a required row asking for a decision
+          before a single frame existed, and became the pill in front of the
+          frames it applies to — accent-tinted, unlike the neutral meta pills
+          beside it, because it's the one you can press. An unpicked session
+          folds to the mode default rather than blocking Generate. The read-only
+          meta stays desktop-only as it has been; the pill doesn't, since a phone
+          would otherwise have no way to change the look but a card modal. It
+          spells out `uppercase` because preflight resets `text-transform` on a
+          <button>, so the row's own class stops reaching it once it's pressable. */}
+      <div className="mb-8 flex min-w-0 max-w-full flex-wrap items-center justify-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
         {/* Scene count matches the per-line storyboard's — small-caps and dim,
             the same eyebrow treatment as the pills beside it. */}
-        <span className="font-semibold text-ink-500">
+        <span className="hidden font-semibold text-ink-500 md:inline">
           {result.scenes.length} {result.scenes.length === 1 ? 'Scene' : 'Scenes'}
         </span>
-        <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{style.label}</span>
-        <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">~{totalSeconds}s</span>
-        <span className="rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300">{framesPicked}/{result.frames.length} keyframes picked</span>
+        <button
+          type="button"
+          onClick={onChangeStyle}
+          title="Change the look every clip renders in"
+          className="inline-flex min-w-0 items-center gap-1 rounded-full border border-broll-500/25 bg-broll-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
+        >
+          <Palette className="h-3 w-3 shrink-0" strokeWidth={2} />
+          <span className="truncate">{style.label}</span>
+          <ChevronRight className="h-3 w-3 shrink-0 opacity-70" strokeWidth={2.5} />
+        </button>
+        <span className="hidden rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300 md:inline">~{totalSeconds}s</span>
+        <span className="hidden rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300 md:inline">{framesPicked}/{result.frames.length} keyframes picked</span>
       </div>
       {result.demo && (
         <div className="mb-4 mt-4 flex items-start gap-2 rounded-2xl border border-broll-500/25 bg-broll-500/10 px-4 py-3">

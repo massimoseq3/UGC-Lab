@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, UserRound, FileText, RefreshCw, Film, X, ChevronRight, Rows3, Box, Sparkles, Coins, Palette, Pencil, FileInput, MessageSquareQuote, Layers } from 'lucide-react'
+import { Package, UserRound, FileText, RefreshCw, Film, X, ChevronRight, Rows3, Box, Coins, Pencil, FileInput, MessageSquareQuote, Layers } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import type { Product, Model, Script } from '../../../stores/types'
 import { isLineMode, type BrollDelivery, type BrollMode } from '../types'
@@ -43,20 +43,15 @@ interface InputPanelProps {
   // the same per-line storyboard, so it rides in the settings band.
   lineDelivery: BrollDelivery
   onLineDeliveryChange: (delivery: BrollDelivery) => void
-  // Visual style — one row, one popup. The presets, the user's saved styles,
-  // and the analyse-from-references flow all live in StyleModal (opened by the
-  // parent), so this panel only shows what's picked. The video model is NOT
-  // picked here: it only matters once there are keyframes to animate, so that
-  // picker lives in the clip modal.
-  // The row mirrors Scripts' Script Style row: dashed + prompting until a style
-  // is actively picked, accent-filled with a clear X after. It's a required
-  // input — nothing generates until the user has chosen a look.
-  styleChosen: boolean
-  styleLabel: string
-  styleHint: string
-  styleIsCustom: boolean
-  onOpenStyle: () => void
-  onClearStyle: () => void
+  // Visual Style is NOT picked here (August 2026). It was a required row at the
+  // bottom of this card, which made a look something you had to decide before
+  // you could see a single shot — and the honest default (UGC Realism) was
+  // already what most sessions wanted. The pick now lives on the storyboard's
+  // own caption pill, where the member is looking at the frames the look
+  // applies to; re-styling is free (the style block rides outside the card
+  // prompts), so moving it there costs nothing and takes a decision off the
+  // way to Generate. The video model isn't picked here either: it only matters
+  // once there are keyframes to animate, so that picker lives in the clip modal.
 }
 
 function BankCard({
@@ -111,9 +106,9 @@ function BankCard({
     return (
       <button
         onClick={onSelect}
-        // Empty: the same dashed surface the Visual Style row wears, fill
-        // included — it had none, so an unfilled Product read a shade darker
-        // than the unfilled style row directly under it.
+        // Empty: a dashed surface asking to be filled, with a fill of its own
+        // — without one an unfilled Product read a shade darker than the other
+        // dashed rows in the card.
         className={`flex w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors ${
           flat
             ? 'border-b border-dashed border-ink/10 hover:bg-ink/[0.04]'
@@ -257,20 +252,14 @@ export default function InputPanel({
   onModeChange,
   lineDelivery,
   onLineDeliveryChange,
-  styleChosen,
-  styleLabel,
-  styleHint,
-  styleIsCustom,
-  onOpenStyle,
-  onClearStyle,
 }: InputPanelProps) {
   const hasScript = scriptText.trim().length > 0
-  // The script gates the run now that B-Roll no longer writes one, alongside
-  // the look. The ad format is still the pick that shapes the shots, but it
-  // isn't in the gate: sessions that predate the format row have a script and
-  // no format, and a storyboard without staging is a plain UGC storyboard, not
-  // a broken one.
-  const canGenerate = hasScript && styleChosen
+  // The script is the whole gate now that B-Roll no longer writes one. The look
+  // used to be the other half and isn't any more — it folds to UGC Realism and
+  // is changed on the storyboard itself. The ad format was never in the gate
+  // either: sessions that predate the format row have a script and no format,
+  // and a storyboard without staging is a plain UGC storyboard, not a broken one.
+  const canGenerate = hasScript
   const [scriptExpanded, setScriptExpanded] = useState(false)
   const [instructionsExpanded, setInstructionsExpanded] = useState(false)
   const isContinuous = mode === 'continuous'
@@ -399,9 +388,8 @@ export default function InputPanel({
             {/* Script — REQUIRED (half of `canGenerate`), and the only reference
                 here that GROWS as you paste, which is why it sits under the two
                 bank pills rather than above them: there, every keystroke would
-                shove them down the column. Visual Style follows it for the same
-                reason it used to lead it — a 58px row that gets pushed down is
-                cheaper than three that do.
+                shove them down the column — a growing box pushes what's below
+                it, and everything below it here is one 48px toggle.
                 Bring your own words from the bank or a paste. It and the
                 Instructions box below share the
                 column's leftover height (`flex-1`, no `basis-0`): each one's base
@@ -446,123 +434,52 @@ export default function InputPanel({
               </div>
             </div>
 
-            {/* The words above, the look and the delivery below — one break
-                inside one card, not two cards. Everything here is still a
-                reference the storyboard is built FROM, so splitting the group
-                would say they're different kinds of thing; a hairline just says
-                you've finished reading one half. INSET, not full-bleed: it takes
-                SectionCard's own `p-3` like every row it sits between, so it ends
-                exactly where the card's HEADER hairline ends and the two read as
-                one pair of rules rather than two widths of line in one card. (It
-                was briefly `-mx-3` edge-to-edge, which met the card's border and
-                cut the card in half — the opposite of a break inside one group.)
-                `shrink-0` so a squeezed column can't drop it. */}
-            <div className="shrink-0 border-t border-ink/10" />
-
-            {/* Visual Style — the last reference, under the Script: the look is
-                something the storyboard is built FROM, so it reads as one of the
-                inputs rather than a switch on the way to Generate. Required, so
-                it's dashed and asking to be filled until picked, then
-                accent-filled with an X to clear. `shrink-0` because it now sits
-                below the box that owns the column's leftover height, and a fixed
-                58px row under a `flex-1` sibling is the one that gets squeezed. */}
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={onOpenStyle}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenStyle() } }}
-              title={styleChosen ? styleHint : 'How every clip looks'}
-              className={`group flex h-[58px] w-full shrink-0 cursor-pointer items-center gap-2.5 rounded-full border px-4 text-left transition-colors ${
-                styleChosen
-                  ? 'border-broll-500/25 bg-broll-500/[0.07] hover:border-broll-500/35 hover:bg-broll-500/10'
-                  : 'border-dashed border-ink/10 bg-ink/[0.02] hover:border-broll-500/30 hover:bg-broll-500/5'
-              }`}
-            >
-              {/* Required — half of `canGenerate`, so an unpicked style is red. */}
-              <StatusDot filled={styleChosen} required />
-              <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${styleIsCustom ? 'bg-broll-500/20 text-broll-300' : 'bg-broll-500/10 text-broll-400 light:text-broll-600'}`}>
-                {styleIsCustom ? <Sparkles className="h-[18px] w-[18px]" strokeWidth={1.75} /> : <Palette className="h-[18px] w-[18px]" strokeWidth={1.5} />}
-              </div>
-              {/* Name over a one-line subtext, the shape of the References
-                  cards above and the model row below — at 58px the second line
-                  is room the row already has, and "Visual Style" alone says
-                  nothing about what picking one does. Picked, the subtext is the
-                  style's own brief, clipped to the line. */}
-              <div className="flex min-w-0 flex-1 flex-col">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  {styleChosen ? (
-                    <>
-                      <span className="truncate text-[13px] font-medium tracking-tight text-broll-200 light:text-broll-700">{styleLabel}</span>
-                      {styleIsCustom && (
-                        <span className="shrink-0 rounded-full bg-broll-500/15 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wider text-broll-300 light:text-broll-700">
-                          Custom
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="truncate text-[13px] font-medium text-ink-300">Visual Style</span>
-                  )}
-                </div>
-                <div className="truncate text-[11px] leading-snug text-ink-500">
-                  {styleChosen ? styleHint : 'How every clip looks'}
-                </div>
-              </div>
-              {styleChosen ? (
-                <div className="flex shrink-0 items-center gap-1">
-                  <span className="hidden items-center rounded-md px-2 py-0.5 text-ink-500 group-hover:flex">
-                    <RefreshCw className="h-2.5 w-2.5" />
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onClearStyle() }}
-                    title="Clear style"
-                    aria-label="Clear style"
-                    className="flex h-6 w-6 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/5 hover:text-red-400 light:hover:text-red-600"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              ) : (
-                <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
-              )}
-            </div>
-
-            {/* Line-by-Line delivery — "B-Roll Clips" keeps every card silent,
-                for a voiceover laid over in the edit; "Dialogue Clips" makes all
-                three the character speaking that line, staged three different
-                ways. It's the last row INSIDE the References card, under Visual
-                Style: it decides what KIND of storyboard the references above it
-                are for, so it belongs to them rather than sitting outside the
-                card as a setting on the way to Generate. Shrink-0 — a fixed h-12
-                row in a column whose script box takes the leftover height. It
-                keeps that 48px switch height rather than the 58px of the picker
-                rows it now stacks with: it's a two-word toggle, not a row that
-                opens something. (It has also sat between the card and the
-                Instructions box, led the settings band, sat at that band's
-                bottom directly above Generate, and sat at the very top of the
-                column above the References heading.)
-                Continuous has no deliveries — it's narration over footage — so
-                it isn't rendered there at all. **B-Roll Clips leads the toggle,
-                Dialogue Clips is still the default**: the order reads left to
-                right as the plainer thing first, while the default stays on the
-                one most members are here to make. Position and default are
-                separate here on purpose — don't "fix" one to match the other. */}
-            {isLineMode(mode) && (
-              <SegmentedToggle<BrollDelivery>
-                className="h-12 shrink-0 !p-1"
-                value={lineDelivery}
-                onChange={onLineDeliveryChange}
-                accent="broll"
-                // The same two glyphs the Generate button below swaps between for
-                // these deliveries, so the button reads as an echo of what's
-                // picked here rather than as a third piece of vocabulary.
-                options={[
-                  { value: 'silent', label: 'B-Roll Clips', icon: Film },
-                  { value: 'dialogue', label: 'Dialogue Clips', icon: MessageSquareQuote },
-                ]}
-              />
-            )}
+            {/* Two rows left this card in August 2026. The Visual Style row is
+                REMOVED outright — the look is picked on the storyboard's caption
+                pill now (see the prop comment at the top of this file), and an
+                unpicked session folds to UGC Realism rather than greying out
+                Generate. The delivery toggle MOVED, to just below the card. The
+                hairline that used to separate the two of them from the script
+                went with them: with nothing but references left in here there is
+                no second half to mark off. */}
           </SectionCard>
+
+          {/* Line-by-Line delivery — "B-Roll Clips" keeps every card silent,
+              for a voiceover laid over in the edit; "Dialogue Clips" makes all
+              three the character speaking that line, staged three different
+              ways. It sits BETWEEN the References card and the Instructions box
+              (August 2026), not as the card's last row: the card is what the
+              storyboard is built FROM, and this is a decision about what to
+              build — it was the only switch in a list of things you attach, and
+              it needed a hairline inside the card to say so, which is a rule
+              admitting the row is in the wrong box. Shrink-0 — a fixed h-12 row
+              in a column whose script box takes the leftover height. It keeps
+              that 48px switch height rather than a picker row's 58px: it's a
+              two-word toggle, not a row that opens something. (It has also led
+              the settings band, sat at that band's bottom directly above
+              Generate, sat at the very top of the column above the References
+              heading, and sat inside the References card.)
+              Continuous has no deliveries — it's narration over footage — so
+              it isn't rendered there at all. **B-Roll Clips leads the toggle,
+              Dialogue Clips is still the default**: the order reads left to
+              right as the plainer thing first, while the default stays on the
+              one most members are here to make. Position and default are
+              separate here on purpose — don't "fix" one to match the other. */}
+          {isLineMode(mode) && (
+            <SegmentedToggle<BrollDelivery>
+              className="mb-2 h-12 shrink-0 !p-1"
+              value={lineDelivery}
+              onChange={onLineDeliveryChange}
+              accent="broll"
+              // The same two glyphs the Generate button below swaps between for
+              // these deliveries, so the button reads as an echo of what's
+              // picked here rather than as a third piece of vocabulary.
+              options={[
+                { value: 'silent', label: 'B-Roll Clips', icon: Film },
+                { value: 'dialogue', label: 'Dialogue Clips', icon: MessageSquareQuote },
+              ]}
+            />
+          )}
 
             {/* Additional instructions — a real textarea you type straight into.
                 It was a pill that opened a centred editor popup, which put a
@@ -605,11 +522,6 @@ export default function InputPanel({
         <div className="shrink-0 px-5 pb-2.5 pt-2">
           <div className="mb-2 flex flex-col gap-2">
 
-            {/* Who writes the shot prompts, then how the cards are delivered.
-                Visual Style used to lead this band and now sits with the
-                References above — it's an input the storyboard is built FROM,
-                like the product and the character, not a setting on the way to
-                Generate. */}
 
             {/* The Ad Format row (Formats + Structures, shared out of Scripts)
                 stood here and is REMOVED (July 2026), a week after B-Roll stopped
@@ -622,12 +534,10 @@ export default function InputPanel({
                 restoring the row is re-adding the picker, not rebuilding the
                 plumbing. See git history. */}
 
-            {/* Who writes the shot prompts. Second in the band because it's the
-                less often changed of the two: the look is a creative decision made
-                per ad, the model is a standing one about intelligence vs. spend.
-                className="" because the band spaces its rows with a flex gap, not
-                margins; `compact` so it matches the References cards up the
-                column, Visual Style now among them. */}
+            {/* Who writes the shot prompts — the only setting left in this
+                band, now that the look is picked on the storyboard and the ad
+                format is gone. className="" because the band spaces its rows
+                with a flex gap, not margins. */}
             <ScriptModelRow appId="broll-studio" className="" />
 
 
