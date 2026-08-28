@@ -5,8 +5,7 @@ import { useActivityStore } from '../stores/activityStore'
 import { useChromeHidden } from '../stores/chromeStore'
 import { useSkillUpdateUnseen } from '../stores/skillUpdateStore'
 import { APP_REGISTRY, type AppCategory, type AppConfig } from '../utils/constants'
-import { getTeamMember } from '../utils/team'
-import CrabSprite from './CrabSprite'
+import AppGlassTile from './AppGlassTile'
 import SettingsModal from './SettingsModal'
 
 // macOS-style bottom dock — the sidebar's replacement for this experiment.
@@ -152,10 +151,9 @@ function DockItem({ label, title, appId, active, running, busy, accent, onClick,
   )
 }
 
-// Colorful macOS-app-icon-style tile, lit as a piece of frosted glass: the
-// accent is the fill, `glass-fill` (index.css) lays the diffuse bloom and the
-// body gradient over it, and the tile's own rims and accent glow finish it.
-// The same class dresses every Generate button, so the two stay in step.
+// The dock's app button: the shared glass tile (components/AppGlassTile, which
+// also dresses Meet Your Team) plus the dock's own label, running dot and
+// update badge.
 function DockAppTile({
   app,
   active,
@@ -173,11 +171,6 @@ function DockAppTile({
   badge: boolean
   onClick: () => void
 }) {
-  const Icon = app.icon
-  // Admin's accent is near-white — a white glyph would vanish on it.
-  const iconColor = app.id === 'admin' ? '#27272a' : '#ffffff'
-  const member = getTeamMember(app.id)
-
   return (
     // No title attr: the native tooltip popping over the dock on hover was
     // distracting — the persona introduction lives in Meet your team.
@@ -190,49 +183,19 @@ function DockAppTile({
       accent={app.accent}
       onClick={onClick}
     >
-      <span className="relative flex h-12 w-12 items-center justify-center">
-        {/* On hover the app's crab persona peeks up over the top-right corner
-            of the tile — tucked behind it (z-0) and hidden until hover, then it
-            rises and fades in so the crew pokes out of the dock. Coloured in the
-            teammate's accent (not white) so it reads as "the new colour". */}
-        {member && (
-          <CrabSprite
-            variant={member.appId}
-            body={member.roleColor ?? app.accent}
-            className="pointer-events-none absolute -top-3 right-0 z-0 h-6 w-[22px] translate-y-2 rotate-6 opacity-0 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] [filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.3))] group-hover:translate-y-0 group-hover:opacity-100"
-          />
-        )}
-        <span
-          className="glass-fill relative z-10 flex h-12 w-12 items-center justify-center overflow-hidden rounded-[14px]"
-          style={{
-            // The accent is the fill; `glass-fill` frosts it. Keeping the flat
-            // colour here rather than baking a gradient in is what lets the
-            // dock and every Generate button share one definition of glass.
-            backgroundColor: app.accent,
-            // A contact shadow, a whisper of the tile's own colour on the dock
-            // below it, then the two rims. Both are lit, and the shaded band
-            // sits just ABOVE the bottom one (glass-fill's last stop): light
-            // entering the top of a solid piece of glass exits along its far
-            // edge, so a dark bottom rim reads as a printed sticker.
-            boxShadow: `0 1px 2px rgba(0,0,0,0.2), 0 6px 14px -10px color-mix(in oklab, ${app.accent} 60%, transparent), inset 0 1px 0 rgba(255,255,255,0.32), inset 0 -1px 0 rgba(255,255,255,0.14)`,
-          }}
-        >
-          <span className="absolute inset-0 rounded-[14px] ring-1 ring-inset ring-white/15" />
-          <Icon
-            className="relative h-[22px] w-[22px]"
-            style={{ color: iconColor, filter: 'drop-shadow(0 1px 1.5px rgba(0,0,0,0.18))' }}
-            strokeWidth={1.9}
-          />
-        </span>
-        {/* Top-LEFT, because the crab peeks out of the top-right on hover.
-            Ringed in the dock's own fill so it reads as a badge on the tile. */}
-        {badge && (
-          <span
-            className="absolute -left-0.5 -top-0.5 z-20 h-3 w-3 rounded-full border-2 border-surface-1 bg-red-500"
-            aria-hidden
-          />
-        )}
-      </span>
+      <AppGlassTile
+        app={app}
+        overlay={
+          // Top-LEFT, because the crab peeks out of the top-right on hover.
+          // Ringed in the dock's own fill so it reads as a badge on the tile.
+          badge ? (
+            <span
+              className="absolute -left-0.5 -top-0.5 z-20 h-3 w-3 rounded-full border-2 border-surface-1 bg-red-500"
+              aria-hidden
+            />
+          ) : null
+        }
+      />
     </DockItem>
   )
 }

@@ -61,15 +61,10 @@ export default function MenuBar() {
       {/* External links are desktop chrome — on phones they overflowed the bar. */}
       <MenuLink href="https://kie.ai/billing" label="Get Credits" />
       <MenuLink href={SKOOL_COMMUNITY_URL} label="Community" />
-      {/* Explicit Meet your team entry (the wordmark also opens it) — desktop
-          only, like the links above; on phones the wordmark stays the way in.
-          Sits at the far right of the bar. */}
-      <button
-        onClick={openTeamIntro}
-        className="hidden h-6 shrink-0 items-center rounded-md px-2 text-[12px] text-ink-300 transition-colors hover:bg-ink/[0.06] hover:text-ink-100 sm:flex"
-      >
-        Meet Your Team
-      </button>
+      {/* No Meet your team entry here any more (August 2026): the bar is
+          chrome, and the intro is a thing you reopen once in a while, not a
+          destination. The wordmark still opens it (macOS: Apple menu → About
+          This Mac) and Settings → About lists it by name. */}
       <ThemeItem />
     </header>
   )
