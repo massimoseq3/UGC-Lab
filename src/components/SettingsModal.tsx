@@ -53,6 +53,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   const storedScKey = useSettingsStore((s) => s.scrapeCreatorsKey)
   const setScrapeCreatorsKey = useSettingsStore((s) => s.setScrapeCreatorsKey)
   const openApp = useAppStore((s) => s.openApp)
+  const openTeamIntro = useAppStore((s) => s.openTeamIntro)
   const profile = useAuthStore((s) => s.profile)
   const signOut = useAuthStore((s) => s.signOut)
   const updateDisplayName = useAuthStore((s) => s.updateDisplayName)
@@ -895,6 +896,20 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
 
             {active.id === 'about' && (
               <Section>
+                {/* The way back into the intro, now that the menu bar no longer
+                    carries one. Settings closes first — the intro is a modal of
+                    its own and would otherwise open over this one. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose()
+                    openTeamIntro()
+                  }}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-ink/5 bg-ink/[0.02] px-4 py-3 text-left transition-colors hover:bg-ink/[0.05]"
+                >
+                  <span className="min-w-0 flex-1 text-[12px] font-medium text-ink-200">Meet Your Team</span>
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-ink-500" />
+                </button>
                 <div className="overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.02]">
                   {LEGAL_LINKS.map((item, i) => (
                     <a

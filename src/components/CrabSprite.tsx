@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react'
+
 // Pixel-art crab mascot, one costume per app — the "team member" avatars for
 // the Meet the Team screen. Drawn as unit rects on a 16×12 grid so it stays
 // crisp at any size (shape-rendering: crispEdges). The base crab is identical
@@ -163,12 +165,14 @@ export default function CrabSprite({
   variant = 'plain',
   body,
   className,
+  style,
 }: {
   variant?: CrabVariant
   // Body color override — the dock passes beige (#F8F8F4) so the crab reads
   // on saturated accent tiles; the default coral is for pale surfaces.
   body?: string
   className?: string
+  style?: CSSProperties
 }) {
   const bodyFill = body ?? (variant === 'kie' ? GOLD : CRAB)
   const rects = [...baseRects(bodyFill), ...COSTUMES[variant]]
@@ -185,6 +189,7 @@ export default function CrabSprite({
       viewBox="0 0 16 12"
       shapeRendering="crispEdges"
       className={className}
+      style={style}
       aria-hidden="true"
     >
       <g transform={`translate(0 ${shiftY})`}>

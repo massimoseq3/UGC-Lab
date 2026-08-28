@@ -7,6 +7,7 @@ import { getAppConfig } from '../utils/constants'
 import { TEAM } from '../utils/team'
 import type { TeamMember } from '../utils/team'
 import CrabSprite from './CrabSprite'
+import AppGlassTile from './AppGlassTile'
 import AppLogo from './AppLogo'
 import { useKeyConnect } from './ApiKeyGuide'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
@@ -146,13 +147,17 @@ function Crew({ onVisit }: { onVisit: (appId: string) => void }) {
       {/* A 3-across grid on a phone (two rows of three), a single chain from sm
           up. Six cards sharing one 390px line left every name truncated to
           "Ch…" / "Scr…" / "Voi…", which introduces nobody. */}
+      {/* Each cell is items-stretch, not items-center: a two-line role
+          ("Creative Director") makes one card taller, and centring it would
+          ride that card's ICON out of line with the other five. The chevron
+          centres itself instead. */}
       <div className="mt-2 grid grid-cols-3 gap-1 sm:flex sm:flex-nowrap sm:items-stretch sm:justify-center">
         {WORKFLOW.map((member, i) => (
-          <div key={member.appId} className="flex min-w-0 items-center sm:flex-1">
+          <div key={member.appId} className="flex min-w-0 items-stretch sm:flex-1">
             {i > 0 && (
               <ChevronRight
                 aria-hidden
-                className="hidden h-4 w-4 shrink-0 text-ink-700 sm:block"
+                className="hidden h-4 w-4 shrink-0 self-center text-ink-700 sm:block"
                 strokeWidth={2.5}
               />
             )}
@@ -161,19 +166,12 @@ function Crew({ onVisit }: { onVisit: (appId: string) => void }) {
         ))}
       </div>
 
-      {/* The caption slot. Fixed height so a hover never nudges the layout. */}
+      {/* The caption slot: the blurb alone. The teammate's name and role used
+          to lead it — the role now sits under every card's title where it reads
+          without a hover, and repeating it here said the same words twice.
+          Fixed height so a hover never nudges the layout. */}
       <p className="mt-3 flex min-h-[34px] items-center justify-center px-4 text-center text-[12.5px] leading-snug text-ink-400">
-        {hovered ? (
-          <span>
-            <span className="font-medium text-ink-200">{hovered.name}</span>
-            <span className="mx-1.5 text-ink-700">·</span>
-            <span className="text-ink-500">{hovered.role}</span>
-            <span className="mx-1.5 text-ink-700">·</span>
-            {hovered.blurb}
-          </span>
-        ) : (
-          DEFAULT_CAPTION
-        )}
+        {hovered ? hovered.blurb : DEFAULT_CAPTION}
       </p>
 
       <GroupHeading className="mt-4">Always on call</GroupHeading>
@@ -214,8 +212,11 @@ function GroupHeading({ children, className = '' }: { children: React.ReactNode;
   )
 }
 
-// One teammate. The crab is the card — big enough to read as a character
-// rather than a bullet glyph, which is what it was at 28px in the old list.
+// One teammate, wearing the SAME icon the dock does (`AppGlassTile`) — the
+// crab alone introduced a picture that appears nowhere else in the workspace,
+// so a member met the crew and then went looking for them among eight glass
+// tiles. The crab still arrives on hover, out of the top-right corner, exactly
+// as it does in the dock; the card's own lift moves the pair together.
 function CrewCard({
   member,
   onVisit,
@@ -239,14 +240,19 @@ function CrewCard({
       style={{ '--tint': `${app.accent}1A` } as CSSProperties}
       className="group relative flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-2xl px-2 py-3 transition-colors duration-200 hover:bg-[var(--tint)] focus-visible:bg-[var(--tint)]"
     >
-      <CrabSprite
-        variant={member.appId}
-        body={member.roleColor ?? app.accent}
-        className="h-10 w-[3.25rem] transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-1"
-      />
+      <span className="flex h-12 items-center transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-1">
+        <AppGlassTile app={app} />
+      </span>
+      {/* The app, then the JOB it does for you. The persona's own name (Clawdia,
+          Pinchy) used to be this second line and came off in August 2026 — a
+          name introduces nobody on its own, where "Casting Director" says what
+          the app is for at a glance, which is the whole point of this screen. */}
       <span className="w-full min-w-0">
         <span className="block truncate text-[12.5px] font-semibold tracking-tight text-ink-100">{app.name}</span>
-        <span className="block truncate text-[11px] leading-tight text-ink-500">{member.name}</span>
+        {/* Wraps rather than truncates: six cards on one line leave ~90px, and
+            "Creative Director" clipped to "Creative Direct…" names no job. The
+            row is items-stretch, so a two-line role just sets the row's height. */}
+        <span className="block text-[11px] leading-tight text-ink-500">{member.role}</span>
       </span>
     </button>
   )
