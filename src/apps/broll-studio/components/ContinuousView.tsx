@@ -2376,7 +2376,7 @@ function ClipCard({
               {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
             </TileActionButton>
             <TileActionButton
-              title="Use in Playground as Gemini Omni source clip"
+              title="Use in Playground as a source clip"
               onClick={() => { void sendClipToPlayground(currentVideo) }}
             >
               <Film className="h-4 w-4" />

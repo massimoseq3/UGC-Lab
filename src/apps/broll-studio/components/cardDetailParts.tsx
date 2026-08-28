@@ -536,7 +536,7 @@ function VideoTile({
           />
         )}
         <TileActionButton
-          title="Use in Playground as Gemini Omni source clip"
+          title="Use in Playground as a source clip"
           onClick={(e) => { e.stopPropagation(); onSendToPlayground() }}
         >
           <Film className="h-4 w-4" />

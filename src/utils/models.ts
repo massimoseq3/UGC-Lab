@@ -1178,6 +1178,70 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // pick, but the *default* video model is Grok Imagine 1.5 (below), which
     // does image-to-video and so works everywhere including Animate.
   },
+  // Gemini Omni Flash 1.1 — the same Omni ecosystem one version on, and the
+  // first of the family with FRAME CONTROL. Everything Omni 1.0 takes it takes
+  // (up to 7 reference images, persistent character ids, designed voice ids, a
+  // trimmed source clip, all on the same shared 7-slot quota), plus:
+  //   • first_frame_url / last_frame_url — real frame-one/frame-last fields,
+  //     which is what makes this the Omni entry B-Roll's Animate tab and
+  //     Continuous' keyframe chain can actually use. 1.0 has neither and folds
+  //     every image into `image_urls`, which is why it lands greyed there.
+  //   • a 360p draft tier, priced identically to 720p/1080p — cheap in time,
+  //     not in credits.
+  // Frames and reference images live in SEPARATE fields here rather than 1.0's
+  // one flat array, but the question `mixedImageInputs` asks is "what happens
+  // when both arrive", and the answer is still that both reach the model — so
+  // 'merged' is the right policy and Playground sends the pair unchallenged.
+  // Docs: https://docs.kie.ai/market/google/gemini-omni-flash-1-1
+  //
+  // Pricing (kie, user-supplied 2026-08-28, matching kie.ai/pricing) — the same
+  // card 1.0 bills on, with 360p riding the base tier:
+  //   360p/720p/1080p: 4s=63 / 6s=84 / 8s=105 / 10s=126
+  //   4k:              4s=147 / 6s=168 / 8s=189 / 10s=210   (base + 84)
+  //   with a video input, duration is model-decided and billing is flat:
+  //                    168 (360p/720p/1080p) or 252 (4k)
+  // No `official` / `market` entry, deliberately: Google publishes no rate for
+  // the Omni Flash tier, and 1.0's ≈$0.10/s estimate is a figure for a
+  // different model — reusing it would invent a discount. Unknown savings
+  // count as zero. kie's +10% top-up bonus is likewise not modelled (it moves
+  // the real cost down, the honest direction to be wrong in).
+  {
+    id: 'google/gemini-omni-flash-1-1',
+    displayName: 'Gemini Omni Flash 1.1',
+    provider: 'Google',
+    task: 'video',
+    modes: ['text-to-video', 'image-to-video', 'frames-to-video', 'reference-to-video'],
+    tags: ['recommended', 'new'],
+    supportsReferenceImages: true,
+    mixedImageInputs: 'merged',
+    // Ceiling when nothing else is attached — characters (×1) and the source
+    // clip (×2) eat into the same 7 slots, which Playground subtracts on top.
+    maxReferenceImages: 7,
+    omniInputs: true,
+    pricing: {
+      unit: 'per-call',
+      credits: 105,
+      priceFor: ({ durationSeconds = 8, resolution = '720p', videoInput = false }) => {
+        const is4k = resolution === '4k'
+        if (videoInput) return is4k ? 252 : 168
+        const base =
+          durationSeconds >= 10 ? 126 :
+          durationSeconds >= 8 ? 105 :
+          durationSeconds >= 6 ? 84 : 63
+        return is4k ? base + 84 : base
+      },
+    },
+    videoEndpoint: 'createTask',
+    videoConstraints: {
+      durations: [4, 6, 8, 10],
+      resolutions: ['360p', '720p', '1080p', '4k'],
+      // 360p costs the same credits as 1080p — it buys a faster draft, not a
+      // cheaper one — so nobody should land on it by default. 720p is the
+      // floor a member expects, same as everywhere else in the picker.
+      default: '720p',
+      aspectRatios: ['16:9', '9:16'],
+    },
+  },
   // Wan 3.0 / Wan 3.0 Prime — Alibaba Tongyi's all-in-one video model, in two
   // speed tiers. ONE schema serves both slugs (`wan/3-0-video`,
   // `wan/3-0-video-prime`): same fields, same caps, same routes — Prime just
@@ -2159,6 +2223,40 @@ export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<
     const allowedDurations = [4, 6, 8, 10]
     return {
       prompt: opts.prompt,
+      ...(imageUrls.length > 0 ? { image_urls: imageUrls } : {}),
+      ...(opts.omniAudioIds?.length ? { audio_ids: opts.omniAudioIds } : {}),
+      ...(opts.omniCharacterIds?.length ? { character_ids: opts.omniCharacterIds } : {}),
+      ...(opts.videoClip ? { video_list: [opts.videoClip] } : {}),
+      duration: String(allowedDurations.includes(duration) ? duration : 8),
+      aspect_ratio: ar === '9:16' ? '9:16' : '16:9',
+      resolution,
+    }
+  }
+
+  // ── Gemini Omni Flash 1.1 ──
+  // Same family as the branch above, one version on, and the difference is
+  // that this one has REAL frame fields: `first_frame_url` / `last_frame_url`
+  // sit beside `image_urls` rather than everything being folded into one flat
+  // array. So a start frame stays frame one here instead of degrading into a
+  // generic reference, and references ride along in the same request
+  // (mixedImageInputs: 'merged' — the pair is legal, just carried in two
+  // fields). Characters / designed voices / the source clip are unchanged, and
+  // `duration` is still a required string enum that kie ignores once a video
+  // clip is present.
+  if (modelId === 'google/gemini-omni-flash-1-1') {
+    const firstFrame = opts.firstFrameUrl ?? (opts.mode === 'image-to-video' ? opts.imageUrl : undefined)
+    // A frame that arrives in reference mode has no frame field to sit in —
+    // the caller already downgraded the mode — so it rides as a reference,
+    // ahead of the explicit ones, exactly as the 1.0 branch does.
+    const strayFrames = opts.mode === 'reference-to-video'
+      ? [opts.imageUrl, opts.firstFrameUrl, opts.lastFrameUrl].filter((u): u is string => !!u)
+      : []
+    const imageUrls = [...strayFrames, ...(opts.referenceImageUrls ?? [])]
+    const allowedDurations = [4, 6, 8, 10]
+    return {
+      prompt: opts.prompt,
+      ...(opts.mode !== 'reference-to-video' && firstFrame ? { first_frame_url: firstFrame } : {}),
+      ...(opts.mode !== 'reference-to-video' && opts.lastFrameUrl ? { last_frame_url: opts.lastFrameUrl } : {}),
       ...(imageUrls.length > 0 ? { image_urls: imageUrls } : {}),
       ...(opts.omniAudioIds?.length ? { audio_ids: opts.omniAudioIds } : {}),
       ...(opts.omniCharacterIds?.length ? { character_ids: opts.omniCharacterIds } : {}),

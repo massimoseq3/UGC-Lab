@@ -254,14 +254,18 @@ export default function Playground() {
       }
     } else if (targetField === 'videoSourceClip' && data && typeof data === 'object' && 'videoRef' in data) {
       // Generated video (B-Roll take, etc.) → Gemini Omni source clip, for
-      // redubs/restyles of an existing clip. Omni is the one model that takes
-      // a source video, so the handoff switches to it outright. Refs are
-      // replaced wholesale: a stale start frame would force image-to-video (a
-      // mode Omni doesn't have) and leftover images could bust the 7-slot
-      // quota. The prompt is left alone — with a source clip it's the change
+      // redubs/restyles of an existing clip. The Omni family is what takes a
+      // source video at all, so the handoff switches to it outright, and it
+      // picks Flash 1.1 — the newer of the two, and the same flat price on a
+      // clip-input run (168 credits, 252 at 4k), so there is nothing to trade.
+      // Refs are replaced wholesale: leftover images could bust the 7-slot
+      // quota, and a stale start frame is worse here than it looks — 1.0 has no
+      // frame fields and would fold it in as another reference, while 1.1 DOES,
+      // so it would land as frame one and fight the clip for what the take
+      // opens on. The prompt is left alone — with a source clip it's the change
       // instruction ("same take, dialogue in Spanish"), not a scene brief.
       const clip = data as VideoSourceClipPayload
-      const omni = getModel('gemini-omni-video')
+      const omni = getModel('google/gemini-omni-flash-1-1')
       const knownDuration = Number.isFinite(clip.durationSeconds) && clip.durationSeconds! > 0
         ? clip.durationSeconds!
         : undefined
@@ -270,7 +274,7 @@ export default function Playground() {
       setState((s) => ({
         ...s,
         mode: 'video',
-        modelId: 'gemini-omni-video',
+        modelId: 'google/gemini-omni-flash-1-1',
         resolution: omni?.videoConstraints?.default ?? s.resolution,
         audio: true,
         refs: [{

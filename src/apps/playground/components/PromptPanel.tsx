@@ -292,12 +292,17 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
 
   // A model's own declared cap wins (the Seedance family takes 9 — see
   // `maxReferenceImages` in the registry); anything undeclared keeps the
-  // panel's historical 9. Gemini Omni is the exception: its image cap is
-  // whatever its 7-slot quota leaves after characters (×1 each) and the source
-  // clip (×2), so it's computed here rather than read off the entry.
+  // panel's historical 9. The Gemini Omni family is the exception: its image
+  // cap is whatever its 7-slot quota leaves after characters (×1 each) and the
+  // source clip (×2), so it's computed here rather than read off the entry.
+  // Frames count as images against that quota — on 1.0 they ARE images (folded
+  // into `image_urls` below), and on Flash 1.1, which has real frame fields,
+  // they still spend a slot. Same sum `omniQuotaUsed` in OmniInputsSection
+  // charges, which is what keeps the two readouts agreeing.
   const omniImageCap = 7
     - state.refs.filter((r) => r.slot === 'omni-character').length
     - (state.refs.some((r) => r.slot === 'omni-clip') ? 2 : 0)
+    - state.refs.filter((r) => r.slot === 'start' || r.slot === 'end').length
   const maxRefs = model?.omniInputs
     ? Math.max(0, omniImageCap)
     : model?.maxReferenceImages ?? 9
@@ -397,10 +402,17 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
         // Leaving a motion-control model: drop its slots before the rest.
         nextRefs = nextRefs.filter((r) => r.slot !== 'motion-image' && r.slot !== 'motion-video')
         if (model?.omniInputs) {
-          // Omni has no frame slots; a start/end frame is just another image ref.
-          nextRefs = nextRefs.map((r) =>
-            r.slot === 'start' || r.slot === 'end' ? { ...r, slot: 'ref' as const } : r,
-          )
+          // Omni 1.0 has no frame fields, so a start/end frame there is just
+          // another image ref and the slot has to be folded or the panel would
+          // hold state it doesn't render. Flash 1.1 DOES have them, so it keeps
+          // its frames — read off the declared modes rather than off
+          // `omniInputs`, which says what extra inputs the family takes and
+          // nothing about frames.
+          if (!supportsFrames) {
+            nextRefs = nextRefs.map((r) =>
+              r.slot === 'start' || r.slot === 'end' ? { ...r, slot: 'ref' as const } : r,
+            )
+          }
         } else {
           nextRefs = nextRefs.filter(
             (r) => r.slot !== 'omni-character' && r.slot !== 'omni-voice' && r.slot !== 'omni-clip',
