@@ -16,16 +16,11 @@ import StreakRing from './StreakRing'
 import Widget, {
   WidgetLabel,
   WidgetFigure,
+  WidgetDelta,
   WIDGET_SHELL,
   WIDGET_INTERACTIVE,
   DISPLAY_FONT,
   riseStyle,
-  SHORTCUT_TILE,
-  SHORTCUT_TILE_DISC,
-  SHORTCUT_TILE_GLYPH,
-  SHORTCUT_TILE_TEXT,
-  SHORTCUT_TILE_TITLE,
-  SHORTCUT_TILE_SUB,
 } from './Widget'
 
 // Dashboard — the workspace's "what you're getting out of this" screen and the
@@ -174,53 +169,76 @@ export default function Dashboard() {
                 `PHONE_WEEKS` columns of smaller cells (see ActivityHeatmap) —
                 a quarter of the history at a size you can read, rather than
                 half a year squeezed into 128px. */}
-            <div className="grid grid-cols-12 gap-3.5">
-              {/* Time saved */}
-              <Widget index={slot(0)} className="col-span-6 max-sm:items-center max-sm:text-center lg:col-span-5">
-                <WidgetLabel icon={Clock} label="Time saved" />
-                <div className="mt-auto w-full pt-4">
-                  <WidgetFigure
-                    value={formatTimeSaved(metrics.minutesSaved)}
-                    delta={metrics.minutesSavedLast7d > 0 ? `+${formatTimeSaved(metrics.minutesSavedLast7d)} this week` : undefined}
-                  />
-                  {/* Two spans, not two strings: the tail is what wraps a
-                      half-width bento tile onto a third line, and a phone gets
-                      the fact without it. */}
-                  <p className="mt-1.5 text-[12px] leading-snug text-ink-500">
-                    {workdays >= 1 ? (
-                      <>
-                        {`≈ ${workdays < 10 ? Math.round(workdays * 10) / 10 : Math.round(workdays)} workdays`}
-                        <span className="hidden sm:inline"> of production and tool-hopping</span>
-                      </>
-                    ) : hasActivity ? (
-                      `across ${metrics.totalGenerations.toLocaleString()} generation${metrics.totalGenerations === 1 ? '' : 's'}`
-                    ) : (
-                      <>
-                        vs doing it by hand
-                        <span className="hidden sm:inline"> — every asset</span>
-                      </>
-                    )}
+            <div className="grid grid-cols-12 gap-3.5 sm:auto-rows-fr">
+              {/* Activity */}
+              <Widget index={slot(0)} className="col-span-6 items-center text-center lg:col-span-4">
+                <WidgetLabel icon={CalendarCheck} label="Activity" />
+                <div className="mt-auto flex w-full items-end pt-3">
+                  <ActivityHeatmap days={usageDays} />
+                </div>
+                {/* The tally reads UNDER the grid it counts, the way Streak's
+                    record reads under its ring — it sat beside the label in the
+                    header until the wall went to six equal centred tiles, where
+                    a note in that row is what knocks the label off centre. Still
+                    gone below `sm`, where the bento can't spare the line.
+                    There is nothing here before there is activity: "Every
+                    generation lights up a day" held the slot on the reasoning
+                    that 26 weeks of blank cells read as a broken widget rather
+                    than a waiting one, and came out because the label already
+                    says Activity and the empty grid says there hasn't been
+                    any. */}
+                {hasActivity && (
+                  <p className="mt-2 hidden max-w-full truncate text-[11px] text-ink-500 sm:block">
+                    {`${metrics.totalGenerations.toLocaleString()} generations · ${metrics.activeDays.toLocaleString()} active days${sinceLabel ? ` since ${sinceLabel}` : ''}`}
                   </p>
+                )}
+              </Widget>
+              {/* Time saved */}
+              <Widget index={slot(1)} className="col-span-6 items-center text-center lg:col-span-4">
+                <WidgetLabel icon={Clock} label="Time saved" />
+                {/* NOT `mt-auto`: bottom-aligning this block lands the figure
+                    at a different height in each tile, because Money saved's
+                    floor art (a bar plus two captions) is taller than a
+                    sparkline and pushes its block further up. The text stacks
+                    from the label down in both, so hero / caption / delta line
+                    up across the pair, and only the CHART takes `mt-auto`. */}
+                <div className="w-full pt-4">
+                  <WidgetFigure value={formatTimeSaved(metrics.minutesSaved)} />
+                  {/* The workdays line is the figure in a second unit and
+                      nothing else — "≈ 7.6 workdays of production and
+                      tool-hopping" was a sentence explaining a number that
+                      doesn't need explaining, and the ≈ hedged a figure the
+                      widget above it already states exactly. */}
+                  <p className="mt-1.5 text-[12px] leading-snug text-ink-500">
+                    {workdays >= 1
+                      ? `${workdays < 10 ? Math.round(workdays * 10) / 10 : Math.round(workdays)} workdays`
+                      : hasActivity
+                        ? `across ${metrics.totalGenerations.toLocaleString()} generation${metrics.totalGenerations === 1 ? '' : 's'}`
+                        : 'vs doing it by hand'}
+                  </p>
+                  {metrics.minutesSavedLast7d > 0 && (
+                    <WidgetDelta>{`+${formatTimeSaved(metrics.minutesSavedLast7d)} this week`}</WidgetDelta>
+                  )}
+                </div>
+                <div className="mt-auto w-full">
                   <Sparkline values={spark} />
                 </div>
               </Widget>
 
               {/* Money saved */}
-              <Widget index={slot(1)} className="col-span-6 max-sm:items-center max-sm:text-center lg:col-span-4">
-                <WidgetLabel
-                  icon={PiggyBank}
-                  label="Money saved"
-                  note={hasActivity ? `${Math.round(metrics.creditsSpent).toLocaleString()} credits` : undefined}
-                />
-                <div className="mt-auto w-full pt-4">
-                  <WidgetFigure
-                    value={formatUsd(metrics.usdSaved)}
-                    delta={metrics.usdSavedLast7d >= 0.01 ? `+${formatUsd(metrics.usdSavedLast7d)} this week` : undefined}
-                  />
+              <Widget index={slot(2)} className="col-span-6 items-center text-center lg:col-span-4">
+                <WidgetLabel icon={PiggyBank} label="Money saved" />
+                <div className="w-full pt-4">
+                  <WidgetFigure value={formatUsd(metrics.usdSaved)} />
                   <p className="mt-1.5 text-[12px] leading-snug text-ink-500">
                     vs official APIs
                     <span className="hidden sm:inline"> &amp; creator platforms</span>
                   </p>
+                  {metrics.usdSavedLast7d >= 0.01 && (
+                    <WidgetDelta>{`+${formatUsd(metrics.usdSavedLast7d)} this week`}</WidgetDelta>
+                  )}
+                </div>
+                <div className="mt-auto w-full">
                   <SpendBar spent={metrics.kieUsd} elsewhere={metrics.officialUsd} format={formatUsd} />
                 </div>
               </Widget>
@@ -228,7 +246,7 @@ export default function Dashboard() {
               {/* Streak — the ring is the desktop's signature widget. The record
                   it's measured against reads under it rather than in a tile of
                   its own; the ring already draws the comparison. */}
-              <Widget index={slot(2)} className="col-span-6 items-center text-center lg:col-span-3">
+              <Widget index={slot(3)} className="col-span-6 items-center text-center lg:col-span-4">
                 <div className="w-full">
                   <WidgetLabel icon={Flame} label="Streak" />
                 </div>
@@ -238,29 +256,6 @@ export default function Dashboard() {
                 <p className="mt-auto pt-2 text-[11px] leading-snug text-ink-500">{streakNote}</p>
               </Widget>
 
-              {/* Activity */}
-              <Widget index={slot(3)} className="col-span-6 max-sm:items-center max-sm:text-center lg:col-span-5">
-                <div className="flex w-full items-center justify-between gap-3 max-sm:justify-center">
-                  <WidgetLabel icon={CalendarCheck} label="Activity" />
-                  {/* Nothing at all before there is activity (August 2026,
-                      Massimo's call). The empty grid used to carry "Every
-                      generation lights up a day" here, on the reasoning that 26
-                      weeks of blank cells read as a broken widget rather than a
-                      waiting one — but the label already says Activity and the
-                      empty grid says there hasn't been any, so the line was
-                      narrating the picture underneath it. */}
-                  {hasActivity && (
-                    <p className="hidden max-w-full truncate text-[11px] text-ink-500 sm:block">
-                      {`${metrics.totalGenerations.toLocaleString()} generations · ${metrics.activeDays.toLocaleString()} active days${sinceLabel ? ` since ${sinceLabel}` : ''}`}
-                    </p>
-                  )}
-                </div>
-                {/* Centred as a block on a phone, where the tile is half a
-                    screen; from `sm` the grid sits at the tile's left edge. */}
-                <div className="mt-auto flex w-full items-end pt-3 max-sm:justify-center">
-                  <ActivityHeatmap days={usageDays} />
-                </div>
-              </Widget>
 
               {/* The row ends in two shortcuts, each with a column of its own
                   and each SIZED TO THE WIDGET ABOVE IT (August 2026, Massimo's
@@ -280,23 +275,31 @@ export default function Dashboard() {
                   `lg`. */}
               <AnnouncementsTile index={slot(4)} className="col-span-6 lg:col-span-4" />
 
-              {/* Academy */}
+              {/* Academy — the wall's one pure LINK, and the one tile with
+                  nothing of the member's own in it, so it keeps the centred
+                  disc-over-title card rather than taking a WidgetLabel header
+                  like the five that report something. Announcements wore this
+                  same shape until it became a log; the shape lived in
+                  Widget.tsx as a shared constant for exactly as long as two
+                  cards wore it. */}
               <a
                 href={AI_UGC_ACADEMY_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={riseStyle(slot(5))}
-                // Shape shared with AnnouncementsTile — SHORTCUT_TILE, Widget.tsx.
-                className={`col-span-6 lg:col-span-3 ${SHORTCUT_TILE} ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
+                className={`widget-rise group relative col-span-6 flex flex-col items-center justify-center gap-3 p-4 text-center lg:col-span-4 ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
               >
-                <span className={SHORTCUT_TILE_DISC}>
-                  <GraduationCap className={`text-dashboard-400 ${SHORTCUT_TILE_GLYPH}`} strokeWidth={1.75} />
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-dashboard-500/15">
+                  <GraduationCap className="h-6 w-6 text-dashboard-400" strokeWidth={1.75} />
                 </span>
-                <span className={SHORTCUT_TILE_TEXT}>
-                  <span className={SHORTCUT_TILE_TITLE} style={DISPLAY_FONT}>
+                <span>
+                  <span
+                    className="block text-[15px] italic font-normal leading-tight tracking-tight text-ink-50"
+                    style={DISPLAY_FONT}
+                  >
                     AI UGC Academy
                   </span>
-                  <span className={`${SHORTCUT_TILE_SUB} text-ink-500`}>Trainings</span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-ink-500">Trainings</span>
                 </span>
                 {/* Out of flow — in it, the arrow costs the title 28px it
                     doesn't have. Gone entirely below `sm`, where the tile is

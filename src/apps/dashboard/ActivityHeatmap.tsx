@@ -4,17 +4,14 @@ import { usageDayId } from '../../utils/usage'
 
 // GitHub-style activity grid: one rounded cell per day, columns are weeks
 // (Monday-first), intensity is a single-hue sequential ramp on the Dashboard
-// amber. Empty days stay in quiet ink so the accent only ever encodes data.
+// green. Empty days stay in quiet ink so the accent only ever encodes data.
 
-const WEEKS = 26
-// How many of those columns survive on a phone. Below `sm` the grid shares a
-// bento row with the streak ring and has ~128px to draw in, so the cells shrink
-// to 8px and the oldest columns are dropped rather than squeezed — a quarter of
-// history at a readable size beats half a year as a smudge. CSS-only: every
-// column still renders and the extra ones take `max-sm:hidden`, so there is no
-// media query in JS and the desktop grid is untouched by construction.
-const PHONE_WEEKS = 12
-const phoneHidden = (i: number) => (i < WEEKS - PHONE_WEEKS ? 'max-sm:hidden' : '')
+// A QUARTER's worth of weeks, not half a year (August 2026, Massimo's call). It
+// ran 26 columns back, which at the tile's own width drew cells too small to
+// read and spent most of the picture on months a member has stopped thinking
+// about — the recent run is the thing this widget is looked at for. Thirteen
+// columns fill the same box at roughly twice the cell size.
+const WEEKS = 13
 
 // Sequential intensity ramp — thresholds chosen so a casual day (1–2 gens)
 // already lights up while heavy batch days still read distinctly darker.
@@ -45,10 +42,7 @@ function mondayOfWeek(ts: number): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() - shift)
 }
 
-interface WeekColumn {
-  monthLabel: string | null
-  days: Array<{ id: string; count: number; future: boolean; label: string }>
-}
+type WeekColumn = Array<{ id: string; count: number; future: boolean; label: string }>
 
 export default function ActivityHeatmap({ days }: { days: UsageDay[] }) {
   // Captured once per mount — the grid's "today" anchor. Fine to go stale
@@ -66,20 +60,10 @@ export default function ActivityHeatmap({ days }: { days: UsageDay[] }) {
     const gridYear = anchor.getFullYear()
     const gridMonth = anchor.getMonth()
     const gridDate = anchor.getDate() - (WEEKS - 1) * 7
-    const out: WeekColumn[] = []
-    let lastMonth = -1
-    for (let w = 0; w < WEEKS; w++) {
+    return Array.from({ length: WEEKS }, (_, w) =>
       // Constructing each day as a real calendar date (not weekStart + i·DAY_MS)
       // keeps every cell on the right local day across DST transitions.
-      const weekStart = new Date(gridYear, gridMonth, gridDate + w * 7)
-      // Label a column when it starts a new month (skip the very first column
-      // if the label would collide with nothing before it — GitHub-style).
-      const month = weekStart.getMonth()
-      const monthLabel = month !== lastMonth
-        ? weekStart.toLocaleDateString(undefined, { month: 'short' })
-        : null
-      lastMonth = month
-      const daysInWeek = Array.from({ length: 7 }, (_, i) => {
+      Array.from({ length: 7 }, (_, i) => {
         const cell = new Date(gridYear, gridMonth, gridDate + w * 7 + i)
         const ts = cell.getTime()
         const id = usageDayId(ts)
@@ -90,66 +74,46 @@ export default function ActivityHeatmap({ days }: { days: UsageDay[] }) {
           future: ts > now,
           label: `${cell.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — ${count === 0 ? 'no generations' : `${count} generation${count === 1 ? '' : 's'}`}`,
         }
-      })
-      out.push({ monthLabel, days: daysInWeek })
-    }
-
-    // Labels are absolutely narrow (11px column, ~18px of text), so two month
-    // starts within a couple of columns render as one smudge — the grid's
-    // first column is the usual culprit, since it's labelled even when the
-    // month turns over a week later ("JanFeb"). Drop the earlier of any two
-    // labels closer than MIN_LABEL_GAP columns; the later one wins because it
-    // marks the month that actually owns most of the grid.
-    const MIN_LABEL_GAP = 3
-    let lastLabelled = -MIN_LABEL_GAP
-    for (let w = 0; w < out.length; w++) {
-      if (!out[w].monthLabel) continue
-      if (w - lastLabelled < MIN_LABEL_GAP) out[lastLabelled].monthLabel = null
-      lastLabelled = w
-    }
-    return out
+      }),
+    )
   }, [days, now])
 
+  // The grid SIZES ITSELF to whatever tile it is dropped in: every column takes
+  // `flex-1 min-w-0` and every cell `aspect-square w-full`, so the blocks come
+  // out as big as the row allows and the picture ends where the tile does. It
+  // drew at a fixed 11px per cell above `sm` until August 2026, which made it a
+  // fixed-size object in a fluid box — a dead margin down its right wherever the
+  // tile was wider (reported as "a massive gap" the moment the legend that had
+  // been filling it came out) and an overflow scrollbar wherever it was
+  // narrower. Both were the same bug.
+  //
+  // `max-w` is the one limit: 13 square cells with no ceiling would be ~24px
+  // each in a full-width tile, and the grid's HEIGHT follows its cell size, so
+  // the whole wall's second row would grow with the window. Capped, a wide tile
+  // centres the grid instead — even margins, which read as placement where a
+  // one-sided margin reads as a gap.
+  //
+  // There are no month labels. They were a 9px row over the grid, and at
+  // thirteen columns the picture is a quarter and reads as "the recent run"
+  // rather than as a calendar to find a date in.
   return (
-    // The grid FILLS its tile at every width: the columns share the width with
-    // `flex-1` and each cell is `aspect-square w-full`, so the blocks come out
-    // as big as the row allows and the picture ends exactly where the tile does.
-    //
-    // It drew at a fixed 11px per cell from `sm` up until August 2026, which
-    // made the grid a 361px object inside a fluid tile — so it had a dead margin
-    // on its right wherever the tile was wider than that (reported as "a massive
-    // gap" once the heatmap's legend, which had been filling it, came out), and
-    // an internal scrollbar wherever the tile was narrower. Both were the same
-    // bug: a fixed picture in a fluid box. Filling has no width to be right or
-    // wrong about, which is also what let Activity give up two of its columns to
-    // the cards beside it.
     <div className="w-full min-w-0 pb-1">
-      <div className="flex w-full flex-col gap-1.5">
-        {/* Month labels row */}
-        <div className="flex gap-[2px] sm:gap-[3px]">
-          {weeks.map((week, i) => (
-            <span key={i} className={`min-w-0 flex-1 overflow-visible whitespace-nowrap text-[9px] leading-none text-ink-500 ${phoneHidden(i)}`}>
-              {week.monthLabel ?? ''}
-            </span>
-          ))}
-        </div>
-        <div className="flex gap-[2px] sm:gap-[3px]">
-          {weeks.map((week, i) => (
-            <div key={i} className={`flex min-w-0 flex-1 flex-col gap-[2px] sm:gap-[3px] ${phoneHidden(i)}`}>
-              {week.days.map((day) =>
-                day.future ? (
-                  <span key={day.id} className="aspect-square w-full rounded-[2px] sm:rounded-[3px]" />
-                ) : (
-                  <span
-                    key={day.id}
-                    title={day.label}
-                    className={`aspect-square w-full rounded-[2px] sm:rounded-[3px] ${levelClass(day.count)}`}
-                  />
-                ),
-              )}
-            </div>
-          ))}
-        </div>
+      <div className="flex justify-center gap-[2px] sm:gap-[3px]">
+        {weeks.map((week, i) => (
+          <div key={i} className="flex min-w-0 max-w-[18px] flex-1 flex-col gap-[2px] sm:gap-[3px]">
+            {week.map((day) =>
+              day.future ? (
+                <span key={day.id} className="aspect-square w-full rounded-[2px] sm:rounded-[3px]" />
+              ) : (
+                <span
+                  key={day.id}
+                  title={day.label}
+                  className={`aspect-square w-full rounded-[2px] sm:rounded-[3px] ${levelClass(day.count)}`}
+                />
+              ),
+            )}
+          </div>
+        ))}
       </div>
     </div>
   )
