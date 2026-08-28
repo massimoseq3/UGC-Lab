@@ -273,7 +273,6 @@ export default function Dashboard() {
                   bento row they have always been — they don't need a wrapper to
                   get it, and without one they can differ from each other above
                   `lg`. */}
-              <AnnouncementsTile index={slot(4)} className="col-span-6 lg:col-span-4" />
 
               {/* Academy — the wall's one pure LINK, and the one tile with
                   nothing of the member's own in it, so it keeps the centred
@@ -281,12 +280,16 @@ export default function Dashboard() {
                   like the five that report something. Announcements wore this
                   same shape until it became a log; the shape lived in
                   Widget.tsx as a shared constant for exactly as long as two
-                  cards wore it. */}
+                  cards wore it.
+
+                  It comes BEFORE Announcements in the row (August 2026,
+                  Massimo's call), so the wall ends on the log — the one tile
+                  that changes because someone else did something. */}
               <a
                 href={AI_UGC_ACADEMY_URL}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={riseStyle(slot(5))}
+                style={riseStyle(slot(4))}
                 className={`widget-rise group relative col-span-6 flex flex-col items-center justify-center gap-3 p-4 text-center lg:col-span-4 ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
               >
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-dashboard-500/15">
@@ -311,6 +314,8 @@ export default function Dashboard() {
                   strokeWidth={2}
                 />
               </a>
+
+              <AnnouncementsTile index={slot(5)} className="col-span-6 lg:col-span-4" />
             </div>
           </div>
 
