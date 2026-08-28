@@ -47,6 +47,16 @@ export default function AnchoredPopover({
       const el = anchorRef.current
       if (!el) return
       const rect = el.getBoundingClientRect()
+      // An anchor with no box at all has been swapped out from under us — on a
+      // phone that's `MobilePaneTabs` hiding the whole pane the button lives on
+      // (`display: none`), which reports 0×0 rather than unmounting. The menu is
+      // portaled to the body, so it survives that and re-measures to the top-left
+      // corner, floating over a pane its button isn't even on. A menu whose
+      // anchor is gone isn't a menu: close it.
+      if (rect.width === 0 && rect.height === 0) {
+        onClose()
+        return
+      }
       const spaceBelow = window.innerHeight - rect.bottom
       const below = placement !== 'above' && spaceBelow >= estimatedHeight + 8
       setPos({
@@ -62,7 +72,7 @@ export default function AnchoredPopover({
       window.removeEventListener('resize', measure)
       window.removeEventListener('scroll', measure, true)
     }
-  }, [open, anchorRef, estimatedHeight, width, placement])
+  }, [open, anchorRef, estimatedHeight, width, placement, onClose])
 
   if (!open || !pos) return null
 
