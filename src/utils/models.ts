@@ -245,10 +245,10 @@ export const TTS_MODEL_SLOT = 'voice-studio:tts'
 //   STRONG  — ~2.6x the credits. The tier for output a person reads and acts
 //             on, where a misread style family or a hedged scene prompt costs
 //             a re-shoot rather than a retry. The Ad Analyzer names this
-//             constant; Scripts and B-Roll reach the same model through their
-//             own registry default (see the `defaultFor` on the Gemini 3.6
-//             Flash entry below). Product auto-fill sat here and moved back —
-//             it feeds another model, not a reader.
+//             constant; Scripts and B-Roll used to reach the same model through
+//             its registry default and now default to GPT 5.6 Terra instead.
+//             Product auto-fill sat here and moved back — it feeds another
+//             model, not a reader.
 //
 // Neither constant is what Scripts or B-Roll call any more: those two read the
 // member's own pick (see resolveScriptModel in stores/settingsStore.ts), which
@@ -384,20 +384,14 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     tags: ['new'],
     pricing: { unit: 'per-1k-tokens', credits: 0.27 },
     official: chatOfficial(1.5, 7.5, KIE_PRICING),
-    // CHAT_MODEL_STRONG, the Ad Analyzer's pinned model, and the unpicked
-    // default in BOTH picker apps: it holds a long prompt contract better than
-    // the cheaper entries, which is what all three of those calls are. The Ad
-    // Analyzer's is one JSON object read by a person and shot against; B-Roll's
-    // is a dozen-plus paragraph prompts under a tag contract the storyboard
-    // parser reads back; Scripts' is a take that has to open on the structure
-    // the member picked and then actually run it. It is also the only chat
-    // surface that sends a whole VIDEO inline, which is why the Ad Analyzer
-    // pins it by name. Grok 4.6 took both picker defaults for a stint in August
-    // 2026: B-Roll came back within the month, and Scripts followed at the
-    // operator's call after takes kept opening on a hook that never set up the
-    // picked structure. Holding a stated contract to the last line is what this
-    // app buys here, and it costs a third of what Grok does.
-    defaultFor: ['ad-anatomy', 'broll-studio', 'script-architect'],
+    // CHAT_MODEL_STRONG, and the Ad Analyzer's pinned model: it holds a long
+    // prompt contract better than the cheaper entries, and the Ad Analyzer's
+    // call is one JSON object read by a person and shot against. It is also
+    // the only chat surface that sends a whole VIDEO inline, which is why the
+    // Ad Analyzer pins it by name. It held the unpicked default in Scripts and
+    // B-Roll too until August 2026, when both slots moved to GPT 5.6 Terra at
+    // the operator's call; it is still one row away in either picker.
+    defaultFor: ['ad-anatomy'],
     // OpenAI-compatible variant slug on kie.ai (native 3.6 uses Google's own
     // generateContent shape; our transport speaks OpenAI chat/completions).
     chatEndpoint: '/gemini-3-6-flash-openai/v1/chat/completions',
@@ -475,6 +469,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     chatEndpoint: '/codex/v1/responses',
     chatTransport: 'openai-responses',
     chatSlug: 'gpt-5-6-terra',
+    // The unpicked default in BOTH picker apps (August 2026, the operator's
+    // call — it took the slots from Gemini 3.6 Flash, which is still one row
+    // away in either picker). The two slots stay independent and can diverge
+    // again, so no blurb anywhere may name a default.
+    defaultFor: ['broll-studio', 'script-architect'],
     chatRating: {
       intelligence: 4,
       blurb:

@@ -504,10 +504,11 @@ export function scriptModelSlot(appId: ScriptModelApp): string {
 }
 
 // Which chat model writes this app's scripts and prompts. Falls back to the
-// app's OWN registry default — and the two differ (August 2026): Scripts on
-// Grok 4.6, B-Roll on Gemini 3.6 Flash. Both sit above the app-wide default the
-// rest of the surfaces run on, because both write against a long contract; how
-// far above is a per-app call, which is exactly what `defaultFor` is for.
+// app's OWN registry default — both on GPT 5.6 Terra since August 2026, though
+// the two are free to differ and have before. Either way they sit above the
+// app-wide default the rest of the surfaces run on, because both write against
+// a long contract; how far above is a per-app call, which is exactly what
+// `defaultFor` is for.
 export function resolveScriptModel(appId: ScriptModelApp): string {
   return (
     useSettingsStore.getState().getAppModel(scriptModelSlot(appId)) ??
