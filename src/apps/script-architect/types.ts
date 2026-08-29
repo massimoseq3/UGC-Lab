@@ -16,8 +16,21 @@ export type ScriptUiMode = 'remix' | 'write'
 // hand-written shape (a line starting "SCENE 1 —" / "Scene 2:") so pasted
 // blueprints that skip the divider dashes still route correctly; a spoken
 // transcript never opens a line with a numbered scene header.
+const SCENE_HEADER_RE = /^(?:---\s*)?scene\s*\d+\s*[—:–-]/im
+
+// The "=== MASTER … ===" blocks the Ad Analyzer puts in front of its scenes
+// (and the "=== VOICE PROFILE … ===" our own blueprint prompts append after
+// them) identify a blueprint on their own: nothing else in the app writes that
+// marker, and a spoken transcript never carries one. They're matched alongside
+// the headers because a blueprint can reach this box with its headers already
+// lost — a single-scene handoff saved to the Script Bank before the Ad
+// Analyzer started headering a lone scene, or a hand-copied paste. Without
+// this those sources were remixed as plain scripts: no scene rewrite, and no
+// voice profile in the output, which is the shape members reported.
+const BLUEPRINT_MARKER_RE = /^\s*=+\s*(?:MASTER\s+(?:VISUAL STYLE|VOICE PROFILE)|VOICE PROFILE)\b/im
+
 export function detectSceneBlueprint(source: string): boolean {
-  return /^(?:---\s*)?scene\s*\d+\s*[—:–-]/im.test(source)
+  return SCENE_HEADER_RE.test(source) || BLUEPRINT_MARKER_RE.test(source)
 }
 
 export type RemixAngle =

@@ -384,7 +384,7 @@ Anchor it to how [CHARACTER] is acting across the scenes so the read feels nativ
 
 OUTPUT FORMAT — CRITICAL:
 - Start directly with the scenes. After the last scene, add a blank line, then the "=== VOICE PROFILE ... ===" block described above (it comes LAST, not first).
-- Reproduce each "--- Scene N: <label> (MM:SS-MM:SS) ---" header EXACTLY as given.
+- Reproduce each "--- Scene N: <label> (MM:SS-MM:SS) ---" header EXACTLY as given. If the source carries no scene headers at all — it is one unbroken shot — write a single "--- Scene 1: <short shot name> ---" header of your own above it. The output is ALWAYS a headed blueprint, whatever shape the input arrived in.
 - Below each header, write the rewritten scene prompt as one self-contained block — visual direction first, then the rewritten dialogue line(s) embedded inline using the same speaker-attribution pattern as the input, with the spoken words in double quotes: She says: "…". Spoken words are plain English — no tokens inside the quotes.
 - In every scene, include an explicit audio direction: NO background music, NO soundtrack, NO score — only the spoken dialogue and natural ambient/diegetic sound (music is added later in editing).
 - Separate scenes with a blank line.
