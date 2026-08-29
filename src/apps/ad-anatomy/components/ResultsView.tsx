@@ -283,11 +283,22 @@ function TranscriptSection({ result, fileName }: { result: AnalysisResult; fileN
 
 /* ─── 3. Reverse-Engineered Prompt ─── */
 
+// EVERY scene carries its "--- Scene N ---" header, a one-scene ad included.
+// The header is what makes this text a BLUEPRINT rather than prose: Scripts
+// routes a pasted remix source on `detectSceneBlueprint`, which matches on
+// those headers, so a lone scene handed over without one was silently remixed
+// as a plain spoken script — no scene rewrite, no voice profile, three script
+// variations written off a video prompt. And a lone scene is the COMMON case,
+// not an edge one: the analyser's chunking rule returns a single scene for any
+// ad of 15 seconds or less. The bare prompt is still one click away on the
+// scene's own Copy button, which hands over `scene.prompt` verbatim.
+function sceneHeader(s: Scene): string {
+  const time = s.startTime && s.endTime ? ` (${s.startTime}-${s.endTime})` : ''
+  return `--- Scene ${s.index}: ${s.label}${time} ---`
+}
+
 function joinScenes(scenes: Scene[]): string {
-  if (scenes.length === 1) return scenes[0].prompt
-  return scenes
-    .map((s) => `--- Scene ${s.index}: ${s.label} (${s.startTime}-${s.endTime}) ---\n${s.prompt}`)
-    .join('\n\n')
+  return scenes.map((s) => `${sceneHeader(s)}\n${s.prompt}`).join('\n\n')
 }
 
 // The two master blocks as plain text. Each scene prompt is self-contained (it
@@ -608,11 +619,11 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
   // B-Roll's consumer are all still wired — restore the button here if the
   // handoff comes back under a label that says where it goes.
 
-  const copyLabel = copied
-    ? 'Copied'
-    : scenes.length > 1 || fullPrompt !== scenes[0]?.prompt
-      ? 'Copy all prompts'
-      : 'Copy prompt'
+  // This button hands over the whole blueprint — the master blocks and every
+  // scene under its own header — never a bare prompt, which is what the scene's
+  // own Copy gives. So the only thing left for the label to say is how many
+  // scenes are in it.
+  const copyLabel = copied ? 'Copied' : scenes.length > 1 ? 'Copy all prompts' : 'Copy blueprint'
 
   return (
     <Section>

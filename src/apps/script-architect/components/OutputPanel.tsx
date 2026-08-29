@@ -40,7 +40,10 @@ interface OutputPanelProps {
 // Canonically "--- Scene N: label (mm:ss-mm:ss) ---", but we tolerate a model
 // near-miss that drops the surrounding dashes ("Scene 1:", "SCENE 1 —") so a
 // scenes/reverse output still splits into cards instead of silently degrading
-// to a plain spoken script. Mirrors detectSceneBlueprint's input matcher.
+// to a plain spoken script. Mirrors the scene-header half of
+// `detectSceneBlueprint` — only that half, since this reads OUTPUT: an input
+// may be routed to the rewrite on its master blocks alone, but the rewrite is
+// told to head every scene it writes, so a take always arrives with headers.
 const SCENE_HEADER = /^(?:---\s*)?scene\s*\d+\s*[—:–-]/i
 const SCENE_REGEX = /(^|\n)\s*(?:---\s*)?scene\s*\d+\s*[—:–-]/i
 
