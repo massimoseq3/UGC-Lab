@@ -8,7 +8,7 @@ import { rangeDurationLabel } from '../../../utils/timecode'
 import TokenField from './TokenField'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
-import { REMIX_ANGLE_LABEL, remixAnglesForCount, HOOK_CATEGORY_META, DEFAULT_HOOK_COUNT, parseHooks, hooksPlainText, hooksToText, spokenLinesOnly, type ParsedHook, type RemixAngle, type ScriptMode, type WriteFormat } from '../types'
+import { REMIX_ANGLE_LABEL, remixAnglesForCount, HOOK_CATEGORY_META, DEFAULT_HOOK_COUNT, parseHooks, hooksPlainText, hooksToText, type ParsedHook, type RemixAngle, type ScriptMode, type WriteFormat } from '../types'
 import { suspendChromeAutoHide } from '../../../hooks/useChromeAutoHide'
 
 interface OutputPanelProps {
@@ -756,13 +756,7 @@ function VariationCard({
   const handleSendToVoiceStudio = () => {
     const autoSaved = !savedOnce
     if (autoSaved) saveToBank(defaultSaveTitle)
-    // The BANK keeps the script exactly as written — the HOST: / PERSON 2: turns
-    // and the ON SCREEN: copy are what a multi-speaker format is shot from. Only
-    // the voice handoff sheds them, because Voiceovers is one TTS speaker
-    // reading one blob and would otherwise say "HOST colon" and read the comment
-    // card aloud (see spokenLinesOnly).
-    const spoken = spokenLinesOnly(text)
-    sendToApp({ targetApp: 'voice-studio', targetField: 'scriptText', data: spoken })
+    sendToApp({ targetApp: 'voice-studio', targetField: 'scriptText', data: text })
     addToast(autoSaved ? 'Script saved to bank · sent to Voiceovers' : 'Script sent to Voiceovers')
   }
 
