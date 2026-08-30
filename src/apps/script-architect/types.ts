@@ -135,10 +135,10 @@ export const WRITE_STYLE_META: Record<WriteStyle, { label: string; hint: string;
   comparison: { label: 'Us vs Them', hint: 'The usual stuff vs this one', group: 'structure' },
   objection: { label: 'Objection Crusher', hint: '"$40 for this? okay, hear me out"', group: 'structure' },
   founder: { label: 'Founder Story', hint: '"I made this because nothing worked"', group: 'structure' },
-  podcast: { label: 'Podcast Clip', hint: 'Mid-answer at the mic, cut from an episode', group: 'format' },
-  interview: { label: 'Street Interview', hint: 'Mic in frame, one question, real answer', group: 'format' },
+  podcast: { label: 'Podcast Clip', hint: 'The host asks, the expert answers', group: 'format' },
+  interview: { label: 'Street Interview', hint: 'Different strangers, doubtful then sold', group: 'format' },
   'green-screen': { label: 'Green Screen Reaction', hint: 'Reacting to a review, comment or headline', group: 'format' },
-  reply: { label: 'Comment Reply', hint: '"Someone asked me why I switched..."', group: 'format' },
+  reply: { label: 'Comment Reply', hint: 'The comment on screen, answered', group: 'format' },
   expert: { label: 'Expert Explainer', hint: '"I do this for a living, so listen"', group: 'format' },
   tutorial: { label: 'How-To / Tutorial', hint: 'Teach the steps, product is step two', group: 'format' },
   grwm: { label: 'GRWM / Routine', hint: 'Inside a real routine, sold on the way past', group: 'format' },
@@ -251,6 +251,44 @@ export function parseHooks(text: string): ParsedHook[] {
 // <FAMILY> tags are UI metadata, not script text).
 export function hooksPlainText(text: string): string {
   return parseHooks(text).map((h) => h.text).join('\n')
+}
+
+// ── Labelled lines → what a voice actually reads ──
+//
+// Four Script Style FORMATS put something in a plain script that nobody speaks:
+// a podcast clip carries HOST: / GUEST: turns, a street interview carries
+// INTERVIEWER: and PERSON N:, and the comment reply and green-screen reaction
+// carry the exact on-screen wording on ON SCREEN: lines. That copy has to reach
+// the creator — it is what gets typed into the overlay, and the reply cannot be
+// shot without it — but Voiceovers hands the script to a single TTS speaker as
+// one blob, so sent raw it reads "HOST colon" out loud and then reads the
+// comment card as if it were dialogue.
+//
+// So the handoff strips the labels and drops the lines that are pictures, not
+// speech. It deliberately does NOT try to pick one speaker: a two-hander read by
+// one voice is a draft the member can hear and edit, where a script silently
+// missing half its lines is not. The label test is a SHORT all-caps token (up to
+// three words) followed by a colon, which covers the vocabulary the prompts name
+// plus anything a member types in the same shape, and can't reach a normal
+// spoken line — those are lower case by every rule in the writing prompts.
+const LINE_LABEL_RE = /^([A-Z][A-Z0-9]*(?:[ -][A-Z0-9]+){0,2}):\s*/
+const ON_SCREEN_LABEL_RE = /^ON[ -]SCREEN\b/
+
+export function spokenLinesOnly(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => {
+      const label = LINE_LABEL_RE.exec(line.trim())
+      if (!label) return line
+      // On-screen copy is a graphic, never a spoken word — the whole line goes.
+      if (ON_SCREEN_LABEL_RE.test(label[1])) return null
+      return line.trim().slice(label[0].length)
+    })
+    .filter((line): line is string => line !== null)
+    .join('\n')
+    // A dropped on-screen line can leave the run of blank lines around it.
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 // The inverse of parseHooks — rebuilds the tagged text a pack is stored as, so
