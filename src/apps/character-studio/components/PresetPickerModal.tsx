@@ -15,7 +15,10 @@ import { useBackdropClose } from '../../../hooks/useBackdropClose'
 import Dropdown from '../../../components/Dropdown'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import Spinner from '../../../components/Spinner'
+import DayPill from '../../../components/DayPill'
+import CountSlot from '../../../components/CountSlot'
 import {
+  flattenJsonProfile,
   loadStarterPresets,
   saveStarterToBank,
   starterThumbUrl,
@@ -31,6 +34,18 @@ import {
 // lot on open costs a visible hitch on a modal whose whole job is to appear
 // instantly.
 const PAGE = 30
+
+/**
+ * How far a section's top sits below the top of its scroll port, in px.
+ *
+ * `Infinity` when the section isn't rendered — a caller comparing against a
+ * threshold then simply says "not there yet", which is the right answer both
+ * for the highlight and for a jump that has just raised the page count.
+ */
+function sectionTopWithin(port: HTMLElement, section: HTMLElement | null): number {
+  if (!section) return Infinity
+  return section.getBoundingClientRect().top - port.getBoundingClientRect().top
+}
 
 // One card's worth of anything pickable — a starter shipped with the app, or a
 // character out of the member's own bank. The grid doesn't care which; the two
@@ -55,19 +70,6 @@ interface Entry {
   setting?: string
 }
 
-function flattenJsonProfile(json: unknown): Record<string, string> {
-  const out: Record<string, string> = {}
-  if (typeof json !== 'object' || json === null) return out
-  for (const section of Object.values(json as Record<string, unknown>)) {
-    if (typeof section === 'object' && section !== null) {
-      for (const [key, value] of Object.entries(section as Record<string, unknown>)) {
-        if (typeof value === 'string') out[key] = value
-      }
-    }
-  }
-  return out
-}
-
 // The Bank's own character card at a smaller size: a 9:16 cover under a
 // gradient with the name across it. Small enough to fit six to a row, which is
 // what makes browsing 81 faces a scan rather than a scroll.
@@ -75,11 +77,10 @@ function flattenJsonProfile(json: unknown): Record<string, string> {
 // A `div` wrapping a full-bleed button rather than a button outright, because a
 // template card carries a Save action of its own and a button inside a button
 // is not a thing the DOM has.
-function PresetCard({ entry, savedId, onClick, onSaveStart }: {
+function PresetCard({ entry, savedId, onClick }: {
   entry: Entry
   savedId?: string
   onClick: () => void
-  onSaveStart: () => void
 }) {
   // Starters pass a bundled thumb URL; bank rows pass an asset:// ref resolved
   // through IndexedDB. Prefer the direct URL when present.
@@ -91,7 +92,7 @@ function PresetCard({ entry, savedId, onClick, onSaveStart }: {
         type="button"
         onClick={onClick}
         title={[entry.title, entry.note].filter(Boolean).join(' — ') || entry.name}
-        className="absolute inset-0 block h-full w-full text-left"
+        className="absolute inset-0 block h-full w-full"
       >
         {url ? (
           <img
@@ -107,7 +108,7 @@ function PresetCard({ entry, savedId, onClick, onSaveStart }: {
           </div>
         )}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2 pt-6">
-          <span className="block truncate text-[11px] font-semibold tracking-tight text-zinc-100">{entry.name}</span>
+          <span className="block truncate text-center text-[11px] font-semibold tracking-tight text-zinc-100">{entry.name}</span>
         </div>
       </button>
       {entry.starred && (
@@ -115,7 +116,7 @@ function PresetCard({ entry, savedId, onClick, onSaveStart }: {
           <Star className="h-3 w-3 fill-current" strokeWidth={2} />
         </span>
       )}
-      {entry.starter && <StarterSaveAction row={entry.starter} savedId={savedId} onSaveStart={onSaveStart} />}
+      {entry.starter && <StarterSaveAction row={entry.starter} savedId={savedId} />}
     </div>
   )
 }
@@ -133,22 +134,13 @@ function PresetCard({ entry, savedId, onClick, onSaveStart }: {
  * Saved state is read off the bank rather than kept here, so it survives the
  * modal closing and reads the same on both scoped pickers.
  */
-function StarterSaveAction({ row, savedId, onSaveStart }: {
-  row: StarterRow
-  savedId?: string
-  onSaveStart: () => void
-}) {
+function StarterSaveAction({ row, savedId }: { row: StarterRow; savedId?: string }) {
   const [saving, setSaving] = useState(false)
   const addToast = useAppStore((s) => s.addToast)
   const saved = !!savedId
 
   const save = async () => {
     if (saving || saved) return
-    // The library side is DERIVED from the bank when nothing has been picked
-    // (see `source`), so a member's first save would otherwise take the grid
-    // they were browsing away with it: the bank goes 0 → 1 rows and the panel
-    // flips to Your Characters mid-click. Saving is a reason to stay put.
-    onSaveStart()
     setSaving(true)
     try {
       await saveStarterToBank(row)
@@ -178,21 +170,6 @@ function StarterSaveAction({ row, savedId, onSaveStart }: {
 }
 
 /**
- * A count in a fixed-width slot.
- *
- * The facet counts are live — they re-tally against whatever else is filtered —
- * so a segment reading "All 76" becomes "All 9" on the next click. Left to size
- * itself, that digit takes ~5px with it and every segment to its right slides,
- * which is what made the row feel like it moved under the pointer. Two digits'
- * worth of room is reserved always (the library is 76 rows; a three-digit one
- * would want another `ch` here), and `tabular-nums` keeps 11 the same width as
- * 76 so nothing shifts between two numbers of the same length either.
- */
-function CountSlot({ value }: { value: number }) {
-  return <span className="inline-block min-w-[2ch] text-center tabular-nums">{value}</span>
-}
-
-/**
  * The centred preset browser — the starters shipped with the app and the
  * member's own saved characters in one scrolling grid.
  *
@@ -203,13 +180,15 @@ function CountSlot({ value }: { value: number }) {
  * judgeable at and pages the grid in as you scroll rather than mounting a few
  * hundred image decodes on open.
  *
- * The two libraries are a TOGGLE, not two sections of one scroll. Stacked,
- * your own characters were a band at the top that a member with 35 of them
- * scrolled past to reach a template, and the templates' scene facet was
- * filtering a list that was half bank rows — where a scene is a keyword guess
- * off free text rather than the library's own shot category. One at a time,
- * each side gets the whole grid and the scene menu belongs to the side it was
- * built for; it renders only there.
+ * The two libraries are ONE scroll, in two labelled sections — your own
+ * characters, then the templates (Massimo's call, August 2026). They were a
+ * toggle that swapped the grid for a while, on the theory that a member with
+ * 35 characters shouldn't scroll past all of them to reach a template; the
+ * jump below is the cheaper answer to that, and it keeps everything the picker
+ * holds in one list you can simply keep scrolling. The toggle stays, as a JUMP
+ * with a count on each side: clicking scrolls to that section (pulling in
+ * enough pages to reach it first), and the highlight follows the scroll rather
+ * than the other way round.
  *
  * Calls `onPick` with the chosen recipe as a flat profile map, then closes.
  * Callers decide what to do with that map: apply it wholesale
@@ -240,12 +219,10 @@ export default function PresetPickerModal({
   const [reloadKey, setReloadKey] = useState(0)
 
   const [search, setSearch] = useState('')
-  // `null` is "hasn't picked yet", so the front door can be DERIVED from the
-  // bank rather than corrected by an effect after the first render: your own
-  // characters, unless you don't have any yet. A click makes it a real pick,
-  // including a click onto an empty bank — the badge reads 0 and the empty
-  // state says why, which beats a segment that ignores you.
-  const [sourcePick, setSourcePick] = useState<Source | null>(null)
+  // Which section the scroll is currently IN, for the toggle's highlight. It
+  // follows the scroller (see `handleScroll`); the toggle only ever moves it by
+  // moving the scroller, so the two can't disagree.
+  const [scrolledTo, setScrolledTo] = useState<Source>('bank')
   const [gender, setGender] = useState('')
   const [setting, setSetting] = useState('')
   const [visible, setVisible] = useState(PAGE)
@@ -283,8 +260,6 @@ export default function PresetPickerModal({
     })
   }, [bankModels])
 
-  const source: Source = sourcePick ?? (bankEntries.length > 0 ? 'bank' : 'starter')
-
   // Which templates are already saved, by preset id. Read off the bank so the
   // green tick survives the modal closing and reads the same on all three
   // pickers that open this component.
@@ -321,10 +296,9 @@ export default function PresetPickerModal({
   const q = search.trim().toLowerCase()
   const passes = useMemo(() => ({
     q: (e: Entry) => !q || e.search.includes(q),
-    source: (e: Entry) => e.source === source,
     gender: (e: Entry) => !gender || e.gender === gender,
     setting: (e: Entry) => !setting || e.setting === setting,
-  }), [q, source, gender, setting])
+  }), [q, gender, setting])
 
   // The style options, in the LIBRARY's own order — the order the source folder
   // numbers its shot categories in, which the build script bakes into the row
@@ -346,13 +320,20 @@ export default function PresetPickerModal({
     return seen
   }, [starterEntries, bankEntries])
 
-  // The two library counts are tallied against search and gender but NOT
-  // against the style, which belongs to the templates alone: a style picked on
-  // that side would otherwise narrow the "Your Characters" badge too, and the
-  // number would stop matching the grid you get on clicking it.
+  // Bank rows first, then the templates in the library's own order — which the
+  // build script already sorts by style, so each style's rows are contiguous
+  // and `sections` below can split on a change rather than re-bucket.
+  const filtered = useMemo(
+    () => all.filter((e) => Object.values(passes).every((fn) => fn(e))),
+    [all, passes],
+  )
+
+  // Each badge is its section's own row count, under every active filter —
+  // with both sections in one list there is nothing left for it to mean. (It
+  // used to skip the style filter, because that facet belonged to the side the
+  // toggle wasn't showing; now the same list carries both.)
   const sourceOptions = useMemo(() => {
-    const rows = all.filter((e) => passes.q(e) && passes.gender(e))
-    const count = (k: Source) => rows.filter((e) => e.source === k).length
+    const count = (k: Source) => filtered.filter((e) => e.source === k).length
     return [
       {
         value: 'bank' as Source,
@@ -370,7 +351,7 @@ export default function PresetPickerModal({
       },
       { value: 'starter' as Source, label: 'Templates', icon: Images, badge: <CountSlot value={count('starter')} /> },
     ]
-  }, [all, passes])
+  }, [filtered])
 
   const facets = useMemo(() => {
     // Rows passing every filter but this one — the pool each facet counts in,
@@ -407,38 +388,88 @@ export default function PresetPickerModal({
     }
   }, [all, passes, styleOrder])
 
-  const filtered = useMemo(
-    () => all.filter((e) => Object.values(passes).every((fn) => fn(e))),
-    [all, passes],
-  )
-
   const shown = filtered.slice(0, visible)
+
+  // The page, cut into its labelled runs. A member's own characters are ONE
+  // group — their style is keyword-guessed off free text and plenty of them
+  // have none, so grouping those would file the same face under a different
+  // heading each time it was extracted. The templates carry a curated style, so
+  // they get one group each ("Handheld Mic", "Car"), which is what makes a
+  // library of 81 scannable in a single scroll (Massimo's call, August 2026).
+  // Split on a change of key rather than bucketed, so a group can never be
+  // rendered before the rows above it have paged in.
+  const sections = useMemo(() => {
+    const out: Array<{ key: string; label: string; source: Source; entries: Entry[] }> = []
+    for (const e of shown) {
+      const key = e.source === 'bank' ? 'bank' : `style:${e.setting || 'Other'}`
+      const last = out[out.length - 1]
+      if (last?.key === key) last.entries.push(e)
+      else out.push({
+        key,
+        label: e.source === 'bank' ? 'Your Characters' : e.setting || 'Other',
+        source: e.source,
+        entries: [e],
+      })
+    }
+    return out
+  }, [shown])
+
+  // Where the templates start, for the jump and the highlight below.
+  const bankCount = useMemo(() => filtered.filter((e) => e.source === 'bank').length, [filtered])
+  const startersRef = useRef<HTMLDivElement>(null)
+
+  // A bank with nothing in it renders no section of its own, so the scroll can
+  // never be inside one and the highlight is DERIVED past the tracker rather
+  // than seeded by an effect — otherwise a new member opens on a grid of
+  // templates with "Your Characters" lit.
+  const section: Source = bankCount === 0 ? 'starter' : scrolledTo
 
   // Infinite scroll: the next page is pulled in once the grid is within a
   // screenful of its end, so it's already rendered by the time the last row
   // is. A plain scroll handler rather than an IntersectionObserver on a
   // sentinel — the arithmetic is two subtractions, and it can be reasoned
-  // about (and watched) without a second async system in the middle.
+  // about (and watched) without a second async system in the middle. The same
+  // handler moves the toggle's highlight, so the control can only ever report
+  // where the scroll actually is.
   const hasMore = shown.length < filtered.length
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (!hasMore) return
     const el = e.currentTarget
-    if (el.scrollHeight - el.scrollTop - el.clientHeight < 500) setVisible((n) => n + PAGE)
+    if (hasMore && el.scrollHeight - el.scrollTop - el.clientHeight < 500) setVisible((n) => n + PAGE)
+    // Measured with rects, not `offsetTop`: the scroller is not a positioned
+    // element, so a section's `offsetTop` is counted from the modal panel and
+    // carries the header + filter bar with it — about a row of cards' worth of
+    // error, which is exactly how far the jump used to overshoot.
+    setScrolledTo(sectionTopWithin(el, startersRef.current) <= 24 ? 'starter' : 'bank')
   }
 
   // Narrowing the list starts it from the top again — otherwise a filter
   // applied after scrolling to card 200 renders 200 cards of a 12-card result.
   // Done on the way in rather than in an effect watching the filters, which
   // would render the long list once before cutting it back.
-  const refilter = <T,>(set: (v: T) => void) => (value: T) => { set(value); setVisible(PAGE) }
-
-  const changeSource = (value: Source) => {
-    setSourcePick(value)
+  const refilter = <T,>(set: (v: T) => void) => (value: T) => {
+    set(value)
     setVisible(PAGE)
-    // Back to the top with it. The page count resets, so a member deep in the
-    // templates who switches would otherwise be dropped at the foot of a
-    // three-card bank by the browser's own clamp.
+    setScrolledTo('bank')
     if (gridRef.current) gridRef.current.scrollTop = 0
+  }
+
+  // The toggle is a JUMP, not a filter. Reaching the templates means rendering
+  // every bank row above them first, so the page count is raised to cover them
+  // and the scroll waits a frame for React to lay the rows out — `scrollTop` set
+  // against a list that hasn't grown yet just clamps to the old bottom.
+  const jumpTo = (value: Source) => {
+    if (value === 'bank') {
+      setScrolledTo('bank')
+      if (gridRef.current) gridRef.current.scrollTop = 0
+      return
+    }
+    setVisible((n) => Math.max(n, bankCount + PAGE))
+    setScrolledTo('starter')
+    requestAnimationFrame(() => {
+      const el = gridRef.current
+      if (!el) return
+      el.scrollTop += sectionTopWithin(el, startersRef.current) - 12
+    })
   }
 
   const pick = (profile: Record<string, string> | CharacterProfile) => {
@@ -503,8 +534,8 @@ export default function PresetPickerModal({
             answering anything. */}
         <div className="flex shrink-0 flex-col gap-2 border-b border-ink/5 px-5 py-3">
           <SegmentedToggle
-            value={source}
-            onChange={changeSource}
+            value={section}
+            onChange={jumpTo}
             options={sourceOptions}
             accent="influencers"
             className="h-10 !p-1"
@@ -548,7 +579,7 @@ export default function PresetPickerModal({
 
         {/* Grid */}
         <div ref={gridRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4" onScroll={handleScroll}>
-          {loadError && source === 'starter' && starterEntries.length === 0 ? (
+          {loadError && starterEntries.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
               <p className="max-w-sm text-sm text-ink-500">{loadError}</p>
               <button
@@ -559,31 +590,41 @@ export default function PresetPickerModal({
                 Try again
               </button>
             </div>
-          ) : !starters && source === 'starter' ? (
+          ) : !starters && bankEntries.length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <Spinner className="h-5 w-5 text-ink-600" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <p className="text-sm text-ink-600">
-                {source === 'bank' && bankEntries.length === 0
-                  ? 'No saved characters yet.'
-                  : 'No characters match those filters.'}
+                {search || gender || setting
+                  ? 'No characters match those filters.'
+                  : 'No characters yet.'}
               </p>
             </div>
           ) : (
             <>
-              <div className={grid}>
-                {shown.map((e) => (
-                  <PresetCard
-                    key={e.key}
-                    entry={e}
-                    savedId={e.starter ? savedStarters.get(e.starter.id) : undefined}
-                    onClick={() => pick(e.profile)}
-                    onSaveStart={() => setSourcePick(source)}
-                  />
-                ))}
-              </div>
+              {sections.map((sec, i) => (
+                <div
+                  key={sec.key}
+                  // The anchor the toggle jumps to and the highlight measures
+                  // against: the FIRST template group, whichever style that
+                  // happens to be under the current filters.
+                  ref={sec.source === 'starter' && sections[i - 1]?.source !== 'starter' ? startersRef : undefined}
+                >
+                  <DayPill label={sec.label} className={i === 0 ? 'mb-2' : 'mb-2 mt-5'} />
+                  <div className={grid}>
+                    {sec.entries.map((e) => (
+                      <PresetCard
+                        key={e.key}
+                        entry={e}
+                        savedId={e.starter ? savedStarters.get(e.starter.id) : undefined}
+                        onClick={() => pick(e.profile)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
               {hasMore && (
                 <div className="flex h-14 items-center justify-center">
                   <Spinner className="h-4 w-4 text-ink-700" />

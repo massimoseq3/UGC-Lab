@@ -96,6 +96,24 @@ export async function saveStarterToBank(row: StarterPreset): Promise<void> {
 }
 
 /**
+ * A bank row's nested `jsonProfile` flattened back to the form's own 29-key
+ * map — the shape a starter already ships in, so the two can be faceted and
+ * searched by the same code.
+ */
+export function flattenJsonProfile(json: unknown): Record<string, string> {
+  const out: Record<string, string> = {}
+  if (typeof json !== 'object' || json === null) return out
+  for (const section of Object.values(json as Record<string, unknown>)) {
+    if (typeof section === 'object' && section !== null) {
+      for (const [key, value] of Object.entries(section as Record<string, unknown>)) {
+        if (typeof value === 'string') out[key] = value
+      }
+    }
+  }
+  return out
+}
+
+/**
  * The haystack a card is searched on: its labels plus every word of its DNA, so
  * "freckles", "gold hoops" and "wood slat wall" all find the character they
  * describe — and so does "braided blonde", the descriptive title the card

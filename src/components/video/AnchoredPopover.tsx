@@ -2,6 +2,22 @@ import { useLayoutEffect, useState, type ReactNode, type RefObject } from 'react
 import { createPortal } from 'react-dom'
 import { useCloseOnAppSwitch } from '../../hooks/useCloseOnAppSwitch'
 
+// Two overlay tiers, and the default is deliberately the LOWEST in the app.
+// This component's job is escaping a scrolling panel's clip, not covering a
+// modal — which is what lets a modal sitting at the same z-[60] win on DOM
+// order (it is portaled first, the menu after) instead of painting over its own
+// menus. `PresetPickerModal` relies on exactly that and says so.
+//
+// A caller mounted ABOVE that tier has the opposite problem and needs the menu
+// raised with it: `BankPicker`'s slide-over is z-[80] over a z-[70] backdrop,
+// so it can sit over B-Roll's z-[60] card modal, and a default-tier menu opened
+// from inside it renders behind the panel — a trigger that visibly opens onto
+// nothing. That's what 'panel' is for.
+const TIERS = {
+  default: { catcher: 'z-[55]', menu: 'z-[60]' },
+  panel: { catcher: 'z-[85]', menu: 'z-[90]' },
+} as const
+
 interface AnchoredPopoverProps {
   // Anchor element — usually the pill that triggers the menu.
   anchorRef: RefObject<HTMLElement | null>
@@ -17,6 +33,9 @@ interface AnchoredPopoverProps {
   // so a menu can technically fit while still covering the button you're about
   // to press.
   placement?: 'auto' | 'above'
+  // Which overlay tier to paint on. See `TIERS` below — raise it only for a
+  // caller that is itself mounted above the default one.
+  tier?: keyof typeof TIERS
   className?: string
   children: ReactNode
 }
@@ -32,6 +51,7 @@ export default function AnchoredPopover({
   width,
   estimatedHeight = 80,
   placement = 'auto',
+  tier = 'default',
   className = '',
   children,
 }: AnchoredPopoverProps) {
@@ -78,8 +98,11 @@ export default function AnchoredPopover({
 
   return createPortal(
     <>
-      <div className="fixed inset-0 z-[55]" onClick={onClose} />
-      <div className={`fixed z-[60] ${className}`} style={{ top: pos.top, left: pos.left, width }}>
+      <div className={`fixed inset-0 ${TIERS[tier].catcher}`} onClick={onClose} />
+      <div
+        className={`fixed ${TIERS[tier].menu} ${className}`}
+        style={{ top: pos.top, left: pos.left, width }}
+      >
         {children}
       </div>
     </>,

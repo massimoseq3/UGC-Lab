@@ -46,6 +46,9 @@ interface DropdownProps {
   // 'above' pins the menu upward regardless of viewport room — for a trigger
   // sitting just above a Generate button, where a downward menu covers it.
   placement?: 'auto' | 'above'
+  // Raise the menu's overlay tier for a trigger inside a panel mounted above
+  // the default one (BankPicker's z-[80] slide-over). See `AnchoredPopover`.
+  tier?: 'default' | 'panel'
   // Shrinks the trigger to its own content, for a wrapping row of filters
   // rather than a settings panel's full-width stack.
   fitContent?: boolean
@@ -74,6 +77,7 @@ export default function Dropdown({
   accent = 'voice',
   label,
   placement = 'auto',
+  tier = 'default',
   fitContent = false,
   menuMinWidth = 168,
   className = '',
@@ -127,6 +131,7 @@ export default function Dropdown({
         width={width}
         estimatedHeight={Math.min(options.length * 38 + 8, 280)}
         placement={placement}
+        tier={tier}
       >
         <div className="menu-scroll max-h-[280px] overflow-y-auto rounded-2xl border border-ink/10 bg-surface-2 p-1 shadow-xl shadow-black/20">
           {items.map((o) => {
