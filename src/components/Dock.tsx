@@ -15,7 +15,10 @@ import SettingsModal from './SettingsModal'
 // Settings modal.
 
 // Dashboard leads (its own 'system' group → divider between it and Bank).
-const SECTION_ORDER: AppCategory[] = ['system', 'library', 'create', 'tools']
+// Tools sit between Bank and the Create row, fenced by a divider on each side:
+// finding a winning ad and tearing it down is what you do BEFORE the production
+// line starts, so the dock reads left to right in the order the work happens.
+const SECTION_ORDER: AppCategory[] = ['system', 'library', 'tools', 'create']
 
 export default function Dock() {
   const activeApp = useAppStore((s) => s.activeApp)

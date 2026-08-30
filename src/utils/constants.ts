@@ -59,9 +59,10 @@ export const APP_REGISTRY: AppConfig[] = [
   { id: 'broll-studio', name: 'B-Roll', icon: Film, accent: '#7165FF', category: 'create' },
   { id: 'playground', name: 'Playground', icon: ImagePlay, accent: '#015C52', category: 'create' },
   { id: 'edit-studio', name: 'Edit', icon: Scissors, accent: '#F77646', category: 'create' },
-  // Tools sit past the divider after Edit — research surfaces that aren't a
-  // step in the production line. Outliers leads the group because the loop runs
-  // left to right: find a winning ad → tear it down.
+  // Tools sit in their own fenced group between Bank and the Create row — a
+  // divider on each side — because research is what happens before the
+  // production line, not after it. Outliers leads the group because the loop
+  // runs left to right: find a winning ad → tear it down.
   //
   // The id is 'discover' and stays that way: it keys the persisted search,
   // filters and sort. The display name is free to change.
