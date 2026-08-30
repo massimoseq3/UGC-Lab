@@ -1,6 +1,11 @@
-// Loading and faceting the starter presets.
+// Loading and faceting the starter presets, and saving one into the bank.
 
 import type { StarterPreset } from './types'
+import { createEmptyProfile } from '../types'
+import { buildJsonPrompt } from '../services/generateCharacter'
+import { uniqueBankName } from '../components/nameGenerator'
+import { useBankStore } from '../../../stores/bankStore'
+import { saveAsset } from '../../../utils/assetStore'
 
 /** A starter with its search haystack folded in — see `loadStarterPresets`. */
 export type StarterRow = StarterPreset & { search: string }
@@ -33,6 +38,61 @@ async function fetchPresets(): Promise<StarterRow[]> {
 /** Where a starter's cover lives. Ships with the app — no signed url, no expiry. */
 export function starterThumbUrl(id: string): string {
   return `${import.meta.env.BASE_URL}presets/thumbs/${id}.webp`
+}
+
+/**
+ * The full-size portrait behind that cover — the source's own 768x1376.
+ *
+ * Fetched only when a member saves the template, which is why the card gets a
+ * separate, lighter cover: a grid of 81 faces shouldn't pay ~100KB each for
+ * resolution it renders at a fifth of.
+ */
+export function starterPortraitUrl(id: string): string {
+  return `${import.meta.env.BASE_URL}presets/full/${id}.webp`
+}
+
+/**
+ * Copies a template into the Characters bank, portrait and all.
+ *
+ * The templates are static files, so nothing outside this picker can reach one
+ * — which meant a member could fill the form from a face and still not use that
+ * face as a reference anywhere. Saving is the app's own answer to "use this
+ * character elsewhere": a bank row shows up in every `BankPicker`, so the
+ * portrait becomes attachable in Playground, B-Roll and Scripts by the same
+ * route a generated character is.
+ *
+ * The portrait is stored as a real asset (IndexedDB + the R2 mirror) rather
+ * than kept as a URL, because that is what every consumer of `characterImage`
+ * expects, and it's what makes the row survive on a browser that never opens
+ * this picker again.
+ */
+export async function saveStarterToBank(row: StarterPreset): Promise<void> {
+  const store = useBankStore.getState()
+  if (store.models.some((m) => m.presetId === row.id)) return
+
+  const res = await fetch(starterPortraitUrl(row.id))
+  if (!res.ok) throw new Error(`Could not load that template's portrait (${res.status}).`)
+  const blob = await res.blob()
+  const imageRef = await saveAsset(blob, blob.type || 'image/webp')
+
+  // The nested shape every other bank row carries — `flattenJsonProfile` in the
+  // picker reads it back, and so does the Bank's own character form.
+  const profile = createEmptyProfile()
+  for (const [key, value] of Object.entries(row.profile)) {
+    if (key in profile && typeof value === 'string') profile[key] = value
+  }
+
+  await store.addModel({
+    // The descriptive export name ("Braided Blonde on the Sofa"), not the
+    // card's "Handheld Mic Female 1": in a bank of characters a scene-and-index
+    // label says nothing about which face it is.
+    name: uniqueBankName(row.title, store.models.map((m) => m.name)),
+    characterImage: imageRef,
+    notes: '',
+    source: 'character-studio',
+    presetId: row.id,
+    jsonProfile: buildJsonPrompt(profile) as Record<string, unknown>,
+  })
 }
 
 /**
