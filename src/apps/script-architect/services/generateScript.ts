@@ -418,11 +418,12 @@ ${CORPUS_EVIDENCE}
 ${SELF_AUDIT}
 
 FORMAT RULES — CRITICAL:
-1. ONLY return the spoken words.
-2. No stage directions, timestamps, headers, bracketed text, emojis, or visual cues.
+1. ONLY return the spoken words, plus the labelled lines the picked style explicitly asks for (see rule 6) — nothing else.
+2. No stage directions, timestamps, headers, bracketed text, emojis, or camera/visual cues.
 3. No quotation marks around the text.
 4. No introductions or conclusions (e.g. "Here is the script:").
-5. Plain text only. EACH SENTENCE ON ITS OWN LINE.`
+5. Plain text only. EACH SENTENCE ON ITS OWN LINE.
+6. LABELLED LINES — ONLY WHERE THE STYLE NAMES THEM. Some formats put a second voice in the ad, or words on the screen, and those have to reach the creator or the ad cannot be shot. Where the style block below names labels, a line may open with a short ALL-CAPS label and a colon (HOST:, GUEST:, INTERVIEWER:, PERSON 2:, ON SCREEN:, ON SCREEN COMMENT:) and nothing else may. Use ONLY the labels that style names, spell each one the same way every time, and put the label on its own line's worth of speech. A style that names no labels gets none at all — an unlabelled script is one person talking, which is what most of them are.`
 
 const WRITE_SCENES_SYSTEM = `You are an elite UGC creative director. You invent a complete scene-by-scene blueprint for a brand-new organic TikTok ad — the visuals AND the spoken dialogue — ready to be generated with AI video models (one scene = one video generation).
 
@@ -450,9 +451,10 @@ SCENE RULES:
 - NEVER describe the product's physical appearance, container, label, or brand in the VISUAL direction — always the literal token [PRODUCT] there. (Dialogue is the exception: spoken lines name the product in plain words, per the rule above.)
 - Each scene block is ONE flowing paragraph (2-4 sentences) — no labelled sub-fields, no SETTING:/CAMERA:/LIGHTING: prefixes. Weave into natural prose: where we are and what's visible, what [CHARACTER] physically does (exact gesture, gaze, micro-expression), the light source (naturalistic, never glam), the camera as a position only when it matters ("framed from chest height an arm's length away" — never a named device: no phone, tripod, or front camera, which get drawn into frame), and the spoken line quoted inline as: [CHARACTER] says: "...". Sound is the dialogue plus natural ambient only — explicitly NO background music, NO soundtrack, NO score (music is added later in editing).
 - SHOW, DON'T TELL: while a line is spoken, [CHARACTER] is DOING or SHOWING what the line is about whenever it allows — telling while showing. Scenes without dialogue visualize their beat (the act happening, a metaphor made literal, the proof on screen) — never someone idling while the voiceover plays.
-- IF A SCENE STAGING BLOCK IS GIVEN, IT OUTRANKS THE DEFAULTS: the ad is imitating a specific kind of content (a podcast clip, a street interview, a green-screen reaction), and that only works if EVERY scene holds the staging — the location, the props, the camera position, the way the person speaks. One scene that drops back to a generic selfie-to-camera shot breaks the illusion for the whole ad.
-- A staging block may put a second voice in the ad (an off-camera interviewer, someone asking from behind the lens). Attribute it on its own — An off-camera voice asks: "..." — keep it to a few words, and give that person NO identity detail and no appearance. [CHARACTER] is the only person with an identity and the VOICE PROFILE describes [CHARACTER] alone.
-- A staging block may also put words on screen (a comment card, a review, a headline). Write the exact wording, keep it to a short legible line or two, and hold it inside the middle band of the frame — the top and bottom eighth are covered by the platform's own UI.
+- IF A SCENE STAGING BLOCK IS GIVEN, IT OUTRANKS THE DEFAULTS: the ad is imitating a specific kind of content (a podcast clip, a street interview, a green-screen reaction), and that only works if EVERY scene holds the staging — the location, the props, the camera position, who is in the room, the way the person speaks. One scene that drops back to a generic selfie-to-camera shot breaks the illusion for the whole ad.
+- A staging block may put OTHER PEOPLE in the ad — an interviewer holding a microphone, a host across a table, other strangers answering the same question. [CHARACTER] is still the ONE person the ad belongs to and the only one who ever carries that token: never write [CHARACTER] for anybody else, because it is a reference-image slot and every scene carrying it comes back as the same face. Describe the others only as far as the staging block asks and no further — an arm and a microphone, a shoulder and the back of a head, or, where the staging block says the ad is several different people, a plainly different person named by two or three generic markers (a rough age band, a build, what they are wearing or carrying), never a name and never a face in detail.
+- When one of those people SPEAKS, attribute the line by ROLE on its own — The host asks: "...", An off-camera voice asks: "...", A second passer-by says: "..." — and give that speaker a one-clause voice note in the same scene (perceived age, energy, accent), because their line is generated with that scene and the VOICE PROFILE at the end describes [CHARACTER] alone.
+- A staging block may also put words on screen (a comment card, a review, a headline, a price). Write the exact wording, keep it to a short legible line or two, hold it inside the middle band of the frame — the top and bottom eighth are covered by the platform's own UI — and repeat that wording VERBATIM in every scene the same graphic appears in, or it changes between cuts.
 
 OUTPUT FORMAT — CRITICAL:
 - Start directly with the scenes. After the last scene, add a blank line, then the "=== VOICE PROFILE ... ===" block (it comes LAST, not first).
@@ -563,13 +565,87 @@ const WRITE_STYLE_INSTRUCTION: Record<WriteStyle, string> = {
   comparison: 'STRUCTURE — US VS THEM: what people normally use versus this. Concrete differences — price, time, result. Never name competitor brands; say "the stuff from the drugstore", "the one everyone buys". End on why switching is obvious, then the call-to-action.',
   objection: 'STRUCTURE — OBJECTION CRUSHER: open by saying the objection out loud, in the viewer\'s own words, before they can think it ("I know. that\'s a stupid amount of money for a [thing]"). Concede the fair part of it — never argue with the viewer. Then kill it with ONE concrete piece of arithmetic or proof: cost per use, what it replaced, how long it lasted, what you were spending before. Call-to-action only once the objection is dead.',
   founder: 'STRUCTURE — FOUNDER / BEHIND THE SCENES: first person, from the person who actually made it. Open on the frustration that caused it ("I got so sick of every [thing] doing [problem] that I just made my own"). Name ONE specific thing you changed and why it was hard or expensive to do. Be understated and a little awkward about selling — a founder who oversells reads as fake, and the restraint IS the credibility. Soft call-to-action.',
-  podcast: 'FORMAT — PODCAST CLIP: this is a clip pulled from the middle of a long episode, not an ad. Start mid-answer, as if the question was asked ten seconds ago and got cut off ("...and honestly that\'s the part everyone gets wrong"). Talk to a person, not to a camera: conversational, slightly rambling, one tangent that comes back. The product comes up because it genuinely is the answer to what was being discussed — mentioned once, in passing, never presented. No pitch at the end; the closest thing to a call-to-action is "it\'ll be in the description" energy, in your own words.',
-  interview: 'FORMAT — STREET INTERVIEW: someone got stopped on the street and asked one question, and this is their answer. Open with the answer already moving, reacting to the question ("honestly? this one, and it wasn\'t even close"). Unrehearsed energy: a laugh, a beat of thinking, a self-correction, a number they half-remember and correct. They are not selling to anyone — they are telling a stranger what actually worked for them. At most ONE short off-camera question at the top and one short follow-up; every other word belongs to the person answering. End on the verdict, never a pitch.',
-  'green-screen': 'FORMAT — GREEN SCREEN REACTION: you are reacting on camera to something on screen behind you — a one-star review, a comment, a forum thread, a price, a headline. Open by reading the thing out loud, then react to it. Agree with the part of it that\'s fair before you take it apart; that concession is what makes the rest believable. The product enters as your answer to what\'s on screen, and you keep pointing back at it ("see this bit"). Quick call-to-action at the end.',
-  reply: 'FORMAT — COMMENT REPLY: you are answering one specific question one specific person asked you. Open by saying the question back the way creators do ("someone asked me why I stopped buying [category], so"). Answer it directly and completely — this is a favour to one person, not a pitch to an audience. Include one detail only somebody who actually uses the thing would know. Close by answering the question a second time in a shorter sentence, then the call-to-action.',
-  expert: 'FORMAT — EXPERT EXPLAINER: you do this for a living and you\'re giving away the thing you tell clients. Open by stating the role and the stake in one breath ("I fit these for a living and this is the mistake I see every single week"). Explain the WHY as one plain-English mechanism — no jargon, or jargon translated the instant it lands. The product is a recommendation, not a promotion: give one honest caveat about who it isn\'t for. Calm and unhurried; authority never rushes. Soft call-to-action.',
-  tutorial: 'FORMAT — HOW-TO / TUTORIAL: teach one thing the viewer can do today, and the product is the tool inside step two. Open on the promise and the timeframe ("here\'s how I do [result] in under a minute"). Count the steps out loud, three at most, each one physically doable. The lesson has to be genuinely useful even if they never buy — that\'s what earns the buy. Fold the call-to-action into the last step.',
-  grwm: 'FORMAT — GRWM / ROUTINE: you\'re doing the routine and the ad happens inside it. Open mid-routine, mid-task, mid-sentence, talking while your hands are busy with something else. The product shows up at the exact moment it gets used and earns one line about why it stayed in the routine. Never stop the routine to sell — the routine is the point and the sell is a byproduct. Call-to-action is an aside on the way out.',
+  // ── The seven FORMATS ──
+  //
+  // A format is longer than a structure on purpose. A structure is one
+  // persuasion mechanic and the model already knows it; a format is a whole
+  // piece of content being imitated, and the imitation fails on the details it
+  // was never told — who is in the room, who speaks first, what is on screen,
+  // where the turn happens. Three of them put a SECOND VOICE or ON-SCREEN COPY
+  // in the ad, so they name the line labels the script format rule allows.
+  podcast: `FORMAT — PODCAST CLIP: two people at the mics, and the viewer has landed in the middle of an episode that was already running.
+
+IT OPENS ON THE HOST'S QUESTION, NOT ON THE GUEST. A real question, asked the way a host actually asks one, and it is one of three things: an objection they have heard a hundred times ("okay but everyone says these are just marketing"), a how-does-that-actually-work question about the mechanism ("what is physically happening when you do that"), or a listener's problem put to the guest ("someone messaged me saying they cannot do X. what do you tell them"). One or two sentences, landing mid-thought as though the setup was cut off the front.
+
+THEN THE GUEST ANSWERS AS THE EXPERT IN THE ROOM. They take the question seriously: concede whatever is fair in it first, then explain the mechanism in plain English, in the order it happens, so the viewer learns something they could repeat to a friend tonight. This is analysis, not enthusiasm — one number or one named specific carries more weight than any adjective, and any technical word is translated in the same breath it lands.
+
+The product arrives as the guest's own answer to their own explanation ("which is the entire reason I use this one"), once, in passing — never presented, never held up, never described.
+
+The host may come back ONCE, briefly, to push back or to react ("wait, so it is not the thing everyone thinks it is"), and the guest lands the point on the other side of it.
+
+No pitch and no call-to-action: a podcast clip ends when the answer ends. The most it does is "it is in the show notes" energy, in your own words.
+
+SPEAKER LABELS: the host's lines start HOST: and the guest's start GUEST:, each on its own line. Nothing else carries a label. The guest is this ad's voice and owns most of the words.`,
+  interview: `FORMAT — STREET INTERVIEW: a vox pop. Someone with a microphone stopped SEVERAL DIFFERENT STRANGERS in the same afternoon and asked them the same thing, and the ad is those answers cut together — a different person every time, never one person filmed from three angles.
+
+TWO BEATS PER PERSON, AND THE TURN BETWEEN THEM IS THE WHOLE FORMAT.
+FIRST they are mildly skeptical, in the ordinary unbothered way real people are: they have heard the claim before, they assume it is overpriced, they think the one they already use is fine, they half-laugh at the question. Doubtful, never hostile — a shrug and a "I mean, does that actually work?", not a rant.
+THEN they try it, right there on the street, and react to what just happened. The reaction is specific and physical — what they felt, tasted, smelled, or watched change in that second — not a verdict and never a line of copy ("oh. okay, that is actually…", "wait, do that again"). The gap between what they expected and what happened IS the ad.
+
+Give every person their own reason to doubt and their own thing to notice, so three strangers do not deliver three versions of one sentence. The strongest turn goes last.
+
+HOW MANY PEOPLE IS DECIDED BY THE LENGTH, not by a rule: a very short ad is ONE person's doubt and their reaction; a longer one runs three or four, and the doubt beats can be cut together before the first person tries anything.
+
+The interviewer's question is short, asked once at the top, and heard again only when someone needs prompting. Nobody sells: they are telling a stranger holding a microphone what just happened to them. It ends on somebody's reaction, never on a pitch — at most one short line the interviewer could plausibly say off camera.
+
+SPEAKER LABELS: the interviewer's lines start INTERVIEWER: and each respondent's start PERSON 1: / PERSON 2: / PERSON 3:, each on its own line. Nothing else carries a label.`,
+  'green-screen': `FORMAT — GREEN SCREEN REACTION: you are standing in front of something on screen, reacting to it.
+
+WRITE THE THING FIRST, WORD FOR WORD, on its own line prefixed ON SCREEN: — and make it a real artifact rather than a slogan: a one-star review with its star count and a username, a comment, a forum reply, a receipt or a price, a headline with a publication name, a screenshot of a search result. Specific enough that a viewer believes somebody actually wrote it, and never a straw man written to be knocked down.
+
+Read it out loud before you react to it — otherwise the reaction has nothing to be a reaction to — and agree with the fair part of it first. That concession is what buys the rest of the argument.
+
+Then take it apart with ONE concrete thing: what it gets wrong, and the arithmetic, the mechanism, or the receipt that proves it. Keep pointing back at it — quote fragments of the wording again as you go ("'lasts a week'. see, that is the bit") — and if the argument moves onto a second piece of evidence, put THAT on screen too, written out on its own ON SCREEN: line the same way.
+
+The product enters as your answer to what is on screen, never as a change of subject. Quick call-to-action at the end.
+
+ON-SCREEN LABELS: every piece of on-screen copy gets its own ON SCREEN: line at the point in the script where it appears. Nothing else carries a label.`,
+  reply: `FORMAT — COMMENT REPLY: one specific person left one specific comment, and this is the reply to it.
+
+WRITE THE COMMENT FIRST, WORD FOR WORD. It is the first thing in the output, on its own line, prefixed ON SCREEN COMMENT: — a handle and one short sentence, typed the way people really type in a comments section: lower case, no full stop, a little blunt. It has to be something somebody would genuinely write — a doubt ("this is just the cheap one with a markup right"), a question ("does it still work if you do X"), a complaint ("tried this, did nothing"), or a challenge ("no way that is worth the money") — never a flattering set-up line and never a straw man.
+
+THEN REPLY TO IT, AND KEEP REFERENCING IT. Open by saying the comment back — their actual words, not a paraphrase — the way creators do, and answer THAT question rather than the version of it you would rather answer. Concede the fair part before you take the rest apart; the concession is the only reason a reply is believed. Come back to their exact wording at least once more in the middle ("'did nothing'. yeah, for about a week. here is why"), and answer the question a second time in one short sentence at the end so it lands.
+
+Talk to that ONE person, by their handle if it helps, not to an audience — this is a favour, not a pitch. Include one detail only somebody who genuinely uses the thing would know; that detail is what turns a reply into proof. Then a quick call-to-action.
+
+ON-SCREEN LABELS: the ON SCREEN COMMENT: line is the only label in the script.`,
+  expert: `FORMAT — EXPERT EXPLAINER: you do this job for a living, and you are giving away the thing you tell the people who pay you.
+
+Open on the role and the stake in one breath, and make the role a specific job in a real setting ("I fit these for a living", "I have been cutting hair for eleven years", "I look at these scans all day") — never a vague "expert" and never a credential nobody can picture. Then the thing you watch people get wrong, stated plainly, because a named mistake is what makes a stranger listen to advice.
+
+The body is ONE mechanism explained properly: what is actually happening, in the order it happens, in plain English, with any technical word translated in the same breath it lands. Explain it well enough that the viewer could repeat it to somebody else tonight — that is the value being handed over, and it has to be worth something even if they never buy.
+
+The product is a recommendation you would give a client, not a promotion: one line on what you actually look for, and one honest caveat about who it is not for or when it is not necessary. That caveat is the credibility — an expert who says the thing is for everyone is a salesperson.
+
+Calm and unhurried the whole way through: authority never rushes, never oversells and never raises its voice. Soft call-to-action, the kind a professional would really say ("if you are going to get one, get one that does X").`,
+  tutorial: `FORMAT — HOW-TO / TUTORIAL: teach one thing the viewer can genuinely do today, and the product is the tool inside one of the steps.
+
+Open on the promise and the timeframe — what they will be able to do by the end, and roughly how long it takes ("here is how I get that in under a minute").
+
+Then the steps, counted out loud, three at most. Every step is a physical action a person could do with their hands right now: name the action, then name the one thing people get wrong at that step. A step that is advice rather than an action is not a step — cut it and give its time to the ones that are.
+
+The product enters at the step where it is actually used, doing the job that step needs, and earns exactly one line on why this one rather than another. It is never step one, which reads as an ad, and never the only step that matters.
+
+Finish on the visible result: what they should be seeing or feeling if they did it right, and what it means if they are not. The lesson has to be worth watching even if they never buy — that is what earns the buy. Fold the call-to-action into the last step so the video never stops teaching in order to sell.`,
+  grwm: `FORMAT — GRWM / ROUTINE: the ad happens inside a routine that was already running, and the routine never stops for it.
+
+Open mid-task, mid-sentence, hands busy — and give the routine a real destination and a real clock ("I have got twenty minutes before I have to leave", "night shift again"). A routine with somewhere to be is a routine; a routine with nowhere to be is a demo with a bathroom in the background.
+
+Talk the way people talk while doing something else: half-sentences, an aside, losing the thread and picking it back up, saying something to the room. The talking happens around the task — never a piece delivered to camera while the hands happen to be moving.
+
+The product shows up at the exact point in the routine it would really be used, taken from wherever it actually lives (a shelf, a bag, a drawer), and earns exactly ONE line about why it stayed in the routine. Not what it does — why it survived ("this is the only one I have ever re-bought").
+
+Never stop the routine to sell it, never turn to camera to present it, and never restate the benefit later. The call-to-action is an aside on the way out of the door, one sentence at most, said while still doing something else.`,
 }
 
 // ── The hook contract, per style ──
@@ -601,13 +677,13 @@ const WRITE_STYLE_HOOK_CONTRACT: Record<WriteStyle, string> = {
   comparison: 'that two things are being put side by side. Both sides land in the first line, so the viewer knows a comparison is running before either one is judged.',
   objection: 'the objection, said out loud in the viewer\'s own words before they can think it. The first line is their doubt, not your answer.',
   founder: 'that you made the thing. Say it in the first line, plainly and a little reluctantly — that is the whole reason this ad is believed, and it stops being a founder story if it arrives late.',
-  podcast: 'that the viewer has walked in on the middle of an answer. Start mid-sentence on a question that was never heard, so the line reads as a clip rather than an opening.',
-  interview: 'that this is an answer given to someone holding a mic. Open already reacting to the question, unrehearsed, to a person and not to the lens.',
-  'green-screen': 'what is on the screen behind you. Read it out loud first — the review, the comment, the price, the headline — so the reaction has something to be a reaction to.',
-  reply: 'that one specific person asked one specific question. Say the question back in the first line; the viewer must know they are watching a reply.',
-  expert: 'the job and the stake, in one breath. What you do for a living, and the thing you see people get wrong, so the authority is established before any advice arrives.',
-  tutorial: 'the promise and the timeframe — what the viewer will be able to do by the end, and roughly how long it takes. If the first line names a number of steps, count exactly that many out loud in the body.',
-  grwm: 'that the routine is already underway. Mid-task, hands busy, talking over what you are doing — never stopping to introduce the video.',
+  podcast: 'the question, and that somebody else asked it. The first line is the HOST\'s question — an objection, a how-does-that-work question, or a listener\'s problem — landing mid-conversation with no introduction, so the viewer knows in one second they have walked into an episode already running. The guest\'s first words then answer THAT question and not a more convenient one.',
+  interview: 'that a stranger on the street is being asked something, and that they doubt it. The first line is a real person\'s offhand, skeptical answer to a question we only half hear — a shrug, a laugh, "does that actually work?" — spoken to whoever is holding the microphone, never to the lens, and never as a claim about the product.',
+  'green-screen': 'what is on the screen, read out loud. Quote the actual wording of the review, comment, price or headline in the first line — a first line that only reacts ("this is insane") with nothing named is a failed hook here, because the viewer cannot read fast enough to supply what you left out.',
+  reply: 'the comment itself, in that person\'s own words. The first spoken line reads the comment back — the real wording, quoted, never summarised — so the viewer knows they are watching a reply and knows exactly what is being answered before the answer starts.',
+  expert: 'the job and the mistake, in one breath. The specific thing you do for a living, and the thing you watch people get wrong doing it — so the authority is established AND pointed at a real error before any advice arrives.',
+  tutorial: 'the promise and the timeframe — what the viewer will be able to do by the end, and roughly how long it takes. Never the product: a first line that names it has promised an ad instead of a lesson. If the first line names a number of steps, count exactly that many out loud in the body.',
+  grwm: 'that the routine is already underway and has somewhere to be. Mid-task, hands busy, talking over what you are doing, with the clock or the destination named early — never stopping to introduce the video.',
 }
 
 // The style's line, then what its hook owes the viewer. Kept as one block so a
@@ -624,14 +700,68 @@ function styleBlock(style: WriteStyle): string {
 // free to pick the shots. Read by the 'scenes' format here, and by B-Roll's two
 // storyboard calls via sceneStagingFor — one block, so a format stages the same
 // way wherever it's picked.
+//
+// THREE OF THEM STAGE MORE THAN ONE PERSON (August 2026), which is what most of
+// these formats actually are and what the first version of them missed — every
+// block staged one person talking, so a "street interview" came back as one
+// creator filmed against three different walls and a "podcast clip" as a
+// monologue with a mic in shot. [CHARACTER] is still the ONE token and the one
+// identity: it is a reference-image slot, so a scene that carries it comes back
+// as that face, and putting it on four strangers turns a vox pop into one person
+// in four coats. The others are staged as far as the shot needs them and no
+// further — the podcast host as a shoulder and the back of a head who speaks,
+// the interviewer as an arm and a mic who never appears, the other respondents
+// as plainly different people carrying two or three generic markers each. See
+// the OTHER PEOPLE rule in WRITE_SCENES_SYSTEM, which is the half that lets a
+// second voice be attributed and given a one-clause voice note of its own.
 const WRITE_STYLE_SCENE_DIRECTION: Partial<Record<WriteStyle, string>> = {
-  podcast: `SCENE STAGING — PODCAST CLIP: stage every scene as a podcast recording. [CHARACTER] sits at a table or in a studio chair with a large boom-arm microphone in frame between them and the lens, headphones on or slung round the neck, warm practical lighting, and a dressed background (acoustic panels, a shelf, a plant, a lamp). Cut between a fixed studio angle framing [CHARACTER] from the chest up and a second angle from roughly 45 degrees off to the side, so it reads as a multi-cam episode. [CHARACTER] speaks to someone just off-lens, not into the lens. A second person may sit opposite — describe them only as a listener seen from behind or half out of frame, never with any identity detail, and they never speak. [PRODUCT] sits on the table and gets picked up mid-answer, turned once, put back down; it is never held up and presented. One scene may be a tight insert of hands and [PRODUCT] on the table while the answer continues over it.`,
-  interview: `SCENE STAGING — STREET INTERVIEW: stage every scene outdoors in a real public place — a pavement, a market, a park path, outside a shop — in daylight, with passers-by and traffic in the background. A handheld microphone enters frame from the edge of the shot, held by an interviewer who stays off camera; describe them only as an arm and a mic, never with identity details. The camera is handheld at eye level with a little natural drift, framing [CHARACTER] from the chest up with the street legible behind them. [CHARACTER] answers whoever is holding the mic and only glances at the lens by accident. When the interviewer speaks, write it as its own line — An off-camera voice asks: "..." — and keep it to a handful of words; the VOICE PROFILE describes [CHARACTER] only. [PRODUCT] comes out of a bag or a coat pocket at the moment it's mentioned.`,
-  'green-screen': `SCENE STAGING — GREEN SCREEN REACTION: stage every scene as a green-screen reaction. [CHARACTER] stands or sits in the foreground to one side of the vertical frame; the rest of the frame is filled by the thing being reacted to, rendered as a flat on-screen graphic behind them — a review card, a comment, a forum post, a price tag, a headline. Write the on-screen wording explicitly and keep it SHORT (a line or two, large and legible) and inside the middle band of the frame, clear of the top and bottom eighth where the platform's own UI sits. [CHARACTER] gestures back at the panel, turns to look at it, reacts with their face. The graphic changes between scenes as the argument moves while the framing and the lighting stay identical, so the cuts read as one continuous take. [PRODUCT] comes up into the free hand when it enters.`,
-  reply: `SCENE STAGING — COMMENT REPLY: stage every scene as a reply filmed wherever this person happens to be — a parked car, a kitchen counter, the end of a bed, a desk — framed tight and casual from chest height about an arm's length away, lit by a window or a lamp in the room. In scene 1 only, the question being answered may appear as a short comment card in the upper middle band of the frame; write its exact wording and keep it to one line. Everything after that is [CHARACTER] talking straight to the lens. Hold the same setup, wardrobe and light across every scene so it reads as one sitting. [PRODUCT] is reached for from just outside the frame when it comes up.`,
-  expert: `SCENE STAGING — EXPERT EXPLAINER: stage every scene in the professional's own workplace — a treatment room, a workshop, a kitchen pass, a salon chair, a workbench — with the tools of that trade visible around them and the wardrobe of the job on. Lighting is whatever that room really has. Hold a steady, unhurried frame from chest height, and cut to tight inserts of the hands demonstrating the thing being explained. [CHARACTER] demonstrates on a real object or a real surface while talking; never a scene of someone only describing. [PRODUCT] sits among the professional tools and gets picked up as one of them.`,
-  tutorial: `SCENE STAGING — HOW-TO / TUTORIAL: one scene per step, and every step is shown being done. Shoot the steps overhead or over the shoulder, on the hands and the surface, and cut back to a chest-up frame of [CHARACTER] between them. Each step scene catches the physical action in motion — the pour, the wipe, the click, the fold — with [PRODUCT] in the hands at the step where it's actually used. Leave the real clutter of the room in frame; nothing is styled or cleared. If the last step has a visible result, the final scene is a tight shot of that result.`,
-  grwm: `SCENE STAGING — GRWM / ROUTINE: every scene sits inside the routine and the routine never stops. A bathroom mirror, a bedroom, a kitchen at the hour this would really happen, with the props of that hour around (a towel, a kettle, a half-packed bag). [CHARACTER] is always mid-task, hands busy, talking while doing — never standing still to deliver a line. Hold one fixed camera position they move in and out of, cut with close inserts of the task itself, and let time move forward across the scenes. [PRODUCT] enters at exactly the point in the routine it would be used, taken from wherever it lives — a shelf, a bag, a drawer.`,
+  podcast: `SCENE STAGING — PODCAST CLIP: stage every scene inside ONE podcast recording session, cut the way a real multi-cam episode is cut. Two people sit across a table with large boom-arm microphones in frame, headphones on or slung round the neck, warm practical lighting, a dressed background (acoustic panels, a shelf, a plant, a lamp).
+
+[CHARACTER] IS THE GUEST — the expert — and is the only person in the ad with an identity. THE HOST IS THE SECOND PERSON AND THEY DO SPEAK: stage them from behind, over the shoulder, or cut off at the edge of the frame, so what is in shot is a shoulder, the back of a head, a hand resting on a mic — never their face, never a name, never an age, gender, or wardrobe beyond a plain silhouette.
+
+Cut it the way an episode is really cut: the host's question runs over an over-the-shoulder framing past the host onto [CHARACTER], and the answer sits on a clean chest-up studio angle of [CHARACTER], with a second angle roughly 45 degrees off to the side for the cut inside a long answer. [CHARACTER] talks to the host, never into the lens.
+
+Attribute the two voices separately — The host asks: "..." for the host's line, [CHARACTER] says: "..." for the guest's — and give the host a one-clause voice note in the scene where they speak, since the VOICE PROFILE at the end describes [CHARACTER] alone.
+
+[PRODUCT] sits on the table between the microphones from the first scene, unremarked, and gets picked up mid-answer, turned once and put back down. It is never held up to the lens and never presented. One scene may be a tight insert of hands and [PRODUCT] on the table while the answer continues over it.`,
+  interview: `SCENE STAGING — STREET INTERVIEW: stage every scene outdoors in the SAME public place on the same afternoon — one stretch of pavement, one market, one park path, one shopfront — in daylight, with real passers-by and traffic behind. A handheld microphone enters frame from the edge of the shot, held by an interviewer who stays off camera and is only ever an arm and a microphone; give them no identity detail at all. The camera is handheld at eye level with a little natural drift, framing whoever is speaking from the chest up with the street legible behind them.
+
+EACH SCENE IS A DIFFERENT PERSON, AND THAT IS THE POINT OF THE FORMAT: several strangers stopped in the same hour, never one person filmed from several angles. [CHARACTER] is ONE of them — the one whose reaction lands the ad — and ONLY their scenes carry the token. Every other respondent is a plainly different person described by two or three generic markers and nothing more (a rough age band, a build, what they are wearing or carrying), never a name and never a face described in detail.
+
+NEVER WRITE [CHARACTER] FOR ANYONE ELSE. That token is a reference-image slot, so every scene carrying it comes back as the same face — put it on all of them and the vox pop becomes one person in four coats. A scene whose speaker is not [CHARACTER] attaches no character reference at all.
+
+Hold the location, the light and the lens identical across all of them so the cuts read as one afternoon; the only thing that changes is who is standing there.
+
+THE TURN HAPPENS ON CAMERA. A doubt scene is a person mid-shrug, eyebrows up, still holding whatever they were carrying, weight on one foot, half-turned as if they were about to walk on. A reaction scene is that same person a beat after trying [PRODUCT] — the eyes going, the second look down at what is in their hand, the involuntary laugh, the "again?" reach. [PRODUCT] is handed in from off frame by the interviewer at the moment it is tried, and stays in that person's hands afterwards.`,
+  'green-screen': `SCENE STAGING — GREEN SCREEN REACTION: stage every scene as a green-screen reaction. [CHARACTER] stands or sits in the foreground to ONE side of the vertical frame, the same side in every scene; the rest of the frame is filled by the thing being reacted to, rendered as a flat on-screen graphic behind them.
+
+RENDER THE ARTIFACT, NOT A CAPTION. Whatever is on screen is a screenshot of a real thing and must look like one: a review card with its star row, a username and a date; a comment with a handle and a like count; a forum post; a price tag or a receipt line; a headline with its publication. Write the exact wording, keep it SHORT (a line or two, large and legible), and keep it inside the middle band of the frame, clear of the top and bottom eighth where the platform's own UI sits.
+
+[CHARACTER] plays to the panel: they turn to look at it, gesture back at it, read a fragment off it, react to it with their face. The graphic CHANGES between scenes as the argument moves — a new piece of evidence each time it is quoted, written out in full in that scene — while the framing, the wardrobe and the lighting stay identical, so the cuts read as one continuous take.
+
+[PRODUCT] comes up into the free hand when it enters, held at chest height on the empty side of the frame so it and the graphic are legible at once.`,
+  reply: `SCENE STAGING — COMMENT REPLY: stage every scene as a reply filmed wherever this person happens to be — a parked car, a kitchen counter, the end of a bed, a desk — framed tight and casual from chest height about an arm's length away, lit by a window or a lamp in the room. Hold the same setup, wardrobe and light across every scene so it reads as one sitting; only the framing, the posture and what their hands are doing change.
+
+THE COMMENT IS ON SCREEN AND IT IS PART OF THE PICTURE. Every scene that references it renders it as a comment card pinned in the upper middle band of the frame — a small avatar circle, a handle, and the comment text — and the wording is written out EXACTLY THE SAME in every scene it appears in, so the card does not change between cuts. One short legible line or two, clear of the top and bottom eighth of the frame where the platform's own UI sits.
+
+[CHARACTER] plays to it: glancing up at it, pointing back at it, reading a fragment off it, reacting to it with their face. They never talk as though it is not there. The card may come off for a scene that is pure answer, and it comes back for the closing line that answers the question a second time.
+
+[PRODUCT] is reached for from just outside the frame at the moment it is named, and held at chest height in the same frame as the comment card, so the question and the answer are visible at once.`,
+  expert: `SCENE STAGING — EXPERT EXPLAINER: stage every scene in the professional's own workplace — a treatment room, a workshop, a kitchen pass, a salon chair, a workbench — with the tools of that trade visible around them and the wardrobe of the job on. Lighting is whatever that room really has, never a lit set.
+
+Hold a steady, unhurried frame from chest height, and cut to tight inserts of the hands demonstrating the thing being explained. [CHARACTER] is DOING the job while talking — working on a real object, a real surface, or a stand-in for a client — never a scene of somebody standing still describing something. Where the explanation has a mechanism, one scene shows that mechanism happening in close-up on the real thing rather than being described over a talking shot.
+
+[PRODUCT] sits among the professional tools from the first scene, treated as one of them, and gets picked up in the scene where it is recommended — used the way the job uses it, never turned to face the lens.`,
+  tutorial: `SCENE STAGING — HOW-TO / TUTORIAL: one scene per step, and every step is shown being DONE. Shoot the steps overhead or over the shoulder, on the hands and the surface, and cut back to a chest-up frame of [CHARACTER] between them.
+
+Each step scene catches the physical action in motion — the pour, the wipe, the click, the fold — with [PRODUCT] in the hands at the step where it is actually used. Where a step names a mistake, that scene shows the mistake being avoided (the hand stopping short, the second pass, the correction), not a diagram of it.
+
+Leave the real clutter of the room in frame; nothing is styled or cleared, and the surface carries whatever was already on it. Hold the same room, wardrobe and light across every step so the steps read as one sitting. The final scene is a tight shot of the finished result, held long enough to be judged.`,
+  grwm: `SCENE STAGING — GRWM / ROUTINE: every scene sits inside the routine and the routine never stops. A bathroom mirror, a bedroom, a kitchen at the hour this would really happen, with the props of that hour around it — a towel, a kettle, a half-packed bag, the coat already over the chair.
+
+[CHARACTER] is always mid-task, hands busy, talking while doing — never standing still to deliver a line and never turning to present anything. Hold one fixed camera position they move in and out of, cut with close inserts of the task itself, and let time move FORWARD across the scenes: hair goes from wet to dry, the bag fills, the light in the window shifts. Two scenes that could have been filmed in either order are the same scene twice.
+
+[PRODUCT] enters at exactly the point in the routine it would be used, taken from wherever it lives — a shelf, a bag, a drawer — used for what it is for, and left where it lands.`,
 }
 
 // How a picked style stages its shots, or undefined when it stages nothing (a
@@ -645,7 +775,17 @@ export function sceneStagingFor(style: WriteStyle | null | undefined): string | 
 // A format style dictates HOW the ad is filmed and spoken; the take dictates
 // WHICH angle it argues. They collide at the opening line — a street interview
 // can't open on a stat read to camera — so this says which one bends.
-const FORMAT_OVERRIDES_TAKE = `WHEN THE FORMAT AND THE TAKE DISAGREE, THE FORMAT WINS: keep the take's angle and its anchor (which pain point, which benefit, who it's written for) and deliver it through the format's own way of opening. The take and the hook formula supply the SUBSTANCE of the first line and the format's hook contract decides what it has to establish, but that line is spoken the way the format speaks — mid-answer, mid-reply, mid-routine — never as a piece delivered to camera.`
+//
+// The second paragraph was added when three formats stopped opening on the ad's
+// own voice (August 2026): a podcast clip opens on the HOST's question, a
+// comment reply on the COMMENT, a green-screen reaction on what is ON SCREEN.
+// The take's anchor used to be attached to "the first spoken line", so on those
+// three it had nowhere to land and the angle quietly evaporated — the batch came
+// back as three takes arguing the same thing behind three different questions.
+// The anchor is handed to whoever speaks first instead.
+const FORMAT_OVERRIDES_TAKE = `WHEN THE FORMAT AND THE TAKE DISAGREE, THE FORMAT WINS: keep the take's angle and its anchor (which pain point, which benefit, who it's written for) and deliver it through the format's own way of opening. The take and the hook formula supply the SUBSTANCE of the first line and the format's hook contract decides what it has to establish, but that line is spoken the way the format speaks — mid-answer, mid-reply, mid-routine — never as a piece delivered to camera.
+
+WHEN THE FORMAT OPENS ON SOMEBODY ELSE, THE ANGLE GOES WITH THEM: some formats do not open on this ad's own voice at all. The take's anchor then decides what that other opening is ABOUT — the host asks their question about the take's pain point, the comment doubts the take's benefit, the thing on screen attacks exactly what this take is defending, the first stranger's doubt is doubt about the take's anchor. The angle is never dropped and never softened, only handed to whoever speaks first.`
 
 // Three parallel takes per generate — same style, deliberately different
 // openings AND different committed angles, so the batch is a real A/B test

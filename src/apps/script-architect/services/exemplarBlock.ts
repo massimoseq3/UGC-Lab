@@ -28,8 +28,13 @@ const STYLE_FAMILIES: Record<WriteStyle, HookCategory[]> = {
   comparison: ['comparison'],
   objection: ['myth-busting'],
   founder: ['storytelling'],
-  podcast: ['storytelling'],
-  interview: ['storytelling'],
+  // The guest is an expert explaining a mechanism, so authority + educational
+  // rather than the storytelling register this sat in while a podcast clip was
+  // a monologue.
+  podcast: ['authority', 'educational'],
+  // A vox pop is a doubt that turns — the doubt half rhymes with myth-busting,
+  // the turn half with storytelling.
+  interview: ['storytelling', 'myth-busting'],
   'green-screen': ['myth-busting'],
   reply: ['myth-busting'],
   expert: ['authority'],
