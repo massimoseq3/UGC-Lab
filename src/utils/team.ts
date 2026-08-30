@@ -67,7 +67,7 @@ export const TEAM: TeamMember[] = [
     appId: 'discover',
     name: 'Pearl',
     role: 'Trend Spotter',
-    blurb: 'Finds the ads already winning, so you know what to make before you make it.',
+    blurb: 'Finds the ads already winning and files them in your swipe file.',
   },
   {
     appId: 'ad-anatomy',

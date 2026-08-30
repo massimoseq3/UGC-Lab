@@ -12,8 +12,28 @@ import { useIsDesktop } from '../hooks/useBreakpoint'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import { sortByOrder, starredFirst, SORT_OPTIONS_WITH_NAME, SORT_OPTIONS_DATE_ONLY, type SortOrder } from '../apps/finder/bankSort'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
+import Spinner from './Spinner'
+import CountSlot from './CountSlot'
 import DayPill from './DayPill'
 import { groupByDay, sectionLabel } from '../utils/history'
+import { humanizeError } from '../utils/friendlyError'
+import {
+  buildSearch,
+  flattenJsonProfile,
+  genderBucket,
+  loadStarterPresets,
+  saveStarterToBank,
+  settingFromProfile,
+  starterThumbUrl,
+  type StarterRow,
+} from '../apps/character-studio/presets/service'
+import Dropdown from './Dropdown'
+
+// A tile standing in for a template that isn't in the bank yet. Prefixed so
+// `handleSelect` can tell one from a real row by its id alone — nothing else
+// in the app mints an id with a colon in it.
+const TEMPLATE_ID = 'template:'
+const templateIdOf = (rowId: string) => rowId.startsWith(TEMPLATE_ID) ? rowId.slice(TEMPLATE_ID.length) : null
 
 type BankItem = AnyBankItem
 
@@ -88,6 +108,17 @@ export default function BankPicker({
   // full masonry width, and wide character sheets span both grid columns,
   // instead of being squeezed into one narrow column.
   const [landscapeIds, setLandscapeIds] = useState<Set<string>>(new Set())
+  // The Characters template library, and the in-flight flag for turning one
+  // into a real bank row on pick.
+  const [templates, setTemplates] = useState<StarterRow[] | null>(null)
+  // The two character facets, mirroring the Characters preset picker — a
+  // picker holding the whole template library needs the same way into it.
+  const [gender, setGender] = useState('')
+  const [styleFacet, setStyleFacet] = useState('')
+  // The row currently being written into the bank ('multi' for a confirmed
+  // multi-select), so the tile it was clicked on can say so.
+  const [addingId, setAddingId] = useState<string | null>(null)
+  const adding = addingId !== null
   const panelRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const isDesktop = useIsDesktop()
@@ -111,6 +142,7 @@ export default function BankPicker({
     () => (expandProductImages ? expandProducts(products) : products),
     [products, expandProductImages],
   )
+  const addToast = useAppStore((s) => s.addToast)
   const openApp = useAppStore((s) => s.openApp)
   const sendToApp = useAppStore((s) => s.sendToApp)
   const activeApp = useAppStore((s) => s.activeApp)
@@ -127,6 +159,28 @@ export default function BankPicker({
     currentBankType === 'styles' ? styles :
     brolls
 
+  // The templates are shipped with the app and identical for every member, so
+  // a character picker offers them alongside the member's own rows: picking one
+  // writes it into the Characters bank (portrait and DNA) and hands the caller
+  // the real `Model` it just made, which is what "use a template exactly like
+  // one of mine" has to mean — every downstream app reads `characterImage`, and
+  // a static URL is not an asset any of them can keep. Fetched on open, and
+  // only for a picker that can actually reach the characters bank.
+  const offersTemplates = normalizedTabs
+    ? normalizedTabs.some((t) => t.type === 'models')
+    : bankType === 'models'
+  useEffect(() => {
+    if (!isOpen || !offersTemplates || templates) return
+    let live = true
+    loadStarterPresets().then(
+      (rows) => { if (live) setTemplates(rows) },
+      // A library that won't load is not worth a toast in a picker that works
+      // perfectly well without it — the member's own characters are the point.
+      () => {},
+    )
+    return () => { live = false }
+  }, [isOpen, offersTemplates, templates])
+
   // Apply the per-tab filter (when in tab-mode) ahead of the caller's
   // general filter so the caller-supplied filter stays in charge.
   const itemsAfterTabFilter = currentTabFilter ? items.filter(currentTabFilter) : items
@@ -138,11 +192,103 @@ export default function BankPicker({
       : itemsAfterTabFilter
   const itemsAfterFilter = filter ? itemsAfterImageFilter.filter(filter) : itemsAfterImageFilter
 
-  const filtered = search.trim()
+  // ── Characters ───────────────────────────────────────────────────────
+  // The member's own rows and the template library, annotated with the two
+  // facets and one search haystack apiece, so both halves of the list filter
+  // through the same code — a picker that offers 81 templates needs the same
+  // way into them the Characters preset picker has.
+  //
+  // A bank row's gender is BUCKETED and its style keyword-matched off its free
+  // text (`genderBucket` / `settingFromProfile`), exactly as over there: raw
+  // values would list two spellings of one thing, and a row nothing matches
+  // simply carries no style rather than a wrong one.
+  const characterPool = useMemo(() => {
+    if (currentBankType !== 'models') return null
+    const own = (itemsAfterFilter as Model[]).map((m) => {
+      const flat = flattenJsonProfile(m.jsonProfile)
+      return {
+        model: m,
+        gender: genderBucket(flat.gender ?? ''),
+        setting: settingFromProfile(flat),
+        search: buildSearch([m.name], flat),
+      }
+    })
+    const saved = new Set(models.map((m) => m.presetId).filter(Boolean))
+    const tpl = (templates ?? [])
+      .filter((t) => !saved.has(t.id))
+      .map((t) => ({
+        model: {
+          id: `${TEMPLATE_ID}${t.id}`,
+          name: t.title,
+          characterImage: starterThumbUrl(t.id),
+          jsonProfile: null,
+          notes: '',
+          source: 'character-studio',
+          presetId: t.id,
+          createdAt: 0,
+        } as Model,
+        gender: genderBucket(t.gender),
+        setting: t.setting,
+        search: t.search,
+      }))
+      .filter((r) => (!currentTabFilter || currentTabFilter(r.model)) && (!filter || filter(r.model)))
+    return { own, tpl }
+  }, [currentBankType, itemsAfterFilter, models, templates, currentTabFilter, filter])
+
+  const q = search.trim().toLowerCase()
+  const characterPasses = useMemo(() => ({
+    q: (r: { search: string }) => !q || r.search.includes(q),
+    gender: (r: { gender?: string }) => !gender || r.gender === gender,
+    setting: (r: { setting?: string }) => !styleFacet || r.setting === styleFacet,
+  }), [q, gender, styleFacet])
+
+  const filtered = characterPool
+    // A character is searched on its whole DNA — "freckles" and "wood slat
+    // wall" find the one they describe, where a name-only match never could.
+    ? characterPool.own.filter((r) => Object.values(characterPasses).every((fn) => fn(r))).map((r) => r.model)
+    : search.trim()
     ? itemsAfterFilter.filter((item) =>
         getItemName(currentBankType, item).toLowerCase().includes(search.toLowerCase())
       )
     : itemsAfterFilter
+
+  // Both facets' counts are taken against the OTHER one (and the search), so a
+  // segment can never promise more than the list delivers, and every option
+  // renders even at zero — a vanishing one moves the control under the pointer,
+  // and a 0 answers "why is there nothing here" outright.
+  const characterFacets = useMemo(() => {
+    if (!characterPool) return null
+    const all = [...characterPool.own, ...characterPool.tpl]
+    const pool = (except: keyof typeof characterPasses) =>
+      all.filter((r) => Object.entries(characterPasses).every(([k, fn]) => k === except || fn(r)))
+    const genderRows = pool('gender')
+    const styleRows = pool('setting')
+    // Styles in the LIBRARY's own order — the shot numbering the build script
+    // bakes into the row order — not by count, which would reshuffle the menu
+    // between two openings. A style only the member's own rows use is appended.
+    const order: string[] = []
+    for (const r of [...characterPool.tpl, ...characterPool.own]) {
+      if (r.setting && !order.includes(r.setting)) order.push(r.setting)
+    }
+    return {
+      genders: [
+        { value: '', label: 'All', badge: <CountSlot value={genderRows.length} /> },
+        ...['Female', 'Male'].map((k) => ({
+          value: k,
+          label: k,
+          badge: <CountSlot value={genderRows.filter((r) => r.gender === k).length} />,
+        })),
+      ],
+      styles: [
+        { value: '', label: 'All Styles' },
+        ...order.map((k) => ({
+          value: k,
+          label: k,
+          count: styleRows.filter((r) => r.setting === k).length,
+        })),
+      ],
+    }
+  }, [characterPool, characterPasses])
 
   // Same sort options as the Bank browser. `sortOptions` is null for banks the
   // Bank doesn't sort (voices) — we then leave the list in its natural order.
@@ -164,6 +310,23 @@ export default function BankPicker({
     // picker is where pinned assets pay off.
     return starredFirst(sortByOrder(filtered, sort, nameOf))
   }, [filtered, sort, sortOptions, currentBankType])
+
+  // One group per style ("Handheld Mic", "Car"), in the library's own order —
+  // which the build script already sorts the rows into, so this splits on a
+  // change of style rather than re-bucketing. 81 unfamiliar faces under one
+  // heading is a wall; under eleven it's a shot list.
+  const templateGroups = useMemo(() => {
+    if (!characterPool) return []
+    const out: Array<{ label: string; models: Model[] }> = []
+    for (const r of characterPool.tpl) {
+      if (!Object.values(characterPasses).every((fn) => fn(r))) continue
+      const label = r.setting || 'Other'
+      const last = out[out.length - 1]
+      if (last?.label === label) last.models.push(r.model)
+      else out.push({ label, models: [r.model] })
+    }
+    return out
+  }, [characterPool, characterPasses])
 
   // B-Rolls are day-grouped under a date pill, exactly as the Bank browser
   // shows them — a still is recognised by when it was shot, and the picker is
@@ -227,6 +390,11 @@ export default function BankPicker({
             <Check className="h-3 w-3" strokeWidth={3} />
           </div>
         )}
+        {addingId === item.id && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-xl bg-black/45">
+            <Spinner className="h-5 w-5 text-white" />
+          </div>
+        )}
       </div>
     )
   }
@@ -242,6 +410,9 @@ export default function BankPicker({
       setSearch('')
       setSelectedIds([])
       setSort('newest')
+      setGender('')
+      setStyleFacet('')
+      setAddingId(null)
       setActiveTab(bankType)
       const initialItems =
         bankType === 'products' ? productPool :
@@ -261,11 +432,36 @@ export default function BankPicker({
 
   useCloseOnEscape(isOpen, onClose)
 
+  // Writes a template into the Characters bank and returns the row it became,
+  // so a caller only ever receives a real `Model` with a real asset behind it.
+  // `saveStarterToBank` is a no-op if it's already there, which is what makes a
+  // double-click safe beyond the `adding` guard.
+  const materialize = async (templateId: string): Promise<Model | null> => {
+    const row = templates?.find((t) => t.id === templateId)
+    if (!row) return null
+    await saveStarterToBank(row)
+    return useBankStore.getState().models.find((m) => m.presetId === templateId) ?? null
+  }
+
   const handleSelect = (item: BankItem) => {
     if (multiSelect) {
       setSelectedIds((prev) =>
         prev.includes(item.id) ? prev.filter((id) => id !== item.id) : [...prev, item.id]
       )
+      return
+    }
+    const templateId = templateIdOf(item.id)
+    if (templateId) {
+      if (adding) return
+      setAddingId(item.id)
+      void materialize(templateId)
+        .then((model) => {
+          if (!model) return
+          onSelect(model)
+          onClose()
+        })
+        .catch((err: unknown) => addToast(humanizeError(err, 'Could not add that template.'), 'error'))
+        .finally(() => setAddingId(null))
       return
     }
     onSelect(item)
@@ -281,8 +477,8 @@ export default function BankPicker({
     t === 'styles' ? styles :
     brolls
 
-  const handleConfirmMulti = () => {
-    if (!onSelectMany || selectedIds.length === 0) return
+  const handleConfirmMulti = async () => {
+    if (!onSelectMany || selectedIds.length === 0 || adding) return
     // Resolve selected ids across *every* bank the picker can switch between
     // (not just the current tab) so a selection spanning multiple tabs is added
     // in one go. Ids are global UUIDs, so a flat id→item map is unambiguous;
@@ -290,7 +486,28 @@ export default function BankPicker({
     const tabTypes: BankType[] = normalizedTabs ? normalizedTabs.map((t) => t.type) : [bankType]
     const byId = new Map<string, BankItem>()
     for (const t of tabTypes) for (const it of poolFor(t)) byId.set(it.id, it)
-    const picked = selectedIds.map((id) => byId.get(id)).filter((x): x is BankItem => !!x)
+    // Templates are written into the bank one at a time on the way out — each
+    // one is a blob fetch plus an IndexedDB write, and firing a dozen at once
+    // is the burst the R2 mirror already has a concurrency cap for.
+    setAddingId('multi')
+    const picked: BankItem[] = []
+    try {
+      for (const id of selectedIds) {
+        const templateId = templateIdOf(id)
+        if (templateId) {
+          const model = await materialize(templateId)
+          if (model) picked.push(model)
+          continue
+        }
+        const item = byId.get(id)
+        if (item) picked.push(item)
+      }
+    } catch (err) {
+      addToast(humanizeError(err, 'Could not add those templates.'), 'error')
+      setAddingId(null)
+      return
+    }
+    setAddingId(null)
     if (picked.length === 0) return
     onSelectMany(picked)
     onClose()
@@ -367,7 +584,7 @@ export default function BankPicker({
               // Keep the running multi-select across tabs — only the per-tab
               // view state (search, sort) resets — so the user can gather refs
               // from several banks and add them all at once.
-              onChange={(t) => { setActiveTab(t); setSearch(''); setSort('newest') }}
+              onChange={(t) => { setActiveTab(t); setSearch(''); setSort('newest'); setGender(''); setStyleFacet('') }}
               options={normalizedTabs.map((t) => ({ value: t.type, label: BANK_CONFIG[t.type].label }))}
               dense
             />
@@ -404,9 +621,39 @@ export default function BankPicker({
           )}
         </div>
 
+        {/* Character facets, on their own row under the search — the same pair
+            the Characters preset picker carries, because this list now holds
+            the same library. Gender is a toggle (three options, all worth
+            seeing without a click); the styles are a menu, since eleven
+            segments make a strip no 560px panel fits. The menu takes a FIXED
+            width rather than fitting its content: its label swings from "All
+            Styles" to "Holding Product", and a self-resizing trigger would
+            shove the gender toggle along the row on every pick. */}
+        {characterFacets && (
+          <div className="flex items-center gap-2 border-b border-ink/5 px-4 py-3">
+            <SegmentedToggle
+              value={gender}
+              onChange={setGender}
+              options={characterFacets.genders}
+              className="shrink-0"
+              fitContent
+              dense
+            />
+            <div className="min-w-0 flex-1">
+              <Dropdown
+                value={styleFacet}
+                onChange={setStyleFacet}
+                options={characterFacets.styles}
+                tier="panel"
+                dense
+              />
+            </div>
+          </div>
+        )}
+
         {/* Item list */}
         <div className="flex-1 overflow-y-auto px-4 py-3">
-          {sorted.length === 0 ? (
+          {sorted.length === 0 && templateGroups.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
               <span className="text-sm text-ink-600">
                 {search ? 'No matches found' : `No ${label.toLowerCase()} yet`}
@@ -424,6 +671,29 @@ export default function BankPicker({
                 </div>
               ))}
             </div>
+          ) : templateGroups.length > 0 ? (
+            /* Your own characters, then the template library grouped by style —
+               the same shape and the same order as the Characters preset
+               picker, since it is now the same list in both places. The heading
+               above your own rows only appears when the templates below give it
+               something to distinguish them from. */
+            <div className="flex flex-col">
+              {sorted.length > 0 && (
+                <>
+                  <DayPill label="Your Characters" className="mb-2" />
+                  <div className={gridClass}>{sorted.map(renderCard)}</div>
+                </>
+              )}
+              {templateGroups.map((group, i) => (
+                <div key={group.label}>
+                  <DayPill
+                    label={group.label}
+                    className={i === 0 && sorted.length === 0 ? 'mb-2' : 'mb-2 mt-4'}
+                  />
+                  <div className={gridClass}>{group.models.map(renderCard)}</div>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className={gridClass}>{sorted.map(renderCard)}</div>
           )}
@@ -433,10 +703,11 @@ export default function BankPicker({
         <div className="border-t border-ink/5 px-4 py-3">
           {multiSelect ? (
             <button
-              onClick={handleConfirmMulti}
-              disabled={selectedIds.length === 0}
+              onClick={() => { void handleConfirmMulti() }}
+              disabled={selectedIds.length === 0 || adding}
               className="flex w-full items-center justify-center gap-2 rounded-full bg-ink px-4 py-2.5 text-sm font-semibold text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
+              {adding && <Spinner className="h-4 w-4" />}
               Add {selectedIds.length || ''} {selectedIds.length === 1 ? 'item' : 'items'}
             </button>
           ) : !supportsCreate ? (

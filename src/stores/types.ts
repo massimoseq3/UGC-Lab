@@ -45,6 +45,11 @@ export interface Model {
   sheetImage?: string
   // User-pinned favourite. Starred items surface first in the bank pickers.
   starred?: boolean
+  // Set when this row was saved out of the Characters preset library
+  // (`public/presets/library.json`). It's what lets the picker show a template
+  // as already saved rather than offering to add a second copy — matching on
+  // the name can't, since the member is free to rename it afterwards.
+  presetId?: string
   createdAt: number
 }
 
@@ -61,6 +66,11 @@ export interface Script {
   kind?: 'remix' | 'reverse-engineer' | 'style'
   // User-pinned favourite. Starred items surface first in the bank pickers.
   starred?: boolean
+  // Set when this row was saved out of the Characters preset library
+  // (`public/presets/library.json`). It's what lets the picker show a template
+  // as already saved rather than offering to add a second copy — matching on
+  // the name can't, since the member is free to rename it afterwards.
+  presetId?: string
   createdAt: number
 }
 
@@ -95,6 +105,11 @@ export interface StylePreset {
   thumbRefs?: string[]
   // User-pinned favourite. Starred items surface first in the bank pickers.
   starred?: boolean
+  // Set when this row was saved out of the Characters preset library
+  // (`public/presets/library.json`). It's what lets the picker show a template
+  // as already saved rather than offering to add a second copy — matching on
+  // the name can't, since the member is free to rename it afterwards.
+  presetId?: string
   createdAt: number
 }
 
@@ -168,6 +183,11 @@ export interface BRoll {
   sourceApp?: 'broll-studio' | 'playground'
   // User-pinned favourite. Starred items surface first in the bank pickers.
   starred?: boolean
+  // Set when this row was saved out of the Characters preset library
+  // (`public/presets/library.json`). It's what lets the picker show a template
+  // as already saved rather than offering to add a second copy — matching on
+  // the name can't, since the member is free to rename it afterwards.
+  presetId?: string
   createdAt: number
 }
 

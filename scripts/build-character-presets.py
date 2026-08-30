@@ -6,7 +6,8 @@ character's DNA in the app's own nested `jsonProfile` shape, each JPEG the
 portrait that prompt produced — and writes:
 
   public/presets/library.json     one flat row per starter
-  public/presets/thumbs/<id>.webp one 400px cover each
+  public/presets/thumbs/<id>.webp one card cover each
+  public/presets/full/<id>.webp   one full-size portrait each
 
 Same reasoning as `build-vault.py`: the starters are identical for every
 member and read-only, so they ship as static files rather than as bank rows,
@@ -26,11 +27,23 @@ REPO = Path(__file__).resolve().parent.parent
 OUT = REPO / "public" / "presets"
 DEFAULT_SRC = Path.home() / "Downloads" / "download" / "_UGC-OS-Import"
 
-# Matches the vault's covers. 400px wide serves a ~180px card at 2x, and a
-# portrait at q68 lands around 20KB — a little above the vault's q58 because
-# these are faces, and a face is what the card is being judged on.
-THUMB_PX = 400
-THUMB_Q = 68
+# Two tiers, both measured on the LONG edge, and the split is the whole point.
+#
+# The cover started at 400 and came out 223x400: a picker card is ~155 CSS px
+# wide, which is 310 device px on the 2x screens these are looked at on, so
+# every face in the library was being upscaled from a picture smaller than the
+# hole it sat in. It was reported as simply looking low quality. 900 covers the
+# same card on a 3x screen with room over, at ~30KB.
+#
+# The portrait is the source's own 768x1376, so nothing is resampled. It stopped
+# being only a picture in August 2026: saving a template to the Characters bank
+# stores THIS file as the character's portrait, which is then the reference
+# image every downstream app renders from. It is fetched only when a member
+# actually saves one, which is why the card doesn't pay its ~100KB.
+THUMB_PX = 900
+THUMB_Q = 80
+FULL_PX = 1376
+FULL_Q = 85
 
 # The curated scene facet. Keyed by the numeric prefix the source folder files
 # each character under, because the profile's own `location` is free text —
@@ -66,19 +79,19 @@ def flatten(profile: dict) -> dict:
     return flat
 
 
-def build_thumb(src: Path, dest: Path) -> bool:
-    """Puts a 400px webp cover at `dest`. True if one is there afterwards."""
+def encode(src: Path, dest: Path, px: int, q: int) -> bool:
+    """Puts a `px`-long-edge webp at `dest`. True if one is there afterwards."""
     if dest.exists():
         return True
     # sips resizes and hands PNG to cwebp — sips has no webp encoder and cwebp
     # no resampler. Same two-step as build-vault.py.
     tmp = dest.with_suffix(".png")
     subprocess.run(
-        ["sips", "-Z", str(THUMB_PX), "-s", "format", "png", str(src), "--out", str(tmp)],
+        ["sips", "-Z", str(px), "-s", "format", "png", str(src), "--out", str(tmp)],
         capture_output=True,
     )
     if tmp.exists():
-        subprocess.run(["cwebp", "-quiet", "-q", str(THUMB_Q), str(tmp), "-o", str(dest)], capture_output=True)
+        subprocess.run(["cwebp", "-quiet", "-q", str(q), str(tmp), "-o", str(dest)], capture_output=True)
         tmp.unlink(missing_ok=True)
     return dest.exists()
 
@@ -90,7 +103,9 @@ def main() -> int:
         return 1
 
     thumbs_dir = OUT / "thumbs"
-    thumbs_dir.mkdir(parents=True, exist_ok=True)
+    full_dir = OUT / "full"
+    for d in (thumbs_dir, full_dir):
+        d.mkdir(parents=True, exist_ok=True)
 
     rows, skipped = [], []
     for path in sorted(src_dir.glob("*.json")):
@@ -119,8 +134,11 @@ def main() -> int:
         profile["aspectRatio"] = data.get("aspectRatio") or "9:16"
 
         preset_id = re.sub(r"[^a-zA-Z0-9_-]", "_", stem)
-        if not build_thumb(image, thumbs_dir / f"{preset_id}.webp"):
+        if not encode(image, thumbs_dir / f"{preset_id}.webp", THUMB_PX, THUMB_Q):
             skipped.append(f"{stem} (thumb failed)")
+            continue
+        if not encode(image, full_dir / f"{preset_id}.webp", FULL_PX, FULL_Q):
+            skipped.append(f"{stem} (portrait failed)")
             continue
 
         rows.append({
@@ -159,8 +177,11 @@ def main() -> int:
     (OUT / "library.json").write_text(json.dumps(rows, separators=(",", ":")))
 
     lib_kb = (OUT / "library.json").stat().st_size / 1024
-    thumb_mb = sum(f.stat().st_size for f in thumbs_dir.glob("*.webp")) / 1e6
-    print(f"{len(rows)} presets → library.json ({lib_kb:.0f} KB), {thumb_mb:.2f} MB of covers")
+    mb = lambda d: sum(f.stat().st_size for f in d.glob("*.webp")) / 1e6
+    print(
+        f"{len(rows)} presets → library.json ({lib_kb:.0f} KB), "
+        f"{mb(thumbs_dir):.2f} MB of covers, {mb(full_dir):.2f} MB of portraits"
+    )
     if skipped:
         print("skipped: " + ", ".join(skipped))
     return 0
