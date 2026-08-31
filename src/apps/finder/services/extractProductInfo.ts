@@ -7,7 +7,7 @@ import {
   type ChatCallTarget,
   type ChatCompletionsOptions,
 } from '../../../utils/kie'
-import { getChatTarget, CHAT_MODEL_STRONG } from '../../../utils/models'
+import { getChatTarget } from '../../../utils/models'
 import { isAssetRef, getAsBase64 } from '../../../utils/assetStore'
 import { extractBlock } from '../../../utils/xmlBlocks'
 import { downscaleForVision } from '../../../utils/visionImage'
@@ -57,7 +57,7 @@ You MAY also get pasted listing copy (a product page, Amazon listing, or landing
 
 ═══ OUTPUT FORMAT ═══
 
-Emit these blocks in this exact order, each opened and closed with its own tag. Nothing before <READ>, nothing after </CTA>. No markdown, no JSON, no code fences, no commentary, no bullet characters.
+Emit these blocks in this exact order, each opened and closed with its own tag. Nothing before <READ>, nothing after </CTA>. No markdown, no JSON, no code fences, no commentary.
 
 <READ>…</READ>
 <PRODUCT_NAME>…</PRODUCT_NAME>
@@ -84,52 +84,35 @@ Nothing in <READ> is shown to anyone — it exists so that the fields are writte
 
 Keep the whole block under 200 words. It is a grounding pass, not the answer: the TEXT line takes the words that identify the product and back its claims (brand, name, variant, actives with amounts, size, dose, badges) and skips the boilerplate — directions, warnings, addresses, barcodes and legal small print change nothing downstream. Everything you spend here comes out of the room left for the ten fields below it, and a profile that stops halfway is worth less than a shorter read.
 
-═══ THE ANTI-GENERIC RULE ═══
-
-Every field must contain at least one thing that could ONLY be written about this exact product. If a sentence would be equally true of any other product in the category, it is wrong: delete it and write the specific version.
-
-Banned outright, because they are what generic output is made of — and don't reach for a synonym either, write the concrete fact instead: "high-quality", "premium quality", "top-of-the-line", "game-changer", "elevate your routine", "in today's fast-paced world", "perfect for anyone who", "designed to help", "helps support", "the ultimate solution", "say goodbye to", "revolutionary", "cutting-edge", "seamlessly", "unlock", "effortlessly", "whether you're X or Y".
-
-Shape only — these come from an unrelated product and demonstrate FORM. Never carry their content into your output:
-  BAD  "Made with high-quality ingredients that help support healthy skin."
-  GOOD "Niacinamide sits second on the ingredient list, above the oils — it's the one working on the marks a breakout leaves behind."
-  BAD  "Perfect for busy people who want convenience."
-  GOOD "The 28-40 woman with a shelf of half-used serums who has stopped believing any of them."
-  BAD  "Great value for money."
-  GOOD "The 60-serving tub works out cheaper per scoop than the 30-serving tubs beside it on the shelf."
-
-═══ HONESTY, AND WHY IT IS NOT A LICENCE TO HEDGE ═══
+═══ HONESTY ═══
 
 Never invent: no clinical percentages, no "FDA approved", no certifications, awards, review counts, prices, guarantees, bundles or shipping terms that aren't visibly printed on the packaging or stated in the listing copy.
 
-But hedging is NOT the safe way out of a fact you don't have, because a hedged line poisons every script written from it. Keep the sentence specific and put the gap in a bracketed placeholder the member fills in:
-  BAD  "Backed by research and trusted by thousands of customers."   (vague — the failure this profile exists to prevent)
-  BAD  "Clinically proven to work in 14 days."                       (invented — never)
-  GOOD "[insert your clinical result, e.g. 'visible in 14 days'] — that result is the reason this beats a drugstore retinol."
-
-Naming what the buyer would OTHERWISE do is not a claim, and is encouraged: "a drugstore retinol", "meal-prepping every Sunday", "the supermarket own-brand". Naming a competitor brand and asserting something about it IS a claim — don't.
+Where you don't have a fact, leave a bracketed placeholder for the member to fill in — "[insert your clinical result]" — rather than inventing one or writing round it.
 
 ═══ THE FIELDS ═══
 
 <PRODUCT_NAME> — short, exactly as it's sold: brand + product, as printed. If no brand is legible, write [brand name] and keep the descriptive part.
 
-<DESCRIPTION> — 90-150 words. What it is, what it does, how the mechanism actually works in plain language, and the moment of use: when in the day, where in the house, what it replaces. Then what it looks and feels like in the hand — texture, weight, scent, finish, the sound of the closure. Concrete nouns over adjectives. This is the block a scriptwriter reaches for first.
+<DESCRIPTION> — exactly two sentences. The first says what it is; the second says what it helps the person do. Plain words, nothing else.
 
-<TARGET_MARKET> — 50-90 words. ONE specific person: age band, life situation, what they've already tried and given up on, what they're quietly embarrassed about, where they see ads like this. "Anyone who wants X" is a failed answer.
+<TARGET_MARKET> — one or two lines naming who this is for. Keep it simple.
 
-<PAIN_POINTS> — 4-6 lines, one per line, no bullets or numbering. Each line is a MOMENT in the customer's own voice from BEFORE they bought anything: a time of day, a place, a specific trigger. "Wakes up to a new breakout the morning of an event" beats "has skin problems". No line may name the product or the solution.
+<PAIN_POINTS> — the problems this buyer has before they own the product, one per line. State them plainly; don't name the product or the solution. As many as it really has — don't pad the list.
 
-<USPS> — 4-6 lines, one per line. What THIS one has that the alternative doesn't, with the concrete detail attached — the ingredient, the mechanism, the material, the number. Every line should be checkable against <READ> or the listing copy. Features and differentiators, not feelings.
+<USPS> — what this one has that the alternative doesn't, one per line, each checkable against <READ> or the listing copy. As many as it really has.
 
-<BENEFITS> — 4-6 lines, one per line. The payoff of the USPs in the customer's life, tied to a visible or feelable result in a real moment. Pair them to the pain points where you can — this is the "so you get Y" to the USP's "ours has X".
+<BENEFITS> — the payoff of the USPs in the customer's life, one per line. Pair them to the pain points where you can — this is the "so you get Y" to the USP's "ours has X".
 
-<KEY_SPECS> — 3-6 lines, one per line. Hard facts a script can cite out loud: ingredients or materials with amounts, dose, dimensions, quantity, servings, run time, how the mechanism works in one plain sentence, usage frequency, anything certifiable that is actually visible or stated. Facts only — strip every trace of persuasion. Everything here must trace back to <READ> or the listing copy.
+<KEY_SPECS> — hard facts a script can cite out loud, one per line: ingredients or materials with amounts, dose, dimensions, quantity, servings, run time, usage frequency. Facts only, no persuasion, and everything must trace back to <READ> or the listing copy.
 
-<OBJECTIONS> — 3-5 lines, one per line, each written as "hesitation — counter". The hesitation is the real reason someone closes the tab. The counter must be supportable from the photos or listing copy; where it isn't, leave the counter as a bracketed placeholder rather than inventing one.
+<OBJECTIONS> — one per line, each written as "hesitation — counter". Keep both halves short. The counter must be supportable from the photos or listing copy; where it isn't, leave it as a bracketed placeholder.
 
 <OFFER> — 1-2 lines: price, bundle, discount, bonus, guarantee, shipping. Stated terms only; bracketed placeholders otherwise.
 
 <CTA> — one short, plain imperative line the creator can say to camera as-is. Three to five words. Pick the ordinary one: "Shop now", "Link's in the bio", "I'll link it below", "Tap the link below", "Grab yours today". NEVER a bracketed placeholder here, and never a price, a discount or a deadline — those belong in <OFFER>, and a CTA that has to be filled in before it can be read is a CTA that stops the script.
+
+The five list fields (pain points, USPs, benefits, key specs, objections) are one item per line. A leading "- " is fine.
 
 Keep these distinct — the overlap is where a profile goes mushy:
   Pain Points = the problem felt BEFORE buying.   USPs = "ours has X".
@@ -146,7 +129,7 @@ Match the positioning you named in <READ>: a premium object gets elevated, senso
 // rather than a second roll of the same dice.
 const BREVITY_OVERRIDE = `
 
-IMPORTANT — the previous attempt did not come back in a readable state, most likely because it ran out of room. Same format, same rules, but spend far less: keep <READ> to about 80 words (the identifying words on the pack and nothing else), and write every field at the SHORT end of its stated range. A complete short profile beats a long one that stops halfway.`
+IMPORTANT — the previous attempt did not come back in a readable state, most likely because it ran out of room. Same format, same rules, but spend far less: keep <READ> to about 80 words (the identifying words on the pack and nothing else), and keep every field as short as it can be while still being useful. A complete short profile beats a long one that stops halfway.`
 
 // Resolve whatever shape an image is stored in (File, data: URI, asset:// ref,
 // blob:/http URL) to a data URI the vision call can carry inline, downscaled to
@@ -287,13 +270,29 @@ export async function extractProductInfo(
   extraImages: string[] = [],
 ): Promise<ProductExtraction> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  // CHAT_MODEL_STRONG, not the app default: this profile is read by the Scripts
-  // writer on every run for the life of the product, so a thin read here is
-  // paid for again in every script — the "it feeds another model, not a reader"
-  // reasoning that put it on the cheap tier missed that the model it feeds is
-  // the one writing prose a person performs. It's also a long tag contract with
-  // a forced transcription pass, which is what this tier is kept for.
-  const endpoint = getChatTarget(CHAT_MODEL_STRONG)
+  // GPT 5.6 Luna, named outright rather than through a role constant: this is
+  // the only surface on it, and inventing a third CHAT_MODEL_* tier for one
+  // caller says less than the model's own name does.
+  //
+  // The slot has now moved twice. It sat on the app default, went to
+  // CHAT_MODEL_STRONG in August 2026 (the profile is re-read by the Scripts
+  // writer for the life of the product, so a thin read is paid for again in
+  // every script), and moved here — the cheapest row in the picker, ~7x under
+  // Gemini 3.6 Flash blended, and the gap is widest on exactly what this call
+  // spends: output and reasoning, 67.2 against 450 credits per million.
+  //
+  // What to watch if it comes back: the <READ> block is a verbatim OCR pass
+  // over the packaging, and every field below it is written from what it
+  // transcribed — so a thin read shows up as small print (actives with
+  // amounts, dosages, the back-of-pack panel) missing from KEY_SPECS and USPS,
+  // not as worse prose. Judge it on a dense label, not on a clean hero shot.
+  //
+  // Vision rides the openai-responses transport (`/codex/v1/responses`), which
+  // maps our image_url parts to `input_image` with the data URI inline — the
+  // same path B-Roll already uses whenever a member picks one of these models,
+  // so this is exercised code rather than a new capability. Reasoning effort
+  // and the truncation salvage both work there too.
+  const endpoint = getChatTarget('gpt-5-6-luna')
 
   const dataUri = await toVisionDataUri(image)
   // A broken extra shouldn't sink the read — the hero photo is what matters.
