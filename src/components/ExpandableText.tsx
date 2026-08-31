@@ -32,7 +32,7 @@ const ACCENT_DONE: Record<ExpandAccent, string> = {
 // the bracket highlight comes from here. The span text stays transparent
 // (inherited from the backdrop); only its background shows through.
 const BRACKET_RE = /\[[^\]]*\]/g
-export function renderBracketHighlight(text: string): ReactNode[] {
+function renderBracketHighlight(text: string): ReactNode[] {
   const nodes: ReactNode[] = []
   let last = 0
   let key = 0

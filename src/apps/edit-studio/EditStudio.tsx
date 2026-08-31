@@ -2,7 +2,8 @@ import { CheckCircle2, Download } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import DesktopWallpaper from '../../components/DesktopWallpaper'
 import { SKILL_VERSION, useSkillUpdateStore } from '../../stores/skillUpdateStore'
-import SkillFolder, { downloadSkill } from './SkillFolder'
+import SkillFolder from './SkillFolder'
+import { downloadSkill } from './downloadSkill'
 
 // Edit is the last stop in the create row. Unlike the other apps it doesn't
 // generate anything in the browser: it hands out the video editor Claude skill

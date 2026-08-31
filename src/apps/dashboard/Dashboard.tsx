@@ -13,15 +13,8 @@ import ConnectKeyCard from './ConnectKeyCard'
 import DesktopWallpaper from '../../components/DesktopWallpaper'
 import SolarSystem from './SolarSystem'
 import StreakRing from './StreakRing'
-import Widget, {
-  WidgetLabel,
-  WidgetFigure,
-  WidgetDelta,
-  WIDGET_SHELL,
-  WIDGET_INTERACTIVE,
-  DISPLAY_FONT,
-  riseStyle,
-} from './Widget'
+import Widget, { WidgetLabel, WidgetFigure, WidgetDelta } from './Widget'
+import { WIDGET_SHELL, WIDGET_INTERACTIVE, DISPLAY_FONT, riseStyle } from './widgetStyles'
 
 // Dashboard — the workspace's "what you're getting out of this" screen and the
 // default landing page, staged as a desk in deep space: a starfield wallpaper,

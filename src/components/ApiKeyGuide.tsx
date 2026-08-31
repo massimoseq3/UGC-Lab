@@ -1,13 +1,11 @@
 import { useState } from 'react'
 import { ArrowUpRight, Check, Eye, EyeOff, X } from 'lucide-react'
 import Spinner from './Spinner'
-import { useSettingsStore } from '../stores/settingsStore'
-import { useCreditsStore } from '../stores/creditsStore'
-import { kieTestConnection } from '../utils/kie'
 import { useBackdropClose } from '../hooks/useBackdropClose'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import CrabSprite from './CrabSprite'
+import { useKeyConnect } from './useKeyConnect'
 
 // Getting started, shown from the menu bar's no-key alert and the Dashboard's
 // connect banner. It used to explain the three steps and send the member to
@@ -21,52 +19,6 @@ import CrabSprite from './CrabSprite'
 //
 // This is an infra surface, so a failed check shows kie.ai's own message — the
 // member (or the operator helping them) needs the real reason, not friendly copy.
-
-type Status =
-  | { phase: 'idle' }
-  | { phase: 'checking' }
-  | { phase: 'connected'; credits: number }
-  | { phase: 'error'; message: string }
-
-/**
- * The connect-a-key transaction, shared by this modal and the Meet-your-team
- * intro. The rule that has to hold in both places: the key is checked against
- * the live balance BEFORE it is saved, so nothing is ever stored that can't
- * generate. Each surface draws its own markup around it.
- */
-export function useKeyConnect() {
-  const setKieApiKey = useSettingsStore((s) => s.setKieApiKey)
-  const refreshCredits = useCreditsStore((s) => s.refresh)
-  const [draft, setDraft] = useState('')
-  const [status, setStatus] = useState<Status>({ phase: 'idle' })
-
-  const key = draft.trim()
-
-  async function connect() {
-    if (!key || status.phase === 'checking') return
-    setStatus({ phase: 'checking' })
-    const result = await kieTestConnection(key)
-    if (!result.ok) {
-      setStatus({ phase: 'error', message: result.error })
-      return
-    }
-    setKieApiKey(key)
-    refreshCredits()
-    setStatus({ phase: 'connected', credits: result.credits })
-  }
-
-  return {
-    draft,
-    key,
-    status,
-    connected: status.phase === 'connected',
-    connect,
-    setDraft: (value: string) => {
-      setDraft(value)
-      setStatus({ phase: 'idle' })
-    },
-  }
-}
 
 export default function ApiKeyGuide({ onClose, onOpenSettings }: { onClose: () => void; onOpenSettings: () => void }) {
   const backdrop = useBackdropClose(onClose)

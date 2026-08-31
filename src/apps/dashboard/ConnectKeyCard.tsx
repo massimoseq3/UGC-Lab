@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ChevronRight, KeyRound } from 'lucide-react'
 import SettingsModal from '../../components/SettingsModal'
 import ApiKeyGuide from '../../components/ApiKeyGuide'
-import { WIDGET_SHELL, WIDGET_INTERACTIVE, riseStyle } from './Widget'
+import { WIDGET_SHELL, WIDGET_INTERACTIVE, riseStyle } from './widgetStyles'
 
 // The first step, staged as a macOS notification banner across the top of the
 // desktop: cut from the same glass as the widgets, an amber key tile on the

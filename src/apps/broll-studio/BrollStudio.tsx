@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react'
 import { Film, SlidersHorizontal } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
-import MobilePaneTabs, { paneClass } from '../../components/MobilePaneTabs'
+import MobilePaneTabs from '../../components/MobilePaneTabs'
+import { paneClass } from '../../components/paneClass'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
 import type { AdBlueprintPayload, Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
@@ -24,7 +25,7 @@ import type { ImportContext, ImportParsed } from './services/importPrompts'
 import StyleModal, { type StyleSelection } from '../../components/StyleModal'
 import { BROLL_STYLE_ACCENT } from '../../components/styleArt'
 import RightPanel from './components/RightPanel'
-import { brollHistoryMode } from './components/BrollHistoryView'
+import { brollHistoryMode } from './components/brollHistoryRows'
 import { backfillCardState, backfillContinuousFrameState, backfillContinuousClipState } from './cardState'
 import {
   editSceneLine,

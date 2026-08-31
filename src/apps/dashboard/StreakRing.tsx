@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { DISPLAY_FONT } from './Widget'
+import { DISPLAY_FONT } from './widgetStyles'
 
 // The desktop's signature widget: a closing ring, Fitness-style, where the arc
 // is the current streak measured against the member's own best. It encodes
