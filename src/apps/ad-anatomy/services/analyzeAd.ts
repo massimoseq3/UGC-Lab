@@ -33,6 +33,41 @@ const REASONING_EFFORT = 'medium' as const
 // have intermediate progress signals like the task-based flow.
 const STREAM_TIMEOUT_MS = 300_000
 
+// How many bytes of video may ride inline in one request.
+//
+// The clip is sent as a base64 data URI, and base64 is 4/3 of what it encodes,
+// so the body is ~1.34x the file: this budget is 12MB on disk against a ~16MB
+// request, comfortably inside the 20MB ceiling Gemini puts on an inline request
+// and any gateway cap of the same order. It is deliberately conservative — the
+// cost of guessing high is the exact 400 this number exists to prevent, and the
+// cost of guessing low is a slightly softer picture.
+//
+// This is the ONE number to move if kie's ceiling ever changes; `analysisQueue`
+// re-encodes anything above it (see `utils/compressVideo.ts`) and `UploadView`
+// quotes it to the member.
+export const INLINE_VIDEO_BUDGET_BYTES = 12 * 1024 * 1024
+
+// A rejection that means "this body is too big", in the vocabulary the layers
+// between us and the model actually use — an HTTP 413, a gateway's "request
+// entity too large", the model's own inline-size complaint. It is NOT a signal
+// that the createTask route is unavailable for chat, which is the only thing
+// the streaming fallback below can fix: re-sending the identical oversized body
+// down a second transport just fails again, after another full upload. Keep the
+// wording in step with the matching rule in `utils/friendlyError.ts`, which
+// turns the same failure into the sentence the member reads.
+function isPayloadTooLarge(err: unknown): boolean {
+  const m = (err instanceof Error ? err.message : String(err)).toLowerCase()
+  return (
+    m.includes('413') ||
+    m.includes('too large') ||
+    m.includes('too big') ||
+    m.includes('entity too large') ||
+    m.includes('payload size') ||
+    m.includes('request size') ||
+    m.includes('exceeds the maximum size')
+  )
+}
+
 // ONE PASS, ON PURPOSE (reverted July 2026). The analysis briefly ran as two
 // high-reasoning passes — perception (video → transcript + per-cut shot log +
 // dossiers) then a text-only synthesis — with ~20 client-side cut keyframes
@@ -305,6 +340,11 @@ export async function startAnalysisTask(videoFile: File): Promise<StartAnalysisO
     }
     return { kind: 'task', taskId }
   } catch (err) {
+    // An oversized body is the one createTask rejection the fallback cannot
+    // help with — the streaming transport carries the same bytes to the same
+    // model. Rethrow so the member gets the real reason after one wait instead
+    // of the generic copy after two.
+    if (isPayloadTooLarge(err)) throw err
     const reason = err instanceof Error ? err.message : String(err)
     console.warn('[ad-anatomy] createTask rejected, falling back to streaming:', reason)
     return { kind: 'fallback', reason }

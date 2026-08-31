@@ -277,7 +277,7 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
     <div className="flex h-full flex-col items-center justify-center gap-6 px-6 py-8">
       <div className="flex flex-col items-center gap-1 text-center">
         <h2 className="text-xl font-semibold tracking-tight text-ink-100">
-          Analyzing the ad
+          {item.compressing ? 'Shrinking the ad to fit' : 'Analyzing the ad'}
         </h2>
       </div>
 
@@ -325,10 +325,20 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
           expectation the sweep animation reads as a hung page — which is what
           sent members reloading and losing their place in the queue. */}
       <div className="flex flex-col items-center gap-1 text-center">
-        <p className="text-xs text-ink-400">Please wait — this can take a couple of minutes.</p>
+        {/* The compress pass runs in realtime, so it takes about as long as the
+            ad itself — a wait BEFORE the analysis starts. Naming it is the
+            whole point: unexplained, it is just the sweep sitting there for
+            another minute on a screen that already asks for patience. */}
+        <p className="text-xs text-ink-400">
+          {item.compressing
+            ? 'This ad is too big to send as-is, so it’s being compressed first — about as long as the ad runs.'
+            : 'Please wait — this can take a couple of minutes.'}
+        </p>
         {/* Deliberately not "survives a refresh": it usually does, but a reload
             in the window before kie accepts the job can't be resumed, and a
             promise the app breaks once is worse than one it never made. */}
+        {/* True of the compress pass too: its frame clock runs on a worker, so
+            a hidden tab no longer throttles it (see utils/compressVideo.ts). */}
         <p className="text-[11px] text-ink-600">No need to reload — it keeps running if you switch tools.</p>
       </div>
 

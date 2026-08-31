@@ -5,14 +5,15 @@
 // Rows that fell back to the streaming transport still can't be resumed; the
 // mount-time reconciler flips those to 'error'.
 
-import { startAnalysisTask, pollAnalysisTask, streamAnalysisFallback } from './analyzeAd'
+import { startAnalysisTask, pollAnalysisTask, streamAnalysisFallback, INLINE_VIDEO_BUDGET_BYTES } from './analyzeAd'
 import { captureFirstFrame } from '../utils/captureFirstFrame'
+import { compressVideoForAnalysis } from '../utils/compressVideo'
 import { saveAsset, deleteAsset, getBlob } from '../../../utils/assetStore'
 // `deleteAsset` is still used for the thumbnail cleanup below.
 import { useBankStore } from '../../../stores/bankStore'
 import type { AnalysisResult } from '../types'
 import type { AdAnatomyHistoryItem } from '../../../stores/types'
-import { humanizeError } from '../../../utils/friendlyError'
+import { humanizeError, FriendlyError } from '../../../utils/friendlyError'
 
 const MAX_CONCURRENT = 5
 
@@ -28,6 +29,51 @@ function pump(): void {
       pump()
     })
   }
+}
+
+function mb(bytes: number): string {
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+// The whole clip rides inline in the request, so anything over the transport's
+// budget is re-encoded here before it is ever sent — that oversized body is the
+// 400 members were hitting on ads the upload screen had already accepted.
+// Everything under budget is passed through untouched: re-encoding costs a
+// realtime pass and a generation of quality, and neither is worth paying for a
+// file that already fits.
+//
+// A failure here is FINAL for this run: the compressor's messages all name what
+// the member should do next, so they are rethrown as-is rather than swallowed
+// into a retry that would send the same oversized body.
+async function fitForInlineRequest(historyId: string, file: File): Promise<File> {
+  if (file.size <= INLINE_VIDEO_BUDGET_BYTES) return file
+  if (!file.type.startsWith('video/')) {
+    throw new FriendlyError(
+      `This image is ${mb(file.size)}, over the ${mb(INLINE_VIDEO_BUDGET_BYTES)} the analyser can send. Export it smaller and try again.`,
+    )
+  }
+
+  const { updateAdAnatomyHistory } = useBankStore.getState()
+  // The analysing screen reads this: a realtime re-encode is a wait BEFORE the
+  // analysis starts, and an unexplained one on top of an already-long call is
+  // what reads as a hung page.
+  await updateAdAnatomyHistory(historyId, { compressing: true })
+  console.log(`[ad-anatomy] ${file.name} is ${mb(file.size)} — compressing to fit ${mb(INLINE_VIDEO_BUDGET_BYTES)}`)
+  const result = await compressVideoForAnalysis(file, INLINE_VIDEO_BUDGET_BYTES)
+    .finally(() => {
+      if (rowExists(historyId)) void updateAdAnatomyHistory(historyId, { compressing: undefined })
+    })
+  console.log(`[ad-anatomy] compressed ${mb(result.originalBytes)} → ${mb(result.compressedBytes)}`)
+
+  // An encoder that missed the budget has produced a body that will be rejected
+  // anyway. Say so here, where we still know the numbers, rather than letting
+  // kie say it in its own words after another upload.
+  if (result.compressedBytes > INLINE_VIDEO_BUDGET_BYTES) {
+    throw new FriendlyError(
+      `This ad is still ${mb(result.compressedBytes)} after compressing, over the ${mb(INLINE_VIDEO_BUDGET_BYTES)} the analyser can send. Trim it shorter or export it at a lower resolution and try again.`,
+    )
+  }
+  return result.file
 }
 
 function deriveFallbackTitle(fileName: string): string {
@@ -70,6 +116,7 @@ async function applyFailure(historyId: string, err: unknown) {
     status: 'error',
     errorMessage,
     taskId: undefined,
+    compressing: undefined,
     perception: undefined,
   })
 }
@@ -101,7 +148,11 @@ export function enqueueAnalysis(historyId: string, file: File): void {
     }
 
     try {
-      const started = await startAnalysisTask(file)
+      // Thumbnail and cost estimate come off the ORIGINAL; only the copy that
+      // goes over the wire is re-encoded.
+      const payload = await fitForInlineRequest(historyId, file)
+      if (!rowExists(historyId)) return
+      const started = await startAnalysisTask(payload)
       if (!rowExists(historyId)) return
 
       let analysis: AnalysisResult
@@ -110,7 +161,7 @@ export function enqueueAnalysis(historyId: string, file: File): void {
         analysis = await pollAnalysisTask(started.taskId)
       } else {
         // Streaming fallback — can't resume across refresh.
-        analysis = await streamAnalysisFallback(file)
+        analysis = await streamAnalysisFallback(payload)
       }
       await applySuccess(historyId, analysis, file.name)
     } catch (err) {
@@ -140,6 +191,7 @@ export async function retryAnalysis(item: AdAnatomyHistoryItem): Promise<boolean
     status: 'analyzing',
     errorMessage: undefined,
     taskId: undefined,
+    compressing: undefined,
   })
   enqueueAnalysis(item.id, file)
   return true

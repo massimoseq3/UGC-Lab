@@ -453,6 +453,12 @@ export interface AdAnatomyHistoryItem {
   // Source ad asset id — only present while status === 'analyzing'. Dropped
   // on success/error so the bank doesn't accumulate large video blobs.
   uploadedRef?: string
+  // True while the clip is being re-encoded to fit the model's inline request
+  // limit (see services/analysisQueue.ts). That pass runs in realtime, so it is
+  // a wait BEFORE the analysis even starts and the analysing screen has to say
+  // what it is doing. Ephemeral — a refresh mid-compress leaves an 'analyzing'
+  // row with no taskId, which the mount-time reconciler already flips to error.
+  compressing?: boolean
   // kie.ai job id of the analysis in flight. Set after createTask returns.
   // Persisted so a refresh-mid-analysis can resume polling instead of dropping
   // the result. Missing when the analyser falls back to the streaming
