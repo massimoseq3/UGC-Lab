@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, type ElementType, type ReactNode } from 'react'
 import { ScanFace, PersonStanding, Camera, Copy, Check, ChevronRight } from 'lucide-react'
-import type { TabId, CharacterProfile } from '../types'
+import type { TabId, CharacterProfile, FieldGroup } from '../types'
 import { TABS, PHOTOREALISM_STYLE, getTabFields } from '../types'
 
 // Per-tab glyphs — specific to each tab's job (appearance / pose / lens),
@@ -73,21 +73,46 @@ function CopyPromptButton({ text, label, title }: { text: string; label: string;
   )
 }
 
-// Preset pill — opens the shared preset picker but scoped to one tab's fields.
-// Matches the Portrait/Sheet toggle's glassy influencers tint (translucent fill
-// + soft accent ring + faint sheen) so the two read as one accent family, with
-// the tab's own glyph leading and a chevron hinting the slide-over.
-function PresetPillButton({ label, title, icon: Icon, onClick }: { label: string; title: string; icon: ElementType; onClick: () => void }) {
+// Preset pill — opens the shared preset picker but scoped to a slice of the
+// form. One shape, two tones, because the two live at different altitudes in
+// the same column: the TAB divider's pill is the loud one (glassy influencers
+// tint, matching the Portrait/Sheet toggle so the two read as one accent
+// family), and every SECTION title inside that tab wears the same dashed pill
+// in plain ink. Eight accent pills down one column would make the divider that
+// separates two tabs no louder than the headings under it — a section title is
+// still a title first, so the neutral tone keeps the heading's own type
+// (`text-sm font-semibold`) and only borrows the chrome that says "this is a
+// button": the dashed ring and the chevron.
+const PILL_TONES = {
+  accent:
+    'border-influencers-500/30 bg-influencers-500/10 text-influencers-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-influencers-500/15 text-[12px] font-medium',
+  neutral:
+    'border-ink/15 bg-ink/[0.03] text-ink-100 hover:border-ink/25 hover:bg-ink/[0.06] text-sm font-semibold tracking-tight',
+} as const
+
+function PresetPillButton({
+  label,
+  title,
+  icon: Icon,
+  onClick,
+  tone = 'accent',
+}: {
+  label: string
+  title: string
+  icon?: ElementType
+  onClick: () => void
+  tone?: keyof typeof PILL_TONES
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={title}
-      className="flex items-center gap-1.5 rounded-full border border-dashed border-influencers-500/30 bg-influencers-500/10 px-3 py-1 text-[12px] font-medium text-influencers-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors hover:bg-influencers-500/15"
+      className={`flex items-center gap-1.5 rounded-full border border-dashed px-3 py-1 transition-colors ${PILL_TONES[tone]}`}
     >
-      <Icon className="h-3.5 w-3.5" />
+      {Icon && <Icon className="h-3.5 w-3.5" />}
       {label}
-      <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
+      <ChevronRight className={`h-3.5 w-3.5 ${tone === 'neutral' ? 'text-ink-400' : ''}`} strokeWidth={2} />
     </button>
   )
 }
@@ -153,6 +178,11 @@ export default function ControlsPanel({
   // fields untouched.
   const [physicalPresetOpen, setPhysicalPresetOpen] = useState(false)
   const [scenePresetOpen, setScenePresetOpen] = useState(false)
+  // …and one level finer: every section title in the column is itself a scoped
+  // picker, merging only that group's keys. Held as the group being picked FOR
+  // rather than one flag per group, so a section added to `TABS` gets its own
+  // picker with no wiring here.
+  const [groupPreset, setGroupPreset] = useState<FieldGroup | null>(null)
 
   const applyScopedPreset = (incoming: Record<string, string>, keys: string[]) => {
     const next = { ...profile }
@@ -337,11 +367,19 @@ export default function ControlsPanel({
                   return (
                     <div key={group.id} className="rounded-2xl border border-ink/5 bg-ink/[0.02] p-4 card-soft-shadow">
                       {/* Section subheading — a centered icon + title-case label,
-                          then a hairline rule. */}
-                      <div className="mb-3 flex items-center justify-center gap-1.5">
-                        {GroupIcon && <GroupIcon className="h-3.5 w-3.5 text-ink-100" />}
-                        <h4 className="text-sm font-semibold tracking-tight text-ink-100">{group.label}</h4>
-                      </div>
+                          then a hairline rule. The heading IS the section's own
+                          preset button: same dashed pill as the tab dividers
+                          above it, in ink rather than the influencers accent,
+                          filling only this group's fields. */}
+                      <h4 className="mb-3 flex justify-center">
+                        <PresetPillButton
+                          tone="neutral"
+                          label={group.label}
+                          title={`Load only the ${group.label.toLowerCase()} fields from a preset`}
+                          icon={GroupIcon}
+                          onClick={() => setGroupPreset(group)}
+                        />
+                      </h4>
                       <div className="mb-4 border-t border-ink/10" />
                       {/* Two-column grid: short one-word fields (gender, age, eye
                           color…) pack two per row; `wide` fields (free-text /
@@ -410,6 +448,19 @@ export default function ControlsPanel({
           title="Scene & Pose Presets"
           subtitle="Fill only the scene & pose fields"
         />
+        {/* One picker for every section title, scoped to whichever heading was
+            clicked. It's mounted only while a group is picked, so the library
+            fetch and the grid belong to that opening rather than to eight
+            always-mounted copies. */}
+        {groupPreset && (
+          <PresetPickerModal
+            open
+            onClose={() => setGroupPreset(null)}
+            onPick={(incoming) => applyScopedPreset(incoming, groupPreset.fields.map((f) => f.key))}
+            title={`${groupPreset.label} Presets`}
+            subtitle={`Fill only the ${groupPreset.label.toLowerCase()} fields`}
+          />
+        )}
       </div>
     </div>
   )
