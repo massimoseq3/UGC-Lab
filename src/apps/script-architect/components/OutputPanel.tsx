@@ -35,6 +35,13 @@ interface OutputPanelProps {
   runId?: string | null
   // Commits an inline edit of take `index` back to the persisted output state.
   onEditVariation?: (index: number, text: string) => void
+  // Remix only: ONE voice brief for the whole run, rendered above the takes and
+  // belonging to none of them. Empty → no card. A scene blueprint's profile is
+  // a different thing and stays where it is: that one is parsed out of the take
+  // and pasted into every scene's prompt, this one is a paragraph the member
+  // copies by hand when a video wants the source ad's voice.
+  voiceProfile?: string
+  onEditVoiceProfile?: (text: string) => void
 }
 
 // Canonically "--- Scene N: label (mm:ss-mm:ss) ---", but we tolerate a model
@@ -1037,7 +1044,11 @@ function VariationCard({
 // of a ten-scene column most members never scrolled far enough to find it. The
 // model still emits it last (the prompt says so); `splitVoiceProfile` lifts it
 // out either way, so only the render order moved.
-function VoiceProfileCard({ body, onChange }: { body: string; onChange?: (next: string) => void }) {
+//
+// A remix run reuses the card for its own brief, which arrives from its own
+// call rather than out of a take (see `runRemixVoiceProfile`) — hence `label`,
+// since nothing there has scenes and the profile is attached to no variation.
+function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene', onChange }: { body: string; label?: string; onChange?: (next: string) => void }) {
   const [copied, setCopied] = useState(false)
   const addToast = useAppStore((s) => s.addToast)
   const handleCopy = async () => {
@@ -1055,7 +1066,7 @@ function VoiceProfileCard({ body, onChange }: { body: string; onChange?: (next: 
       <div className="relative mb-2 flex select-none items-center justify-center gap-2 px-8">
         <span className="flex items-center gap-1.5 text-center text-[10px] font-semibold uppercase tracking-tight text-scripts-300">
           <Mic className="h-3 w-3 text-scripts-300" strokeWidth={2} />
-          Voice Profile · same in every scene
+          {label}
         </span>
         <button
           onClick={handleCopy}
@@ -1404,7 +1415,7 @@ function SceneChunkCard({
 // inset) — a Tailwind class can't be built from a variable.
 const SWITCHER_H = 53
 
-export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, hookCount = DEFAULT_HOOK_COUNT, linkedProductId, isGenerating, error, runId, onEditVariation }: OutputPanelProps) {
+export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, hookCount = DEFAULT_HOOK_COUNT, linkedProductId, isGenerating, error, runId, onEditVariation, voiceProfile, onEditVoiceProfile }: OutputPanelProps) {
   // Resolve the linked product so saved scripts get a meaningful default title
   // ("<Product> — Hook-Led Script").
   const products = useBankStore((s) => s.products)
@@ -1568,6 +1579,18 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
         onScroll={handleScroll}
         className={`flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto p-5 ${variations.length > 1 ? 'pt-[73px]' : ''}`}
       >
+        {/* Above the takes and inside the scroller: it's the first thing on the
+            page but it isn't a header — it scrolls away with everything else,
+            because most runs it's a paragraph the member never touches. The
+            take switcher jumps by card offset, so nothing above it needs to
+            know this is here. */}
+        {mode === 'remix' && voiceProfile && (
+          <VoiceProfileCard
+            body={voiceProfile}
+            label="Voice Profile · optional"
+            onChange={onEditVoiceProfile}
+          />
+        )}
         {variations.map((text, i) => {
           const isRemix = mode === 'remix'
           const isWrite = mode === 'write'

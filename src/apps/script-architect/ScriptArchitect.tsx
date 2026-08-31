@@ -104,6 +104,10 @@ export default function ScriptArchitect() {
   // labels come from what actually ran rather than from re-deriving off a list
   // that may have been reordered or resized since.
   const [outputAngles, setOutputAngles] = usePersistedState<RemixAngle[] | null>(`${baseKey}:outputAngles`, null)
+  // Remix only: the one voice brief the shown run came back with. Its own slot
+  // rather than a line inside a variation — nothing generates it into a take,
+  // and it belongs to the batch, not to any card in it.
+  const [outputVoiceProfile, setOutputVoiceProfile] = usePersistedState<string>(`${baseKey}:outputVoiceProfile`, '')
   const [outputHookCategory, setOutputHookCategory] = usePersistedState<HookCategoryChoice>(`${baseKey}:outputHookCategory`, 'auto', {
     sanitize: (v) => (isHookCategoryChoice(v) ? v : 'auto'),
   })
@@ -224,6 +228,7 @@ export default function ScriptArchitect() {
       })
       setVariations(result.variations)
       setOutputAngles(result.angles ?? null)
+      setOutputVoiceProfile(result.voiceProfile ?? '')
 
       const inputSource = mode === 'write' ? brief : source
       const item: ScriptHistoryItem = {
@@ -245,6 +250,7 @@ export default function ScriptArchitect() {
         hookCount,
         variationCount,
         remixAngles: result.angles,
+        voiceProfile: result.voiceProfile,
         createdAt: Date.now(),
       }
       addScriptHistory(item)
@@ -283,6 +289,9 @@ export default function ScriptArchitect() {
     // Rows saved before the count was pickable carry no angle list; OutputPanel
     // falls back to matching them by variation count.
     setOutputAngles((item.remixAngles as RemixAngle[] | undefined) ?? null)
+    // Rows saved before the voice brief existed carry none, and so do runs
+    // whose profile call failed — both restore to no card.
+    setOutputVoiceProfile(item.voiceProfile ?? '')
     if (isVariationCount(item.variationCount)) setVariationCount(item.variationCount)
     // Rows saved before Remix had a length carry none — they keep the current
     // pick rather than snapping to 'default'.
@@ -388,6 +397,8 @@ export default function ScriptArchitect() {
           onEditVariation={(index, text) =>
             setVariations((prev) => prev.map((v, i) => (i === index ? text : v)))
           }
+          voiceProfile={outputVoiceProfile}
+          onEditVoiceProfile={setOutputVoiceProfile}
           history={scriptHistory}
           activeHistoryId={activeHistoryId}
           onSelectHistory={handleSelectHistory}

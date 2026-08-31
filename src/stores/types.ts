@@ -297,6 +297,10 @@ export interface ScriptHistoryItem {
   // which OutputPanel matches by variation count instead. Plain strings so the
   // store doesn't import an app-level union.
   remixAngles?: string[]
+  // Remix only: the run's one voice brief (see GeneratedScript.voiceProfile).
+  // Absent on rows saved before it existed, and on runs whose profile call
+  // failed — the card simply doesn't render.
+  voiceProfile?: string
   createdAt: number
 }
 
