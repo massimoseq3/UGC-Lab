@@ -458,44 +458,49 @@ textarea,
   background-color: color-mix(in srgb, var(--color-ink) 45%, transparent);
 }
 
-/* Skeleton shimmer. The sweep is a transform on an overlay pseudo-element, NOT
-   an animated `background-position` — background-position repaints the whole
-   element every frame, which visibly stuttered on the B-Roll loading panes
-   (dozens of skeletons, several of them full 9:16 cards). A transform stays on
-   the compositor and costs nothing to animate. */
-@keyframes skeleton-sweep {
-  from { transform: translateX(-100%); }
-  to   { transform: translateX(100%); }
-}
+/* Skeleton loader. NOTHING SWEEPS, and it is the group that breathes, not the
+   block — the same rule as `.gen-lobes` further down, and for the same reason.
+
+   Each skeleton used to carry an `::after` overlay sweeping across it under a
+   transform. That was already the cheap version of the effect (an animated
+   `background-position` repaints the whole element every frame and stuttered
+   visibly), but a transform still promotes the pseudo-element to a composited
+   layer of its own — and every one of them sits inside a `border-radius` +
+   `overflow: hidden` parent, which is the case WebKit is worst at: a rounded
+   clip over a moving layer either costs a clip/mask layer per skeleton or drops
+   the child off the fast path entirely and repaints the parent every frame.
+   B-Roll's Line-by-Line loading pane renders 3 scenes x 6 skeletons = EIGHTEEN
+   of them, nine at full 9:16 card size, which is what was reported as lag while
+   the storyboard was being written (Safari, August 2026).
+
+   So the sweep is gone and the block is flat. `.skeleton-group` puts one slow
+   alpha breathe on the WRAPPER instead: opacity is the cheapest property there
+   is to animate (the layer rasterises once and only its alpha varies), and one
+   wrapper means one composited layer for the whole pane rather than one per
+   skeleton. Every loading pane that uses these already has a `GenerationProgress`
+   bar and a rotating status line above it, which is what actually says the work
+   is running — eighteen shimmer bars underneath were decoration on top of a
+   signal that was already there. Don't put an animation back on `.skeleton`
+   itself; wrap the block. */
 .skeleton {
   position: relative;
   overflow: hidden;
-  background-color: color-mix(in srgb, var(--color-ink) 4%, transparent);
+  /* Slightly stronger than the old 4% base, because the sweep is no longer
+     adding a brighter band on top — this is now the whole of the block. */
+  background-color: color-mix(in srgb, var(--color-ink) 7%, transparent);
   border-radius: 8px;
 }
 /* Card-sized skeleton (a 9:16 media placeholder rather than a text line) —
    needs the card radius, and `.skeleton`'s own rule outranks a Tailwind
    `rounded-*` utility, so it gets its own paired class. */
 .skeleton.skeleton-card { border-radius: 0.75rem; }
-.skeleton::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--color-ink) 7%, transparent) 50%,
-    transparent 100%
-  );
-  border-radius: inherit;
-  transform: translateX(-100%);
-  animation: skeleton-sweep 1.6s ease-in-out infinite;
-  /* No `will-change` on purpose — a loading pane renders a dozen-plus of these
-     and pre-promoting every one is worse than letting the compositor promote
-     the running transform itself. */
+@keyframes skeleton-breathe {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
 }
+.skeleton-group { animation: skeleton-breathe 1.8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .skeleton::after { animation: none; }
+  .skeleton-group { animation: none; }
 }
 
 /* Send-to field highlight flash */
