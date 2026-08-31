@@ -46,7 +46,9 @@ export default function LoadPresetDropdown({ onLoadProfile }: LoadPresetDropdown
         <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />
       </button>
 
-      <PresetPickerModal open={open} onClose={() => setOpen(false)} onPick={apply} />
+      {/* Mounted only while open, so each visit starts at the top of the
+          library — see `PresetPickerModal`'s own doc. */}
+      {open && <PresetPickerModal open onClose={() => setOpen(false)} onPick={apply} />}
     </>
   )
 }
