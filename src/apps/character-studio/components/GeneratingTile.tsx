@@ -57,7 +57,7 @@ export default function GeneratingTile({
       style={fill ? undefined : aspectStyle(aspectRatio)}
     >
       <GeneratingBackdrop family="influencers" />
-      <div className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/25 text-influencers-100 backdrop-blur-sm">
+      <div className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/30 text-influencers-100">
         {isSheet ? <LayoutGrid className="h-4 w-4" /> : <UserRound className="h-4 w-4" />}
       </div>
       {onCancel && (
@@ -65,7 +65,7 @@ export default function GeneratingTile({
           type="button"
           title="Cancel"
           onClick={(e) => { e.stopPropagation(); onCancel() }}
-          className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white opacity-0 backdrop-blur transition-opacity hover:border-red-400/40 hover:bg-red-500/30 hover:text-red-100 group-hover:opacity-100"
+          className="absolute right-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-white/20 bg-black/45 text-white opacity-0 transition-opacity hover:border-red-400/40 hover:bg-red-500/30 hover:text-red-100 group-hover:opacity-100"
         >
           <X className="h-3 w-3" />
         </button>

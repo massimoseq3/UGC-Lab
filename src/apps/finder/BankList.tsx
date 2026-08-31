@@ -210,10 +210,12 @@ function ModelCard({ item, onEdit, onDelete }: { item: Model; onEdit: () => void
           />
         ) : isPreset ? (
           // A preset has no generated image — reuse the studio's "generating"
-          // backdrop (drifting influencers blobs) as its cover with a centered
-          // person glyph, so it reads as a recipe rather than a blank card.
+          // backdrop as its cover with a centered person glyph, so it reads as a
+          // recipe rather than a blank card. `still` because nothing here is
+          // generating: a bank of saved recipes would otherwise put a running
+          // light sweep on every card in the grid to decorate them.
           <>
-            <GeneratingBackdrop family="influencers" />
+            <GeneratingBackdrop family="influencers" still />
             <div className="absolute inset-0 flex items-center justify-center">
               <UserRound className="h-12 w-12 text-influencers-100" strokeWidth={1} />
             </div>

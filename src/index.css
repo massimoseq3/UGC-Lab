@@ -752,22 +752,55 @@ textarea,
   .widget-rise { animation: none; }
 }
 
-/* Gemini-style generating backdrop — soft, blurred accent blobs that slowly
-   drift and breathe behind a dark frosted surface, conveying "alive" without
-   a harsh pulse. Used by GeneratingBackdrop. */
-/* Blob drift — TRANSLATION ONLY, and it has to stay that way.
-   These keyframes carried a `scale()` alongside the translate, which is the one
-   thing a blurred layer cannot do cheaply: translating a layer is a compositor
-   move of an existing texture, scaling it re-rasters the blur every frame. Each
-   backdrop has three of these, and a storyboard batch puts a backdrop on every
-   card at once — a dozen tiles generating meant three dozen blurred layers
-   re-blurring on every frame, which is what made the generating animation
-   stutter (reported on a B-Roll clip run, August 2026). The size the scale used
-   to reach is baked into each blob's own width/height in GeneratingBackdrop, so
-   the wash covers the same area; what's lost is the slow breathe, and the drift
-   it kept is the half that reads as movement anyway. `offscreen-idle` already
-   skips tiles that are scrolled away — this is the on-screen half of the same
-   problem, and it's the lever the file's own note said to reach for first. */
+/* Generating backdrop — soft, blurred accent blobs that slowly drift behind a
+   frosted surface, conveying "alive" without a harsh pulse. Used by
+   GeneratingBackdrop.
+
+   THE GAUSSIAN IS BAKED INTO A MASK, NOT RUN AS A LIVE FILTER, and it has to
+   stay that way. Each blob used to carry `filter: blur(40px)` and drift under a
+   transform, which is the one combination a browser cannot make cheap: a
+   filtered layer is re-blurred on every frame it moves, and a storyboard batch
+   puts a backdrop on every card at once, so a dozen generating tiles meant three
+   dozen full-size Gaussians per frame. Measured on a grid of these and nothing
+   else — 12 tiles / 24 tiles:
+
+     live blur    63 fps / 36 fps      (worst frame 18ms / 34ms)
+     one shared filter over all three blobs   114 fps / 64 fps
+     baked into a mask                       120 fps / 120 fps   ← flat
+
+   Only the third one stops getting worse as the batch grows, because no filter
+   runs per frame at all. `.gen-blob` masks a flat accent fill with an SVG whose
+   white circle is blurred by a real `feGaussianBlur`: the browser rasterises
+   that mask ONCE and from then on the blob is a picture being moved, which is
+   compositor work. Taking the `scale()` out of the keyframes (August 2026) was
+   an earlier, partial go at the same problem — the translate alone was still
+   enough to keep every blurred layer dirty.
+
+   Three things follow, and all three are load-bearing:
+   - This is NOT the radial-gradient version that was tried and reverted. That
+     one banded, because a gradient's falloff is a linear ramp and its plateau
+     edge reads as a lobe; this is the same Gaussian curve as before, just drawn
+     ahead of time. Don't "simplify" it into a gradient.
+   - Don't put `filter` back on anything that moves. If the blur ever needs to
+     change, change the mask's `stdDeviation`, not the element.
+   - The blob boxes in GeneratingBackdrop are ~2.1x the old ones around the same
+     centres, and that is not decoration: a CSS filter paints outside its
+     element's box, a mask cannot, so the whole falloff has to fit inside the
+     element carrying it. Resize the mask's circle and the boxes together. */
+.gen-blob {
+  /* r=24 with stdDeviation 8.7 in a 100-unit box: the circle plus ~3 sigma of
+     falloff just fills the viewBox, so the mask reaches zero before the element
+     edge and the blob has no cut-off rim. */
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cfilter id='b' x='-60%25' y='-60%25' width='220%25' height='220%25'%3E%3CfeGaussianBlur stdDeviation='8.7'/%3E%3C/filter%3E%3Ccircle cx='50' cy='50' r='24' fill='%23fff' filter='url(%23b)'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cfilter id='b' x='-60%25' y='-60%25' width='220%25' height='220%25'%3E%3CfeGaussianBlur stdDeviation='8.7'/%3E%3C/filter%3E%3Ccircle cx='50' cy='50' r='24' fill='%23fff' filter='url(%23b)'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+/* Blob drift — TRANSLATION ONLY, and it has to stay that way. A scale re-rasters
+   the mask the same way it used to re-blur the filter; the reach the old scale
+   gave is baked into each blob's own width/height in GeneratingBackdrop. */
 @keyframes blob-drift-1 {
   0%, 100% { transform: translate3d(-12%, -8%, 0); }
   33%      { transform: translate3d(14%, 12%, 0); }
@@ -781,17 +814,17 @@ textarea,
   0%, 100% { transform: translate3d(-4%, 14%, 0); }
   50%      { transform: translate3d(12%, -10%, 0); }
 }
-.animate-blob-1 { animation: blob-drift-1 7s ease-in-out infinite; will-change: transform; }
-.animate-blob-2 { animation: blob-drift-2 9s ease-in-out infinite; will-change: transform; }
-.animate-blob-3 { animation: blob-drift-3 8s ease-in-out infinite; will-change: transform; }
+.animate-blob-1 { animation: blob-drift-1 7s ease-in-out infinite; }
+.animate-blob-2 { animation: blob-drift-2 9s ease-in-out infinite; }
+.animate-blob-3 { animation: blob-drift-3 8s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) {
   .animate-blob-1, .animate-blob-2, .animate-blob-3 { animation: none; }
 }
 
 /* Skip rendering a subtree while it's off screen — animations inside it stop
-   ticking with it. For the generating backdrop above, which a batch puts on
-   every card of a storyboard at once: three large blurred layers per tile, each
-   re-blurred every frame because the keyframes scale them. Only ever put this
+   ticking with it, and a mask inside it isn't rasterised until it scrolls in.
+   For the generating backdrop above, which a batch puts on every card of a
+   storyboard at once: three large drifting layers per tile. Only ever put this
    on a box whose size comes from its own geometry (an `absolute inset-0`
    layer), never one sized by its content — the skip carries size containment,
    so a content-sized box would collapse to nothing while off screen. */
