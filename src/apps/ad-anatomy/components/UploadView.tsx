@@ -1,8 +1,9 @@
 import { useRef, useCallback, useEffect, useState } from 'react'
-import { Upload, Eye, Coins, X, Film } from 'lucide-react'
+import { Upload, Eye, Coins, X, Film, Minimize2 } from 'lucide-react'
 import { formatCredits } from '../../../utils/models'
 import { readMediaDuration } from '../../../utils/media'
 import { estimateAnalysisCredits } from '../services/analysisCost'
+import { INLINE_VIDEO_BUDGET_BYTES } from '../services/analyzeAd'
 
 // IMPORTANT: The drop overlay lives on the panel root. Do NOT add an onDrop
 // handler to the button — React onDrop on a child + native drop on the panel
@@ -26,6 +27,15 @@ interface StagedFile {
   id: string
   file: File
   durationSec: number | null
+}
+
+// The clip is sent inline in one request, so anything over the transport's
+// budget is re-encoded first (see services/analysisQueue.ts). Said here as well
+// as on the analysing screen: the pass runs in realtime, and a member who was
+// told to expect "a couple of minutes" should know before they commit which of
+// their clips is buying an extra one.
+function needsCompressing(file: File): boolean {
+  return file.type.startsWith('video/') && file.size > INLINE_VIDEO_BUDGET_BYTES
 }
 
 function validate(file: File): string | null {
@@ -188,6 +198,15 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
             >
               <Film className="h-3.5 w-3.5 shrink-0 text-[#FF5257]/70" strokeWidth={1.75} />
               <span className="min-w-0 flex-1 truncate text-xs text-ink-300">{s.file.name}</span>
+              {needsCompressing(s.file) && (
+                <span
+                  title={`This ad is over the ${Math.round(INLINE_VIDEO_BUDGET_BYTES / (1024 * 1024))}MB the analyser can send in one request, so it gets compressed first — that takes about as long as the ad runs.`}
+                  className="flex shrink-0 items-center gap-1 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium text-ink-400"
+                >
+                  <Minimize2 className="h-2.5 w-2.5" strokeWidth={2.25} />
+                  Compress first
+                </span>
+              )}
               {s.durationSec != null && (
                 <span className="shrink-0 text-[11px] tabular-nums text-ink-600">{Math.round(s.durationSec)}s</span>
               )}
@@ -231,6 +250,8 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
           <p className="text-center text-[11px] text-ink-600">
             Please wait after starting — this can take a couple of minutes
             {staged.length > 1 ? ' per ad' : ''}.
+            {staged.some((s) => needsCompressing(s.file)) &&
+              ' Oversized ads are compressed first, which adds roughly their own runtime.'}
           </p>
         </div>
       )}

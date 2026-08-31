@@ -10,6 +10,29 @@
 // still lives in kie.ai's own request logs (which the operator reads) and in
 // admin/settings/infra surfaces, which intentionally keep verbatim messages.
 
+/**
+ * An error whose message is ALREADY the sentence to show the member —
+ * `humanizeError` hands it straight back instead of matching it against the
+ * table below.
+ *
+ * The table exists to translate a VENDOR's wording, and it can only ever
+ * recognise wording it has seen. Anything we raise ourselves that is more
+ * specific than the copy a rule could give — a file we measured, a browser
+ * capability we probed, a limit we know the exact number of — loses that detail
+ * the moment it falls through to the generic fallback. Throw this instead, and
+ * write the message as a complete sentence that names what to do next.
+ *
+ * Do NOT reach for it to smuggle raw API text past the table: the whole point
+ * of the table is that a member never reads a vendor's 4xx. This is for
+ * sentences written for a member in the first place.
+ */
+export class FriendlyError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'FriendlyError'
+  }
+}
+
 // Each rule matches case-insensitively against the raw error message. Order
 // matters: most specific first, generic codes last. The first match wins.
 const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
@@ -229,6 +252,37 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
       'The model returned an empty result. Try again, or simplify your prompt.',
   },
 
+  // ── Request body too large ──
+  //
+  // The Ad Analyzer sends a whole video inline, so it is the one surface that
+  // can walk past the model's request-size ceiling — and it did, on files the
+  // upload screen had already accepted. Without this rule the rejection landed
+  // on the generic validation copy below ("adjust your inputs"), which sent
+  // members off changing settings on a failure only a smaller file can fix.
+  //
+  // Kept ABOVE the validation rule because this arrives as a 400 or a 422 as
+  // often as a 413, and above the timeout rules is unnecessary — none of them
+  // match these words. The phrases are the ones the layers in between actually
+  // use (an HTTP 413, a gateway's "request entity too large", the model's own
+  // inline-size complaint), the same list `analyzeAd.ts` matches on to stop a
+  // doomed retry down the streaming transport.
+  //
+  // 'too large' is deliberately unqualified: every producer of it here is a
+  // size rejection, and pairing it with a status code would miss the ones that
+  // come back inside a 200 envelope.
+  {
+    test: (m) =>
+      m.includes('413') ||
+      m.includes('too large') ||
+      m.includes('too big') ||
+      m.includes('entity too large') ||
+      m.includes('payload size') ||
+      m.includes('request size') ||
+      m.includes('exceeds the maximum size'),
+    message:
+      'This file is too large to send in one request. Trim the ad shorter or export it at a lower resolution, then try again.',
+  },
+
   // ── Generic validation ──
   {
     test: (m) => m.includes('422') || m.includes('validation'),
@@ -271,6 +325,8 @@ const GENERIC_FALLBACK =
 const DEBUG_TAIL = /(?:^|[^a-z0-9])(?:taskid|url|record|body|size|endpoint|response shape|response tail|first \d+ chars)\s*[=:]/i
 
 export function humanizeError(err: unknown, fallback: string = GENERIC_FALLBACK): string {
+  // Already written for the member — see FriendlyError above.
+  if (err instanceof FriendlyError && err.message.trim()) return err.message
   const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : ''
   if (!raw) return fallback
   const cut = raw.search(DEBUG_TAIL)
