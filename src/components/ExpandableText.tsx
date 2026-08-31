@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, type ChangeEvent, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Maximize2, X } from 'lucide-react'
+import AutoGrowTextarea from './AutoGrowTextarea'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useBackdropClose } from '../hooks/useBackdropClose'
@@ -200,6 +201,123 @@ export function BracketHighlightArea({
           className={`relative block w-full resize-none overflow-hidden border-0 bg-transparent outline-none ${padClass} ${textClass} ${textareaClass}`}
         />
       </div>
+    </div>
+  )
+}
+
+interface BracketFieldProps {
+  value: string
+  onChange: (e: ChangeEvent<HTMLTextAreaElement>) => void
+  placeholder?: string
+  // Chrome for the field itself — border, fill, radius. It goes on the WRAPPER,
+  // because the textarea has to be transparent for the highlight behind it to
+  // show through; a `focus:` border belongs here as `focus-within:`.
+  className?: string
+  // Padding + font metrics, applied to BOTH layers so they wrap identically.
+  padClass: string
+  textClass: string
+  // Colours for the visible textarea only.
+  textareaClass?: string
+  rows?: number
+}
+
+// A field that GROWS to its content with [bracketed placeholders] painted red
+// behind it — the shape a form column needs, where `BracketHighlightArea`'s
+// fixed-height scroll port is the shape a prompt box needs.
+//
+// The scroll-sync problem that component exists to solve simply doesn't arise
+// here: nothing scrolls. `AutoGrowTextarea` sets the field's own height to its
+// content, the wrapper is sized by it, and the mirror is `inset-0` of that same
+// box — so the two layers are pinned together by layout rather than by an event
+// handler that lands a frame late.
+export function BracketGrowArea({
+  value,
+  onChange,
+  placeholder,
+  className = '',
+  padClass,
+  textClass,
+  textareaClass = '',
+  rows = 3,
+}: BracketFieldProps) {
+  return (
+    <div className={className}>
+      <div className="relative">
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 whitespace-pre-wrap break-words text-transparent ${MIRROR_METRICS} ${padClass} ${textClass}`}
+        >
+          {renderBracketHighlight(value)}
+        </div>
+        <AutoGrowTextarea
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          rows={rows}
+          className={`relative block w-full resize-none border-0 bg-transparent outline-none ${padClass} ${textClass} ${textareaClass}`}
+        />
+      </div>
+    </div>
+  )
+}
+
+interface BracketInputProps {
+  value: string
+  onChange: (e: ChangeEvent<HTMLInputElement>) => void
+  placeholder?: string
+  className?: string
+  padClass: string
+  textClass: string
+  inputClass?: string
+}
+
+// The single-line version. An input scrolls sideways rather than wrapping, so
+// this one DOES have to sync — but an input's horizontal scroll is driven by
+// the caret on the main thread, not by the compositor, so the mirror moves in
+// the same frame as the text. (The lag this cannot fix is a pointer-drag scroll
+// past the edge, which on a field holding a product name is not a thing anyone
+// does.)
+export function BracketInput({
+  value,
+  onChange,
+  placeholder,
+  className = '',
+  padClass,
+  textClass,
+  inputClass = '',
+}: BracketInputProps) {
+  const mirrorRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const sync = () => {
+    const mirror = mirrorRef.current
+    const input = inputRef.current
+    if (mirror && input) mirror.scrollLeft = input.scrollLeft
+  }
+
+  // A value set from outside (the auto-fill landing) can reset the scroll on
+  // the input without any event of ours firing.
+  useLayoutEffect(sync, [value])
+
+  return (
+    <div className={`relative ${className}`}>
+      <div
+        ref={mirrorRef}
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 overflow-hidden whitespace-pre text-transparent ${MIRROR_METRICS} ${padClass} ${textClass}`}
+      >
+        {renderBracketHighlight(value)}
+      </div>
+      <input
+        ref={inputRef}
+        value={value}
+        onChange={(e) => { onChange(e); sync() }}
+        onScroll={sync}
+        onKeyUp={sync}
+        onClick={sync}
+        placeholder={placeholder}
+        className={`relative block w-full border-0 bg-transparent outline-none ${padClass} ${textClass} ${inputClass}`}
+      />
     </div>
   )
 }

@@ -16,7 +16,8 @@ import VoiceForm from './VoiceForm'
 import BRollForm from './BRollForm'
 import StyleForm from './StyleForm'
 import { partitionImageFiles } from './services/imageValidation'
-import { saveProductDraft } from './services/saveProductDraft'
+import { saveProductDraft, adoptDetachedExtraction } from './services/saveProductDraft'
+import type { ProductExtraction } from './services/extractProductInfo'
 
 const SIDEBAR_ICONS: Record<BankType, React.ElementType> = {
   products: Package,
@@ -181,6 +182,13 @@ export default function Finder() {
 
   const [sort, setSort, sortOptions] = useBankSort(activeBank)
 
+  // Bumped to force the open Product form to re-seed from its row — see
+  // `handleDetachExtraction`. Read through a ref there so the callback stays
+  // stable while a background read is running.
+  const [formSeed, setFormSeed] = useState(0)
+  const editingIdRef = useRef<string | null>(editingId)
+  useEffect(() => { editingIdRef.current = editingId }, [editingId])
+
   // The open form's scratch (see FormScratch above). The row id it carries is
   // deliberately NOT `editingId`: promoting it would swap a real `item` under
   // the open form and reset the fields out from under whoever is typing.
@@ -221,16 +229,18 @@ export default function Finder() {
     // it, whatever the member has opened by the time it resolves.
     const scratch = scratchRef.current
     const saved = await persistProductImages(data, scratch.images)
-    const id = editingId ?? (scratch.rowId ? await scratch.rowId : null)
-    if (id) {
-      await updateProduct(id, saved, { silent: true })
-    } else {
-      // Claim the slot with the promise itself, with no await in between, so a
-      // second pass can only ever wait on this add.
-      scratch.rowId = addProduct({ ...saved, confirmed: false }, { silent: true })
-      await scratch.rowId
+    const existing = editingId ?? (scratch.rowId ? await scratch.rowId : null)
+    if (existing) {
+      await updateProduct(existing, saved, { silent: true })
+      // The id goes back with the row: a read the form hands off on its way out
+      // needs to know which product to write into, and the form is the only one
+      // that knows whether its own save had landed yet.
+      return { ...saved, id: existing }
     }
-    return saved
+    // Claim the slot with the promise itself, with no await in between, so a
+    // second pass can only ever wait on this add.
+    scratch.rowId = addProduct({ ...saved, confirmed: false }, { silent: true })
+    return { ...saved, id: await scratch.rowId }
   }
 
   // Memoized — captured by the useCallback save handlers below, so it must
@@ -261,25 +271,26 @@ export default function Finder() {
     })
   }, [])
 
-  const handleCancelDuringExtraction = useCallback(async (file: File, partial: Omit<Product, 'id' | 'createdAt'>, listingText?: string) => {
-    // The form autosaves, so the row it was editing (or created on the way)
-    // usually already exists — finish the extraction into that one.
-    const scratch = scratchRef.current
-    const editing = editingId
-    closeForm()
-    const existingId = editing ?? (scratch.rowId ? await scratch.rowId : undefined)
-    saveProductDraft({
-      file,
-      listingText,
-      initial: partial,
-      existingId,
+  // A read that outlived its form — the member dropped a photo and then closed
+  // the form or switched bank tab. The RUNNING call is handed over rather than
+  // restarted, so leaving costs nothing and bills nothing; `rowId` resolves once
+  // the form has flushed whatever it still owed the bank.
+  const handleDetachExtraction = useCallback((job: Promise<ProductExtraction>, rowId: Promise<string | null>) => {
+    void adoptDetachedExtraction({
+      job,
+      rowId,
       onStart: (id) => trackInFlight(id, true),
-      onFinish: (id, ok) => {
-        trackInFlight(id, false)
-        addToast(ok ? 'Draft product saved' : 'Saved as draft (extraction failed)', ok ? 'success' : 'info')
+      onFinish: (id, ok, message) => {
+        if (id) trackInFlight(id, false)
+        addToast(message, ok ? 'success' : 'error')
+        // If the member came back and opened this very product while the read
+        // was still running, the form on screen is holding the row as it was
+        // BEFORE the fields landed — and its next keystroke would autosave that
+        // stale copy straight over them. Re-seed it from the row instead.
+        if (ok && id && id === editingIdRef.current) setFormSeed((n) => n + 1)
       },
     })
-  }, [editingId, trackInFlight, addToast, closeForm])
+  }, [trackInFlight, addToast])
 
   const handleBulkFiles = useCallback(async (files: File[]) => {
     // Names the format that bounced (AVIF, HEIC, …) rather than a bare count —
@@ -296,10 +307,18 @@ export default function Finder() {
 
     const succeeded = results.filter((r) => r.ok).length
     const failed = results.length - succeeded
-    const summary = failed === 0
-      ? `${succeeded} product${succeeded === 1 ? '' : 's'} extracted`
-      : `${succeeded} of ${results.length} extracted, ${failed} failed — review drafts`
-    addToast(summary, failed === 0 ? 'success' : 'info')
+    if (failed === 0) {
+      addToast(`${succeeded} product${succeeded === 1 ? '' : 's'} extracted`, 'success')
+      return
+    }
+    // One photo dropped and one photo failed: say WHY. A bare count is the right
+    // shape for a batch and useless for a single drop, which is most of them —
+    // it sends a member off re-cropping a photo when their key was the problem.
+    const single = results.length === 1 ? results[0].reason : null
+    addToast(
+      single ?? `${succeeded} of ${results.length} extracted, ${failed} failed — review drafts`,
+      single ? 'error' : 'info',
+    )
   }, [addToast, trackInFlight])
 
   const handleSaveModel = useCallback(async (data: Omit<Model, 'id' | 'createdAt'>) => {
@@ -448,12 +467,12 @@ export default function Finder() {
                 // product's values — which autosave would then write to a row
                 // of its own. `editingId` doesn't change while autosaving, so
                 // typing never remounts the form.
-                key={editingId ?? 'new'}
+                key={`${editingId ?? 'new'}:${formSeed}`}
                 item={editingProduct}
                 onSave={handleSaveProduct}
                 onAutosave={handleAutosaveProduct}
                 onCancel={closeForm}
-                onCancelDuringExtraction={handleCancelDuringExtraction}
+                onDetachExtraction={handleDetachExtraction}
               />
             )}
             {activeBank === 'models' && (

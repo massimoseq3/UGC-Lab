@@ -4,12 +4,13 @@ import Spinner from '../../components/Spinner'
 import type { Product } from '../../stores/types'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
 import { useAppStore } from '../../stores/appStore'
-import { extractProductInfo } from './services/extractProductInfo'
+import { extractProductInfo, type ProductExtraction } from './services/extractProductInfo'
 import { downloadImage } from '../../utils/downloadImage'
 import { imageRejectionReason, partitionImageFiles, IMAGE_ACCEPT_ATTR } from './services/imageValidation'
 import { humanizeError } from '../../utils/friendlyError'
+import { fileToDataUri } from '../../utils/kie'
 import SegmentedToggle from '../../components/SegmentedToggle'
-import ExpandTextModal, { ExpandButton } from '../../components/ExpandableText'
+import ExpandTextModal, { ExpandButton, BracketGrowArea, BracketInput } from '../../components/ExpandableText'
 import AutoGrowTextarea from '../../components/AutoGrowTextarea'
 import SectionCard, { SectionLabel } from '../../components/SectionCard'
 import { suspendChromeAutoHide } from '../../hooks/useChromeAutoHide'
@@ -18,13 +19,16 @@ interface ProductFormProps {
   item?: Product | null
   onSave: (data: Omit<Product, 'id' | 'createdAt'>) => Promise<void> | void
   // Persists the form as it stands without closing it, and hands back the row
-  // as stored (photos swapped for asset refs). See the autosave block below.
-  onAutosave?: (data: Omit<Product, 'id' | 'createdAt'>) => Promise<Omit<Product, 'id' | 'createdAt'>>
+  // as stored (photos swapped for asset refs) plus the id it was written into.
+  // See the autosave block below.
+  onAutosave?: (data: Omit<Product, 'id' | 'createdAt'>) => Promise<Omit<Product, 'id' | 'createdAt'> & { id: string }>
   onCancel: () => void
-  // Called when the user dismisses the form while extraction is still running.
-  // The parent takes over: persists the partial form as a draft and lets the
-  // extraction finish in the background.
-  onCancelDuringExtraction?: (file: File, partial: Omit<Product, 'id' | 'createdAt'>, listingText?: string) => void
+  // Called when the form goes away while a read is still running — dismissed,
+  // or unmounted by a bank switch. The RUNNING call is handed over, not the
+  // file: the parent writes its result into `rowId` when it lands. Starting a
+  // second extraction here would bill the member twice for one photo, which is
+  // what the file-based version of this prop used to do.
+  onDetachExtraction?: (job: Promise<ProductExtraction>, rowId: Promise<string | null>) => void
 }
 
 const FIELD_META: Record<string, { label: string; type: 'text' | 'textarea'; required?: boolean; hint?: string }> = {
@@ -127,7 +131,7 @@ function useScrollFade<T extends HTMLElement>() {
   return [ref, more] as const
 }
 
-export default function ProductForm({ item, onSave, onAutosave, onCancel, onCancelDuringExtraction }: ProductFormProps) {
+export default function ProductForm({ item, onSave, onAutosave, onCancel, onDetachExtraction }: ProductFormProps) {
   const [form, setForm] = useState<FormState>({
     productImage: item?.productImage ?? '',
     extraImages: item?.extraImages ?? [],
@@ -146,7 +150,13 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
   const fileRef = useRef<HTMLInputElement>(null)
   const extraFileRef = useRef<HTMLInputElement>(null)
   const dragDepthRef = useRef(0)
-  const extractingFileRef = useRef<File | null>(null)
+  // The read that is currently in the air, so it can be handed to the parent
+  // instead of dying when this form unmounts.
+  const extractionRef = useRef<Promise<ProductExtraction> | null>(null)
+  const detachedRef = useRef(false)
+  // False between the unmount and a StrictMode remount — an async step that
+  // resolves in that window must not write to a form that no longer exists.
+  const aliveRef = useRef(true)
   const [localPreview, setLocalPreview] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [showError, setShowError] = useState(false)
@@ -200,7 +210,17 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
   const savedSigRef = useRef(signatureOf(form))
   const autosaveRef = useRef(onAutosave)
   autosaveRef.current = onAutosave
+  const detachRef = useRef(onDetachExtraction)
+  detachRef.current = onDetachExtraction
+  // Set below, once `releaseForm` exists — the unmount effect reads it, and
+  // everything that WRITES a ref has to sit above the hook that captured it.
+  const detachOnExitRef = useRef<() => void>(() => {})
   const inFlightRef = useRef(false)
+  // The row this form's work lands in, held as a PROMISE rather than an id: a
+  // detach that happens while a save is still in the air has to be able to wait
+  // for it, and polling a ref until it fills in is the version of this that
+  // reads like a bug.
+  const rowIdRef = useRef<Promise<string | null>>(Promise.resolve(item?.id ?? null))
   // Set once the form has handed off (submitted, or closed mid-extraction) —
   // the unmount flush must not run then, or Add Product would write the row
   // twice: once confirmed, once as a fresh draft.
@@ -215,8 +235,14 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
 
     inFlightRef.current = true
     setAutosaveState('saving')
+    const pending = save(snapshot)
+    // Claim the row before the first await, so a detach arriving mid-save waits
+    // on this one instead of finding nothing. A failed save keeps whatever row
+    // the form was already pointed at.
+    const previousRowId = rowIdRef.current
+    rowIdRef.current = pending.then((s) => s.id, () => previousRowId)
     try {
-      const stored = await save(snapshot)
+      const stored = await pending
       // What's on disk is the snapshot with its photos swapped for asset refs.
       savedSigRef.current = signatureOf({
         ...snapshot,
@@ -248,6 +274,14 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
   const flushRef = useRef(flushAutosave)
   flushRef.current = flushAutosave
 
+  // Everything the form still owes the bank, written — then the id of the row
+  // it went into. What a detached extraction is handed, so it can never land on
+  // a product that doesn't exist yet.
+  const flushToRowId = useCallback(async (): Promise<string | null> => {
+    await flushAutosave()
+    return rowIdRef.current
+  }, [flushAutosave])
+
   // Deliberately keyed on the form alone — `onAutosave` is read through a ref,
   // so a parent that hands down a fresh function each render can't restart the
   // debounce out from under the typist.
@@ -256,10 +290,6 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
     const timer = setTimeout(() => { void flushAutosave() }, AUTOSAVE_DELAY)
     return () => clearTimeout(timer)
   }, [form, flushAutosave])
-
-  // Leaving the bank, switching tabs, closing the form — whatever ends this
-  // component, the pending edit goes with it.
-  useEffect(() => () => { void flushAutosave() }, [flushAutosave])
 
   const set = (key: string, value: string) => {
     setForm((f) => ({ ...f, [key]: value }))
@@ -327,69 +357,103 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
     setForm((f) => ({ ...f, extraImages: f.extraImages.filter((_, i) => i !== index) }))
   }
 
-  const runExtraction = async (file: File) => {
+  // Fire the read and keep hold of it. The promise is stored SYNCHRONOUSLY, so
+  // a close arriving in the next tick has something to hand over.
+  const startExtraction = (source: File | string, extras: string[], listing: string) => {
     setExtractError(null)
     setIsExtracting(true)
-    extractingFileRef.current = file
-    const extras = form.extraImages
-
-    const reader = new FileReader()
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setForm((f) => ({ ...f, productImage: reader.result as string }))
-        setLocalPreview(reader.result as string)
-      }
-    }
-    // Without this the photo just never appears while the fields fill in around
-    // it — a product saved with every line of copy and no picture.
-    reader.onerror = () => addToast(`Couldn't read ${file.name}.`, 'error')
-    reader.readAsDataURL(file)
-
-    try {
-      const result = await extractProductInfo(file, listingText, extras)
-      setForm((f) => ({ ...f, ...result }))
-      setShowError(false)
-    } catch (err) {
-      const message = humanizeError(err, 'Failed to extract product info from image.')
-      setExtractError(message)
-      addToast('Extraction failed', 'error')
-    } finally {
-      extractingFileRef.current = null
+    detachedRef.current = false
+    const job = extractProductInfo(source, listing, extras)
+    extractionRef.current = job
+    job.then(
+      (result) => {
+        if (detachedRef.current) return
+        setForm((f) => ({ ...f, ...result }))
+        setShowError(false)
+      },
+      (err) => {
+        // Toast the real reason. The inline `extractError` below renders at the
+        // bottom of a scrolling column under four section cards — off screen on
+        // any normal window — so a two-word "Extraction failed" toast was the
+        // whole of what a member ever saw, whether the photo was refused, the
+        // key was out of credits, or the answer came back unreadable.
+        if (detachedRef.current) return
+        const message = humanizeError(
+          err,
+          "Couldn't read that product photo. Try Auto-fill again, or paste the listing copy to help it along.",
+        )
+        setExtractError(message)
+        addToast(message, 'error')
+      },
+    ).finally(() => {
+      if (extractionRef.current === job) extractionRef.current = null
       setIsExtracting(false)
-    }
+    })
+  }
+
+  // A dropped or picked file. The photo is encoded and put on the form BEFORE
+  // the read starts, so there is never a window where a read is running against
+  // a product with no picture to save it into.
+  const runExtraction = (file: File) => {
+    setExtractError(null)
+    setIsExtracting(true)
+    fileToDataUri(file).then(
+      (dataUri) => {
+        if (!aliveRef.current) return
+        setForm((f) => ({ ...f, productImage: dataUri }))
+        setLocalPreview(dataUri)
+        startExtraction(dataUri, formRef.current.extraImages, listingText)
+      },
+      () => {
+        addToast(`Couldn't read ${file.name}.`, 'error')
+        setIsExtracting(false)
+      },
+    )
   }
 
   // Re-run extraction on the image already in the form (e.g. after pasting
   // listing copy). Editing an existing product means there's no File — the
-  // stored image resolves to a blob/data URL, which we re-encode.
-  const rerunExtraction = async () => {
+  // stored image resolves to a blob/data URL, which the service re-encodes.
+  const rerunExtraction = () => {
     if (!displayImage || isExtracting) return
-    setExtractError(null)
-    setIsExtracting(true)
-    try {
-      // `displayImage` is a data: or blob: URL — the service resolves either.
-      const result = await extractProductInfo(displayImage, listingText, form.extraImages)
-      setForm((f) => ({ ...f, ...result }))
-      setShowError(false)
-    } catch (err) {
-      const message = humanizeError(err, 'Failed to extract product info from image.')
-      setExtractError(message)
-      addToast('Extraction failed', 'error')
-    } finally {
-      setIsExtracting(false)
-    }
+    startExtraction(displayImage, form.extraImages, listingText)
   }
 
-  const handleClose = () => {
-    if (isExtracting && extractingFileRef.current && onCancelDuringExtraction) {
-      // The parent finishes the extraction in the background and writes it to
-      // the same row this form has been autosaving into.
-      handedOffRef.current = true
-      onCancelDuringExtraction(extractingFileRef.current, form, listingText)
-    } else {
+  // Flush what's unsaved, and hand any running read to the parent along with
+  // the row it should be written into. Called from the X and from the unmount,
+  // so a bank switch behaves exactly like a close.
+  const releaseForm = () => {
+    const job = extractionRef.current
+    const detach = detachRef.current
+    if (!job || detachedRef.current || !detach) {
       void flushAutosave()
-      onCancel()
+      return
     }
+    detachedRef.current = true
+    detach(job, flushToRowId())
+  }
+  detachOnExitRef.current = releaseForm
+
+  // Leaving the bank, switching tabs, closing the form — whatever ends this
+  // component, the pending edit goes with it, and a read still in the air is
+  // handed to the parent rather than dying on the unmount. That handoff is the
+  // whole of "drop a photo, go somewhere else, come back to a filled-in
+  // product": the call outlives the form because the form stops owning it.
+  //
+  // Read through a ref (declared above) and mounted with no deps, or the
+  // cleanup would fire on every render instead of on the way out.
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
+      aliveRef.current = false
+      detachOnExitRef.current()
+    }
+  }, [])
+
+
+  const handleClose = () => {
+    releaseForm()
+    onCancel()
   }
 
   const handleDragEnter = (e: React.DragEvent) => {
@@ -455,8 +519,17 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
     const { label, type, required, hint } = FIELD_META[key]
     const value = form[key as keyof FormState] as string
     const isMissing = showError && required && !value.toString().trim()
-    const baseCls = 'w-full rounded-2xl border bg-ink/[0.02] px-4 py-3 text-[13px] text-ink-200 placeholder-ink-600 outline-none transition-colors'
-    const borderCls = isMissing ? 'border-red-500/60 focus:border-red-400' : 'border-ink/10 focus:border-ink/20'
+    // The border and fill move to the WRAPPER, because the field itself has to
+    // be transparent for the red placeholder wash behind it to show through —
+    // which is also why `focus:` becomes `focus-within:` here.
+    const chromeCls = `w-full border bg-ink/[0.02] transition-colors ${
+      isMissing ? 'border-red-500/60 focus-within:border-red-400' : 'border-ink/10 focus-within:border-ink/20'
+    }`
+    // Both layers take the same padding and metrics, or they wrap on different
+    // characters and every wash slides off its word further down the paragraph.
+    const padClass = 'px-4 py-3'
+    const textClass = 'text-[13px] leading-relaxed'
+    const inkClass = 'text-ink-200 placeholder-ink-600'
     return (
       <label key={key} className="flex flex-col gap-1.5">
         {/* The in-card small-caps register. It was quiet 12px sentence case
@@ -477,20 +550,30 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
           <div className="relative">
             {/* Grows to fit — an auto-filled product fills every one of these,
                 and a column of boxes that each scroll internally is a column
-                you can't scroll through. */}
-            <AutoGrowTextarea
+                you can't scroll through. The read leaves a [bracketed
+                placeholder] wherever it had no fact to state, deliberately, so
+                every one of them is painted red: that is the list of what the
+                member still has to write in, and without the wash it is ten
+                paragraphs of prose with the gaps hidden inside them. */}
+            <BracketGrowArea
               value={value}
               onChange={(e) => set(key, e.target.value)}
               rows={3}
-              className={`${baseCls} ${borderCls} min-h-[84px] resize-none leading-relaxed`}
+              className={`${chromeCls} rounded-2xl`}
+              padClass={padClass}
+              textClass={textClass}
+              textareaClass={`min-h-[84px] ${inkClass}`}
             />
             <ExpandButton onClick={() => setExpandedField(key)} className="absolute bottom-2 right-2" />
           </div>
         ) : (
-          <input
+          <BracketInput
             value={value}
             onChange={(e) => set(key, e.target.value)}
-            className={`${baseCls} ${borderCls} rounded-full`}
+            className={`${chromeCls} rounded-full`}
+            padClass={padClass}
+            textClass={textClass}
+            inputClass={inkClass}
           />
         )}
       </label>
@@ -775,6 +858,9 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onCanc
           onChange={(v) => set(expandedField, v)}
           title={FIELD_META[expandedField].label}
           accent="ink"
+          // The gaps have to stay marked in the big editor too — it's where a
+          // member actually fills them in.
+          highlightBrackets
         />
       )}
     </form>

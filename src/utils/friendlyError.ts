@@ -92,6 +92,18 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
   },
 
   // ── Auth / billing on the kie.ai key ──
+  //
+  // `getKieApiKey()` throws before any request is made when the field is empty,
+  // and its message names no status code and no vendor phrase — so it fell
+  // through every rule below and landed on whatever fallback the call site
+  // passed. On a generation surface that reads as the model refusing the work,
+  // which sends a member off rewriting a prompt when they simply have no key in
+  // yet. Above the 401 rule, which is the same problem one step later.
+  {
+    test: (m) => m.includes('no kie.ai api key'),
+    message:
+      'No kie.ai API key yet. Open Settings, paste a key from kie.ai, and try again.',
+  },
   {
     test: (m) => m.includes('401') || (m.includes('invalid') && m.includes('key')) || (m.includes('expired') && m.includes('key')),
     message:
@@ -256,7 +268,7 @@ const GENERIC_FALLBACK =
 // deliberately NOT in the list — it only ever follows a `size=`/`url=` that
 // already cuts, and including it would truncate at `content-type=` and throw
 // away the sentence that names the failure.
-const DEBUG_TAIL = /(?:^|[^a-z0-9])(?:taskid|url|record|body|size|endpoint|response shape|first \d+ chars)\s*[=:]/i
+const DEBUG_TAIL = /(?:^|[^a-z0-9])(?:taskid|url|record|body|size|endpoint|response shape|response tail|first \d+ chars)\s*[=:]/i
 
 export function humanizeError(err: unknown, fallback: string = GENERIC_FALLBACK): string {
   const raw = err instanceof Error ? err.message : typeof err === 'string' ? err : ''
