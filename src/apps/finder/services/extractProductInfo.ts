@@ -158,6 +158,14 @@ IMPORTANT — the previous attempt did not come back in a readable state, most l
 // it to its own tile size regardless, so every one of those megabytes is upload
 // time charged against this call's timeout and nothing else. A failed re-encode
 // falls back to the original rather than sending nothing.
+//
+// It only ever affects THIS request. The result is a local, used once in the
+// message body and dropped; the photo saved to the bank is the original file
+// untouched (`ProductForm` puts the raw `fileToDataUri` on the form and
+// `Finder.persistImage` stores that; `saveProductDraft` does the same for a
+// bulk add). That matters because a product photo is a REFERENCE IMAGE — it
+// gets attached to image and video generations later — so it has to stay at
+// full quality. Never write what this returns back to the row.
 async function toVisionDataUri(source: File | string): Promise<string> {
   const original = await toDataUri(source)
   return (await downscaleForVision(original)) ?? original

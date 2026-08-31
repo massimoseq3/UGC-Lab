@@ -12,6 +12,14 @@
 // that reads fine and one that "just never extracts". This is that helper,
 // promoted out of `character-studio/utils/thumbnail.ts` once a second app
 // needed it.
+//
+// THIS IS THE WIRE COPY, NEVER THE SAVED ONE. What every caller here does with
+// the result is put it in a request body and throw it away. The photo that goes
+// into the bank is the ORIGINAL file, byte for byte — a product shot is a
+// reference image that gets attached to real image and video generations, so it
+// has to stay at full quality, and the model's copy has nothing to do with it.
+// If a future caller ever wants to persist what comes back from here, that is a
+// different helper with a different name.
 
 // Above what the vision models sample from a single image, so the label text
 // the product read has to transcribe is all still there — this only sheds
