@@ -27,6 +27,9 @@ interface RightPanelProps {
   error: string | null
   // Commits an inline edit of take `index` back to the persisted output state.
   onEditVariation: (index: number, text: string) => void
+  // Remix only: the run's one voice brief, shown above the takes. Empty → no card.
+  voiceProfile?: string
+  onEditVoiceProfile?: (text: string) => void
 
   history: ScriptHistoryItem[]
   activeHistoryId: string | null
@@ -47,6 +50,8 @@ export default function RightPanel({
   isGenerating,
   error,
   onEditVariation,
+  voiceProfile,
+  onEditVoiceProfile,
   history,
   activeHistoryId,
   onSelectHistory,
@@ -112,6 +117,8 @@ export default function RightPanel({
             // on this and on nothing else.
             runId={activeHistoryId}
             onEditVariation={onEditVariation}
+            voiceProfile={cleared ? '' : voiceProfile}
+            onEditVoiceProfile={onEditVoiceProfile}
           />
         ) : (
           <HistoryView

@@ -364,6 +364,12 @@ export interface GeneratedScript {
   // a saved session labels its cards from what actually ran rather than from a
   // list that may have been reordered since.
   angles?: RemixAngle[]
+  // Remix only: one voice brief for the whole run, read off the source ad.
+  // Deliberately not part of any variation — it's a paragraph the member can
+  // copy into Voiceovers or B-Roll when they want every video cut from this
+  // batch read by the same person. Absent when the run had no source, or when
+  // the (optional, non-blocking) call that writes it failed.
+  voiceProfile?: string
 }
 
 export const REMIX_ANGLE_LABEL: Record<RemixAngle, string> = {

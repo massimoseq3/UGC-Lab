@@ -1088,6 +1088,66 @@ async function runRemix(input: GenerateScriptInput, angle: RemixAngle, apiKey: s
   return nameSpokenTokens(text, spokenProductName(input))
 }
 
+// ── The remix run's one voice brief ──
+//
+// A remix hands back N spoken scripts and nothing else, so a member shooting
+// two of them gets two different-sounding people reading the same winner. The
+// blueprint pipelines already solve this (both emit a VOICE PROFILE block after
+// their scenes); a plain spoken script has nowhere to put one, because the take
+// IS the words that get read aloud and a paragraph of casting direction inside
+// it would be spoken by TTS.
+//
+// So it's written by its OWN call, fired alongside the takes, and it belongs to
+// the run rather than to any one variation — which is also what the member
+// asked for: one paragraph at the top, copied by hand when a video wants it.
+// Read off the SOURCE ad, since that's the delivery that won and every
+// variation keeps its speaker, its POV and its rhythm.
+const REMIX_VOICE_SYSTEM = `You are a casting director for short-form UGC ads. You read the transcript of an ad that already won, hear the person saying it, and write ONE reusable voice brief for whoever reads the rewritten versions of it.
+
+${VOICE_PROFILE_SPEC}
+
+Judge the voice from how the source is WRITTEN — its rhythm, its slang, its confidence, who it's talking to, how hard it pushes. Where the source doesn't settle something, commit to the read that suits this product's audience rather than hedging: a brief full of "or" casts nobody.
+
+OUTPUT: the paragraph and nothing else. No heading, no label, no quotation marks, no markdown, no preamble.`
+
+// Never blocks and never fails the run: the takes are what the member pressed
+// Generate for, and a missing voice card is a card that isn't there rather
+// than an error over three scripts they already paid for.
+async function runRemixVoiceProfile(input: GenerateScriptInput, apiKey: string, endpoint: ChatTarget): Promise<string | undefined> {
+  const source = input.winningTranscript?.trim()
+  if (!source) return undefined
+
+  let prompt = `THE SOURCE AD you are casting the voice for:\n\n"""\n${source}\n"""\n\n`
+
+  const ctxLines = productContextLines(input.productContext)
+  if (ctxLines) {
+    prompt += `The rewrites are for this product, so the voice has to suit its audience:\n${ctxLines}\n\n`
+  }
+  if (input.additionalContext) {
+    prompt += `The creator's instructions for the rewrites:\n${input.additionalContext}\n\n`
+  }
+  prompt += `Write the voice brief now, as one paragraph.`
+
+  const messages: ChatMessage[] = [
+    { role: 'system', content: [{ type: 'text', text: REMIX_VOICE_SYSTEM }] },
+    { role: 'user', content: [{ type: 'text', text: prompt }] },
+  ]
+
+  try {
+    const text = await kieChatCompletions(apiKey, endpoint, messages, { timeoutMs: SCRIPT_TIMEOUT_MS })
+    // A model that ignores "no heading" leads with its own "VOICE PROFILE"
+    // line, and the card renders the body only. Matched on the labelled pair
+    // and nothing looser — a brief that legitimately opens "Voice of a woman in
+    // her late 20s" would lose its first line to a bare "VOICE" rule.
+    return text
+      .replace(/^[=*#\s]*(?:MASTER\s+)?VOICE PROFILE\b[^\n]*\n/i, '')
+      .replace(/^[=\s]+|[=\s]+$/g, '')
+      .trim() || undefined
+  } catch {
+    return undefined
+  }
+}
+
 async function runReverseEngineer(input: GenerateScriptInput, apiKey: string, endpoint: ChatTarget): Promise<string> {
   // No target length means the 'default' pick: the rewrite inherits the source
   // blueprint's own scene count and timings, which is what a rewrite usually
@@ -1162,12 +1222,20 @@ export async function generateScript(input: GenerateScriptInput): Promise<Genera
   }
 
   const requested = REMIX_ANGLES.slice(0, Math.min(requestedCount(input), REMIX_ANGLES.length))
+  // The voice brief rides alongside the takes rather than after them — it reads
+  // the same source they do, so there's nothing to wait for, and a member
+  // shouldn't sit through a second round trip for a paragraph they may not use.
+  const voicePromise = runRemixVoiceProfile(input, apiKey, endpoint)
   const settled = await Promise.allSettled(requested.map((angle) => runRemix(input, angle, apiKey, endpoint)))
+  // Awaited before keepFulfilled, which throws when every take failed — this
+  // one resolves either way (it swallows its own failure), so settling it here
+  // means it can't be left running behind a thrown run.
+  const voiceProfile = await voicePromise
   const variations = keepFulfilled(settled)
   // The stamp has to name the angles that actually came back, in order — it's
   // what OutputPanel labels each take with.
   const angles = requested.filter((_, i) => settled[i].status === 'fulfilled')
-  return { variations, angles }
+  return { variations, angles, voiceProfile }
 }
 
 // A batch is N independent chat calls, and Promise.all rejects on the FIRST one
