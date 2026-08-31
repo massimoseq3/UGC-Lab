@@ -750,7 +750,7 @@ function InFlightTile({ gen }: { gen: InFlightGen }) {
     >
       <GeneratingBackdrop family="playground" />
       {/* Mode glyph, top-left — mirrors the reference framing. */}
-      <div className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/25 text-playground-100 backdrop-blur-sm">
+      <div className="absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/30 text-playground-100">
         <Icon className="h-4 w-4" />
       </div>
       <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 text-center">

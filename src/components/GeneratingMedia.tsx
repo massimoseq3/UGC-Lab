@@ -53,8 +53,12 @@ export function GeneratingMediaFill({
   return (
     <>
       <GeneratingBackdrop family={family} />
-      {/* Mode glyph, top-left. */}
-      <div className={`absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/25 backdrop-blur-sm ${accent.text}`}>
+      {/* Mode glyph, top-left. No `backdrop-blur` here or on the dismiss button
+          below, and none anywhere else over this backdrop: a backdrop-filter
+          re-samples and re-blurs its patch on every frame the sweep behind it
+          moves, and there are as many of these as there are generating tiles.
+          A slightly heavier flat scrim reads the same over a soft wash. */}
+      <div className={`absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/30 ${accent.text}`}>
         <Icon className="h-4 w-4" />
       </div>
       {onDismiss && (
@@ -62,7 +66,7 @@ export function GeneratingMediaFill({
           type="button"
           onClick={(e) => { e.stopPropagation(); onDismiss() }}
           title="Stop tracking this generation"
-          className={`absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm transition-colors hover:bg-black/60 hover:text-white ${accent.text}`}
+          className={`absolute right-2 top-2 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-black/45 transition-colors hover:bg-black/60 hover:text-white ${accent.text}`}
         >
           <X className="h-3 w-3" />
         </button>
