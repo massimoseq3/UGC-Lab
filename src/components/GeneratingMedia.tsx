@@ -55,8 +55,8 @@ export function GeneratingMediaFill({
       <GeneratingBackdrop family={family} />
       {/* Mode glyph, top-left. No `backdrop-blur` here or on the dismiss button
           below, and none anywhere else over this backdrop: a backdrop-filter
-          re-samples and re-blurs its patch on every frame the sweep behind it
-          moves, and there are as many of these as there are generating tiles.
+          re-samples and re-blurs its patch on every frame the thing behind it
+          changes, and there are as many of these as there are generating tiles.
           A slightly heavier flat scrim reads the same over a soft wash. */}
       <div className={`absolute left-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg bg-black/30 ${accent.text}`}>
         <Icon className="h-4 w-4" />
