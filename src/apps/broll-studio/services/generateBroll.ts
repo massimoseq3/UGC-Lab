@@ -100,6 +100,39 @@ THE QUOTED LINE IS HEARD, NEVER SEEN. It is what comes out of their mouth, not s
 
 Say where they are and what they're doing while they talk — ONE ongoing activity caught mid-way, not a list of things they get through. It's the same person and the same ad throughout, but not the same chair: a dialogue shot can happen anywhere their life plausibly takes them, and the interesting ones happen mid-something.`
 
+// What the CLIP gets, as opposed to what the still gets.
+//
+// The still prompt is a frozen instant by construction (see PROMPT_FORMAT_CORE:
+// one frame, one action, caught before it lands). Handing that same paragraph to
+// a video model is the bug this exists to fix -- the model reads a picture it is
+// already holding as an image and re-renders it, so the clip comes back with the
+// character almost still. What a video model needs from a start frame is the
+// MOVEMENT, and it needs it short: every sentence re-describing the room, the
+// wardrobe or the light is another instruction to redraw rather than animate.
+//
+// Continuous mode has always worked this way (ContinuousConcept.motionPrompt),
+// which is why its clips move; this is that idea brought to Line-by-Line, where
+// the Animate tab was firing the still's own paragraph.
+//
+// THE CAMERA NEVER MOVES here, and that is a deliberate difference from
+// Continuous, where a keyframe chain is doing something else entirely. This is
+// UGC: the phone is propped on a shelf and left there, so the only thing moving
+// in a real clip is the person. The motion therefore says nothing about the
+// camera AT ALL — it is a box about what moves, and a sentence about a camera
+// that is deliberately doing nothing is a sentence the member has to read past
+// every time. The lock itself is guaranteed downstream instead, by
+// `withLockedCamera` appended at fire time on the animate path (realism.ts),
+// which is where every other invariant in this app already lives.
+const MOTION_FORMAT = `ONE OR TWO SENTENCES, and never more. This is not a second prompt for the picture — the picture already exists as the still, and this is the only thing telling the clip what to perform.
+
+WRITE THE ACTION PLAYING OUT, and nothing else: the same single action the still caught at its first instant, carried through to the end of the move. The teeth close and grind sideways through the cardboard. The flat hand finishes its sweep and the last bars tip over the drawer's edge. The shoulders drop as the breath goes all the way out.
+
+NEVER WRITE ANYTHING ABOUT THE CAMERA. Not a push in, a pull back, a zoom, a pan, a tilt, an orbit, a track, a dolly, a crane, a drift, a handheld sway, a rack focus or a reframe — and not "the camera holds steady" or "the shot stays locked" either. The frame is fixed and the app guarantees that separately; your job is only what moves inside it. If the movement you have in mind needs the camera to travel, it is the wrong movement: say what the person or the object does within the fixed frame instead.
+
+NEVER A NEW EVENT. The still holds one action back at its beginning and the clip finishes that one action — nothing after it, nobody arriving, nothing new entering frame, no second beat. Never "then", "after which", "before finally", "cut to", or "dissolve to".
+
+NEVER RE-DESCRIBE THE PICTURE. Not the room, the wardrobe, the props, the light, the framing, or the character's appearance — all of it is already in the frame the clip starts on, and repeating it is what makes a model redraw instead of animate. Never name a style or the filming device. No dialogue, no narration, no music.`
+
 const SYSTEM_INSTRUCTION = `# ROLE
 
 You are a senior UGC creative director inventing silent B-roll shots for AI image and video models. You have shipped thousands of paid UGC ads. Your gift is translating a spoken line into a picture: someone watching the footage with the sound off should be able to guess what the voiceover is saying.
@@ -154,6 +187,12 @@ You decide per variation:
 
 ${PROMPT_FORMAT}
 
+# MOTION FORMAT (EVERY VARIATION, ALONGSIDE ITS PROMPT)
+
+Every variation carries a second, much shorter prompt in its <MOTION> field. The <PROMPT> is the still; the <MOTION> is what that still does once a video model animates it, and it is fired on its own when the member clicks Animate. They are written together because only you know which single action the frame was caught at the start of.
+
+${MOTION_FORMAT}
+
 # THE CAMERA IS A VIEWPOINT, NOT A PROP
 
 Image and video models draw the nouns you give them: write "phone" and a phone appears in frame, and your shot becomes a mirror selfie. So never name the filming device — no "phone", "iPhone", "smartphone", "front camera", "tripod", "ring light" — never in a hand, on a table, or in a reflection. When the camera position matters, state it as a position: "framed from chest height an arm's length away", "from directly above the counter", "from lap height looking up".
@@ -191,6 +230,7 @@ The ONE exception: a PROOF shot may show a screen as the deliberate subject bein
 4. Read each prompt back and COUNT THE MOMENTS. One action, caught at one instant? Or two or three strung together with "then" and "and"? If it's more than one, the image model draws all of them side by side — keep the strongest instant and delete the rest.
 5. Is every prompt ONE readable paragraph — no labels, no device named, silent?
 6. Does product visibility match the rule exactly?
+7. Is every <MOTION> one or two sentences that say ONLY what moves? If it re-describes the room, the clothes or the light, cut that — the clip starts on the still and can already see them. If it mentions the camera at all, cut that too, whether it asks for a move or says the shot holds still.
 
 # REFERENCE EXAMPLE
 
@@ -198,20 +238,25 @@ Line: "I spent years eating protein bars that tasted like actual cardboard befor
 
 > <TAG>ACTION</TAG> <LABEL>CARDBOARD BITE</LABEL>
 > The character stands at their kitchen counter with a torn strip of corrugated cardboard held like a snack bar, teeth sunk an inch into one torn corner and jaw working slowly sideways through the fibres, eyes flat and half-lidded, one crumb of brown board clinging to their lower lip. Framed from chest height across the counter, morning window light from the left. The only sound is the dry papery crunch.
+> The jaw grinds sideways through the bite until the corner tears free, cheeks working, the throat working once on a dry swallow and the eyes never leaving the middle distance.
 
 > <TAG>TRANSITION</TAG> <LABEL>BARS HIT THE BIN</LABEL>
 > An open kitchen drawer packed with a graveyard of half-eaten, stale protein bars in dull, crumpled wrappers, the character's flat hand caught mid-sweep across it — the first three bars already tipping over the front edge into the open bin below, the rest still piled where they lay, crumbs skidding ahead of their fingers. Framed from just above the drawer, close enough to read the sad crumbs. Wrappers crinkle under the drag of the hand.
+> The hand completes its sweep and the whole row of bars goes over the edge into the bin, wrappers tumbling after it, the drawer left bare but for a scatter of crumbs.
 
 > <TAG>ACTION</TAG> <LABEL>WASHING IT DOWN</LABEL>
 > At a cluttered desk mid-afternoon, the character tips a cold mug of coffee against their lips to force down a dry mouthful, cheeks still packed, eyes screwed half shut and brows pulled together mid-swallow, the half-eaten chalky bar in a plain unmarked grey wrapper — no logo, no text — still gripped in their other hand at the edge of the keyboard. Framed from across the desk at eye height, flat overcast light from the window behind the monitor. A dull swallow under the flat hum of the room.
+> The swallow finishes and the mug lowers to the desk, the eyes reopening flat and unimpressed with the brows still knitted.
 
 Three different pictures. The first and third share the ACTION lens and that is fine — different room, different object, different act, so neither could be filmed as the other. A second angle on the cardboard bite would NOT be fine. Note the desk bar is an unbranded stand-in: this line attacks the category, so VISIBILITY is no and the bad bar can never be the advertised product.
 
 Note the SHAPE of all three: each one is a single frozen instant of a single action — mid-bite, mid-sweep, mid-swallow — described in heavy detail, with the rest of the move still ahead of it. None of them narrates a sequence, and none of them could be drawn as more than one picture. That is the shape every prompt takes.
 
+And note the SECOND line under each: one or two sentences, nothing but the move. It finishes the action the still was caught at the start of, and it says nothing about the kitchen, the clothes, the light or the camera — the clip opens on the frame that already has all of them, and that frame does not move. That is the shape every motion takes.
+
 # OUTPUT FORMAT (STRICT)
 
-Wrap every scene in this exact XML envelope. Do not include any text outside these tags. Every <PROMPT> body is ONE paragraph in the PROMPT FORMAT above.
+Wrap every scene in this exact XML envelope. Do not include any text outside these tags. Every <PROMPT> body is ONE paragraph in the PROMPT FORMAT above, and every <MOTION> body is one or two sentences in the MOTION FORMAT above.
 
 <SCENE>
 <LINE>exact grouped script segment, a complete sentence</LINE>
@@ -222,18 +267,21 @@ Wrap every scene in this exact XML envelope. Do not include any text outside the
 <LABEL>short descriptive shot label, e.g. COUNTER REACTION</LABEL>
 <REFS>character|product|both|none</REFS>
 <PROMPT>one flowing paragraph matching the chosen lens — ONE instant of ONE action, described in full detail. Silent b-roll — no speech anywhere</PROMPT>
+<MOTION>one or two sentences: that same action playing out to its end. Subject movement only — never anything about the camera, never the room, the wardrobe, the light, or a second event</MOTION>
 </VAR_1>
 <VAR_2>
 <TAG>the lens this idea turned out to be — may repeat an earlier VAR's tag when the picture is genuinely different</TAG>
 <LABEL>...</LABEL>
 <REFS>...</REFS>
 <PROMPT>...</PROMPT>
+<MOTION>...</MOTION>
 </VAR_2>
 <VAR_3>
 <TAG>the lens this idea turned out to be — may repeat an earlier VAR's tag when the picture is genuinely different</TAG>
 <LABEL>...</LABEL>
 <REFS>...</REFS>
 <PROMPT>...</PROMPT>
+<MOTION>...</MOTION>
 </VAR_3>
 </SCENE>`
 
@@ -279,6 +327,7 @@ VAR_2 and VAR_3 are the same idea as each other if they happen in the same place
 
 WHEN A SCENE STAGING BLOCK IS PRESENT, IT WINS: it says what kind of content this ad imitates, and every variation stages that — a street interview happens along that street, a GRWM inside that routine, a podcast clip in that recording session. Vary WITHIN the format; never break it. The anchor rule applies inside the format rather than around it: VAR_1 picks ONE spot in that world (one stretch of pavement, one seat at the desk) and every scene's VAR_1 stays there, while VAR_2 and VAR_3 move elsewhere within the same format. When there is no staging block, the ad is a plain organic UGC video: the anchor is a spot in the character's own home, and the two alternatives move around their life.
 
+- <MOTION> STILL APPLIES, AND ON A TALKING CARD IT CARRIES THE LINE. It is one or two sentences and it is the whole prompt the clip is fired with, so a motion without the words is a talking clip with nothing to say. Write the character DELIVERING the line — the exact words verbatim inside double quotes, copied character for character exactly as in the <PROMPT>, so the app can rewrite them when the member edits the line — plus how they move while they say it — the gesture finishing, the head turning back to the lens, the smile arriving on the last word. Nothing about the room, the wardrobe or the light: the still already has them. Nothing about the camera either, in any direction. The words are HEARD, never written anywhere in the picture.
 - Product: follow VISIBILITY exactly as the rules above describe. When VISIBILITY is yes the character may hold, use, or be near the product while they talk, and <REFS> must include product so it's built from the real packaging. When VISIBILITY is no, no product anywhere — not in a hand, not on a counter behind them.
 - Still obey every other rule: camera is a viewpoint not a prop (never name the filming device), gender-neutral language ("the character", "they/them"), UGC realism, no captions or on-screen text, after-not-before, constant motion.
 
@@ -307,10 +356,10 @@ export function brollSystemInstruction(delivery: BrollDelivery, productPhotoCoun
 export function buildBrollUserPrompt(input: BrollInput): string {
   const withDialogue = input.delivery === 'dialogue'
   const variationBrief = withDialogue
-    ? `For EACH scene emit exactly three variations, and ALL THREE are the character speaking that line out loud — <TAG>DIALOGUE</TAG> on every one, with the line embedded verbatim in double quotes. VAR_1 is the ANCHOR TAKE: one place, one spot, one wardrobe, one light, one camera position, held across EVERY scene of the ad so the VAR_1 column plays as a single take cut into pieces — restate that setup in full, in the same words, in every scene's VAR_1. VAR_2 and VAR_3 are two genuinely DIFFERENT ways to deliver the same line: different room or location, different thing they're doing while they talk, different physical relationship to the camera. Three slots only — no VAR_4.`
-    : `For EACH scene emit exactly three variations: three genuinely DIFFERENT ideas for showing what that line SAYS — make metaphors literal, show the act, the feeling, the proof. Two of them are the same idea if you could film them in the same room, in the same minute, with the same prop. Tag each with the lens it turned out to be (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF) in its <TAG> field — the lens follows the idea, and two variations may share one when the pictures are genuinely different. Every shot is silent — no one speaks (a voiceover is added later). Three slots only, so every one has to earn its place — no filler.`
+    ? `For EACH scene emit exactly three variations, and ALL THREE are the character speaking that line out loud — <TAG>DIALOGUE</TAG> on every one, with the line embedded verbatim in double quotes. VAR_1 is the ANCHOR TAKE: one place, one spot, one wardrobe, one light, one camera position, held across EVERY scene of the ad so the VAR_1 column plays as a single take cut into pieces — restate that setup in full, in the same words, in every scene's VAR_1. VAR_2 and VAR_3 are two genuinely DIFFERENT ways to deliver the same line: different room or location, different thing they're doing while they talk, different physical relationship to the camera. Three slots only — no VAR_4. Every variation also carries a <MOTION>: one or two sentences of the character delivering the line, with the exact words quoted verbatim, plus what moves as they say it. Never anything about the camera, and never a re-description of the room.`
+    : `For EACH scene emit exactly three variations: three genuinely DIFFERENT ideas for showing what that line SAYS — make metaphors literal, show the act, the feeling, the proof. Two of them are the same idea if you could film them in the same room, in the same minute, with the same prop. Tag each with the lens it turned out to be (ACTION / EMOTIONAL / PRODUCT / POV / ENVIRONMENT / TRANSITION / PROOF) in its <TAG> field — the lens follows the idea, and two variations may share one when the pictures are genuinely different. Every shot is silent — no one speaks (a voiceover is added later). Three slots only, so every one has to earn its place — no filler. Every variation also carries a <MOTION>: one or two sentences saying how that exact still moves once it's animated — the action finishing, and nothing else. Never anything about the camera, and never a second description of the picture.`
 
-  let prompt = `Break this script into ${withDialogue ? 'dialogue' : 'B-Roll'} scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph, as long as the idea needs — no word limit, and never trim a detail to hit a length. Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation, erring toward attaching references whenever they could plausibly help. Two REFS rules are hard: VISIBILITY=no excludes the product from every variation, and VISIBILITY=yes includes it in every variation.\n\nScript:\n${input.scriptText}`
+  let prompt = `Break this script into ${withDialogue ? 'dialogue' : 'B-Roll'} scenes following the system rules. ${variationBrief} Each prompt is ONE readable paragraph, as long as the idea needs — no word limit, and never trim a detail to hit a length. Each <MOTION> is the opposite: one or two sentences, subject movement only, with nothing said about the camera. Decide POSITION + VISIBILITY per scene — if the line names or references the product, VISIBILITY must be yes regardless of POSITION. Pick REFS per variation, erring toward attaching references whenever they could plausibly help. Two REFS rules are hard: VISIBILITY=no excludes the product from every variation, and VISIBILITY=yes includes it in every variation.\n\nScript:\n${input.scriptText}`
 
   // The picked Script Style's scene staging, when it's a FORMAT (podcast clip,
   // street interview, green-screen reaction…). Structures carry none on
@@ -472,12 +521,16 @@ export function parseScenes(responseText: string, delivery: BrollDelivery = 'sil
         .replace(/<LABEL>[\s\S]*?<\/LABEL>/g, '')
         .replace(/<REFS>[\s\S]*?<\/REFS>/g, '')
         .replace(/<PHOTOS>[\s\S]*?<\/PHOTOS>/g, '')
+        // The motion is its own field — without this it lands inside the still
+        // prompt on a response that omitted the <PROMPT> wrapper, and the image
+        // model is handed a paragraph that ends by asking for movement.
+        .replace(/<MOTION>[\s\S]*?<\/MOTION>/g, '')
         .replace(/<\/?PROMPT>/g, '')
         .trim()
       // Final belt-and-braces — wipe any straggler control tags. Cheap to
       // run, catches misformed LLM output without touching legitimate prose.
       const cleanPrompt = promptText
-        .replace(/<\/?(LABEL|REFS|PHOTOS|PROMPT|VAR_\d+|TAG|POSITION|VISIBILITY)>/g, '')
+        .replace(/<\/?(LABEL|REFS|PHOTOS|MOTION|PROMPT|VAR_\d+|TAG|POSITION|VISIBILITY)>/g, '')
         .trim()
       if (!cleanPrompt) continue
 
@@ -486,6 +539,10 @@ export function parseScenes(responseText: string, delivery: BrollDelivery = 'sil
       // Which product photo this shot needs (the sealed wrapper, the unwrapped
       // bar). Absent → the card falls back to the hero photo alone.
       const productPhotos = parsePhotoPick(extractBlock(varBlock, 'PHOTOS'))
+      // How this still moves once it's animated. Absent on a storyboard written
+      // before the field existed (and on an import from one), which is why the
+      // Animate path falls back to the still prompt rather than firing nothing.
+      const motionPrompt = extractBlock(varBlock, 'MOTION')?.trim() || undefined
 
       variations.push({
         id: nextId(),
@@ -494,6 +551,7 @@ export function parseScenes(responseText: string, delivery: BrollDelivery = 'sil
         refs,
         ...(productPhotos ? { productPhotos } : {}),
         prompt: cleanPrompt,
+        ...(motionPrompt ? { motionPrompt } : {}),
       })
     }
 
@@ -818,6 +876,12 @@ ${productContext ? `\n${productContext}\n` : ''}${modelContext ? `\n${modelConte
 
 ${isDialogue ? PROMPT_FORMAT_DIALOGUE : PROMPT_FORMAT}
 
+# MOTION FORMAT
+
+The <MOTION> field is a SECOND, much shorter prompt: what that still does once a video model animates it. It's fired on its own when the member animates the shot, so it can't be a repeat of the paragraph above.
+
+${MOTION_FORMAT}${isDialogue ? '\n\nOn this talking card the motion carries the line: quote the exact words verbatim, the same way the prompt does, plus how they move as they say it.' : ''}
+
 ${deliveryClause}
 
 SHOW, DON'T TELL — the shot must visualize what the line SAYS, so a viewer could guess the line from the footage alone. If the line has a metaphor or vivid image, consider making it literal on screen, even if absurd ("tasted like cardboard" → the character deadpan biting actual cardboard). Never a person passively existing while the line plays. Bring a genuinely fresh idea, not a re-angle of an obvious shot.
@@ -840,6 +904,9 @@ Respond with ONLY this envelope. No markdown, no commentary, nothing outside the
 <PROMPT>
 one flowing paragraph
 </PROMPT>
+<MOTION>
+one or two sentences of subject movement, with nothing said about the camera
+</MOTION>
 </VARIATION>`
 
   const messages: ChatMessage[] = [
@@ -855,6 +922,7 @@ one flowing paragraph
   const tagRaw = responseText.match(/<TAG>([\s\S]*?)<\/TAG>/)?.[1]?.trim()
   const refsRaw = responseText.match(/<REFS>([\s\S]*?)<\/REFS>/)?.[1]?.trim().toLowerCase()
   const promptRaw = responseText.match(/<PROMPT>([\s\S]*?)<\/PROMPT>/)?.[1]?.trim()
+  const motionRaw = responseText.match(/<MOTION>([\s\S]*?)<\/MOTION>/)?.[1]?.trim()
   if (!promptRaw) {
     throw new Error(`No <PROMPT> in the variation response — body: ${responseText.slice(0, 400)}`)
   }
@@ -869,6 +937,10 @@ one flowing paragraph
     tag: finalTag,
     refs: clampRefsToVisibility(parseRefs(refsRaw) ?? defaultRefsFor(finalTag, undefined), undefined),
     prompt: promptRaw,
+    // Undefined when the model skipped the field: the caller only overwrites the
+    // card's motion when there's a real one, so a thin response leaves whatever
+    // motion the card already had rather than blanking it.
+    ...(motionRaw ? { motionPrompt: motionRaw } : {}),
   }
 }
 

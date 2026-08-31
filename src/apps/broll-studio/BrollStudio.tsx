@@ -634,11 +634,14 @@ export default function BrollStudio() {
   // every prompt of that scene and everything else about the shot survives.
   // See services/scriptLineEdit.ts for why this isn't a regeneration.
   //
-  // Three places hold a copy of the line and all three move together, or the
+  // Four places hold a copy of the line and all four move together, or the
   // card renders one sentence while the header shows another:
   //   1. the scene itself (the header, and what a regen is briefed from)
-  //   2. each variation's original prompt
+  //   2. each variation's original prompt AND its motion — a dialogue motion
+  //      quotes the line too, since it's the whole prompt an animated clip
+  //      fires with, so a motion left behind makes the clip say the old words
   //   3. each card's editablePrompt — the one that actually gets generated
+  //   4. each card's animateMotion — the same, for the clip
   const handleEditSceneLine = useCallback((sceneNumber: number, nextLine: string) => {
     const line = nextLine.trim()
     if (!line) return
@@ -657,6 +660,9 @@ export default function BrollStudio() {
               variations: s.variations.map((v) => ({
                 ...v,
                 prompt: swapQuotedLine(v.prompt, previousLine, line),
+                ...(v.motionPrompt
+                  ? { motionPrompt: swapQuotedLine(v.motionPrompt, previousLine, line) }
+                  : {}),
               })),
             }
           : s,
@@ -668,16 +674,22 @@ export default function BrollStudio() {
       for (const [key, card] of Object.entries(prev)) {
         // Positional key: `${sceneNumber}-${index}`.
         const keyScene = Number(key.slice(0, key.lastIndexOf('-')))
-        const swapped = keyScene === sceneNumber
+        const isThisScene = keyScene === sceneNumber
+        const swapped = isThisScene
           ? swapQuotedLine(card.editablePrompt, previousLine, line)
           : card.editablePrompt
-        if (swapped !== card.editablePrompt) {
+        // The motion is a second prompt with its own copy of the words on a
+        // dialogue card, and it's the one an animated clip actually speaks.
+        const swappedMotion = isThisScene
+          ? swapQuotedLine(card.animateMotion, previousLine, line)
+          : card.animateMotion
+        if (swapped !== card.editablePrompt || swappedMotion !== card.animateMotion) {
           changed = true
           // Deliberately NOT pushed onto promptHistory. Undo is for rewrites of
           // the shot; the line has its own editor, and burying a line change in
           // the prompt undo stack would let Undo desync the prompt from the
           // scene header it's supposed to be speaking.
-          next[key] = { ...card, editablePrompt: swapped }
+          next[key] = { ...card, editablePrompt: swapped, animateMotion: swappedMotion }
         } else {
           next[key] = card
         }

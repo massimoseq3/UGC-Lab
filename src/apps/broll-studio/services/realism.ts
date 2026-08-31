@@ -123,3 +123,30 @@ export function withSingleFrame(prompt: string): string {
 export function withSingleTake(prompt: string): string {
   return appendClause(prompt, SINGLE_TAKE_SUFFIX)
 }
+
+// ── Locked camera (animating a still) ──────────────────────────
+//
+// ANIMATE ONLY. A clip that opens on a still the member already chose has its
+// frame decided: the phone was propped and left there, and the only thing that
+// should move is what is inside the shot. A video model given no camera
+// direction invents one — a slow push-in on every clip, which reads as a
+// showreel rather than something filmed at home — and a camera move is also the
+// fastest way to lose the face, since the model has to invent geometry the
+// start frame never showed it.
+//
+// It lives HERE, not in the motion prompt, on Massimo's call: the motion box is
+// for what MOVES, and a member reading their own prompt back shouldn't have to
+// wade through a sentence about a camera that isn't doing anything. Same
+// reasoning as the three clauses above — the writer-side rule binds the chat
+// model and nothing else, so a hand-typed motion, an imported storyboard or a
+// resumed session was uncovered either way.
+//
+// Deliberately NOT applied to the Video tab: a from-scratch clip has no frame
+// to hold still, so the composition is the model's to choose.
+export const LOCKED_CAMERA_SUFFIX =
+  'The camera is locked off on a fixed tripod for the whole clip: no push in, no pull back, no zoom, no pan, no tilt, no orbit, no tracking, no dolly, no crane, no handheld drift or shake, and no reframing of any kind. The frame stays exactly as it is in the start image — only the subject inside it moves.'
+
+/** Append the locked-camera guarantee. Animating a still only — see above. */
+export function withLockedCamera(prompt: string): string {
+  return appendClause(prompt, LOCKED_CAMERA_SUFFIX)
+}

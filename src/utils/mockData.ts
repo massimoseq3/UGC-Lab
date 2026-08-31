@@ -397,9 +397,9 @@ const BROLL_SESSION_SCENES = [
     position: 'hook' as const,
     productVisible: false,
     variations: [
-      { tag: 'DIALOGUE' as const, label: 'Talking to camera', refs: 'character' as const, from: '#fb7185', to: '#e11d48', prompt: "@INFLUENCER sits on the edge of her bed, phone held at arm's length, talking candidly into the front camera in a sunlit apartment. Natural handheld micro-jitter, UGC selfie framing, no on-screen text." },
-      { tag: 'EMOTIONAL' as const, label: 'Skeptical glance', refs: 'character' as const, from: '#f472b6', to: '#be123c', prompt: '@INFLUENCER raises an eyebrow at the camera, half-smiling in disbelief, soft window light across her face, tight close-up UGC selfie.' },
-      { tag: 'ACTION' as const, label: 'The return box', refs: 'both' as const, from: '#e879f9', to: '#831843', prompt: 'A half-packed return box sits open on a bedroom floor with @PRODUCT balanced on the flap, a hand lifting it back out again, flat afternoon light, handheld close shot.' },
+      { tag: 'DIALOGUE' as const, label: 'Talking to camera', refs: 'character' as const, from: '#fb7185', to: '#e11d48', prompt: "@INFLUENCER sits on the edge of her bed, phone held at arm's length, talking candidly into the front camera in a sunlit apartment. Natural handheld micro-jitter, UGC selfie framing, no on-screen text.", motion: 'She finishes the sentence with a small shrug and a half-laugh, her eyes flicking away and back to the lens.' },
+      { tag: 'EMOTIONAL' as const, label: 'Skeptical glance', refs: 'character' as const, from: '#f472b6', to: '#be123c', prompt: '@INFLUENCER raises an eyebrow at the camera, half-smiling in disbelief, soft window light across her face, tight close-up UGC selfie.', motion: 'The raised eyebrow settles and the half-smile widens as she tips her head, unconvinced.' },
+      { tag: 'ACTION' as const, label: 'The return box', refs: 'both' as const, from: '#e879f9', to: '#831843', prompt: 'A half-packed return box sits open on a bedroom floor with @PRODUCT balanced on the flap, a hand lifting it back out again, flat afternoon light, handheld close shot.', motion: 'The hand lifts the bottle clear of the flap and out of frame, leaving the box gaping where it sits.' },
     ],
   },
   {
@@ -408,9 +408,9 @@ const BROLL_SESSION_SCENES = [
     position: 'mechanism' as const,
     productVisible: true,
     variations: [
-      { tag: 'PRODUCT' as const, label: 'Product detail', refs: 'product' as const, from: '#f59e0b', to: '#b45309', prompt: 'Extreme close-up of @PRODUCT glass bottle on a marble vanity, a single drop sliding down the dropper, soft morning light, photorealistic.' },
-      { tag: 'ACTION' as const, label: 'Applying serum', refs: 'both' as const, from: '#fbbf24', to: '#d97706', prompt: '@INFLUENCER dispenses @PRODUCT onto her fingertips and pats it across her cheek in front of the bathroom mirror, bright daylight, UGC handheld.' },
-      { tag: 'PROOF' as const, label: 'Label in focus', refs: 'product' as const, from: '#fcd34d', to: '#92400e', prompt: 'Macro rack-focus across the back label of @PRODUCT until the 15% vitamin C line snaps sharp, fingers rotating the bottle slowly, soft window light.' },
+      { tag: 'PRODUCT' as const, label: 'Product detail', refs: 'product' as const, from: '#f59e0b', to: '#b45309', prompt: 'Extreme close-up of @PRODUCT glass bottle on a marble vanity, a single drop sliding down the dropper, soft morning light, photorealistic.', motion: 'The drop runs the length of the dropper, swells at the tip and lets go.' },
+      { tag: 'ACTION' as const, label: 'Applying serum', refs: 'both' as const, from: '#fbbf24', to: '#d97706', prompt: '@INFLUENCER dispenses @PRODUCT onto her fingertips and pats it across her cheek in front of the bathroom mirror, bright daylight, UGC handheld.', motion: 'Her fingertips pat across the cheekbone twice more and sweep up toward the temple, the serum disappearing into the skin.' },
+      { tag: 'PROOF' as const, label: 'Label in focus', refs: 'product' as const, from: '#fcd34d', to: '#92400e', prompt: 'Macro rack-focus across the back label of @PRODUCT until the 15% vitamin C line snaps sharp, fingers rotating the bottle slowly, soft window light.', motion: 'The fingers keep rotating the bottle until the 15% vitamin C line comes round to face the lens and settles.' },
     ],
   },
   {
@@ -419,9 +419,9 @@ const BROLL_SESSION_SCENES = [
     position: 'CTA' as const,
     productVisible: true,
     variations: [
-      { tag: 'DIALOGUE' as const, label: 'Direct CTA', refs: 'both' as const, from: '#fb7185', to: '#9f1239', prompt: '@INFLUENCER holds @PRODUCT up beside her face, grinning at the camera as she delivers the call to action, warm natural light, UGC selfie.' },
-      { tag: 'PRODUCT' as const, label: 'Hero shot', refs: 'product' as const, from: '#f59e0b', to: '#c2410c', prompt: '@PRODUCT standing centered on a clean countertop with soft shadows and a subtle glow, lifestyle hero shot, photorealistic.' },
-      { tag: 'ENVIRONMENT' as const, label: 'Shelf lineup', refs: 'both' as const, from: '#fb923c', to: '#7c2d12', prompt: '@PRODUCT sitting at the front of a lived-in bathroom shelf among everyday bottles, morning light through frosted glass, shot from just above shelf height.' },
+      { tag: 'DIALOGUE' as const, label: 'Direct CTA', refs: 'both' as const, from: '#fb7185', to: '#9f1239', prompt: '@INFLUENCER holds @PRODUCT up beside her face, grinning at the camera as she delivers the call to action, warm natural light, UGC selfie.', motion: 'She gives the bottle a small shake beside her jaw and the grin lands on the last word.' },
+      { tag: 'PRODUCT' as const, label: 'Hero shot', refs: 'product' as const, from: '#f59e0b', to: '#c2410c', prompt: '@PRODUCT standing centered on a clean countertop with soft shadows and a subtle glow, lifestyle hero shot, photorealistic.', motion: 'The light creeps across the label and the shadow shortens under the bottle, everything else holding still.' },
+      { tag: 'ENVIRONMENT' as const, label: 'Shelf lineup', refs: 'both' as const, from: '#fb923c', to: '#7c2d12', prompt: '@PRODUCT sitting at the front of a lived-in bathroom shelf among everyday bottles, morning light through frosted glass, shot from just above shelf height.', motion: 'A hand comes into frame, nudges the bottle a half-turn until its label squares up to the lens, and withdraws.' },
     ],
   },
 ]
@@ -968,7 +968,7 @@ export async function seedMockData(): Promise<void> {
       const variations: Array<Record<string, unknown>> = []
       for (let vi = 0; vi < sc.variations.length; vi++) {
         const v = sc.variations[vi]
-        variations.push({ id: `demo-broll-s${sceneNumber}-v${vi}`, tag: v.tag, label: v.label, refs: v.refs, prompt: v.prompt })
+        variations.push({ id: `demo-broll-s${sceneNumber}-v${vi}`, tag: v.tag, label: v.label, refs: v.refs, prompt: v.prompt, motionPrompt: v.motion })
         const img = await makeImageAsset({ w: 768, h: 1365, from: v.from, to: v.to, label: `Scene ${sceneNumber}`, sub: v.label })
         // The first variation of the first two scenes is animated as well, so
         // the grid shows video covers and "Download clips" has something to zip.
@@ -1012,6 +1012,7 @@ export async function seedMockData(): Promise<void> {
           editablePrompt: v.prompt,
           promptHistory: [v.prompt],
           promptHistoryIndex: 0,
+          animateMotion: v.motion,
           images: [{ imageUrl: img, prompt: v.prompt, modelId: 'nano-banana-2', createdAt: ago(brollTick++) }],
           currentImageIndex: 0,
           videos,

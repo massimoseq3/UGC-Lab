@@ -60,6 +60,10 @@ export function createDefaultCardState(variation: PromptVariation, scriptLine?: 
     editablePrompt: initialPrompt,
     promptHistory: [initialPrompt],
     promptHistoryIndex: 0,
+    // What the still DOES, written by the storyboard alongside it. Empty on a
+    // variation that carries none (a legacy session, an import, a hand-added
+    // option) — the Animate tab falls back to the still prompt there.
+    animateMotion: variation.motionPrompt ?? '',
     images: [],
     currentImageIndex: 0,
     videos: [],
@@ -168,6 +172,10 @@ export function backfillCardState(card: Partial<CardState> & Record<string, unkn
     editablePrompt,
     promptHistory,
     promptHistoryIndex,
+    // Cards persisted before the storyboard wrote a motion have none, and there
+    // is nothing to derive one from — the animate path reads the still prompt
+    // when this is empty, which is what those sessions have always fired.
+    animateMotion: (card.animateMotion as string) ?? '',
     images: ((card.images as CardState['images']) ?? []).map((img) => ({
       ...img,
       // Legacy images persisted before iteration 3 didn't carry createdAt.

@@ -206,6 +206,10 @@ export default function CardDetailModal(props: CardDetailModalProps) {
     : undefined
   const effectiveAnimateFrame = animateFrameRef ?? selectedImageRef ?? latestImageRef
   const animateFrameUrl = useAssetUrl(effectiveAnimateFrame)
+  // Mirrors VariationCard's own resolution — the motion, or the shot prompt when
+  // this card carries none. Only used to gate the button, so it can't offer an
+  // Animate that would fire an empty prompt.
+  const animatePrompt = cardState.animateMotion.trim() || cardState.editablePrompt
   const [draft, setDraft] = useState(cardState.editablePrompt)
   // Local draft for the shared voice profile (DIALOGUE cards) — committed to the
   // shared value on blur so keystrokes don't churn the whole result.
@@ -668,6 +672,33 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                   </SectionCard>
                 )}
 
+                {/* Motion — the Animate tab's own prompt, and the only thing
+                    that clip is fired with. It is deliberately NOT the still
+                    prompt above: the clip opens on the still, so a paragraph
+                    re-describing that same picture reads as "draw this" rather
+                    than "play this out", and the character barely moves. Seeded
+                    by the storyboard alongside the shot; edit freely. Same shape
+                    as Continuous' frame modal, which has always worked this way. */}
+                {tab === 'animate' ? (
+                  <div className="flex grow flex-col gap-1.5">
+                    {/* Neutral when empty, never red: Animate is gated on the
+                        still and the model's capability, and an empty motion
+                        still fires — it falls back to the shot prompt, silently
+                        (Massimo's call: the note that said so was a line of
+                        explanation under a box that needs none). */}
+                    <SectionLabel label="Motion" filled={cardState.animateMotion.trim().length > 0} />
+                    <div className="relative flex grow flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
+                      <textarea
+                        value={cardState.animateMotion}
+                        onChange={(e) => onUpdateState({ animateMotion: e.target.value })}
+                        rows={5}
+                        placeholder="How this still moves — the action finishing. One or two sentences."
+                        className="relative min-h-[140px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                <>
                 {/* Prompt — grows to absorb leftover height. Textarea + footer
                     toolbar (Enhance / Regenerate / Undo / Redo + Expand) inside
                     one rounded box, matching the Playground prompt field. */}
@@ -708,6 +739,8 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                     </div>
                   )}
                 </div>
+                </>
+                )}
 
                 {/* Voice profile — one shared voice for every dialogue clip so
                     the character sounds the same across scenes. Sits below the
@@ -721,6 +754,17 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                   <SectionCard
                     icon={Volume2}
                     title="Voice"
+                    // Nothing is gated on this: a talking clip renders without a
+                    // profile, the model just picks its own voice and the ad
+                    // ends up sounding like a different person every scene. The
+                    // card sat in a column of things that DO gate the run, which
+                    // read as another box to fill in before generating. Same
+                    // pill the input panel puts on Additional Instructions.
+                    left={(
+                      <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
+                        optional
+                      </span>
+                    )}
                     right={(
                       <span className="rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500">
                         every clip
@@ -985,7 +1029,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
               ) : (
                 <button
                   onClick={() => { for (let i = 0; i < takeCount; i++) handleAnimate(effectiveAnimateFrame, videoModelId) }}
-                  disabled={!cardState.editablePrompt.trim() || !effectiveAnimateFrame}
+                  disabled={!animatePrompt.trim() || !effectiveAnimateFrame}
                   title={!effectiveAnimateFrame ? 'Generate an image first, then animate it' : undefined}
                   className="flex w-full items-center justify-center gap-2.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >

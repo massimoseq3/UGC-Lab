@@ -13,6 +13,7 @@ import { ANIMATE_MESSAGES } from '../../../components/generatingMessages'
 import type { PromptVariation, CardState, GeneratedImage, ReferenceImage, BatchVideoSettings } from '../types'
 import type { VideoHistoryItem, Product, Model, BRoll } from '../../../stores/types'
 import { enhanceVariationPrompt, generateNewVariation, startImageTask, finishImageTask, buildDialogueChainPreamble, resolveImageModelId } from '../services/generateBroll'
+import { withLockedCamera } from '../services/realism'
 import { attachProductAngles, productRefsForSelection } from '../services/productAngles'
 import { applyStyleToPrompt } from '../services/generateContinuous'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
@@ -312,7 +313,15 @@ export default function VariationCard(props: VariationCardProps) {
         modelContext,
       )
       pushPromptHistory(fresh.prompt)
-      onUpdateState({ isPromptWorking: false, promptError: null })
+      // A regenerate is a different shot, so the motion written for the old one
+      // no longer describes anything on screen. Only overwritten when the model
+      // actually returned one — a response that skipped the field leaves the
+      // card's existing motion rather than blanking it.
+      onUpdateState({
+        isPromptWorking: false,
+        promptError: null,
+        ...(fresh.motionPrompt ? { animateMotion: fresh.motionPrompt } : {}),
+      })
     } catch (err) {
       const msg = humanizeError(err, 'Regenerate failed.')
       onUpdateState({ isPromptWorking: false, promptError: msg })
@@ -520,6 +529,16 @@ export default function VariationCard(props: VariationCardProps) {
     // absent `durationSeconds` is the dialog's Auto length: each card keeps its
     // own per-line estimate.
     batchSettings?: { resolution: string; durationSeconds?: number },
+    // Set only when this run is ANIMATING a still, and it carries the card's
+    // MOTION — one or two sentences of movement. The clip opens ON that still,
+    // so handing a video model the still's own paragraph again reads as "draw
+    // this picture" rather than "play this out", which is why those clips came
+    // back barely moving. The from-scratch paths (text- and reference-to-video)
+    // leave it undefined: they have no frame, so they need the picture
+    // described and the still prompt is the right thing to send. Its presence
+    // is also what arms the locked-camera clause below, for the same reason —
+    // there is only a frame to hold still when there is a start frame.
+    motionPrompt?: string,
   ) => {
     if (!videoModelId) {
       useAppStore.getState().addToast('No video model configured.', 'error')
@@ -581,7 +600,8 @@ export default function VariationCard(props: VariationCardProps) {
     }
 
     const inFlightId = crypto.randomUUID()
-    const promptText = cardState.editablePrompt
+    const isAnimating = motionPrompt !== undefined
+    const promptText = motionPrompt ?? cardState.editablePrompt
     const videoAspectRatio = cardState.cardVideoAspectRatio
     // A talking card's clip has to hold its spoken line: unless the run pins one
     // length for everything, the length is derived per card (the line's own
@@ -625,9 +645,13 @@ export default function VariationCard(props: VariationCardProps) {
       // A DIALOGUE card gets the shared voice profile appended at fire time so
       // every talking clip is read by the same voice. Like the STYLE block, it
       // rides outside the persisted prompt (promptText stays clean).
-      const finalPrompt = variation.tag === 'DIALOGUE' && voiceProfile?.trim()
+      const withVoice = variation.tag === 'DIALOGUE' && voiceProfile?.trim()
         ? `${styledPrompt}\n\n=== VOICE PROFILE (same voice in every dialogue clip) ===\n${voiceProfile.trim()}`
         : styledPrompt
+      // Animating a still holds the frame it opens on — appended here rather
+      // than written into the motion, so the box stays about what MOVES and the
+      // persisted prompt (promptText) stays clean. See realism.ts.
+      const finalPrompt = isAnimating ? withLockedCamera(withVoice) : withVoice
       const { taskId, videoEndpoint } = await startVideoTask({
         prompt: finalPrompt,
         mode: effectiveMode,
@@ -724,6 +748,14 @@ export default function VariationCard(props: VariationCardProps) {
     }
   }
 
+  // What every Animate fires: the card's MOTION prompt, falling back to the
+  // still prompt when it has none. A card only has none when the storyboard that
+  // wrote it predates the field (a session from before this shipped, or an
+  // import written against the old envelope) — and firing nothing there would
+  // take Animate away from those sessions entirely, where the old behaviour at
+  // least produced a clip.
+  const animatePrompt = cardState.animateMotion.trim() || cardState.editablePrompt
+
   // Animate a still into a video (image-to-video) from inside the modal's
   // Animate tab. The start frame is one of this card's generated images,
   // converted to a data URI the model can seed from.
@@ -746,9 +778,9 @@ export default function VariationCard(props: VariationCardProps) {
     // reference-to-video model. Either way the chosen still drives the clip.
     const modes = (videoModelId ? getModel(videoModelId)?.modes : undefined) ?? []
     if (modes.includes('image-to-video')) {
-      await runVideoTask('image-to-video', dataUri, undefined, videoModelId, startFrameRef, batchSettings)
+      await runVideoTask('image-to-video', dataUri, undefined, videoModelId, startFrameRef, batchSettings, animatePrompt)
     } else if (modes.includes('reference-to-video')) {
-      await runVideoTask('reference-to-video', undefined, [dataUri], videoModelId, startFrameRef, batchSettings)
+      await runVideoTask('reference-to-video', undefined, [dataUri], videoModelId, startFrameRef, batchSettings, animatePrompt)
     } else {
       useAppStore.getState().addToast("This model can't animate a still — pick one that takes a start frame or reference images.", 'error')
     }
@@ -784,12 +816,14 @@ export default function VariationCard(props: VariationCardProps) {
     const tok = generateVideoToken ?? 0
     if (tok === lastVideoTokenRef.current) return
     lastVideoTokenRef.current = tok
-    if (!cardState.editablePrompt.trim()) return
+    // A card with a still animates and a card without renders from its prompt,
+    // so the gate is whichever of the two this card is about to send.
+    const startFrame = coverKind === 'image' ? coverImage?.imageUrl : undefined
+    if (!(startFrame ? animatePrompt : cardState.editablePrompt).trim()) return
     const batchSettings = batchVideoOverride
       ? { resolution: batchVideoOverride.resolution, durationSeconds: batchVideoOverride.durationSeconds }
       : undefined
     const modelId = batchVideoOverride?.modelId
-    const startFrame = coverKind === 'image' ? coverImage?.imageUrl : undefined
     if (startFrame) void handleAnimate(startFrame, modelId, batchSettings)
     else void handleGenerateVideo(modelId, batchSettings)
     // Intentionally only react to the token; everything else is read fresh from
