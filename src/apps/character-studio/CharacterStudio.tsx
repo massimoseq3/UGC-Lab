@@ -303,12 +303,16 @@ export default function CharacterStudio() {
     const snapshotAspect = sheetMode ? sheetAspect : (profile.aspectRatio || '9:16')
     const count = clampBatchCount(batchCount)
 
-    // Follow the run to the view that can actually show it: a batch is a set to
-    // compare, which is the grid; one character is the single stage. Already ON
-    // the single stage, we stay — it lays a batch out as one composition, and
-    // being thrown into the grid from the view you deliberately chose (it's the
-    // one members record on) would undo that choice on every press.
-    if (viewMode !== 'single') setViewMode(count > 1 ? 'grid' : 'single')
+    // Follow the run to the view that can actually show it — but only ever
+    // TOWARDS the grid. A batch is a set to compare, so firing one from the
+    // list goes there; everything else stays where the member already was.
+    // Generate used to pull a run of ONE onto the single stage, which made
+    // Single the view members actually sat in whatever the toggle defaulted
+    // to (Massimo's call, August 2026: the grid is the view). Already ON the
+    // single stage we still stay — it lays a batch out as one composition, and
+    // it's the view members record on, so being thrown out of a view you
+    // deliberately chose would undo that choice on every press.
+    if (viewMode !== 'single' && count > 1) setViewMode('grid')
 
     // A run of one carries no stamp, so nothing downstream has to special-case
     // "batch of 1" — an unstamped gen is its own group by construction.
