@@ -993,17 +993,21 @@ export default function ContinuousView({
           showHelper={false}
         />
         <div className="flex-1 overflow-y-auto">
-          <div className="mb-6 flex items-center gap-4">
-            <div className="skeleton h-14 w-14 rounded-2xl" />
-            <div className="flex flex-col gap-2">
-              <div className="skeleton h-4 w-40" />
-              <div className="skeleton h-3 w-56" />
+          {/* One breathe for the whole block — see `.skeleton-group` in
+              index.css. The bar above already says the work is running. */}
+          <div className="skeleton-group">
+            <div className="mb-6 flex items-center gap-4">
+              <div className="skeleton h-14 w-14 rounded-2xl" />
+              <div className="flex flex-col gap-2">
+                <div className="skeleton h-4 w-40" />
+                <div className="skeleton h-3 w-56" />
+              </div>
             </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="skeleton skeleton-card aspect-[9/16]" />
-            ))}
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="skeleton skeleton-card aspect-[9/16]" />
+              ))}
+            </div>
           </div>
         </div>
       </div>

@@ -1503,13 +1503,17 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
           {/* Accent glow while the words are being written — the same "this is
               alive" cue the media apps get on a generating frame. */}
           <div className="flex flex-1 min-h-0 flex-col gap-3 rounded-3xl border border-scripts-500/20 bg-surface-1 p-5 shadow-[0_0_90px_-24px_var(--color-scripts-500)]">
-            <div className="skeleton h-4 w-full" />
-            <div className="skeleton h-4 w-[90%]" />
-            <div className="skeleton h-4 w-[95%]" />
-            <div className="skeleton h-4 w-[70%]" />
-            <div className="mt-2 skeleton h-4 w-full" />
-            <div className="skeleton h-4 w-[85%]" />
-            <div className="skeleton h-4 w-[92%]" />
+            {/* One breathe for the block — see `.skeleton-group` in index.css.
+                The wrapper is what animates, not each line. */}
+            <div className="skeleton-group flex flex-col gap-3">
+              <div className="skeleton h-4 w-full" />
+              <div className="skeleton h-4 w-[90%]" />
+              <div className="skeleton h-4 w-[95%]" />
+              <div className="skeleton h-4 w-[70%]" />
+              <div className="mt-2 skeleton h-4 w-full" />
+              <div className="skeleton h-4 w-[85%]" />
+              <div className="skeleton h-4 w-[92%]" />
+            </div>
           </div>
         </div>
       </GridCanvas>

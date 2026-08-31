@@ -726,7 +726,11 @@ export default function ScenesView({
           showHelper={false}
         />
         <div className="flex-1 overflow-y-auto">
-          <div className="flex flex-col gap-8">
+          {/* One breathe for the whole block — see `.skeleton-group` in
+              index.css. Eighteen individually-shimmering skeletons is eighteen
+              composited layers inside rounded clips; the bar above already says
+              the work is running. */}
+          <div className="skeleton-group flex flex-col gap-8">
             {[1, 2, 3].map((i) => (
               <SkeletonScene key={i} />
             ))}
