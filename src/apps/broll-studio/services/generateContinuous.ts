@@ -327,10 +327,12 @@ Each narration line will be HEARD over the footage. The frames must SHOW what th
 
 - If the line contains a metaphor, comparison, or vivid image, MAKE IT LITERAL — even when it's absurd. The absurdity is what stops the scroll. "Your brain runs a cleanup cycle at night" → a glowing factory inside the skull, tiny drones sweeping the walkways. "My skin felt like sandpaper" → fingertips dragging across a real sheet of sandpaper.
 - If the line describes an act, show the act actually happening — mid-motion, hands busy, real.
-- If the line makes a claim, show the evidence.
+- If the line makes a claim, show the evidence — and the evidence is the outcome turning up in a life, never the spec that causes it: the bottle scraped empty after a month, not the ingredient list on its back.
 - If the line is emotional, show the emotion landing inside a real moment — never a face in a void.
 
 When the script points at the product itself, the product IS the visual. When the script attacks the category, the generic stand-in is the visual — never the product. A viewer watching with the sound off should be able to guess the narration.
+
+A BENEFIT IS A PICTURE, A SPEC IS NOT. When a line makes a promise, show the promise KEPT inside a life — the gym bag already by the door at six in the morning, the jeans that button — never the object that produces it turned round to its ingredient list. And when the product IS the visual, it is the product being USED or the result it left behind, never presented to camera and never its packaging read like a spec sheet. The specs in the product context exist to tell you which outcome is worth showing: never draw one, as a badge, a panel, a printed claim, or numbers anywhere in frame.
 
 # THE ONE RULE — AN ACTION THAT SHOWS THE LINE, CAUGHT AT ITS FIRST INSTANT
 

@@ -7,7 +7,7 @@ import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
 import type { AdBlueprintPayload, Product, Model, Script, BRoll, BrollHistoryItem } from '../../stores/types'
 import { isLineMode, sanitizeBrollMode, type BrollResult, type PromptVariation, type ReferenceImage, type VariationTag, type VariationRefs, type CardState, type BrollMode, type BrollDelivery, type ContinuousResult, type ContinuousConcept, type ContinuousSelection, type ContinuousFrameCardState, type ContinuousClipCardState } from './types'
-import { productPhotosOf } from './services/productAngles'
+import { productPhotosOf, buildProductContext } from './services/productAngles'
 import { buildDemoContinuousResult, analyzeStyleReferences, getContinuousStyle, styleBriefFor, styleUsesRealism, CONTINUOUS_DEFAULT_MODEL_ID } from './services/generateContinuous'
 import {
   startStoryboard,
@@ -707,9 +707,9 @@ export default function BrollStudio() {
   const handleOpenProductPicker = useCallback(() => setPickerMode('products'), [])
 
   // Build context strings and reference images from selected bank items
-  const productContext = selectedProduct
-    ? `Product: ${selectedProduct.productName}. ${selectedProduct.productDescription}. USPs: ${selectedProduct.usps}. Benefits: ${selectedProduct.benefits}.${selectedProduct.keySpecs ? ` Key specs: ${selectedProduct.keySpecs}.` : ''}`
-    : ''
+  // Labelled per field rather than one flat sentence, because every consumer of
+  // this string turns it into a PICTURE — see buildProductContext.
+  const productContext = buildProductContext(selectedProduct)
   const modelContext = selectedModel
     ? `Model/Character: ${selectedModel.name}.${selectedModel.notes ? ` ${selectedModel.notes}.` : ''}${selectedModel.jsonProfile ? ` Profile: ${JSON.stringify(selectedModel.jsonProfile)}` : ''}`
     : ''

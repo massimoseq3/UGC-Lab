@@ -10,6 +10,49 @@ import type { Product } from '../../../stores/types'
 export const PRODUCT_ANGLE_LABEL = 'product-angle'
 
 /**
+ * The product half of every storyboard and per-card prompt — Line-by-Line,
+ * Continuous, each keyframe brief, and the two per-variation rewrites all paste
+ * this one string, so its labels are the single lever on how the product's
+ * material is read.
+ *
+ * THE LABELS ARE THE LOAD-BEARING PART (August 2026). This was one flat
+ * sentence — `USPs: … Benefits: … Key specs: …` — pasted into Line-by-Line's
+ * user prompt with no framing at all, and that is the same bug Scripts had in
+ * its own product block: unlabelled product material carries no job, and the
+ * spec list is the most concrete thing in the prompt. But the failure it
+ * produces here is a VISUAL one, because this app never writes the copy — the
+ * script arrives already written and every <LINE> is copied verbatim. Hand a
+ * model a spec and ask it for a picture and it draws the spec: the claim
+ * printed on the wrapper, the nutrition panel held to the lens, the number
+ * across the frame. So each field now says what it is FOR in a pipeline whose
+ * output is a shot, and the attached PHOTO — never this text — is what a
+ * prompt describes the product from (see rule 8's "the product reference image
+ * is the source of truth").
+ *
+ * Empty bank fields are dropped rather than rendered as a labelled blank. Only
+ * keySpecs was ever guarded, so a product saved without USPs shipped the model
+ * a literal `USPs: .`
+ */
+export function buildProductContext(product: Product | null | undefined): string {
+  if (!product) return ''
+  const head = [product.productName, product.productDescription].map((v) => v?.trim()).filter(Boolean).join('. ')
+  const lines: string[] = [
+    'THE PRODUCT THIS AD IS FOR — material for deciding WHICH picture each line gets, never words to put inside one. The attached photo is what describes the product; nothing below is.',
+  ]
+  if (head) lines.push(`- Product: ${head}`)
+  if (product.benefits?.trim()) {
+    lines.push(`- Benefits (what the viewer GETS — the outcome, which is the one thing here a shot can show happening in a real life): ${product.benefits.trim()}`)
+  }
+  if (product.usps?.trim()) {
+    lines.push(`- USPs (what makes it different — a shot shows the DIFFERENCE it makes to someone, never the feature that causes it): ${product.usps.trim()}`)
+  }
+  if (product.keySpecs?.trim()) {
+    lines.push(`- Key facts & specs (background, and the weakest material here: a spec is a fact about the object, and a picture of a fact is a label. Use one only to work out which outcome is worth showing — never draw it, as a badge, a panel, a printed claim, or numbers anywhere in frame): ${product.keySpecs.trim()}`)
+  }
+  return lines.length > 1 ? lines.join('\n') : ''
+}
+
+/**
  * Every photo the bank holds for a product, hero first: [productImage, …extraImages].
  * This ordering IS the numbering the storyboard LLM sees and the <PHOTOS> field
  * refers to, so it must stay stable — photo 1 is always the hero packshot.

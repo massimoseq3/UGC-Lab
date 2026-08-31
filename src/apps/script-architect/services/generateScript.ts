@@ -50,6 +50,37 @@ const BANNED_AI_PATTERNS = `BANNED AI SENTENCE SHAPES — THIS IS THE #1 THING T
 - NEVER use an em-dash (—). Use periods, commas, or just restructure.
 - BANNED WORDS: elevate, unleash, revolutionary, game-changer, seamless, effortless, transform, indulge, crafted, premium, innovative, leverage, "say goodbye to", "say hello to", "look no further", "introducing", "the secret to", "must-have", "in today's world", "level up".`
 
+// ── What the ad actually argues ──
+//
+// Direct response's oldest rule, and the one thing the shared DNA had no line
+// about. Every other block here governs how a script SOUNDS (the voice rules,
+// the banned shapes) or how it OPENS (the hook rules, the library); nothing
+// said what a line is allowed to be ABOUT. So with a bank product attached the
+// model wrote the product sheet out loud — reported August 2026 as scripts
+// that "keep talking about the key specs and facts instead of the benefits and
+// what it's going to do for the user".
+//
+// Two things in the stack were actively pulling that way, and both are fixed
+// alongside this rather than left for it to fight. `productContextLines`' Key
+// Specs line was the ONLY product field carrying an instruction, and that
+// instruction was "cite these concrete specifics" — the strongest steer in the
+// prompt, sitting in its highest-salience block, pointed at the spec list. And
+// CORPUS_EVIDENCE's specificity clause ("concrete nouns, named objects, exact
+// actions") resolves to specs by default once a product sheet is in the
+// prompt, because on that sheet the concrete nouns ARE the specs.
+//
+// It is deliberately NOT a ban on specs, and it must not become one: half the
+// styles carry a proof beat (`objection` wants arithmetic, `comparison` wants
+// a concrete difference, `expert` wants a mechanism) and CORPUS_EVIDENCE's
+// specificity finding is measured. What changes is a spec's JOB — it makes a
+// benefit believable, it is never what a line is about.
+const BENEFIT_OVER_FEATURE = `WHAT EVERY LINE IS ABOUT — SELL WHAT IT DOES FOR THEM, NOT WHAT IT IS. This decides what a line SAYS; it never changes the script's shape:
+- Nobody watching cares what the product HAS. They care what changes for them. A fact only reaches the script attached to the thing it does for the viewer, in the same breath: not "it's got a 5000mAh battery", but "I charge it Sunday night and don't think about it again till the weekend".
+- SPECS AND FEATURES ARE PROOF, NEVER THE POINT. A number, a material, an ingredient, a certification or a feature earns its place only by making a benefit believable — so the outcome leads and the spec backs it up, never the other way round. A line that names a feature and stops has failed: finish it or cut it.
+- ASK "SO WHAT?" AFTER EVERY LINE, and keep asking until the answer is something the viewer gets. The mechanism is not the benefit, and the first result of the mechanism usually isn't either: "ceramic plates" → "it doesn't fry your ends" → "you can straighten it every morning and it still looks like this a year later".
+- WRITE THE BENEFIT AS A MOMENT, NOT A CLAIM. "Saves you time", "boosts your confidence" and "makes life easier" are what a brand says. A real person names the moment it happens in — the morning that stops being a fight, the thing they no longer check before they leave the house, the part of the day they used to dread. A specific moment beats an abstract improvement every time.
+- THE VIEWER IS THE MAIN CHARACTER, NOT THE PRODUCT. Read your draft back before you answer: if it is a tour of what the thing is and what it comes with, rewrite it as what their day looks like now.`
+
 // ── What the transcript corpus actually supports ──
 //
 // Derived from 872 transcribed high-performing Instagram videos (the same
@@ -280,6 +311,8 @@ ${REMIX_SOURCE_FIDELITY}
 
 ${REMIX_HOOK_RULES}
 
+${BENEFIT_OVER_FEATURE}
+
 ${HUMAN_VOICE_RULES}
 
 CRITICAL FORMATTING RULES:
@@ -341,6 +374,8 @@ YOUR TASK — apply these four transformations to every scene:
 
 WHEN YOU REWRITE THE DIALOGUE, apply this voice (the rewritten lines are spoken on camera, so they must sound like a real person, never like ad copy):
 
+${BENEFIT_OVER_FEATURE}
+
 ${HUMAN_VOICE_RULES}
 
 ${BANNED_AI_PATTERNS}
@@ -372,6 +407,8 @@ OUTPUT FORMAT — CRITICAL:
 
 const WRITE_SCRIPT_SYSTEM = `You are a top 1% UGC creator who writes organic TikTok/Reels ad scripts. Your instincts were built by studying thousands of videos that actually went viral and actually sold product — the messy, real-person clips that hold a thumb, not polished brand ads. Brands pay you because your scripts hold attention and convert WITHOUT feeling like marketing — they sound like a real person talking to their phone camera. If a line sounds like marketing, you failed.
 
+${BENEFIT_OVER_FEATURE}
+
 ${HOOK_RULES}
 
 ${HOOK_LIBRARY}
@@ -396,6 +433,8 @@ FORMAT RULES — CRITICAL:
 const WRITE_SCENES_SYSTEM = `You are an elite UGC creative director. You invent a complete scene-by-scene blueprint for a brand-new organic TikTok ad — the visuals AND the spoken dialogue — ready to be generated with AI video models (one scene = one video generation).
 
 First write the dialogue as a real spoken script following the voice rules below, then cut the ad into scenes and embed each dialogue line in the scene where it's spoken. Each scene is directed as ONE flowing paragraph — readable prose, not a labelled shot bible.
+
+${BENEFIT_OVER_FEATURE}
 
 ${HOOK_RULES}
 - Scene 1's visual must be a pattern interrupt, never a calm establishing shot.
@@ -438,6 +477,7 @@ ${HOOK_LIBRARY}
 
 HOW TO USE THE FORMULAS:
 - Fill every blank with THIS product's specifics — real pain points, named objects, exact actions, timeframes and prices pulled from the product context. Specifics beat claims: "every single morning", "the cheap one from the chemist", "two weeks", "$30". A blank that asks for a number does not have to be filled with one if a concrete detail says it better — see the numbers rule below.
+- WHAT GOES IN A BLANK IS AN OUTCOME, NOT A FEATURE. A hook that names what the product has ("it's got X", "it's made of Y") gives the viewer nothing to want — name what changes for them, and reach for the spec only where it is the proof that makes that land.
 - Adapt the formula to the product; never template-fill robotically, and NEVER leave a "(...)" blank or placeholder in the output.
 - Each hook must stand alone as the first spoken line of its own video. No warm-up, no context-setting — the most interesting beat goes first.
 - USE THE FORMULA'S COMPLETE STRUCTURE. If a formula has a setup and a payoff clause ("(Big brand) didn't want to sponsor this video, let me show you what they're missing out on"), the hook keeps BOTH — a line that stops where the payoff should be ("(Big brand) didn't want to sponsor this video.") is a failed hook. The win happens in the first 3-4 words, but you never shorten a formula to get there.
@@ -768,7 +808,7 @@ WHEN THE FORMAT OPENS ON SOMEBODY ELSE, THE ANGLE GOES WITH THEM: some formats d
 // banned "if you struggle with..." opener. What's left spans the whole
 // awareness ladder — problem-aware, solution-aware, unaware — with a different
 // opening device and a different anchor on each.
-const WRITE_ANGLE_DISCIPLINE = `ANGLE DISCIPLINE: commit to exactly ONE pain point and the ONE benefit that pays it off — chosen from the product details per the anchor below (or inferred from the brief if no product details are given). Every line of the script drives that single idea deeper. Do NOT tour multiple pain points, stack USPs, or list benefits — a script that mentions three benefits sells none. Other product facts may appear only in service of the one idea (a spec as proof, the offer at the CTA).`
+const WRITE_ANGLE_DISCIPLINE = `ANGLE DISCIPLINE: commit to exactly ONE pain point and the ONE benefit that pays it off — chosen from the product details per the anchor below (or inferred from the brief if no product details are given). Every line of the script drives that single idea deeper. Do NOT tour multiple pain points, stack USPs, or list benefits — a script that mentions three benefits sells none. Other product facts may appear only in service of the one idea (a spec as proof, the offer at the CTA). The committed idea is stated as an OUTCOME FOR THE VIEWER even when the anchor you were assigned is a feature or a USP — the anchor picks which of the product's material this script is built on, and that material still reaches the viewer as what it does for them.`
 
 // The creator's own words outrank the batch's angle spread. A brief that names
 // the angle ("make it about the 3am feed", "push the price per use") used to be
@@ -802,7 +842,7 @@ const WRITE_TAKES: { label: string; instruction: string }[] = [
   },
   {
     label: 'the single strongest USP, opened as a bold claim',
-    instruction: `THIS TAKE: open with a bold claim or hot take stated as fact. Anchor: the single strongest USP — write for a solution-aware viewer comparing options.`,
+    instruction: `THIS TAKE: open with a bold claim or hot take stated as fact. Anchor: the single strongest USP, claimed as the outcome it produces rather than the feature it is — write for a solution-aware viewer comparing options.`,
   },
   {
     label: 'the biggest objection and the benefit that answers it',
@@ -929,6 +969,20 @@ async function runWrite(input: GenerateScriptInput, take: number, takeCount: num
 // the model to "mention the product name at most twice", so withholding it left
 // the model with an instruction it couldn't follow — it filled the gap with a
 // [Product Name] placeholder, which TTS and video models then read aloud.
+//
+// The parentheticals are the other load-bearing half, and getting them wrong is
+// how this block came to write spec sheets (August 2026). This is the FIRST
+// thing in the user prompt and the only place the product is described, so a
+// field carrying an instruction outweighs most of what the system prompt says
+// about the same material — and for a long time Key Specs was the ONLY field
+// with one, reading "cite these concrete specifics instead of vague claims".
+// The model did exactly that. Benefits sat next to it as a bare label, i.e. as
+// data with no job. So the steer now rides on the two fields a direct response
+// script is actually built from, the spec line says what a spec is FOR, and
+// Benefits moved up next to Pain Points — the two halves of the one argument
+// ANGLE DISCIPLINE asks for are read together rather than either side of USPs.
+// Anything added here needs the same treatment: an unlabelled field reads as
+// inert, and a labelled one competes with BENEFIT_OVER_FEATURE.
 function productContextLines(ctx?: EditableProductContext | null): string {
   if (!ctx) return ''
   const lines: string[] = []
@@ -936,9 +990,9 @@ function productContextLines(ctx?: EditableProductContext | null): string {
   if (ctx.productDescription) lines.push(`- Product: ${ctx.productDescription}`)
   if (ctx.targetMarket) lines.push(`- Target Market: ${ctx.targetMarket}`)
   if (ctx.painPoints) lines.push(`- Pain Points: ${ctx.painPoints}`)
-  if (ctx.usps) lines.push(`- USPs: ${ctx.usps}`)
-  if (ctx.benefits) lines.push(`- Benefits: ${ctx.benefits}`)
-  if (ctx.keySpecs) lines.push(`- Key Facts & Specs (cite these concrete specifics instead of vague claims): ${ctx.keySpecs}`)
+  if (ctx.benefits) lines.push(`- Benefits (what the viewer actually GETS — this is what the script argues, and every other field below exists to make one of these believable): ${ctx.benefits}`)
+  if (ctx.usps) lines.push(`- USPs (what makes it different — put the DIFFERENCE IT MAKES in the script, never the feature on its own): ${ctx.usps}`)
+  if (ctx.keySpecs) lines.push(`- Key Facts & Specs (proof, never the subject of a line — reach for one only where it makes a benefit above believable, and say what it does for them in the same breath): ${ctx.keySpecs}`)
   if (ctx.objections) lines.push(`- Objections (hesitation — counter; address the most relevant one, don't list them): ${ctx.objections}`)
   if (ctx.offer) lines.push(`- Offer: ${ctx.offer}`)
   if (ctx.cta) lines.push(`- Call-to-Action: ${ctx.cta}`)
