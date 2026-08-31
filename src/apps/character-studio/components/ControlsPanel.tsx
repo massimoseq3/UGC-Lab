@@ -434,24 +434,30 @@ export default function ControlsPanel({
 
         {/* Scoped preset pickers — same slide-over as the footer's full picker,
             but each merges only its tab's fields onto the current form. */}
-        <PresetPickerModal
-          open={physicalPresetOpen}
-          onClose={() => setPhysicalPresetOpen(false)}
-          onPick={(incoming) => applyScopedPreset(incoming, PHYSICAL_KEYS)}
-          title="Physical Presets"
-          subtitle="Fill only the physical fields"
-        />
-        <PresetPickerModal
-          open={scenePresetOpen}
-          onClose={() => setScenePresetOpen(false)}
-          onPick={(incoming) => applyScopedPreset(incoming, SCENE_KEYS)}
-          title="Scene & Pose Presets"
-          subtitle="Fill only the scene & pose fields"
-        />
+        {/* Every picker is mounted only while it's open — the grid, its page
+            count and the rail's highlight then belong to that opening, which
+            is the component's own contract (see its doc). */}
+        {physicalPresetOpen && (
+          <PresetPickerModal
+            open
+            onClose={() => setPhysicalPresetOpen(false)}
+            onPick={(incoming) => applyScopedPreset(incoming, PHYSICAL_KEYS)}
+            title="Physical Presets"
+            subtitle="Fill only the physical fields"
+          />
+        )}
+        {scenePresetOpen && (
+          <PresetPickerModal
+            open
+            onClose={() => setScenePresetOpen(false)}
+            onPick={(incoming) => applyScopedPreset(incoming, SCENE_KEYS)}
+            title="Scene & Pose Presets"
+            subtitle="Fill only the scene & pose fields"
+          />
+        )}
         {/* One picker for every section title, scoped to whichever heading was
-            clicked. It's mounted only while a group is picked, so the library
-            fetch and the grid belong to that opening rather than to eight
-            always-mounted copies. */}
+            clicked — eight always-mounted copies would each hold their own
+            grid. */}
         {groupPreset && (
           <PresetPickerModal
             open

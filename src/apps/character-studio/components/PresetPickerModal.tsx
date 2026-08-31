@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { ElementType } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Search, Sparkles, Star, UserRound, Images, Bookmark, Check } from 'lucide-react'
 import type { CharacterProfile } from '../types'
@@ -17,6 +18,7 @@ import SegmentedToggle from '../../../components/SegmentedToggle'
 import Spinner from '../../../components/Spinner'
 import DayPill from '../../../components/DayPill'
 import CountSlot from '../../../components/CountSlot'
+import { SectionLabel } from '../../../components/SectionCard'
 import {
   flattenJsonProfile,
   loadStarterPresets,
@@ -35,12 +37,18 @@ import {
 // instantly.
 const PAGE = 30
 
+// How close to the top of the scroll port a section's heading has to come
+// before the rail calls it the one you're in. Sections are a row of cards tall
+// at minimum, so a fixed band reads the same on every list — the Ad Analyzer's
+// own scroll-spy uses a proportion of its port for the same job.
+const SPY_OFFSET = 64
+
 /**
  * How far a section's top sits below the top of its scroll port, in px.
  *
- * `Infinity` when the section isn't rendered — a caller comparing against a
- * threshold then simply says "not there yet", which is the right answer both
- * for the highlight and for a jump that has just raised the page count.
+ * `Infinity` when the section isn't rendered — a jump that has just raised the
+ * page count then simply doesn't move, rather than scrolling somewhere it
+ * measured against nothing.
  */
 function sectionTopWithin(port: HTMLElement, section: HTMLElement | null): number {
   if (!section) return Infinity
@@ -68,6 +76,24 @@ interface Entry {
   search: string
   gender?: string
   setting?: string
+}
+
+/**
+ * The key of the section an entry belongs to.
+ *
+ * Your own characters are ONE section whatever their style — it's keyword-
+ * guessed off free text and plenty of rows have none, so grouping those would
+ * file the same face under a different heading each time it was extracted.
+ * Templates carry a curated style, so they get one section each.
+ */
+function sectionKey(e: Entry): string {
+  return e.source === 'bank' ? 'bank' : `style:${e.setting || 'Other'}`
+}
+
+// The section a style row points at. "All Styles" (an empty value) points at
+// the head of the list, which is where every style is still ahead of you.
+function styleSectionKey(style: string): string {
+  return style ? `style:${style}` : 'bank'
 }
 
 // The Bank's own character card at a smaller size: a 9:16 cover under a
@@ -170,6 +196,52 @@ function StarterSaveAction({ row, savedId }: { row: StarterRow; savedId?: string
 }
 
 /**
+ * One row of the left rail: a place in the grid, its size, and whether you're
+ * in it.
+ *
+ * The two blocks read as one control because every row does the same thing —
+ * what separates them is the heading above and the icon the library rows
+ * carry. The count rides in a `CountSlot` for the reason the old filter bar
+ * needed one: these tallies are live (search and gender move them), and a
+ * number that sized itself would shift the row's own label under the pointer.
+ */
+function RailRow({ label, count, active, icon: Icon, onClick }: {
+  label: string
+  count: number
+  active: boolean
+  icon?: ElementType
+  onClick: () => void
+}) {
+  // A section a search has emptied has nowhere to scroll to. It stays in the
+  // rail — a row that vanished at zero would move the rest under the pointer,
+  // and the count answers "why is there nothing there" outright — but it stops
+  // looking clickable, because it isn't.
+  const empty = count === 0
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={empty}
+      title={label}
+      aria-pressed={active}
+      className={`flex w-full items-center gap-2 rounded-full px-3 py-[7px] text-left text-[12.5px] transition-colors ${
+        active
+          ? 'bg-influencers-500/10 font-medium text-influencers-300 ring-1 ring-inset ring-influencers-500/15'
+          : empty
+            ? 'text-ink-700'
+            : 'text-ink-500 hover:bg-ink/5 hover:text-ink-300'
+      }`}
+    >
+      {Icon && <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />}
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      <span className={`shrink-0 text-[11px] ${active ? 'text-influencers-300/70' : 'text-ink-600'}`}>
+        <CountSlot value={count} />
+      </span>
+    </button>
+  )
+}
+
+/**
  * The centred preset browser — the starters shipped with the app and the
  * member's own saved characters in one scrolling grid.
  *
@@ -194,6 +266,15 @@ function StarterSaveAction({ row, savedId }: { row: StarterRow; savedId?: string
  * Callers decide what to do with that map: apply it wholesale
  * (LoadPresetDropdown) or merge only a subset of keys (the scoped Physical /
  * Scene & Pose preset buttons in ControlsPanel).
+ *
+ * **Mount it only while it's open.** Every caller does, and the browsing state
+ * — the page count and which section the rail is lit on — is per-opening
+ * because of that, with no effect resetting anything. Left mounted behind
+ * `open={false}` it keeps that state while its scroller does not (a new one
+ * starts at the top), so the rail lit the section you left off in while the
+ * grid showed the first, and the page count stayed wherever the last visit had
+ * raised it — the hitch `PAGE` exists to avoid. The starter library is cached
+ * in `presets/service.ts`, so reopening re-fetches nothing.
  */
 export default function PresetPickerModal({
   open,
@@ -219,12 +300,12 @@ export default function PresetPickerModal({
   const [reloadKey, setReloadKey] = useState(0)
 
   const [search, setSearch] = useState('')
-  // Which section the scroll is currently IN, for the toggle's highlight. It
-  // follows the scroller (see `handleScroll`); the toggle only ever moves it by
-  // moving the scroller, so the two can't disagree.
-  const [scrolledTo, setScrolledTo] = useState<Source>('bank')
+  // Which SECTION the scroll is currently in, by key ('bank' / 'style:Car').
+  // The rail reads where you are out of this — both blocks of it — and it
+  // follows the scroller (see `handleScroll`), never the other way round, so
+  // the rail and the grid can't disagree about what's on screen.
+  const [scrolledKey, setScrolledKey] = useState('bank')
   const [gender, setGender] = useState('')
-  const [setting, setSetting] = useState('')
   const [visible, setVisible] = useState(PAGE)
 
   // The library is fetched on first open, not on mount — nothing pays for
@@ -297,8 +378,7 @@ export default function PresetPickerModal({
   const passes = useMemo(() => ({
     q: (e: Entry) => !q || e.search.includes(q),
     gender: (e: Entry) => !gender || e.gender === gender,
-    setting: (e: Entry) => !setting || e.setting === setting,
-  }), [q, gender, setting])
+  }), [q, gender])
 
   // The style options, in the LIBRARY's own order — the order the source folder
   // numbers its shot categories in, which the build script bakes into the row
@@ -312,13 +392,17 @@ export default function PresetPickerModal({
   // call, August 2026): "Handheld Mic" and "Talking Head" are how a shot is
   // shot, not where it is, and the two the library really does name by place
   // (Kitchen, Car) are still styles of UGC ad.
+  // Templates only. A style is a place in the list now, and only the templates
+  // are filed into one — your own characters are a single section whatever
+  // their keyword-guessed style, so a style none of the templates use would be
+  // a row that scrolls nowhere.
   const styleOrder = useMemo(() => {
     const seen: string[] = []
-    for (const e of [...starterEntries, ...bankEntries]) {
+    for (const e of starterEntries) {
       if (e.setting && !seen.includes(e.setting)) seen.push(e.setting)
     }
     return seen
-  }, [starterEntries, bankEntries])
+  }, [starterEntries])
 
   // Bank rows first, then the templates in the library's own order — which the
   // build script already sorts by style, so each style's rows are contiguous
@@ -370,19 +454,26 @@ export default function PresetPickerModal({
       ]
     }
 
-    // The style MENU keeps the same two rules as the toggle: the library's own
-    // order, and every option always present (a count of 0 says why the grid
-    // would be empty). A menu sorted by count would reshuffle itself between
-    // two openings, which is the same disorientation on a slower fuse.
-    const styleRows = pool('setting')
+    // The styles keep the same two rules as the toggle: the library's own
+    // order, and every option always present. Sorting by count instead (the
+    // obvious thing) would reshuffle the whole list every time a search
+    // changed the tallies, so the row you were about to click moves out from
+    // under the pointer.
+    //
+    // Each count is the SIZE OF THE SECTION it scrolls to — the templates
+    // under that style, since your own characters are one section of their
+    // own — and "All Styles" carries the whole list, which is what the top of
+    // it holds. A style at 0 has no section this run and simply doesn't move
+    // the scroll; the count is what says so before you click it.
+    const styleRows = all.filter((e) => Object.values(passes).every((fn) => fn(e)))
     return {
       genders: segments('gender', ['Female', 'Male'], (e) => e.gender),
       styles: [
-        { value: '', label: 'All Styles' },
+        { value: '', label: 'All Styles', count: styleRows.length },
         ...styleOrder.map((k) => ({
           value: k,
           label: k,
-          count: styleRows.filter((e) => e.setting === k).length,
+          count: styleRows.filter((e) => e.source === 'starter' && e.setting === k).length,
         })),
       ],
     }
@@ -401,7 +492,7 @@ export default function PresetPickerModal({
   const sections = useMemo(() => {
     const out: Array<{ key: string; label: string; source: Source; entries: Entry[] }> = []
     for (const e of shown) {
-      const key = e.source === 'bank' ? 'bank' : `style:${e.setting || 'Other'}`
+      const key = sectionKey(e)
       const last = out[out.length - 1]
       if (last?.key === key) last.entries.push(e)
       else out.push({
@@ -414,32 +505,65 @@ export default function PresetPickerModal({
     return out
   }, [shown])
 
-  // Where the templates start, for the jump and the highlight below.
   const bankCount = useMemo(() => filtered.filter((e) => e.source === 'bank').length, [filtered])
-  const startersRef = useRef<HTMLDivElement>(null)
 
-  // A bank with nothing in it renders no section of its own, so the scroll can
-  // never be inside one and the highlight is DERIVED past the tracker rather
-  // than seeded by an effect — otherwise a new member opens on a grid of
-  // templates with "Your Characters" lit.
-  const section: Source = bankCount === 0 ? 'starter' : scrolledTo
+  // Every rendered section, by key, for the spy and the jump. A map rather
+  // than a ref per section because the list of sections is itself derived —
+  // a filter or another page changes which ones exist.
+  const sectionEls = useRef(new Map<string, HTMLDivElement>())
+
+  // Where the templates start. Taken off `filtered` rather than off the DOM,
+  // so the jump knows its target before the rows it has to scroll past have
+  // been paged in.
+  const firstStarterKey = useMemo(() => {
+    const first = filtered.find((e) => e.source === 'starter')
+    return first ? sectionKey(first) : null
+  }, [filtered])
+
+  // The section actually on screen. The tracker holds a key that a filter can
+  // retire (its section stops being rendered), so an unknown one falls back to
+  // the FIRST section — which is what the top of a re-filtered list means, and
+  // is also the right answer for an empty bank, whose section simply isn't
+  // there to be scrolled into.
+  const currentKey = sections.some((sec) => sec.key === scrolledKey) ? scrolledKey : sections[0]?.key ?? 'bank'
+  const section: Source = currentKey === 'bank' ? 'bank' : 'starter'
+  // Which style the scroll is inside, for the rail. Empty in the bank's own
+  // section — you're in all of them there, which is what lights "All Styles".
+  const scrolledStyle = currentKey.startsWith('style:') ? currentKey.slice('style:'.length) : ''
 
   // Infinite scroll: the next page is pulled in once the grid is within a
   // screenful of its end, so it's already rendered by the time the last row
   // is. A plain scroll handler rather than an IntersectionObserver on a
   // sentinel — the arithmetic is two subtractions, and it can be reasoned
-  // about (and watched) without a second async system in the middle. The same
-  // handler moves the toggle's highlight, so the control can only ever report
-  // where the scroll actually is.
+  // about (and watched) without a second async system in the middle. It also
+  // keeps working through a section list that changes under it, which an
+  // observer would have to be re-subscribed for on every filter and page.
+  //
+  // The same handler moves the rail's highlight, so the rail can only ever
+  // report where the scroll actually is.
   const hasMore = shown.length < filtered.length
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget
     if (hasMore && el.scrollHeight - el.scrollTop - el.clientHeight < 500) setVisible((n) => n + PAGE)
-    // Measured with rects, not `offsetTop`: the scroller is not a positioned
-    // element, so a section's `offsetTop` is counted from the modal panel and
-    // carries the header + filter bar with it — about a row of cards' worth of
-    // error, which is exactly how far the jump used to overshoot.
-    setScrolledTo(sectionTopWithin(el, startersRef.current) <= 24 ? 'starter' : 'bank')
+    // The last section whose heading has passed the band below the port's top
+    // is the one being looked at. Measured with rects, not `offsetTop`: the
+    // scroller is not a positioned element, so a section's `offsetTop` is
+    // counted from the modal panel and carries the header + filter bar with it
+    // — about a row of cards' worth of error, which is exactly how far the jump
+    // used to overshoot. Tops only increase down the list, so the walk stops at
+    // the first section still below the band.
+    const portTop = el.getBoundingClientRect().top
+    let current = sections[0]?.key
+    for (const sec of sections) {
+      const node = sectionEls.current.get(sec.key)
+      if (!node) continue
+      if (node.getBoundingClientRect().top - portTop > SPY_OFFSET) break
+      current = sec.key
+    }
+    // Only on a real change: this fires on every scroll frame, over a list that
+    // is a few hundred cards by the time anyone is scrolling it far enough to
+    // move the highlight.
+    if (current && current !== scrolledKey) setScrolledKey(current)
   }
 
   // Narrowing the list starts it from the top again — otherwise a filter
@@ -449,28 +573,62 @@ export default function PresetPickerModal({
   const refilter = <T,>(set: (v: T) => void) => (value: T) => {
     set(value)
     setVisible(PAGE)
-    setScrolledTo('bank')
+    // Whatever the new first section turns out to be — `currentKey` resolves an
+    // unknown key to it, so a style whose section this filter just retired
+    // can't stay lit.
+    setScrolledKey('bank')
     if (gridRef.current) gridRef.current.scrollTop = 0
   }
 
-  // The toggle is a JUMP, not a filter. Reaching the templates means rendering
-  // every bank row above them first, so the page count is raised to cover them
-  // and the scroll waits a frame for React to lay the rows out — `scrollTop` set
-  // against a list that hasn't grown yet just clamps to the old bottom.
-  const jumpTo = (value: Source) => {
-    if (value === 'bank') {
-      setScrolledTo('bank')
-      if (gridRef.current) gridRef.current.scrollTop = 0
-      return
-    }
-    setVisible((n) => Math.max(n, bankCount + PAGE))
-    setScrolledTo('starter')
+  /**
+   * Scrolls to a section, paging the grid in far enough to reach it first.
+   *
+   * Every rail row and the phone menu land here: the rail is a table of
+   * contents, so nothing on it filters — it moves the ONE scroll (Massimo's
+   * call, August 2026). Filtering by style was tried first and reads as a set
+   * of tabs, which is the opposite of a library you browse: it hides the
+   * eleven other looks the moment you glance at one.
+   *
+   * A section that isn't rendered yet can't be measured, hence the two steps:
+   * the page count is raised to cover the target's index (the position is
+   * taken off `filtered`, which knows the whole list, not off the DOM), then
+   * the scroll waits for React to lay the rows out. `scrollTop` set against a
+   * list that hasn't grown yet just clamps to the old bottom, and a jump that
+   * measured against nothing would scroll to the end — so the measure retries
+   * for a few frames rather than firing blind.
+   */
+  const scrollToSection = (key: string, tries = 3) => {
     requestAnimationFrame(() => {
       const el = gridRef.current
       if (!el) return
-      el.scrollTop += sectionTopWithin(el, startersRef.current) - 12
+      const node = sectionEls.current.get(key)
+      if (!node) {
+        if (tries > 0) scrollToSection(key, tries - 1)
+        return
+      }
+      el.scrollTop += sectionTopWithin(el, node) - 12
     })
   }
+
+  const jumpToSection = (key: string) => {
+    // The first section is simply the top — no measuring, and it's also what
+    // "All Styles" means once nothing filters: the whole list, from the start.
+    if (key === 'bank' || key === sections[0]?.key) {
+      setScrolledKey(key)
+      if (gridRef.current) gridRef.current.scrollTop = 0
+      return
+    }
+    const index = filtered.findIndex((e) => sectionKey(e) === key)
+    if (index < 0) return
+    setVisible((n) => Math.max(n, index + PAGE))
+    // The spy corrects this once the scroll lands; setting it here only saves a
+    // frame of the old highlight.
+    setScrolledKey(key)
+    scrollToSection(key)
+  }
+
+  // The library toggle jumps to the same two places the rail's top block does.
+  const jumpTo = (value: Source) => jumpToSection(value === 'bank' ? 'bank' : firstStarterKey ?? 'bank')
 
   const pick = (profile: Record<string, string> | CharacterProfile) => {
     onPick(profile)
@@ -480,7 +638,7 @@ export default function PresetPickerModal({
   const portalTarget = typeof document !== 'undefined' ? document.body : null
   if (!open || !portalTarget) return null
 
-  const grid = 'grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6'
+  const grid = 'grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6'
 
   return createPortal(
     // z-[60], not the z-[70] a picker would normally take. `AnchoredPopover`
@@ -499,7 +657,7 @@ export default function PresetPickerModal({
     // pixel would drag a full-viewport filter recompute behind it.
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" {...backdrop}>
       <div
-        className="flex h-[86vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-ink/10 bg-surface-0 shadow-2xl"
+        className="flex h-[86vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-ink/10 bg-surface-0 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -518,120 +676,183 @@ export default function PresetPickerModal({
           </button>
         </div>
 
-        {/* Which library first, then how to narrow it. The toggle SWAPS what
-            the panel is showing where the row under it only filters that, so
-            it reads as the panel's own tab strip — the same shape and job as
-            the Controls column's Physical / Scene & Pose toggle, which is also
-            the first thing in its column. It sat under the filter bar until
-            August 2026 (Massimo's call): a member picks a side before they
-            search it, and a search box above the thing it searches puts the
-            two in the wrong order. Gender is a toggle (three options, all
-            worth seeing without a click); the styles are a menu, since as a
-            toggle they made a strip no window fits and pushed the grid down a
-            row. Shot type (Close-up / Medium / Full body) was a third facet
-            and is gone: a starter is chosen by who and where, and three
-            framings across the library mostly cut the grid down without
-            answering anything. */}
-        <div className="flex shrink-0 flex-col gap-2 border-b border-ink/5 px-5 py-3">
-          <SegmentedToggle
-            value={section}
-            onChange={jumpTo}
-            options={sourceOptions}
-            accent="influencers"
-            className="h-10 !p-1"
-          />
-          {/* One bar. The style menu takes a FIXED width rather than fitting
-              its content — its label swings from "All Styles" to "Holding
-              Product", and a trigger that resized itself would push the gender
-              toggle along the row on every pick, which is the shifting this
-              control was moved to avoid. Every count rides in a `CountSlot`
-              for the same reason. */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex h-9 min-w-[180px] flex-1 items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5">
-              <Search className="h-3.5 w-3.5 shrink-0 text-ink-600" />
-              <input
-                value={search}
-                onChange={(e) => refilter(setSearch)(e.target.value)}
-                placeholder="Search name, look, style..."
-                className="w-full bg-transparent text-sm text-ink-200 placeholder-ink-600 outline-none"
+        {/* Body: the rail on the left, the one scrolling grid on the right.
+
+            The rail is the TABLE OF CONTENTS of that scroll, and nothing on it
+            filters (Massimo's call, August 2026). Every row is a place in the
+            list — your characters, then each style the templates are filed
+            under — clicking one scrolls there, and the highlight FOLLOWS THE
+            SCROLL, the way the Ad Analyzer's section toggle follows its read.
+            One rule for the whole rail: it says where you are.
+
+            Two shapes were tried on the way here and both were worse. The
+            styles were a `Dropdown` on the filter bar — eleven options behind a
+            click, on a panel whose whole job is browsing — and then a rail that
+            filtered, which reads as a set of tabs: it hides the ten other looks
+            the moment you glance at one, when the point of the grid is that you
+            keep scrolling through it. Navigating costs nothing the filter
+            saved, because the section a jump lands on is the same handful of
+            cards the filter would have left.
+
+            Search and gender stay real filters, on the bar above the grid,
+            because they cut ACROSS the sections rather than picking one.
+
+            Below `lg` there is no room for a rail beside a grid of faces, so
+            the same two controls ride the bar: the library toggle, and the
+            style menu — which is this rail's Style block, one option per
+            section, jumping exactly as the rows do. */}
+        <div className="flex min-h-0 flex-1">
+          <div className="hidden w-[204px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-ink/5 px-3 py-4 lg:flex">
+            <div className="flex flex-col gap-0.5">
+              <SectionLabel label="Library" className="px-3 pb-1.5" />
+              <RailRow
+                icon={UserRound}
+                label="Your Characters"
+                count={bankCount}
+                active={section === 'bank'}
+                onClick={() => jumpTo('bank')}
+              />
+              <RailRow
+                icon={Images}
+                label="Templates"
+                count={filtered.length - bankCount}
+                active={section === 'starter'}
+                onClick={() => jumpTo('starter')}
               />
             </div>
-            <SegmentedToggle
-              value={gender}
-              onChange={refilter(setGender)}
-              options={facets.genders}
-              accent="influencers"
-              className="shrink-0"
-              fitContent
-              dense
-            />
-            <div className="w-[190px] shrink-0">
-              <Dropdown
-                value={setting}
-                onChange={refilter(setSetting)}
-                options={facets.styles}
-                accent="influencers"
-                dense
-              />
+            <div className="flex flex-col gap-0.5">
+              <SectionLabel label="Style" className="px-3 pb-1.5" />
+              {facets.styles.map((o) => (
+                <RailRow
+                  key={o.value || 'all'}
+                  label={o.label}
+                  count={o.count}
+                  active={o.value === scrolledStyle}
+                  onClick={() => jumpToSection(styleSectionKey(o.value))}
+                />
+              ))}
             </div>
           </div>
-        </div>
 
-        {/* Grid */}
-        <div ref={gridRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4" onScroll={handleScroll}>
-          {loadError && starterEntries.length === 0 ? (
-            <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
-              <p className="max-w-sm text-sm text-ink-500">{loadError}</p>
-              <button
-                type="button"
-                onClick={() => { setLoadError(null); setReloadKey((n) => n + 1) }}
-                className="rounded-full border border-ink/10 bg-ink/[0.03] px-4 py-1.5 text-[13px] font-medium text-ink-300 transition-colors hover:bg-ink/[0.06]"
-              >
-                Try again
-              </button>
+          <div className="flex min-w-0 flex-1 flex-col">
+            {/* Where you're going, then what to cut out of it. Gender stays a
+                toggle (three options, all worth seeing without a click). Below
+                `lg` the two navigation controls join this bar, in the order
+                they always had — a member picks a side before they search it,
+                so the toggle sits above the box that searches it. Shot type
+                (Close-up / Medium / Full body) was a third facet and is gone: a
+                starter is chosen by who and where, and three framings across
+                the library mostly cut the grid down without answering
+                anything. */}
+            <div className="flex shrink-0 flex-col gap-2 border-b border-ink/5 px-5 py-3">
+              <div className="lg:hidden">
+                <SegmentedToggle
+                  value={section}
+                  onChange={jumpTo}
+                  options={sourceOptions}
+                  accent="influencers"
+                  className="h-10 !p-1"
+                />
+              </div>
+              {/* One bar. The style menu takes a FIXED width rather than
+                  fitting its content — its label swings from "All Styles" to
+                  "Holding Product", and a trigger that resized itself would
+                  push the gender toggle along the row on every pick. Every
+                  count rides in a `CountSlot` for the same reason. */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex h-9 min-w-[180px] flex-1 items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5">
+                  <Search className="h-3.5 w-3.5 shrink-0 text-ink-600" />
+                  <input
+                    value={search}
+                    onChange={(e) => refilter(setSearch)(e.target.value)}
+                    placeholder="Search name, look, style..."
+                    className="w-full bg-transparent text-sm text-ink-200 placeholder-ink-600 outline-none"
+                  />
+                </div>
+                <SegmentedToggle
+                  value={gender}
+                  onChange={refilter(setGender)}
+                  options={facets.genders}
+                  accent="influencers"
+                  className="shrink-0"
+                  fitContent
+                  dense
+                />
+                {/* The rail's Style block, for a width with no room for a
+                    rail: same options, same jump, and its trigger reads the
+                    section you're in because the spy owns that value. */}
+                <div className="w-[190px] shrink-0 lg:hidden">
+                  <Dropdown
+                    value={scrolledStyle}
+                    onChange={(v) => jumpToSection(styleSectionKey(v))}
+                    options={facets.styles}
+                    accent="influencers"
+                    dense
+                  />
+                </div>
+              </div>
             </div>
-          ) : !starters && bankEntries.length === 0 ? (
-            <div className="flex h-full items-center justify-center">
-              <Spinner className="h-5 w-5 text-ink-600" />
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex h-full items-center justify-center">
-              <p className="text-sm text-ink-600">
-                {search || gender || setting
-                  ? 'No characters match those filters.'
-                  : 'No characters yet.'}
-              </p>
-            </div>
-          ) : (
-            <>
-              {sections.map((sec, i) => (
-                <div
-                  key={sec.key}
-                  // The anchor the toggle jumps to and the highlight measures
-                  // against: the FIRST template group, whichever style that
-                  // happens to be under the current filters.
-                  ref={sec.source === 'starter' && sections[i - 1]?.source !== 'starter' ? startersRef : undefined}
+
+          {/* Grid */}
+          <div ref={gridRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-4" onScroll={handleScroll}>
+            {loadError && starterEntries.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+                <p className="max-w-sm text-sm text-ink-500">{loadError}</p>
+                <button
+                  type="button"
+                  onClick={() => { setLoadError(null); setReloadKey((n) => n + 1) }}
+                  className="rounded-full border border-ink/10 bg-ink/[0.03] px-4 py-1.5 text-[13px] font-medium text-ink-300 transition-colors hover:bg-ink/[0.06]"
                 >
-                  <DayPill label={sec.label} className={i === 0 ? 'mb-2' : 'mb-2 mt-5'} />
-                  <div className={grid}>
-                    {sec.entries.map((e) => (
-                      <PresetCard
-                        key={e.key}
-                        entry={e}
-                        savedId={e.starter ? savedStarters.get(e.starter.id) : undefined}
-                        onClick={() => pick(e.profile)}
-                      />
-                    ))}
+                  Try again
+                </button>
+              </div>
+            ) : !starters && bankEntries.length === 0 ? (
+              <div className="flex h-full items-center justify-center">
+                <Spinner className="h-5 w-5 text-ink-600" />
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex h-full items-center justify-center">
+                <p className="text-sm text-ink-600">
+                  {search || gender
+                    ? 'No characters match those filters.'
+                    : 'No characters yet.'}
+                </p>
+              </div>
+            ) : (
+              <>
+                {sections.map((sec, i) => (
+                  <div
+                    key={sec.key}
+                    // Every section registers itself: the rail measures against
+                    // these to say which one you're in, and the library jump
+                    // scrolls to one of them.
+                    ref={(node) => {
+                      if (node) sectionEls.current.set(sec.key, node)
+                      else sectionEls.current.delete(sec.key)
+                    }}
+                  >
+                    <DayPill label={sec.label} className={i === 0 ? 'mb-2' : 'mb-2 mt-5'} />
+                    <div className={grid}>
+                      {sec.entries.map((e) => (
+                        <PresetCard
+                          key={e.key}
+                          entry={e}
+                          savedId={e.starter ? savedStarters.get(e.starter.id) : undefined}
+                          onClick={() => pick(e.profile)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {hasMore && (
-                <div className="flex h-14 items-center justify-center">
-                  <Spinner className="h-4 w-4 text-ink-700" />
-                </div>
-              )}
-            </>
-          )}
+                ))}
+                {hasMore && (
+                  <div className="flex h-14 items-center justify-center">
+                    <Spinner className="h-4 w-4 text-ink-700" />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          </div>
         </div>
       </div>
     </div>,
