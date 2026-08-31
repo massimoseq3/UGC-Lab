@@ -1,28 +1,16 @@
-// The "this is generating" backdrop — soft, blurred accent blobs drifting behind
-// a frosted surface. Drop in as the first child of a `relative overflow-hidden`
-// container; foreground content layers on top (give it z-10).
+// The "this is generating" backdrop — three soft accent lobes behind a frosted
+// surface. Drop in as the first child of a `relative overflow-hidden` container;
+// foreground content layers on top (give it z-10).
 //
-// The look is unchanged from the original: same three lobes, same positions,
-// same opacities, same drift. What changed is where the Gaussian comes from.
-// The blobs used to carry a live `filter: blur(40px)`, which is the single most
-// expensive thing in this app to animate — a filtered layer is re-blurred on
-// every frame of a transform, and a storyboard batch puts a backdrop on every
-// card at once, so a dozen generating tiles meant three dozen full-size blurs
-// per frame. Measured here, on a grid of these and nothing else:
-//
-//        12 tiles   24 tiles
-//   live blur     63 fps     36 fps
-//   baked blur   120 fps    120 fps   ← flat, because no filter runs per frame
-//
-// So the blur is baked into a MASK instead (`.gen-blob` in index.css): a real
-// `feGaussianBlur` over a white circle, rasterised once into a mask texture and
-// then only ever transformed. Same Gaussian falloff — this is not the radial
-// gradient that was tried and reverted, which banded because its ramp is linear
-// — with the per-frame cost of moving a picture. The blob boxes below are ~2.1x
-// the old ones around the same centres, because a CSS filter paints outside its
-// element's box and a mask cannot: the falloff now has to fit inside the element
-// that carries it. Resize them and the mask's circle together, or the blob gains
-// a cut-off rim.
+// The lobes DON'T MOVE, and that is deliberate — see the long note above
+// `.gen-blob` in index.css. Short version: they used to drift, first under a
+// live `filter: blur()` and then with the Gaussian baked into a mask. Baking the
+// blur fixed the re-blur-per-frame cost but not the rest of it, because a moving
+// element is a composited layer of its own: three of them per tile, each ~2x the
+// tile, on every card of a storyboard batch at once. The only motion left here
+// is one slow alpha breathe over the group, which rasterises once and then just
+// varies its own opacity; the tile's real "something is happening" signal is the
+// progress bar and the rotating status line sitting on top of this.
 type Family = 'playground' | 'broll' | 'influencers'
 
 // The base is the original frosted gradient with a TOUCH of the app's own accent
@@ -52,33 +40,33 @@ const BLOBS: Record<Family, [string, string, string]> = {
 
 export default function GeneratingBackdrop({
   family = 'playground',
-  // Hold the blobs still. For a decorative use of this wash that isn't reporting
-  // on work in progress — the Bank's preset covers, where a bank of saved
-  // recipes would otherwise animate a whole grid of tiles that aren't
-  // generating anything.
+  // Drop the breathe too, leaving a completely still wash. For a decorative use
+  // of this surface that isn't reporting on work in progress — the Bank's preset
+  // covers, where a bank of saved recipes would otherwise all breathe at once.
   still = false,
 }: {
   family?: Family
   still?: boolean
 }) {
   const [a, b, c] = BLOBS[family]
-  const drift = (n: 1 | 2 | 3) => (still ? '' : ` animate-blob-${n}`)
   return (
     // `offscreen-idle` is `content-visibility: auto` — the browser skips this
-    // subtree entirely while it's outside the viewport, which stops its blobs
-    // animating and defers their mask raster until the tile is scrolled to.
-    // Nothing changes for a tile on screen, and the element is `absolute
-    // inset-0`, so the size containment that comes with the skip has nothing to
-    // collapse.
+    // subtree entirely while it's outside the viewport, which defers the mask
+    // raster until the tile is scrolled to. The element is `absolute inset-0`,
+    // so the size containment that comes with the skip has nothing to collapse.
     <div aria-hidden className="offscreen-idle absolute inset-0 overflow-hidden">
       {/* Frosted base, faintly accent-tinted — dark in dark mode, light in light
           mode (the ink ramp flips). */}
       <div className="absolute inset-0" style={{ backgroundImage: BASE[family] }} />
-      {/* Same three lobes, same centres. The box is bigger than the old one only
-          because the baked falloff has to live inside it — see the note above. */}
-      <div className={`gen-blob absolute left-[-69%] top-[-69%] h-[168%] w-[168%] ${a} opacity-50${drift(1)}`} />
-      <div className={`gen-blob absolute right-[-77%] top-[-52%] h-[197%] w-[197%] ${b} opacity-40${drift(2)}`} />
-      <div className={`gen-blob absolute bottom-[-68%] left-[-18%] h-[166%] w-[166%] ${c} opacity-35${drift(3)}`} />
+      {/* The lobes share one wrapper so the breathe is a single layer, and that
+          wrapper CLIPS: each lobe's box is ~2x the tile (a mask can't paint
+          outside its element the way a filter could), so without the clip the
+          layer's bounds would be the union of all three. */}
+      <div className={`absolute inset-0 overflow-hidden${still ? '' : ' gen-lobes'}`}>
+        <div className={`gen-blob absolute left-[-69%] top-[-69%] h-[168%] w-[168%] ${a} opacity-50`} />
+        <div className={`gen-blob absolute right-[-77%] top-[-52%] h-[197%] w-[197%] ${b} opacity-40`} />
+        <div className={`gen-blob absolute bottom-[-68%] left-[-18%] h-[166%] w-[166%] ${c} opacity-35`} />
+      </div>
     </div>
   )
 }

@@ -2153,8 +2153,12 @@ function FrameConceptCard({
           </div>
         )}
 
-        {/* Top-centre pill — which option this is. Stays visible on hover. */}
-        <span className="pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full border border-ink/15 bg-ink/10 px-2 py-0.5 text-[10px] font-medium tracking-tight text-ink-300 backdrop-blur">
+        {/* Top-centre pill — which option this is. Stays visible on hover, which
+            means it is also on screen while the card is generating: no
+            `backdrop-filter` here, since one over the generating backdrop
+            re-samples its patch every frame, once per option tile. A slightly
+            heavier flat fill reads the same over a soft wash. */}
+        <span className="pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full border border-ink/15 bg-ink/15 px-2 py-0.5 text-[10px] font-medium tracking-tight text-ink-300">
           Option {optionNumber}
         </span>
 
