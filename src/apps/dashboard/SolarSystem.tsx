@@ -3,7 +3,7 @@ import { useAppStore } from '../../stores/appStore'
 import { getAppConfig } from '../../utils/constants'
 import { TEAM } from '../../utils/team'
 import CrabSprite from '../../components/CrabSprite'
-import { DISPLAY_FONT } from './Widget'
+import { DISPLAY_FONT } from './widgetStyles'
 
 // The crew in orbit — the desktop's launcher and its signature. One planet per
 // crew member, the workspace at the centre: the app already frames itself as

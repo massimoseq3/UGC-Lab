@@ -1,7 +1,8 @@
 import { Siren } from 'lucide-react'
 import { useAnnouncementStore, unreadCount } from '../../stores/announcementStore'
 import type { Announcement } from '../../stores/announcementStore'
-import { WIDGET_SHELL, WIDGET_INTERACTIVE, WidgetLabel, riseStyle } from './Widget'
+import { WidgetLabel } from './Widget'
+import { WIDGET_SHELL, WIDGET_INTERACTIVE, riseStyle } from './widgetStyles'
 
 // The way into the announcements log, sitting at the end of the desktop's
 // second row. Cut from the same glass as every other widget, so it reads as

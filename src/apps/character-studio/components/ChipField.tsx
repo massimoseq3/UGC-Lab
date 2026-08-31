@@ -89,6 +89,15 @@ export default function ChipField({ label, value, onChange, suggestions, placeho
     restSection = rest.filter((s) => !isDetailed(s))
   }
   const showDropdown = open && !editing && !locked && suggestions.length > 0
+
+  // Closing the menu leaves the last measurement behind, and the next open
+  // would paint one frame of it before the observer reports. Clear it during
+  // render — a reset-on-state-change belongs here, not in an effect.
+  const [fadeShownFor, setFadeShownFor] = useState(showDropdown)
+  if (showDropdown !== fadeShownFor) {
+    setFadeShownFor(showDropdown)
+    if (!showDropdown) setShowMoreFade(false)
+  }
   const showExpand = !locked && value.trim().length > LONG_VALUE
 
   // The edges that actually clip a pop-up: the most restrictive of every
@@ -131,14 +140,24 @@ export default function ChipField({ label, value, onChange, suggestions, placeho
   // Shared vertical placement for the dropdown + editor pop-ups.
   const panelPos = openUp ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
 
-  // Recompute the "more below" fade whenever the menu opens or its rows change.
+  // Recompute the "more below" fade by OBSERVING the list rather than by listing
+  // the state that might have changed its height. The fade is a fact about the
+  // rendered box (does the content overrun the 13rem cap?), and the row counts
+  // only approximate that — a wrapped long preset, a late font, or the menu
+  // flipping above the field all change the height with no state to key off. A
+  // ResizeObserver catches every one of them, including the first measurement
+  // when the menu opens, and it watches the rows too: the list box itself is
+  // capped, so it stops resizing exactly when there IS overflow to report.
   useEffect(() => {
-    if (showDropdown) updateFade()
-    else setShowMoreFade(false)
-    // updateFade reads a ref; the deps below cover every state that changes the
-    // list height (open/close, typed query, section sizes).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showDropdown, value, topSection.length, restSection.length])
+    const el = listRef.current
+    if (!el) return
+    const ro = new ResizeObserver(updateFade)
+    ro.observe(el)
+    for (const row of Array.from(el.children)) ro.observe(row)
+    return () => ro.disconnect()
+    // updateFade only reads a ref and calls a stable setter, so the observer
+    // can safely hold the identity it captured on the render that opened.
+  }, [showDropdown, topSection.length, restSection.length])
 
   return (
     <div className="flex flex-col gap-1.5">

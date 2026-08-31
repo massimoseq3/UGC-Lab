@@ -126,6 +126,24 @@ export default function ModelSidePanel({
   // The rail's star: show only the recommended models.
   const [starredOnly, setStarredOnly] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
+
+  // Reset search + capability filters + the provider rail the moment the panel
+  // opens — during render, not in an effect. Every derived list below reads
+  // these, so resetting after paint drew one frame of the PREVIOUS session's
+  // filters and then cascaded a second render to correct it. Adjusting state
+  // during render is React's own answer to "reset when a prop changes": it
+  // re-runs this component before anything is committed, so the first frame is
+  // already correct and nothing else re-renders.
+  const [wasOpen, setWasOpen] = useState(isOpen)
+  if (isOpen !== wasOpen) {
+    setWasOpen(isOpen)
+    if (isOpen) {
+      setSearch('')
+      setCapFilters(new Set())
+      setProviderFilter(null)
+      setStarredOnly(false)
+    }
+  }
   const isDesktop = useIsDesktop()
   const accent = ACCENTS[appId] ?? ACCENTS['broll-studio']
 
@@ -177,15 +195,13 @@ export default function ModelSidePanel({
     a.displayName.localeCompare(b.displayName),
   )
 
-  // Reset search + capability filters + provider rail + focus on open.
+  // Focus the search box on open. This one genuinely is an effect — it touches
+  // the DOM and sets no state. Cleared on close so a panel dismissed inside the
+  // delay can't steal focus back.
   useEffect(() => {
-    if (isOpen) {
-      setSearch('')
-      setCapFilters(new Set())
-      setProviderFilter(null)
-      setStarredOnly(false)
-      setTimeout(() => searchRef.current?.focus(), 100)
-    }
+    if (!isOpen) return
+    const t = setTimeout(() => searchRef.current?.focus(), 100)
+    return () => clearTimeout(t)
   }, [isOpen])
 
   const toggleFilter = (m: Mode) =>

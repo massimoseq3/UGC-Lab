@@ -1,5 +1,6 @@
 import CrabSprite from '../../components/CrabSprite'
 import { SKILL_VERSION } from '../../stores/skillUpdateStore'
+import { downloadSkill } from './downloadSkill'
 
 // The downloadable video editor skill, drawn as a glowing macOS-style folder
 // (recreates Massimo's "edit video" folder art in live DOM so it can animate).
@@ -52,18 +53,6 @@ function PopCard({
       {children}
     </div>
   )
-}
-
-// Trigger the download from JS (via a throwaway anchor) rather than wrapping
-// the folder in an <a href>, so hovering it shows neither the browser's URL
-// preview nor a native tooltip.
-export function downloadSkill() {
-  const link = document.createElement('a')
-  link.href = '/video-editor.skill'
-  link.download = 'video-editor.skill'
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
 }
 
 // The version sticker on the folder's corner. The skill is installed by hand
