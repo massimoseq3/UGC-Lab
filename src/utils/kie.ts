@@ -681,6 +681,83 @@ export interface ChatCallTarget {
 // are whole storyboards, so ask for plenty of room.
 const CLAUDE_MAX_TOKENS = 16_384
 
+// kie answers the CHAT routes with its own `{ code, msg }` envelope inside an
+// HTTP 200 — verified live: an unauthenticated POST to a chat endpoint comes
+// back `HTTP/2 200`, `content-type: application/json`, body
+// `{"code":401,"msg":"Unauthorized – Authentication failed…"}`. `authedFetch`
+// reads that envelope on every jobs-API call; this transport never did.
+//
+// So a bad key, an empty balance, a rate limit, a maintenance window and a 5xx
+// all arrived below as a body with no `choices`, fell through to the "Empty
+// response from chat model" throw, and reached the member as "The model
+// returned an empty result. Try again, or simplify your prompt." — the one
+// sentence none of them means, on all ~20 chat call sites in the app. Reported
+// from the Ad Analyzer, where it also happens to be the most expensive place to
+// send someone back round the loop.
+//
+// Also reads the OpenAI-style `{ error: { message, code } }` a gateway emits
+// for a model-side rejection, so the vendor's own wording reaches
+// `humanizeError`'s rule table instead of being thrown away.
+//
+// Returns null for a normal completion: no chat response shape carries a
+// top-level `code` or `error` — openai-chat keys its payload under `choices`,
+// claude-messages under `content`, openai-responses under `output`.
+function chatEnvelopeError(body: unknown, endpoint: string): Error | null {
+  if (!body || typeof body !== 'object') return null
+  const b = body as { code?: unknown; msg?: unknown; message?: unknown; error?: unknown }
+  const tag = `POST ${endpoint}`
+
+  if (typeof b.code === 'number' && b.code !== 200) {
+    const msg =
+      (typeof b.msg === 'string' && b.msg) || (typeof b.message === 'string' && b.message) || ''
+    return new KieHttpError(b.code, friendlyHttpError(b.code, msg, tag))
+  }
+
+  const err = b.error
+  if (typeof err === 'string' && err.trim()) return new Error(`kie.ai error at ${tag}: ${err}`)
+  if (err && typeof err === 'object') {
+    const e = err as { message?: unknown; code?: unknown; status?: unknown; type?: unknown }
+    // A vendor's `code` is a number as often as a slug ('insufficient_quota'),
+    // and the slug is exactly the wording the rule table matches on — so a
+    // numeric one becomes the status and a string one rides in the message.
+    const status =
+      typeof e.code === 'number' ? e.code : typeof e.status === 'number' ? e.status : undefined
+    const parts = [
+      typeof e.message === 'string' ? e.message : '',
+      typeof e.code === 'string' ? e.code : '',
+      typeof e.type === 'string' ? e.type : '',
+    ].filter(Boolean)
+    const msg = parts.join(' — ') || JSON.stringify(err).slice(0, 300)
+    return status === undefined
+      ? new Error(`kie.ai error at ${tag}: ${msg}`)
+      : new KieHttpError(status, friendlyHttpError(status, msg, tag))
+  }
+  return null
+}
+
+// A stream that produced no content, explained. The reason is usually IN the
+// body: kie can end an SSE response with an error event, and when it rejects
+// the request outright it answers with the envelope above — sometimes still
+// under an event-stream content type, which is why the whole body is tried as
+// JSON here as well as event by event.
+function emptyStreamError(raw: string, endpoint: string): Error {
+  const payloads: unknown[] = []
+  for (const rawLine of raw.split('\n')) {
+    const line = rawLine.trim()
+    if (!line.startsWith('data:')) continue
+    const data = line.slice(5).trim()
+    if (!data || data === '[DONE]') continue
+    try { payloads.push(JSON.parse(data)) } catch { /* keepalive or comment */ }
+  }
+  try { payloads.push(JSON.parse(raw)) } catch { /* not a bare JSON body */ }
+
+  for (const payload of payloads) {
+    const err = chatEnvelopeError(payload, endpoint)
+    if (err) return err
+  }
+  return new Error(`Chat model produced empty SSE stream. First 200 chars: ${raw.slice(0, 200)}`)
+}
+
 export async function kieChatCompletions(
   apiKey: string,
   target: ChatCallTarget,
@@ -728,9 +805,7 @@ export async function kieChatCompletions(
     // text is still a token-limit failure, and saying so beats "empty stream".
     if (truncated) throw new TruncatedResponseError(content)
     if (content.length > 0) return content
-    throw new Error(
-      `Chat model produced empty SSE stream. First 200 chars: ${raw.slice(0, 200)}`,
-    )
+    throw emptyStreamError(raw, target.endpoint)
   }
 
   // Plain JSON response
@@ -740,6 +815,12 @@ export async function kieChatCompletions(
   } catch {
     throw new Error(`Chat model returned non-JSON response: ${raw.slice(0, 200)}`)
   }
+
+  // kie's own envelope, inside an HTTP 200 — see chatEnvelopeError. Checked
+  // before the content extraction below, which would otherwise read an error
+  // body as an empty answer.
+  const envelopeError = chatEnvelopeError(body_, target.endpoint)
+  if (envelopeError) throw envelopeError
 
   const text =
     transport === 'claude-messages'
