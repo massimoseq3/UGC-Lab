@@ -1491,8 +1491,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //   minimax-h3/reference-to-video  reference_image_urls (≤9) /
   //                                  reference_video_urls (≤3) /
   //                                  reference_audio_urls (≤3) + aspect_ratio
-  // Output is 2K on every route — none of the three takes a resolution param.
-  // Audio is generated natively with no toggle, hence supportsAudio: false
+  // All three take an optional `resolution`, whose kie enum is UPPERCASE
+  // ('768P' | '2K', default 2K). The ladder below declares the cheap tier as
+  // '768p' so the picker reads like every other p-tier in the catalog, and the
+  // body builder uppercases it on the way out; '2K' is left exactly as it is
+  // because members' cards have been persisting that string since this entry
+  // shipped 2K-only. Audio is generated natively with no toggle, hence
+  // supportsAudio: false
   // (same shape as Grok above: the flag means "offers an audio control").
   // Docs: minimax-h3/{text,image,reference}-to-video on docs.kie.ai.
   {
@@ -1507,26 +1512,41 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     supportsReferenceAudio: true,
     supportsReferenceVideos: true,
     maxReferenceImages: 9,
-    // 36.5 credits/s of generated video, plus 11 credits per input image past
-    // the first five (input audio is free). Source (user-supplied kie pricing:
-    // $0.1825/s, $0.055/image at 200 credits/$). Two costs we deliberately do
-    // NOT model: kie also bills the DURATION of any reference video at the same
-    // per-second rate, and no video call site passes an image count. Both can
-    // only push the real figure up, so the estimate reads as a floor.
+    // kie halved this on 2026-08-31 and split it by resolution: 8 credits/s at
+    // 768P and 13 credits/s at 2K, plus 4 credits per input image past the
+    // first five (input audio is free). Was a flat 36.5/s with no resolution
+    // param at all, and 11/image. Source: kie.ai/pricing ($0.04/s, $0.065/s,
+    // $0.02/image at 200 credits/$). Two costs we deliberately do NOT model:
+    // kie bills the DURATION of any reference video at the same per-second
+    // rate, and no video call site passes an image count. Both can only push
+    // the real figure up, so the estimate reads as a floor.
     pricing: {
       unit: 'per-second',
-      credits: 36.5,
-      priceFor: ({ durationSeconds = 6, inputImageCount = 1 }) =>
-        36.5 * durationSeconds + 11 * Math.max(0, inputImageCount - 5),
+      credits: 13,
+      priceFor: ({ durationSeconds = 6, resolution = '2K', inputImageCount = 1 }) =>
+        (resolution === '768p' ? 8 : 13) * durationSeconds +
+        4 * Math.max(0, inputImageCount - 5),
     },
-    // No `official` entry on purpose: MiniMax publishes no comparable
-    // per-second list price we can cite, and an unverified baseline would be
-    // inventing a discount. No savings claimed rather than a flattering one.
+    // MiniMax still publishes no per-second list price of its own, so this is
+    // kie's own stated gap read backwards — it announced the new rates as
+    // "50% of official pricing", making official exactly 2x. Same derivation
+    // as Wan 3.0's entry, and it replaces the deliberate blank this row
+    // carried while the discount was genuinely unknown.
+    official: {
+      usdFor: ({ durationSeconds = 6, resolution = '2K', inputImageCount = 1 }) =>
+        (resolution === '768p' ? 0.08 : 0.13) * durationSeconds +
+        0.04 * Math.max(0, inputImageCount - 5),
+      source: KIE_PRICING,
+    },
     videoEndpoint: 'createTask',
     videoConstraints: {
       // The API takes any integer 4–15s; this is the app's usual ladder.
       durations: [4, 5, 6, 8, 10, 12, 15],
-      resolutions: ['2K'],
+      // Default stays 2K, unlike the cheap-tier default everywhere else: 2K is
+      // what this model is picked for, it is kie's own default, and it is the
+      // string every card persisted while it was the only tier — landing them
+      // on 768P would silently downgrade work already set up.
+      resolutions: ['768p', '2K'],
       default: '2K',
       aspectRatios: ['9:16', '16:9', '1:1', '4:3', '3:4', '21:9'],
       supportsAudio: false,
@@ -2369,6 +2389,11 @@ export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<
   // under another model can carry an off-grid length (Kling's 3s).
   if (modelId === 'minimax-h3') {
     const h3Duration = Math.min(15, Math.max(4, Math.round(duration)))
+    // kie's enum is uppercase and the tier ladder declares the cheap one
+    // lowercase (see the registry entry); anything else — a card carried over
+    // from a model with a 480p/1080p ladder — falls back to 2K, this model's
+    // own default, rather than 422ing on a tier it doesn't have.
+    const h3Resolution = resolution === '768p' ? '768P' : '2K'
     const route = minimaxH3Route(opts)
     if (route === 'image') {
       const [first, last] = [
@@ -2379,6 +2404,7 @@ export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<
         prompt: opts.prompt,
         ...(first ? { first_frame_url: first } : {}),
         ...(last ? { last_frame_url: last } : {}),
+        resolution: h3Resolution,
         duration: h3Duration,
       }
     }
@@ -2390,10 +2416,11 @@ export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<
         ...(opts.referenceVideoUrls?.length ? { reference_video_urls: opts.referenceVideoUrls.slice(0, 3) } : {}),
         ...(opts.referenceAudioUrls?.length ? { reference_audio_urls: opts.referenceAudioUrls.slice(0, 3) } : {}),
         aspect_ratio: ar,
+        resolution: h3Resolution,
         duration: h3Duration,
       }
     }
-    return { prompt: opts.prompt, aspect_ratio: ar, duration: h3Duration }
+    return { prompt: opts.prompt, aspect_ratio: ar, resolution: h3Resolution, duration: h3Duration }
   }
 
   // ── Seedance 2.5 ──
