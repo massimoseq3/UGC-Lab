@@ -40,7 +40,13 @@ export default function LoadPresetDropdown({ onLoadProfile }: LoadPresetDropdown
         {/* 13px — the B-Roll reference-row title size, so a picker row reads
             the same weight in every app. No hint line: the title says it. */}
         <div className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-300">
-          <span className="lg:hidden">Load Preset</span>
+          {/* Three tiers, not two. The band gained a third control (the prompt
+              JSON square), and at 375px the two rows split what's left: "Load
+              Preset" no longer fits and truncated to "Load …", which names
+              nothing. A label that doesn't fit gets shorter — the tinted person
+              circle beside it is what says which row this is. */}
+          <span className="sm:hidden">Preset</span>
+          <span className="hidden sm:inline lg:hidden">Load Preset</span>
           <span className="hidden lg:inline">Load Character Preset</span>
         </div>
         <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" strokeWidth={2} />

@@ -1,4 +1,5 @@
 import type { CharacterProfile } from '../types'
+import { ALL_FIELD_KEYS } from '../types'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { createTask, ensureHostedUrl, kieChatCompletions, type ChatMessage } from '../../../utils/kie'
 import { finishImageAssetTask } from '../../../utils/imageTask'
@@ -120,6 +121,71 @@ export function buildPhysicalPrompt(profile: CharacterProfile): string {
 // scoped "Copy scene & pose" action on the second tab divider.
 export function buildScenePrompt(profile: CharacterProfile): string {
   return toJsonPrompt(buildSceneJson(profile))
+}
+
+// ── Reading a prompt back in ──
+
+// The field keys a paste may land on — the form's own, which is what keeps
+// `aspectRatio` out of reach: it rides in the same profile object but is a
+// picker setting rather than a tab field, so it isn't in ALL_FIELD_KEYS and a
+// paste can never move it.
+const PASTEABLE_KEYS = new Set<string>(ALL_FIELD_KEYS)
+
+export interface ParsedPromptJson {
+  fields: Record<string, string>
+  count: number
+}
+
+// The inverse of buildImagePrompt: read a pasted prompt JSON back into form
+// fields.
+//
+// Tolerant about SHAPE, strict about KEYS. This app itself emits three
+// different section layouts over the same fields — buildImagePrompt's lowercase
+// sections (physical / wardrobe / scene / pose / camera), the Single view's
+// display JSON (`Physical` / `Style` / `Pose & Action` / …), and a flat map with
+// no sections at all — and a member pasting from an LLM will produce a fourth.
+// What every one of them agrees on is the camelCase FIELD key, so section names
+// are walked through and thrown away, and only keys the form actually owns are
+// taken. Anything else (a sheet's `layout`, an editor's `direction`, a stray
+// note) is ignored rather than treated as an error, because refusing a paste
+// over one unknown key would refuse most real ones.
+//
+// One key is remapped: a top-level `style` STRING is where buildImagePrompt
+// puts `cameraDevice` (the photorealism directive), so it round-trips back
+// there. It can't collide with the display JSON's `Style` SECTION, which is an
+// object and is walked like any other.
+//
+// Returns null when the text isn't JSON at all, or when nothing in it is a
+// field this form owns — the two cases the caller has to say something about.
+export function fieldsFromPromptJson(text: string): ParsedPromptJson | null {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    return null
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+
+  const fields: Record<string, string> = {}
+  const take = (key: string, value: unknown) => {
+    if (typeof value !== 'string' || !value.trim()) return
+    if (key === 'style') { fields.cameraDevice = value.trim(); return }
+    if (PASTEABLE_KEYS.has(key)) fields[key] = value.trim()
+  }
+
+  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      // A section — its name is decoration, its entries are the payload.
+      for (const [innerKey, innerValue] of Object.entries(value as Record<string, unknown>)) {
+        take(innerKey, innerValue)
+      }
+    } else {
+      take(key, value)
+    }
+  }
+
+  const count = Object.keys(fields).length
+  return count ? { fields, count } : null
 }
 
 // Sheet layout directive — leads the prompt so the model commits to the

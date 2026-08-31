@@ -174,7 +174,11 @@ export default function PhotoExtractZone({
             'Drop to extract DNA'
           ) : (
             <>
-              <span className="lg:hidden">Extract DNA</span>
+              {/* See the note on the preset row beside this one: three tiers,
+                  because the band's third control leaves 375px too little for
+                  "Extract DNA". The green DNA glyph carries the short label. */}
+              <span className="sm:hidden">Extract</span>
+              <span className="hidden sm:inline lg:hidden">Extract DNA</span>
               <span className="hidden lg:inline">Extract Character DNA</span>
             </>
           )}

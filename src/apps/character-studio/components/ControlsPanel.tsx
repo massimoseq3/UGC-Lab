@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type ElementType, type ReactNode } from 'react'
-import { ScanFace, PersonStanding, Camera, Copy, Check, ChevronRight } from 'lucide-react'
+import { ScanFace, PersonStanding, Camera, Copy, Check, ChevronRight, Braces } from 'lucide-react'
 import type { TabId, CharacterProfile, FieldGroup } from '../types'
 import { TABS, PHOTOREALISM_STYLE, getTabFields } from '../types'
 
@@ -18,6 +18,7 @@ import ClearAllButton from '../../../components/ClearAllButton'
 import LoadPresetDropdown from './LoadPresetDropdown'
 import PresetPickerModal from './PresetPickerModal'
 import PhotoExtractZone from './PhotoExtractZone'
+import PromptJsonModal from './PromptJsonModal'
 import { buildPhysicalPrompt, buildScenePrompt } from '../services/generateCharacter'
 import { copyToClipboard } from '../../../utils/clipboard'
 import { suspendChromeAutoHide } from '../../../hooks/useChromeAutoHide'
@@ -183,6 +184,11 @@ export default function ControlsPanel({
   // rather than one flag per group, so a section added to `TABS` gets its own
   // picker with no wiring here.
   const [groupPreset, setGroupPreset] = useState<FieldGroup | null>(null)
+  // The whole-form prompt as one editable JSON box — copy the character out, or
+  // paste one in. It sits in the band with the other two ways of filling this
+  // form (a saved preset, an analysed photo) rather than on a tab divider,
+  // because it is the only one of the three that carries every field at once.
+  const [promptJsonOpen, setPromptJsonOpen] = useState(false)
 
   const applyScopedPreset = (incoming: Record<string, string>, keys: string[]) => {
     const next = { ...profile }
@@ -302,6 +308,20 @@ export default function ControlsPanel({
               onOpenLibrary={onOpenLibrary}
             />
           </div>
+          {/* The third way into this form, and the only one that reads AND
+              writes. Square and icon-only on purpose: the two rows beside it
+              already truncate their own labels at phone width, and a third
+              labelled row would take the ~25px that turns "Load Preset" into
+              "Load Pres…". The glyph is the one the box is full of. */}
+          <button
+            type="button"
+            onClick={() => setPromptJsonOpen(true)}
+            title="Prompt JSON — copy this character out, or paste one in"
+            aria-label="Prompt JSON"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-dashed border-ink/10 bg-ink/[0.02] text-ink-400 transition-colors hover:border-ink/20 hover:bg-ink/[0.05] hover:text-ink-200"
+          >
+            <Braces className="h-4 w-4" strokeWidth={1.5} />
+          </button>
         </div>
       </div>
 
@@ -465,6 +485,17 @@ export default function ControlsPanel({
             onPick={(incoming) => applyScopedPreset(incoming, groupPreset.fields.map((f) => f.key))}
             title={`${groupPreset.label} Presets`}
             subtitle={`Fill only the ${groupPreset.label.toLowerCase()} fields`}
+          />
+        )}
+
+        {/* Mounted only while open, so the box is re-seeded from the live form
+            on every visit and a mangled edit is thrown away by closing it. */}
+        {promptJsonOpen && (
+          <PromptJsonModal
+            open
+            onClose={() => setPromptJsonOpen(false)}
+            profile={profile}
+            onProfileChange={onProfileChange}
           />
         )}
       </div>

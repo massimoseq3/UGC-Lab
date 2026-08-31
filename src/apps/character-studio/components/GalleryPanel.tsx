@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useState, useEffect } from 'react'
-import { Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil, Frame, History } from 'lucide-react'
+import { Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil, Frame, History, ArrowLeft } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState } from '../../../hooks/useAssetUrl'
@@ -38,6 +38,10 @@ interface GalleryPanelProps {
   onViewModeChange: (v: ViewMode) => void
   onCancelGen: (id: string) => void
   onLaunchGen: (opts: LaunchGenOptions) => void
+  // Put a finished character's parameters back in the left-hand form. Lives in
+  // CharacterStudio because the form does; stable, like the two above it, or
+  // this memoized panel would re-render its whole history on every keystroke.
+  onReuseProfile: (profile: Record<string, string>) => void
 }
 
 // One cell on the Single stage: a generation still running, or a finished
@@ -64,6 +68,7 @@ export default memo(function GalleryPanel({
   onViewModeChange: setViewMode,
   onCancelGen,
   onLaunchGen,
+  onReuseProfile,
 }: GalleryPanelProps) {
   // The editor is anchored by ID, not by a snapshot of the row: a generation
   // can be opened while it's still running, and `finishGen` writes its history
@@ -278,6 +283,7 @@ export default memo(function GalleryPanel({
           onDelete={(item) => deleteCharacterHistory(item.id)}
           onMakeSheet={(item) => openEditor(item.id, 'sheet')}
           onCopyPrompt={(item) => handleCopyPrompt(item)}
+          onReuse={(item) => onReuseProfile(item.profile)}
           onShowInSingle={showInSingle}
         />
       ) : (
@@ -318,6 +324,7 @@ export default memo(function GalleryPanel({
                           onDelete={() => deleteCharacterHistory(item.id)}
                           onMakeSheet={() => openEditor(item.id, 'sheet')}
                           onCopyPrompt={() => handleCopyPrompt(item)}
+                          onReuse={() => onReuseProfile(item.profile)}
                           onShowInSingle={() => showInSingle(item)}
                         />
                       </div>
@@ -334,6 +341,7 @@ export default memo(function GalleryPanel({
                         onDelete={() => deleteCharacterHistory(item.id)}
                         onMakeSheet={() => openEditor(item.id, 'sheet')}
                         onCopyPrompt={() => handleCopyPrompt(item)}
+                        onReuse={() => onReuseProfile(item.profile)}
                         onShowInSingle={() => showInSingle(item)}
                       />
                     ))}
@@ -718,6 +726,7 @@ function SingleView({
   onDelete,
   onMakeSheet,
   onCopyPrompt,
+  onReuse,
   onShowInSingle,
 }: {
   slots: StageSlot[]
@@ -727,6 +736,7 @@ function SingleView({
   onDelete: (item: CharacterHistoryItem) => void | Promise<unknown>
   onMakeSheet: (item: CharacterHistoryItem) => void
   onCopyPrompt: (item: CharacterHistoryItem) => void
+  onReuse: (item: CharacterHistoryItem) => void
   onShowInSingle: (item: CharacterHistoryItem) => void
 }) {
   const generating = slots.filter((s) => s.kind === 'gen').length
@@ -771,6 +781,7 @@ function SingleView({
             onDelete={() => onDelete(first!.item)}
             onMakeSheet={() => onMakeSheet(first!.item)}
             onCopyPrompt={() => onCopyPrompt(first!.item)}
+            onReuse={() => onReuse(first!.item)}
           />
         )
       ) : (
@@ -803,6 +814,7 @@ function SingleView({
                   onDelete={() => onDelete(slot.item)}
                   onMakeSheet={() => onMakeSheet(slot.item)}
                   onCopyPrompt={() => onCopyPrompt(slot.item)}
+                  onReuse={() => onReuse(slot.item)}
                   onShowInSingle={() => onShowInSingle(slot.item)}
                 />
               ))}
@@ -826,6 +838,7 @@ function StageCell({
   onDelete,
   onMakeSheet,
   onCopyPrompt,
+  onReuse,
   onShowInSingle,
 }: {
   item: CharacterHistoryItem
@@ -833,6 +846,7 @@ function StageCell({
   onDelete: () => void | Promise<unknown>
   onMakeSheet: () => void
   onCopyPrompt: () => void
+  onReuse: () => void
   onShowInSingle: () => void
 }) {
   const natural = useNaturalRatio()
@@ -847,6 +861,7 @@ function StageCell({
           onDelete={onDelete}
           onMakeSheet={onMakeSheet}
           onCopyPrompt={onCopyPrompt}
+          onReuse={onReuse}
           onShowInSingle={onShowInSingle}
         />
       )}
@@ -933,12 +948,14 @@ function SingleCard({
   onDelete,
   onMakeSheet,
   onCopyPrompt,
+  onReuse,
 }: {
   item: CharacterHistoryItem
   onClick: () => void
   onDelete: () => void | Promise<unknown>
   onMakeSheet: () => void
   onCopyPrompt: () => void
+  onReuse: () => void
 }) {
   const a = useHistoryTileActions(item, onDelete)
   const natural = useNaturalRatio()
@@ -1014,6 +1031,16 @@ function SingleCard({
           />
           <ActionPill icon={Download} label="Download" onClick={a.handleDownload} />
           <ActionPill icon={Copy} label="Copy prompt" onClick={onCopyPrompt} />
+          {/* Straight after Copy prompt, because it's the same object headed
+              somewhere else: copy puts this character's parameters on the
+              clipboard, reuse puts them back in the form on the left. The arrow
+              points at where they land. */}
+          <ActionPill
+            icon={ArrowLeft}
+            label="Reuse prompt"
+            title="Load this character's parameters back into the form"
+            onClick={onReuse}
+          />
           {/* Same destination as clicking the picture — spelled out, because in
               this view the image reads as a still rather than a button. */}
           <ActionPill
@@ -1142,6 +1169,7 @@ function HistoryTile({
   onDelete,
   onMakeSheet,
   onCopyPrompt,
+  onReuse,
   onShowInSingle,
 }: {
   item: CharacterHistoryItem
@@ -1156,6 +1184,7 @@ function HistoryTile({
   onDelete: () => void | Promise<unknown>
   onMakeSheet: () => void
   onCopyPrompt: () => void
+  onReuse: () => void
   onShowInSingle: () => void
 }) {
   const a = useHistoryTileActions(item, onDelete)
@@ -1224,6 +1253,9 @@ function HistoryTile({
           </TileActionButton>
           <TileActionButton title="Copy prompt" onClick={() => onCopyPrompt()}>
             <Copy className="h-4 w-4" />
+          </TileActionButton>
+          <TileActionButton title="Reuse — load these parameters back into the form" onClick={() => onReuse()}>
+            <ArrowLeft className="h-4 w-4" />
           </TileActionButton>
           <TileActionButton title="Show this one in Single view" onClick={() => onShowInSingle()}>
             <Frame className="h-4 w-4" />
@@ -1302,6 +1334,7 @@ function HistoryListRow({
   onDelete,
   onMakeSheet,
   onCopyPrompt,
+  onReuse,
   onShowInSingle,
 }: {
   item: CharacterHistoryItem
@@ -1310,6 +1343,7 @@ function HistoryListRow({
   onDelete: () => void | Promise<unknown>
   onMakeSheet: () => void
   onCopyPrompt: () => void
+  onReuse: () => void
   onShowInSingle: () => void
 }) {
   const a = useHistoryTileActions(item, onDelete)
@@ -1383,10 +1417,20 @@ function HistoryListRow({
             saving={a.savingToBank}
           />
         ) : (
-          // Canonical action order, kept on one centered line: download · save ·
-          // copy · make-sheet · delete (delete last). Buttons are compact so the
-          // narrow side panel never wraps them onto a second row.
-          <div className="flex flex-nowrap items-center justify-center gap-1">
+          // Canonical action order, centred: download · save · copy · reuse ·
+          // frame · make-sheet · delete (delete last).
+          //
+          // It WRAPS, and has to. It was `flex-nowrap` on the theory that
+          // compact buttons keep seven of them on one line, but this panel is a
+          // quarter of a half-pane: the line needs 178px and gets 155 at a
+          // 1084px window, so `nowrap` inside the row's `overflow-hidden` simply
+          // cut the last button off — Delete, silently unreachable on every
+          // portrait row below about a 1350px window. (Six of these already
+          // overflowed by 9px before Reuse joined them; seven is what made it
+          // obvious.) A second centred line is the honest answer at that width,
+          // and the prompt box above it owns the leftover height, so the row
+          // itself doesn't grow — its height is the media's aspect ratio.
+          <div className="flex flex-wrap items-center justify-center gap-1">
             <ListRowButton title="Download image" onClick={a.handleDownload}>
               <Download className="h-3.5 w-3.5" />
             </ListRowButton>
@@ -1399,6 +1443,9 @@ function HistoryListRow({
             </ListRowButton>
             <ListRowButton title="Copy prompt" onClick={onCopyPrompt}>
               <Copy className="h-3.5 w-3.5" />
+            </ListRowButton>
+            <ListRowButton title="Reuse — load these parameters back into the form" onClick={onReuse}>
+              <ArrowLeft className="h-3.5 w-3.5" />
             </ListRowButton>
             <ListRowButton title="Show this one in Single view" onClick={onShowInSingle}>
               <Frame className="h-3.5 w-3.5" />

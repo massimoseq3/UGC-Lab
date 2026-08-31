@@ -151,6 +151,33 @@ export default function CharacterStudio() {
     setActiveRefId((current) => (current === id ? null : current))
   }, [removeRef, setActiveRefId])
 
+  // Reuse — put a finished character's parameters back in the form, so the next
+  // run starts from one that already worked instead of from a blank column. The
+  // row carries the exact snapshot it was generated from, so this is a straight
+  // restore; it's overlaid on a fresh empty profile rather than set directly so
+  // a row written before a field existed leaves that field blank instead of
+  // absent, and so a legacy row's stray keys don't ride into the form.
+  //
+  // The reference photo is detached with it (same reason "New" does): whatever
+  // filled the form before, it isn't what's in it now, and leaving the pill
+  // green would claim this character came off that photo. Resolution and the
+  // Portrait/Sheet toggle are deliberately NOT restored — they're the member's
+  // current cost settings, and quietly moving someone to 4K multiplies what the
+  // next press charges. The aspect ratio rides along because it's part of the
+  // profile snapshot and is a shape rather than a price.
+  const handleReuseProfile = useCallback((snapshot: Record<string, string>) => {
+    const next = createEmptyProfile()
+    for (const [key, value] of Object.entries(snapshot)) {
+      if (key in next && typeof value === 'string') next[key] = value
+    }
+    setProfile(next)
+    setActiveRefId(null)
+    // On a phone the form is the other tab, so a reuse that stayed here would
+    // look like nothing happened — the mirror of Generate flipping to Gallery.
+    setPane('controls')
+    useAppStore.getState().addToast('Prompt loaded into the form', 'success')
+  }, [setProfile, setActiveRefId])
+
   // "New": reset the form to empty AND detach the reference photo + any errors,
   // so the controls are a true blank slate. The gallery stays — generated
   // influencers live in the characterHistory bank, untouched — and so does the
@@ -434,6 +461,7 @@ export default function CharacterStudio() {
           onViewModeChange={setViewMode}
           onCancelGen={handleCancelGen}
           onLaunchGen={handleLaunchGen}
+          onReuseProfile={handleReuseProfile}
         />
       </div>
 
