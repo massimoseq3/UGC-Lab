@@ -3,7 +3,7 @@ import { Upload, Eye, Coins, X, Film, Minimize2 } from 'lucide-react'
 import { formatCredits } from '../../../utils/models'
 import { readMediaDuration } from '../../../utils/media'
 import { estimateAnalysisCredits } from '../services/analysisCost'
-import { INLINE_VIDEO_BUDGET_BYTES } from '../services/analyzeAd'
+import { VIDEO_UPLOAD_BUDGET_BYTES } from '../services/analyzeAd'
 
 // IMPORTANT: The drop overlay lives on the panel root. Do NOT add an onDrop
 // handler to the button — React onDrop on a child + native drop on the panel
@@ -29,13 +29,13 @@ interface StagedFile {
   durationSec: number | null
 }
 
-// The clip is sent inline in one request, so anything over the transport's
-// budget is re-encoded first (see services/analysisQueue.ts). Said here as well
+// The clip is uploaded to kie's file host, and anything over the upload budget
+// is re-encoded first (see services/analysisQueue.ts). Said here as well
 // as on the analysing screen: the pass runs in realtime, and a member who was
 // told to expect "a couple of minutes" should know before they commit which of
 // their clips is buying an extra one.
 function needsCompressing(file: File): boolean {
-  return file.type.startsWith('video/') && file.size > INLINE_VIDEO_BUDGET_BYTES
+  return file.type.startsWith('video/') && file.size > VIDEO_UPLOAD_BUDGET_BYTES
 }
 
 function validate(file: File): string | null {
@@ -200,7 +200,7 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
               <span className="min-w-0 flex-1 truncate text-xs text-ink-300">{s.file.name}</span>
               {needsCompressing(s.file) && (
                 <span
-                  title={`This ad is over the ${Math.round(INLINE_VIDEO_BUDGET_BYTES / (1024 * 1024))}MB the analyser can send in one request, so it gets compressed first — that takes about as long as the ad runs.`}
+                  title={`This ad is over the ${Math.round(VIDEO_UPLOAD_BUDGET_BYTES / (1024 * 1024))}MB the analyser can upload, so it gets compressed first — that takes about as long as the ad runs.`}
                   className="flex shrink-0 items-center gap-1 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium text-ink-400"
                 >
                   <Minimize2 className="h-2.5 w-2.5" strokeWidth={2.25} />
