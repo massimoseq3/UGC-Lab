@@ -65,6 +65,15 @@ export interface PromptVariation {
   // selection that can never render two products.
   productPhotos?: number[]
   prompt: string
+  // The one-or-two-sentence MOTION prompt for this exact shot: what the still
+  // above DOES once a video model animates it. Written by the same storyboard
+  // call, and it is the only thing the Animate tab fires. The still prompt is a
+  // frozen instant by construction, so handing that same paragraph back to a
+  // video model asks it to re-draw the picture it already has -- and the clip
+  // comes back with the character barely moving. Absent on legacy sessions and
+  // on imports written before the field existed; the card falls back to the
+  // still prompt there, which is exactly the old behaviour.
+  motionPrompt?: string
 }
 
 export interface Scene {
@@ -274,6 +283,13 @@ export interface CardState {
   cardVideoDurationAuto?: boolean
   cardVideoResolution: string
   cardVideoAudio: boolean
+  // The editable MOTION prompt behind the modal's Animate tab -- what the still
+  // does once it is animated. Seeded from the variation's `motionPrompt` and
+  // owned by the card from then on, exactly as `editablePrompt` is for the
+  // still. Empty (a legacy card, an import with no <MOTION>) means the animate
+  // path falls back to the still prompt, so no card ever loses the ability to
+  // fire.
+  animateMotion: string
   // True while the prompt-rewrite LLM call is in flight (Enhance or Regenerate).
   // Drives a "Working…" overlay on the prompt section.
   isPromptWorking?: boolean

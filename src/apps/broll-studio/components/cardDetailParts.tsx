@@ -342,6 +342,7 @@ function ImageTile({
 }) {
   const { url, status } = useAssetUrlState(imageRef)
   return (
+    <div className="flex flex-col gap-1 text-center">
     <div
       onClick={onClick}
       className={`group relative cursor-pointer overflow-hidden rounded-lg border bg-black light:bg-zinc-200 transition-colors ${
@@ -357,8 +358,13 @@ function ImageTile({
           {status === 'loading' ? <Spinner className="h-5 w-5 text-zinc-500" /> : <ImageIcon className="h-6 w-6 text-zinc-700" />}
         </div>
       )}
-      {/* Bottom scrim — the Animate bar sits on it. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
+      {/* Bottom scrim — the Animate bar sits on it, so it arrives with it.
+          It used to be permanent because the model pill sat down there too;
+          that pill is the caption under the tile now, which leaves a quarter of
+          every still darkened for nothing until the pointer lands on it. */}
+      {onAnimate && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+      )}
       {/* Centred, like the tag chip on a scene card — the corners belong to the
           hover actions, and a badge that names the whole tile reads better over
           the middle of it. */}
@@ -367,15 +373,6 @@ function ImageTile({
           Cover
         </span>
       )}
-      {/* Which model drew this take — the gallery is where a card's takes are
-          compared, so it's the one place the answer is actually being looked
-          for. Bottom-left on the scrim, fading on hover: the Animate bar and
-          the action stack both reach into the tile on hover. */}
-      <ModelPill
-        variant="media"
-        modelId={modelId}
-        className="absolute bottom-1.5 left-1.5 max-w-[calc(100%-0.75rem)] transition-opacity group-hover:opacity-0"
-      />
       {/* Animate — opens the Animate tab with this still as the start frame.
           Full-width, chunky bar across the bottom so it's an easy hit target. */}
       {onAnimate && (
@@ -416,6 +413,19 @@ function ImageTile({
         <TileDeleteButton onDelete={onDelete} />
       </TileActionStack>
     </div>
+      {/* The model that made this take, as the tile's own caption line rather
+          than a chip lying on the picture. The gallery is where takes are
+          compared, so the answer has to be visible — but a white-on-black pill
+          was the loudest thing on a still whose whole job is to be judged, and
+          on the clip tile it collided with the centred Cover badge on the same
+          bottom strip. Under the card it can be permanent and quiet instead of
+          fading on hover, which is the `quiet` variant's whole purpose. */}
+      <ModelPill
+        variant="quiet"
+        modelId={modelId}
+        className="inline-block max-w-full"
+      />
+    </div>
   )
 }
 
@@ -452,6 +462,7 @@ function VideoTile({
   const ratio = aspectStyle(aspectRatio)
 
   return (
+    <div className="flex flex-col gap-1 text-center">
     <div
       {...inline.hoverProps}
       onClick={onClick}
@@ -493,18 +504,15 @@ function VideoTile({
           {unmuted ? <Volume2 className="h-3 w-3" /> : <VolumeX className="h-3 w-3" />}
         </button>
       )}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/80 to-transparent" />
-      {/* Which model rendered this take. Bottom-left, capped so it can't run
-          into the centred Cover badge; fades on hover with the action stack. */}
-      <ModelPill
-        variant="media"
-        modelId={modelId}
-        className="absolute bottom-1.5 left-1.5 max-w-[55%] transition-opacity group-hover:opacity-0"
-      />
-      {/* Cover badge, centred on the bottom edge — the top corners are taken by
-          play/mute and the action stack. */}
+      {/* Cover badge, centred on the TOP edge — matching the still tile, and
+          out of the way of the model caption. It shared the bottom strip with
+          the model pill, and a 55% cap was not enough to keep two centred-ish
+          chips off each other on a narrow tile: the pill ran under the badge.
+          The top row has room because its two corners are taken by fixed-width
+          chrome (play/mute left, the action stack right) with a clear lane
+          between them. */}
       {selected && (
-        <span className="pointer-events-none absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-broll-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
+        <span className="pointer-events-none absolute left-1/2 top-1.5 -translate-x-1/2 rounded-full bg-broll-500/90 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur">
           Cover
         </span>
       )}
@@ -543,6 +551,13 @@ function VideoTile({
         </TileActionButton>
         <TileDeleteButton onDelete={onDelete} />
       </TileActionStack>
+    </div>
+      {/* Same caption line as the still tile above — see the note there. */}
+      <ModelPill
+        variant="quiet"
+        modelId={modelId}
+        className="inline-block max-w-full"
+      />
     </div>
   )
 }
