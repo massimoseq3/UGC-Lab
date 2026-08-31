@@ -772,7 +772,7 @@ export default function InputPanel({
                   // Filled is about the TEXT, not the bank pick — a pasted
                   // transcript is a filled source with no bank row behind it.
                   filled={sourceFilled}
-                  label={blueprintActive ? 'Scene' : 'Reference script'}
+                  label={blueprintActive ? 'Scene' : 'Reference Script'}
                   icon={blueprintActive ? Clapperboard : FileText}
                   accentClass={blueprintActive ? 'bg-fuchsia-500/10 text-fuchsia-300/80 light:text-fuchsia-700/80' : 'bg-scripts-500/10 text-scripts-300/80'}
                   onSelect={() => setScriptPickerOpen(true)}
