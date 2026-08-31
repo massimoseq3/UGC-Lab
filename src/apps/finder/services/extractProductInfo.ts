@@ -1,8 +1,16 @@
 import { useSettingsStore } from '../../../stores/settingsStore'
-import { kieChatCompletions, fileToDataUri, type ChatMessage } from '../../../utils/kie'
+import {
+  kieChatCompletions,
+  fileToDataUri,
+  TruncatedResponseError,
+  type ChatMessage,
+  type ChatCallTarget,
+  type ChatCompletionsOptions,
+} from '../../../utils/kie'
 import { getChatTarget, CHAT_MODEL_STRONG } from '../../../utils/models'
 import { isAssetRef, getAsBase64 } from '../../../utils/assetStore'
 import { extractBlock } from '../../../utils/xmlBlocks'
+import { downscaleForVision } from '../../../utils/visionImage'
 
 export interface ProductExtraction {
   productName: string
@@ -74,6 +82,8 @@ CATEGORY: name the market this actually competes in, then the two or three thing
 
 Nothing in <READ> is shown to anyone — it exists so that the fields are written from what is in front of you rather than from what products in general are like.
 
+Keep the whole block under 200 words. It is a grounding pass, not the answer: the TEXT line takes the words that identify the product and back its claims (brand, name, variant, actives with amounts, size, dose, badges) and skips the boilerplate — directions, warnings, addresses, barcodes and legal small print change nothing downstream. Everything you spend here comes out of the room left for the ten fields below it, and a profile that stops halfway is worth less than a shorter read.
+
 ═══ THE ANTI-GENERIC RULE ═══
 
 Every field must contain at least one thing that could ONLY be written about this exact product. If a sentence would be equally true of any other product in the category, it is wrong: delete it and write the specific version.
@@ -119,19 +129,48 @@ Naming what the buyer would OTHERWISE do is not a claim, and is encouraged: "a d
 
 <OFFER> — 1-2 lines: price, bundle, discount, bonus, guarantee, shipping. Stated terms only; bracketed placeholders otherwise.
 
-<CTA> — one short imperative line, e.g. "Shop now", "Claim 20% off today".
+<CTA> — one short, plain imperative line the creator can say to camera as-is. Three to five words. Pick the ordinary one: "Shop now", "Link's in the bio", "I'll link it below", "Tap the link below", "Grab yours today". NEVER a bracketed placeholder here, and never a price, a discount or a deadline — those belong in <OFFER>, and a CTA that has to be filled in before it can be read is a CTA that stops the script.
 
 Keep these distinct — the overlap is where a profile goes mushy:
   Pain Points = the problem felt BEFORE buying.   USPs = "ours has X".
   Benefits = "so you get Y".                      Key Specs = the raw facts behind the USPs, persuasion stripped out.
-  Offer = the commercial deal.                    CTA = the single action.
+  Offer = the commercial deal.                    CTA = the single action, in plain words.
 
 ═══ TONE ═══
 
 Match the positioning you named in <READ>: a premium object gets elevated, sensory, confident language; a budget utility gets plain and practical. Default to punchy spoken-UGC phrasing over corporate copy — these lines get performed to camera.`
 
+// Appended to the user turn on the SECOND attempt only — see `extractProductInfo`
+// below. The first attempt is the full contract; this one is the same contract
+// with its budget spent differently, so the retry is a genuinely different run
+// rather than a second roll of the same dice.
+const BREVITY_OVERRIDE = `
+
+IMPORTANT — the previous attempt did not come back in a readable state, most likely because it ran out of room. Same format, same rules, but spend far less: keep <READ> to about 80 words (the identifying words on the pack and nothing else), and write every field at the SHORT end of its stated range. A complete short profile beats a long one that stops halfway.`
+
 // Resolve whatever shape an image is stored in (File, data: URI, asset:// ref,
-// blob:/http URL) to a data URI the vision call can carry inline.
+// blob:/http URL) to a data URI the vision call can carry inline, downscaled to
+// what a vision model actually samples.
+//
+// The downscale is not a nicety. A product photo pulled off a brand site or an
+// Amazon listing is routinely 3000-6000px, and it rides in the request body as
+// base64 — which is another third again on top of the file. The model resamples
+// it to its own tile size regardless, so every one of those megabytes is upload
+// time charged against this call's timeout and nothing else. A failed re-encode
+// falls back to the original rather than sending nothing.
+//
+// It only ever affects THIS request. The result is a local, used once in the
+// message body and dropped; the photo saved to the bank is the original file
+// untouched (`ProductForm` puts the raw `fileToDataUri` on the form and
+// `Finder.persistImage` stores that; `saveProductDraft` does the same for a
+// bulk add). That matters because a product photo is a REFERENCE IMAGE — it
+// gets attached to image and video generations later — so it has to stay at
+// full quality. Never write what this returns back to the row.
+async function toVisionDataUri(source: File | string): Promise<string> {
+  const original = await toDataUri(source)
+  return (await downscaleForVision(original)) ?? original
+}
+
 async function toDataUri(source: File | string): Promise<string> {
   if (typeof source !== 'string') return fileToDataUri(source)
   if (source.startsWith('data:')) return source
@@ -161,6 +200,80 @@ function cleanLines(value: string): string {
     .join('\n')
 }
 
+// The CTA is the one field that must never need filling in. It's a single
+// spoken line at the end of a script, and every other field can carry a
+// bracketed gap because a member reads those before they perform them — this
+// one gets said. Models still reach for "Claim [your discount] today", so
+// anything bracketed, long or multi-line is replaced outright with the plainest
+// version of what a CTA is.
+const CTA_FALLBACK = 'Shop now'
+const MAX_CTA_CHARS = 44
+
+function normalizeCta(raw: string): string {
+  const line = raw.split('\n').map((l) => l.trim()).filter(Boolean)[0] ?? ''
+  const cleaned = line.replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, '').trim()
+  if (!cleaned) return CTA_FALLBACK
+  if (/\[[^\]]*\]/.test(cleaned)) return CTA_FALLBACK
+  if (cleaned.length > MAX_CTA_CHARS) return CTA_FALLBACK
+  return cleaned
+}
+
+// Read the ten fields out of one response. Returns null when the response
+// wasn't a profile at all — a refusal, a preamble, a wrong format — which is
+// what the anchor-field test is for: a missing tag here or there is exactly
+// what the tolerant reader absorbs, but overwriting the form with ten blanks
+// would be worse than saying nothing.
+function parseExtraction(responseText: string): ProductExtraction | null {
+  // Drop the working notes before reading fields: <READ> holds text transcribed
+  // off a label verbatim, and a label that happens to contain something
+  // tag-shaped would otherwise be picked up as a field.
+  const readEnd = responseText.search(/<\/READ>/i)
+  const body = readEnd === -1 ? responseText : responseText.slice(readEnd)
+
+  const read = (key: keyof ProductExtraction): string => {
+    const raw = extractBlock(body, FIELD_TAGS[key]) ?? ''
+    return LIST_FIELDS.has(key) ? cleanLines(raw) : raw
+  }
+
+  const extracted: ProductExtraction = {
+    productName: read('productName'),
+    productDescription: read('productDescription'),
+    targetMarket: read('targetMarket'),
+    painPoints: read('painPoints'),
+    usps: read('usps'),
+    benefits: read('benefits'),
+    offer: read('offer'),
+    cta: normalizeCta(read('cta')),
+    keySpecs: read('keySpecs'),
+    objections: read('objections'),
+  }
+
+  if (!extracted.productName && !extracted.productDescription) return null
+  return extracted
+}
+
+// One call, with the truncation escape hatch taken. `TruncatedResponseError`
+// carries the text the model got through before it hit the output ceiling, and
+// this is the call site that shape was written for: the ten fields are
+// independent of each other and the block reader is tolerant of a missing
+// closing tag, so a run cut off inside <OBJECTIONS> still yields a usable
+// profile — and the alternative is throwing away an answer the member paid for.
+// The anchor-field test in `parseExtraction` is what keeps that honest: a
+// fragment too short to carry a name or a description is still a failure.
+async function requestRead(
+  apiKey: string,
+  endpoint: ChatCallTarget,
+  messages: ChatMessage[],
+  opts: ChatCompletionsOptions,
+): Promise<string> {
+  try {
+    return await kieChatCompletions(apiKey, endpoint, messages, opts)
+  } catch (err) {
+    if (err instanceof TruncatedResponseError && err.partial.trim()) return err.partial
+    throw err
+  }
+}
+
 // `image` is the hero product photo as a File or an already-encoded data URI
 // (the form re-extracts from the stored image when no fresh File exists).
 // `listingText` is optional pasted product-page / listing copy — when present
@@ -182,10 +295,10 @@ export async function extractProductInfo(
   // a forced transcription pass, which is what this tier is kept for.
   const endpoint = getChatTarget(CHAT_MODEL_STRONG)
 
-  const dataUri = await toDataUri(image)
+  const dataUri = await toVisionDataUri(image)
   // A broken extra shouldn't sink the read — the hero photo is what matters.
   const extraUris = (await Promise.all(
-    extraImages.map((src) => toDataUri(src).catch(() => null)),
+    extraImages.map((src) => toVisionDataUri(src).catch(() => null)),
   )).filter((u): u is string => !!u)
 
   const photoCount = 1 + extraUris.length
@@ -194,57 +307,45 @@ export async function extractProductInfo(
     : `these ${photoCount} photos of the same product`
 
   const trimmedListing = listingText?.trim()
-  const userText = trimmedListing
+  const baseText = trimmedListing
     ? `Build the product profile from ${photoPhrase} and the listing copy below. The listing copy is authoritative for claims, specs, price, and offer. Start with the <READ> block — transcribe every word you can see before you write a single field.\n\n--- LISTING COPY ---\n${trimmedListing}`
     : `Build the product profile from ${photoPhrase}. Start with the <READ> block — transcribe every word you can see before you write a single field.`
 
-  const messages: ChatMessage[] = [
+  const photos = [dataUri, ...extraUris].map((url) => ({ type: 'image_url' as const, image_url: { url } }))
+
+  const buildMessages = (userText: string): ChatMessage[] => [
     { role: 'system', content: [{ type: 'text', text: SYSTEM_INSTRUCTION }] },
-    {
-      role: 'user',
-      content: [
-        { type: 'text', text: userText },
-        ...[dataUri, ...extraUris].map((url) => ({ type: 'image_url' as const, image_url: { url } })),
-      ],
-    },
+    { role: 'user', content: [{ type: 'text', text: userText }, ...photos] },
   ]
 
-  const responseText = await kieChatCompletions(apiKey, endpoint, messages, {
+  const first = await requestRead(apiKey, endpoint, buildMessages(baseText), {
     timeoutMs: 180_000,
     reasoningEffort: 'high',
   })
+  const parsed = parseExtraction(first)
+  if (parsed) return parsed
 
-  // Drop the working notes before reading fields: <READ> holds text transcribed
-  // off a label verbatim, and a label that happens to contain something
-  // tag-shaped would otherwise be picked up as a field.
-  const readEnd = responseText.search(/<\/READ>/i)
-  const body = readEnd === -1 ? responseText : responseText.slice(readEnd)
+  // One retry, and only for this failure. A response with neither a name nor a
+  // description didn't happen because the model was unlucky — it either spent
+  // its whole output budget on the read block, or answered in prose. Both are
+  // fixed by asking for the same thing smaller, so the second attempt is worth
+  // the member's credits in a way that re-rolling the identical call would not
+  // be. A hard error (no key, no credits, a refusal, a dropped connection)
+  // never reaches here — `requestRead` throws and the caller reports it.
+  const second = await requestRead(apiKey, endpoint, buildMessages(baseText + BREVITY_OVERRIDE), {
+    timeoutMs: 180_000,
+    // Reasoning tokens come out of the same output budget on this transport, so
+    // the retry buys its room back from the thinking as well as from the copy.
+    reasoningEffort: 'medium',
+  })
+  const retried = parseExtraction(second)
+  if (retried) return retried
 
-  const read = (key: keyof ProductExtraction): string => {
-    const raw = extractBlock(body, FIELD_TAGS[key]) ?? ''
-    return LIST_FIELDS.has(key) ? cleanLines(raw) : raw
-  }
-
-  const extracted: ProductExtraction = {
-    productName: read('productName'),
-    productDescription: read('productDescription'),
-    targetMarket: read('targetMarket'),
-    painPoints: read('painPoints'),
-    usps: read('usps'),
-    benefits: read('benefits'),
-    offer: read('offer'),
-    cta: read('cta'),
-    keySpecs: read('keySpecs'),
-    objections: read('objections'),
-  }
-
-  // A missing tag here or there is what the tolerant reader exists to absorb;
-  // both of the two anchor fields empty means the response wasn't a profile at
-  // all (a refusal, a preamble, a wrong format) and overwriting the form with
-  // ten blanks would be worse than saying so.
-  if (!extracted.productName && !extracted.productDescription) {
-    throw new Error(`Product extraction returned no readable fields — response tail: ${responseText.slice(-400)}`)
-  }
-
-  return extracted
+  // `response tail=` and not a bare colon: `humanizeError` cuts a message at
+  // that marker before matching its rules, and a model's prose refusal is full
+  // of arbitrary digits — a tail containing "401" would otherwise tell a member
+  // with a working key to go and replace it.
+  throw new Error(
+    `The product read came back without any of the fields it was asked for. response tail=${second.slice(-400)}`,
+  )
 }
