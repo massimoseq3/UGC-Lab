@@ -7,7 +7,7 @@ import {
   type ChatCallTarget,
   type ChatCompletionsOptions,
 } from '../../../utils/kie'
-import { getChatTarget } from '../../../utils/models'
+import { getChatTarget, CHAT_MODEL_STRONG } from '../../../utils/models'
 import { isAssetRef, getAsBase64 } from '../../../utils/assetStore'
 import { extractBlock } from '../../../utils/xmlBlocks'
 import { downscaleForVision } from '../../../utils/visionImage'
@@ -270,29 +270,21 @@ export async function extractProductInfo(
   extraImages: string[] = [],
 ): Promise<ProductExtraction> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  // GPT 5.6 Luna, named outright rather than through a role constant: this is
-  // the only surface on it, and inventing a third CHAT_MODEL_* tier for one
-  // caller says less than the model's own name does.
+  // CHAT_MODEL_STRONG, not the app default: this profile is read by the Scripts
+  // writer on every run for the life of the product, so a thin read here is
+  // paid for again in every script — the "it feeds another model, not a reader"
+  // reasoning that put it on the cheap tier missed that the model it feeds is
+  // the one writing prose a person performs. It's also a long tag contract with
+  // a forced transcription pass, which is what this tier is kept for.
   //
-  // The slot has now moved twice. It sat on the app default, went to
-  // CHAT_MODEL_STRONG in August 2026 (the profile is re-read by the Scripts
-  // writer for the life of the product, so a thin read is paid for again in
-  // every script), and moved here — the cheapest row in the picker, ~7x under
-  // Gemini 3.6 Flash blended, and the gap is widest on exactly what this call
-  // spends: output and reasoning, 67.2 against 450 credits per million.
-  //
-  // What to watch if it comes back: the <READ> block is a verbatim OCR pass
-  // over the packaging, and every field below it is written from what it
-  // transcribed — so a thin read shows up as small print (actives with
-  // amounts, dosages, the back-of-pack panel) missing from KEY_SPECS and USPS,
-  // not as worse prose. Judge it on a dense label, not on a clean hero shot.
-  //
-  // Vision rides the openai-responses transport (`/codex/v1/responses`), which
-  // maps our image_url parts to `input_image` with the data URI inline — the
-  // same path B-Roll already uses whenever a member picks one of these models,
-  // so this is exercised code rather than a new capability. Reasoning effort
-  // and the truncation salvage both work there too.
-  const endpoint = getChatTarget('gpt-5-6-luna')
+  // It spent a day on GPT 5.6 Luna (August 2026) for the ~7x saving and came
+  // straight back. The thing that keeps pulling it here is <READ>: a verbatim
+  // OCR pass over the packaging, where a thin read costs small print — actives
+  // with amounts, dosages, the back-of-pack panel — out of KEY_SPECS and USPS,
+  // and every field below is written from what it transcribed. Cheap reads on
+  // this surface are paid for in every script the product ever produces. Check
+  // `git log` before moving it again.
+  const endpoint = getChatTarget(CHAT_MODEL_STRONG)
 
   const dataUri = await toVisionDataUri(image)
   // A broken extra shouldn't sink the read — the hero photo is what matters.

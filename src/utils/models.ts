@@ -244,11 +244,10 @@ export const TTS_MODEL_SLOT = 'voice-studio:tts'
 //             model rather than by a person.
 //   STRONG  — ~2.6x the credits. The tier for output a person reads and acts
 //             on, where a misread style family or a hedged scene prompt costs
-//             a re-shoot rather than a retry. The Ad Analyzer is its ONE
-//             consumer; Scripts and B-Roll used to reach the same model through
-//             its registry default and now default to GPT 5.6 Terra instead.
-//             Product auto-fill sat here twice and is now on GPT 5.6 Luna,
-//             named there by slug rather than through a third role.
+//             a re-shoot rather than a retry. The Ad Analyzer and the Bank's
+//             product auto-fill both name this constant; Scripts and B-Roll
+//             used to reach the same model through its registry default and
+//             now default to GPT 5.6 Terra instead.
 //
 // Neither constant is what Scripts or B-Roll call any more: those two read the
 // member's own pick (see resolveScriptModel in stores/settingsStore.ts), which
@@ -494,14 +493,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // list by a wide margin — it undercuts even Gemini 3 Flash — so it's the
     // row to reach for when a member wants volume over polish.
     //
-    // The Bank's product auto-fill pins this entry BY SLUG (August 2026,
-    // finder/services/extractProductInfo.ts) — the one surface in the app on a
-    // named chat model that isn't one of the two role constants or a member's
-    // own pick. That call is a vision read, which works here because the
-    // Responses transport carries image parts as `input_image`; a whole VIDEO
-    // is what it can't take, which is the Ad Analyzer's constraint, not this
-    // one. Renaming or removing this id breaks that call at runtime — nothing
-    // resolves it through `defaultFor`.
+    // The Bank's product auto-fill ran on it for a day (August 2026) and went
+    // back to CHAT_MODEL_STRONG: that call opens with a verbatim OCR pass over
+    // the packaging, and small print dropped out of it is paid for in every
+    // script the product ever produces. Vision itself was never the problem —
+    // the Responses transport carries image parts as `input_image` fine; a
+    // whole VIDEO is what it can't take, which is the Ad Analyzer's
+    // constraint.
     chatEndpoint: '/codex/v1/responses',
     chatTransport: 'openai-responses',
     chatSlug: 'gpt-5-6-luna',
@@ -528,9 +526,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // reach for when a take should read better than it obeys. It held both
     // picker defaults for a stint in August 2026 and holds neither now — see
     // the Gemini 3.6 Flash entry above. It is also deliberately NOT wired to
-    // CHAT_MODEL_STRONG: that constant's one consumer is the Ad Analyzer, whose
-    // call sends a whole VIDEO inline, and the Responses API this transport
-    // speaks declares input_text / input_image only.
+    // CHAT_MODEL_STRONG: that constant's video-sending consumer is the Ad
+    // Analyzer, whose call puts a whole VIDEO inline, and the Responses API
+    // this transport speaks declares input_text / input_image only.
     chatEndpoint: '/grok/v1/responses',
     chatTransport: 'openai-responses',
     chatSlug: 'grok-4-6',
