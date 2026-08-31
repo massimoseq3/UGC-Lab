@@ -34,12 +34,10 @@ const HUMAN_VOICE_RULES = `HOW IT MUST SOUND — NON-NEGOTIABLE:
 - These words get spoken out loud by a real person filming themselves on their phone. Every single line must pass this test: "would a normal person in their 20s actually say this to a friend?" If not, rewrite it.
 - ALWAYS use contractions: I'm, don't, it's, can't, that's, you're, I've, didn't.
 - Use casual spoken reductions where a real person would: gonna, wanna, kinda, gotta, 'cause. Sprinkle them where they'd naturally land — never force them into every line.
-- Conversational starters and fillers in MODERATION (a couple per script, never every line): "okay so", "honestly", "no because", "literally", "I'm not even kidding", "wait". Overusing these is its own fake-casual tell.
+- Conversational starters and fillers in MODERATION (a couple per script, never every line): "okay so", "honestly", "no because", "literally".
 - One idea per breath. Short sentences. Fragments are fine. Vary the rhythm hard: a 3-word line next to a longer rambling one. Never an even, metronome cadence — that evenness is the AI tell.
-- Build in ONE natural disfluency on purpose: a restart, a self-correction, or an aside ("it's like 30 bucks? maybe 35"). Controlled imperfection reads as real.
 - 6th-grade vocabulary. If a word would feel weird said out loud, cut it.
 - Don't oversell. Real people undersell and let the result talk: "and it just... worked" lands harder than "it works amazingly well".
-- Specifics beat claims. Tiny concrete details make it believable — a named object, an exact action, a real timeframe or price ("the lid never sat right", "every single morning", "two weeks", "$30"). Reach for the concrete detail before the digit; see the numbers rule below.
 - No emojis, no hashtags, no [pause] markers.`
 
 const BANNED_AI_PATTERNS = `BANNED AI SENTENCE SHAPES — THIS IS THE #1 THING THAT GIVES AI WRITING AWAY. Word choice isn't enough; these CONSTRUCTIONS are the real tell. Never use any:
@@ -84,17 +82,8 @@ const CORPUS_EVIDENCE = `WHAT SEPARATES THE BIGGEST WINNERS FROM THE MERELY VIRA
 
 const HOOK_RULES = `THE HOOK IS 80% OF THE JOB:
 - The first line is the entire video. Write it to win in under 1.5 seconds of speech, in the first 3-4 words.
-- Enter mid-thought, mid-story, or mid-reaction. Never warm up, never set up context. The most interesting beat goes FIRST; you explain later.
 - Banned hook openers (they scream "ad"): "So I've been...", "Have you ever...", "Let me tell you about...", "Introducing...", "If you struggle with...".
 - Open a loop in or near the hook that only pays off later, so they keep watching to the end.`
-
-const SELF_AUDIT = `SELF-AUDIT BEFORE YOU ANSWER (do this silently; output ONLY the final result):
-1. Read the hook. Does it win in 3-4 words with no warm-up? If not, rewrite it.
-1b. Read the hook against the HOOK CONTRACT in the brief. Does it establish what that structure or format needs established, so a viewer knows from the first line what kind of video this is? If it names a count of anything, does the body deliver exactly that many, counted out loud? If either answer is no, rewrite the hook — or the body — until they agree.
-2. Scan every line for the 6 banned sentence shapes and any em-dash. Kill them.
-3. Check rhythm: if 3+ sentences in a row are the same length, break one.
-4. Find one vague claim and make it specific. Find one oversell and undersell it.
-5. Read the whole thing out loud in your head. Any line you wouldn't actually say to a friend gets rewritten or cut.`
 
 // The voice-consistency spec (shared — see utils/voiceProfile.ts). The scenes
 // format emits this so the SAME on-camera voice can be reproduced across every
@@ -257,27 +246,21 @@ WHICH FORMULA YOU PICK IS DECIDED BY THE HOOK CONTRACT IN THE BRIEF, NOT BY YOU:
 // ── Remix: the source-fidelity contract ──
 //
 // A remix is an ADAPTATION, and the app kept producing fresh scripts because
-// nothing here made that structural. "Rigorously maintain the original's
-// pacing" was asserted once and given no mechanism, while three other blocks
-// actively pulled the other way: HOOK_RULES ("write it to win in 3-4 words"),
-// SELF_AUDIT step 1 ("if the hook doesn't win, rewrite it") and every angle's
-// "Lead with X" all told the model to design its own opening — which is the one
-// thing a remix inherits. So the hook rules and the self-audit are remix-specific
-// here, the angles pick CONTENT rather than structure (see the block above
-// REMIX_ANGLE_INSTRUCTION), and this contract gives the model the missing
-// mechanism: map the source into beats first, then write against that map.
+// nothing here made that structural: HOOK_RULES ("write it to win in 3-4
+// words") and every angle's "Lead with X" told the model to design its own
+// opening, which is the one thing a remix inherits. So the hook rules are
+// remix-specific here and the angles pick CONTENT rather than structure (see
+// the block above REMIX_ANGLE_INSTRUCTION).
+//
+// This block used to carry the mechanism as well — map the source into beats
+// first, then write beat for beat against that map (same beats, same order,
+// same count, same rhythm, same CTA placement). That came out in August 2026
+// to see what the model does when it's told WHAT a remix is and left to work
+// out how, rather than being handed a checklist. The self-audit and
+// BANNED_AI_PATTERNS came out of REMIX_SYSTEM in the same pass. Read the takes
+// before putting any of it back — `git show` has the removed text verbatim.
 const REMIX_SOURCE_FIDELITY = `HOW A REMIX WORKS — THIS IS AN ADAPTATION, NOT A NEW SCRIPT:
 The source script you are given is a proven winner. Its STRUCTURE is the thing being reused, so you don't get to redesign it. You are swapping a new product into a machine that already works.
-
-FIRST, silently map the source into its beats, in order: what the first line DOES (a confession, a number, a question, a callout, a mid-story drop, reading something out loud), then what each following line does (agitate, reveal, prove, handle an objection, demo, close), where the product first appears, where the script turns, and where the CTA lands and how hard it asks.
-
-THEN write the new script beat for beat against that map:
-- SAME BEATS, SAME ORDER, SAME COUNT. One source beat in, one new beat out. Don't add beats the source doesn't have, don't merge two of its beats into one, don't reorder them.
-- SAME OPENING DEVICE. Whatever the source's first line does, your first line does the same thing with this product's material. You copy the SHAPE, never the words.
-- SAME RHYTHM AND LINE LENGTHS. If a source line is three words, its replacement is about three words. The pacing is a big part of why this ad won.
-- SAME TURN, SAME CTA PLACEMENT. The product enters at the same point in the script, and the call-to-action sits in the same position with the same energy (hard ask, throwaway aside, or no ask at all).
-- SAME SPEAKER. Keep the source's point of view (I / you / we), its tense, and how casual or unhinged the person talking is.
-- Where these rules and the voice rules below disagree about rhythm or line count, THE SOURCE WINS. The voice rules govern word choice, not shape.
 
 WHAT DOES CHANGE — every product-specific fact. The pain point, the benefit, the proof, the numbers, the price, the category, the product name, the objection, the offer and the CTA wording all come from the NEW product's details. Nothing about the source's product, brand or category survives; never mention or imply it.
 
@@ -289,14 +272,6 @@ A remix that reads like a fresh script written off the product brief is a FAILUR
 // true: the openers that scream "ad", and the open loop.
 const REMIX_HOOK_RULES = `THE HOOK IS INHERITED, NOT INVENTED: the source's first line already won — that's the whole reason this ad is being remixed. Keep its device, its shape and roughly its word count, and refill it with this product's specifics. Do NOT "improve" it into a different kind of hook, and do NOT put a warm-up in front of it. If the source opens a loop that pays off later, your version opens the same loop and pays it off in the same place. The only openers that are off-limits no matter what the source did: "So I've been...", "Have you ever...", "Let me tell you about...", "Introducing...", "If you struggle with...".`
 
-const REMIX_SELF_AUDIT = `SELF-AUDIT BEFORE YOU ANSWER (do this silently; output ONLY the final script):
-1. Lay your script next to the source, beat for beat. Same count, same order, same job per beat? Rewrite any beat that drifted.
-2. Does your first line DO what the source's first line does? If you invented a different kind of hook, replace it.
-3. Is the CTA in the same position, asking about as hard as the source's?
-4. Did any of the SOURCE's product, brand, category or specifics survive? Cut them — every fact comes from the new product.
-5. Scan every line for the 6 banned sentence shapes and any em-dash. Kill them.
-6. Read it out loud in your head. Any line you wouldn't actually say to a friend gets rewritten.`
-
 const REMIX_SYSTEM = `You are an elite UGC ad script writer with the specialized skill of "Structural Adaptation". Brands pay you because your rewrites hold attention and convert WITHOUT ever sounding like marketing — they sound like a real person talking to their phone camera.
 
 Your task is taking a winning ad script and rewriting it for a completely new product while rigorously maintaining the original script's beats, pacing, hook device, psychological triggers, and call-to-action placement.
@@ -306,11 +281,6 @@ ${REMIX_SOURCE_FIDELITY}
 ${REMIX_HOOK_RULES}
 
 ${HUMAN_VOICE_RULES}
-- Mention the product name at most twice, the casual way a person would ("so I got the X", "this thing").
-
-${BANNED_AI_PATTERNS}
-
-${REMIX_SELF_AUDIT}
 
 CRITICAL FORMATTING RULES:
 1. ONLY return the spoken dialogue.
@@ -414,8 +384,6 @@ ${HUMAN_VOICE_RULES}
 ${BANNED_AI_PATTERNS}
 
 ${CORPUS_EVIDENCE}
-
-${SELF_AUDIT}
 
 FORMAT RULES — CRITICAL:
 1. ONLY return the spoken words, plus the labelled lines the picked style explicitly asks for (see rule 6) — nothing else.
