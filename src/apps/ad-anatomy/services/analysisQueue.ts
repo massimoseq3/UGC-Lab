@@ -5,7 +5,7 @@
 // Rows that fell back to the streaming transport still can't be resumed; the
 // mount-time reconciler flips those to 'error'.
 
-import { startAnalysisTask, pollAnalysisTask, streamAnalysisFallback, INLINE_VIDEO_BUDGET_BYTES } from './analyzeAd'
+import { startAnalysisTask, pollAnalysisTask, streamAnalysisFallback, VIDEO_UPLOAD_BUDGET_BYTES } from './analyzeAd'
 import { captureFirstFrame } from '../utils/captureFirstFrame'
 import { compressVideoForAnalysis } from '../utils/compressVideo'
 import { saveAsset, deleteAsset, getBlob } from '../../../utils/assetStore'
@@ -45,11 +45,11 @@ function mb(bytes: number): string {
 // A failure here is FINAL for this run: the compressor's messages all name what
 // the member should do next, so they are rethrown as-is rather than swallowed
 // into a retry that would send the same oversized body.
-async function fitForInlineRequest(historyId: string, file: File): Promise<File> {
-  if (file.size <= INLINE_VIDEO_BUDGET_BYTES) return file
+async function fitForUpload(historyId: string, file: File): Promise<File> {
+  if (file.size <= VIDEO_UPLOAD_BUDGET_BYTES) return file
   if (!file.type.startsWith('video/')) {
     throw new FriendlyError(
-      `This image is ${mb(file.size)}, over the ${mb(INLINE_VIDEO_BUDGET_BYTES)} the analyser can send. Export it smaller and try again.`,
+      `This image is ${mb(file.size)}, over the ${mb(VIDEO_UPLOAD_BUDGET_BYTES)} the analyser can send. Export it smaller and try again.`,
     )
   }
 
@@ -58,8 +58,8 @@ async function fitForInlineRequest(historyId: string, file: File): Promise<File>
   // analysis starts, and an unexplained one on top of an already-long call is
   // what reads as a hung page.
   await updateAdAnatomyHistory(historyId, { compressing: true })
-  console.log(`[ad-anatomy] ${file.name} is ${mb(file.size)} — compressing to fit ${mb(INLINE_VIDEO_BUDGET_BYTES)}`)
-  const result = await compressVideoForAnalysis(file, INLINE_VIDEO_BUDGET_BYTES)
+  console.log(`[ad-anatomy] ${file.name} is ${mb(file.size)} — compressing to fit ${mb(VIDEO_UPLOAD_BUDGET_BYTES)}`)
+  const result = await compressVideoForAnalysis(file, VIDEO_UPLOAD_BUDGET_BYTES)
     .finally(() => {
       if (rowExists(historyId)) void updateAdAnatomyHistory(historyId, { compressing: undefined })
     })
@@ -68,9 +68,9 @@ async function fitForInlineRequest(historyId: string, file: File): Promise<File>
   // An encoder that missed the budget has produced a body that will be rejected
   // anyway. Say so here, where we still know the numbers, rather than letting
   // kie say it in its own words after another upload.
-  if (result.compressedBytes > INLINE_VIDEO_BUDGET_BYTES) {
+  if (result.compressedBytes > VIDEO_UPLOAD_BUDGET_BYTES) {
     throw new FriendlyError(
-      `This ad is still ${mb(result.compressedBytes)} after compressing, over the ${mb(INLINE_VIDEO_BUDGET_BYTES)} the analyser can send. Trim it shorter or export it at a lower resolution and try again.`,
+      `This ad is still ${mb(result.compressedBytes)} after compressing, over the ${mb(VIDEO_UPLOAD_BUDGET_BYTES)} the analyser can send. Trim it shorter or export it at a lower resolution and try again.`,
     )
   }
   return result.file
@@ -150,7 +150,7 @@ export function enqueueAnalysis(historyId: string, file: File): void {
     try {
       // Thumbnail and cost estimate come off the ORIGINAL; only the copy that
       // goes over the wire is re-encoded.
-      const payload = await fitForInlineRequest(historyId, file)
+      const payload = await fitForUpload(historyId, file)
       if (!rowExists(historyId)) return
       const started = await startAnalysisTask(payload)
       if (!rowExists(historyId)) return

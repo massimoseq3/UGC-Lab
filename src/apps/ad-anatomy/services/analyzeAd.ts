@@ -6,6 +6,7 @@ import {
   extractChatTaskText,
   kieChatCompletions,
   fileToDataUri,
+  ensureHostedUrl,
   CHAT_POLL_ATTEMPTS,
   type ChatMessage,
 } from '../../../utils/kie'
@@ -33,19 +34,25 @@ const REASONING_EFFORT = 'medium' as const
 // have intermediate progress signals like the task-based flow.
 const STREAM_TIMEOUT_MS = 300_000
 
-// How many bytes of video may ride inline in one request.
+// How many bytes of video the analyser will send to kie in one go.
 //
-// The clip is sent as a base64 data URI, and base64 is 4/3 of what it encodes,
-// so the body is ~1.34x the file: this budget is 12MB on disk against a ~16MB
-// request, comfortably inside the 20MB ceiling Gemini puts on an inline request
-// and any gateway cap of the same order. It is deliberately conservative — the
-// cost of guessing high is the exact 400 this number exists to prevent, and the
-// cost of guessing low is a slightly softer picture.
+// This used to be the INLINE budget — what fit in a chat request as a base64
+// data URI — and it was never the real ceiling: the gateway rejects an inline
+// clip far below it (see `buildMessages`). The ad is uploaded to kie's file
+// host now, so this bounds the UPLOAD rather than the model request. base64 is
+// still the wire format for that POST, so the ~1.34x inflation still applies:
+// 12MB on disk is a ~16MB upload.
 //
-// This is the ONE number to move if kie's ceiling ever changes; `analysisQueue`
-// re-encodes anything above it (see `utils/compressVideo.ts`) and `UploadView`
-// quotes it to the member.
-export const INLINE_VIDEO_BUDGET_BYTES = 12 * 1024 * 1024
+// It is deliberately unchanged from the inline era, and deliberately
+// conservative. Moving the transport and the budget in one step would be two
+// variables at once, and this app has been burnt by that before (see the
+// two-pass note at the top of this file). It is very likely raisable now that
+// nothing rides in the request body — establish the file host's real cap on a
+// big ad first, then move this number on evidence rather than on hope.
+//
+// This is the ONE number to move; `analysisQueue` re-encodes anything above it
+// (see `utils/compressVideo.ts`) and `UploadView` quotes it to the member.
+export const VIDEO_UPLOAD_BUDGET_BYTES = 12 * 1024 * 1024
 
 // A rejection that means "this body is too big", in the vocabulary the layers
 // between us and the model actually use — an HTTP 413, a gateway's "request
@@ -214,23 +221,49 @@ const USER_PROMPT = `Analyze this UGC ad video/image thoroughly. Produce: (1) a 
 
 The recreation is the point: these prompts go straight into an AI video model, and whatever you leave vague, the model invents. Classify the look (live-action UGC or a rendered/animated style) and write the style paragraph that holds every clip together. Profile the voice once — how it sounds and who is speaking from where — so every clip is read by the same person. The scenes must cover the ENTIRE ad from 00:00 to the end with no gaps, and every individual camera cut inside a scene must be described in chronological order as a timeline — do not merge or skip any shot. Each scene prompt MUST describe the original character in full identifying detail, describe the original product in full identifying detail, quote the original spoken lines verbatim with the speaker named, transcribe any on-screen text exactly, and direct the shot's camera position, movement, lighting, setting, action and audio. No hedges, no generics, no placeholder tokens. Return the analysis as JSON.`
 
-// Inline data URI in the chat message. We previously tried kie's hosted-URL
-// upload but the createTask + recordInfo path didn't return results for the
-// chat model (PR #91 → reverted). Base64 inline is slower on the wire but
-// it's the path that actually works end-to-end today.
+// The ad is UPLOADED to kie's file host and referenced by URL. It is never sent
+// as an inline data URI, and this has now been settled the hard way in both
+// directions — read this before changing it back.
+//
+// kie's gateway refuses an inline data URI for a clip of any real size, with a
+// 400 that names the fix outright:
+//
+//   The image URL<data:video/mp4;base64,...(truncated,len=7232110)>
+//   Inline data URL is too large. Upload the file and pass an HTTP(S) URL
+//   instead.
+//
+// That was a ~5.4MB ad — comfortably UNDER the budget below, so nothing
+// compressed it and nothing warned the member. The ceiling is the gateway's,
+// not the model's, so no amount of swapping chat models moves it — this failure
+// was read as Gemini 3.6 Flash being unreliable and very nearly bought a model
+// swap that would have changed nothing.
+//
+// Hosted URLs were tried once before and reverted the same day (PR #91 → #92,
+// May 2026) — but NOT because the upload failed. The revert message says
+// createTask succeeded and `pollAnalysisTask` couldn't fetch the result back,
+// and that poll was reading task records with a narrow local envelope reader.
+// It was replaced in August 2026 by the shared `extractChatTaskText` (PR #479),
+// which reads every shape kie returns a chat answer in and is what this file
+// polls through today. The blocker that justified the revert is gone; the 400
+// above is what makes the inline path untenable regardless.
+//
+// `ensureHostedUrl` memoises by content hash, so a Retry on a failed row costs
+// no second upload. Hosted files expire after ~3 days on kie's side, which
+// outlives any single analysis by a wide margin.
 //
 // The video is the ONLY media part. Attaching extra stills alongside it is what
 // the two-pass build did, and every request came back rejected — see the note
 // at the top of this file.
-async function buildMessages(videoFile: File): Promise<ChatMessage[]> {
+async function buildMessages(videoFile: File, apiKey: string): Promise<ChatMessage[]> {
   const dataUri = await fileToDataUri(videoFile)
+  const hostedUrl = await ensureHostedUrl(apiKey, dataUri)
   return [
     { role: 'system', content: [{ type: 'text', text: SYSTEM_INSTRUCTION }] },
     {
       role: 'user',
       content: [
         { type: 'text', text: USER_PROMPT },
-        { type: 'image_url', image_url: { url: dataUri } },
+        { type: 'image_url', image_url: { url: hostedUrl } },
       ],
     },
   ]
@@ -326,7 +359,7 @@ export type StartAnalysisOutcome =
 // through to the streaming transport.
 export async function startAnalysisTask(videoFile: File): Promise<StartAnalysisOutcome> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
-  const messages = await buildMessages(videoFile)
+  const messages = await buildMessages(videoFile, apiKey)
 
   try {
     const taskId = await createTask(apiKey, CHAT_MODEL_ID, {
@@ -377,7 +410,7 @@ export async function pollAnalysisTask(taskId: string): Promise<AnalysisResult> 
 export async function streamAnalysisFallback(videoFile: File): Promise<AnalysisResult> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const endpoint = getChatTarget(CHAT_MODEL_ID)
-  const messages = await buildMessages(videoFile)
+  const messages = await buildMessages(videoFile, apiKey)
   const responseText = await kieChatCompletions(apiKey, endpoint, messages, {
     timeoutMs: STREAM_TIMEOUT_MS,
     reasoningEffort: REASONING_EFFORT,
