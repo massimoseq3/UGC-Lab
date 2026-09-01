@@ -295,15 +295,11 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
         </div>
       )}
 
+      {/* No "Optional" tag on the group: it came off the card header it echoed
+          (September 2026), and a lone reminder at the bottom of a card that no
+          longer says it up top reads as this group being the special one. */}
       {chips.length > 0 && (
-        <RefGroup
-          label="Attachments"
-          tag={
-            <span className="rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] normal-case tracking-normal text-ink-500">
-              Optional
-            </span>
-          }
-        >
+        <RefGroup label="Attachments">
           {/* A wrapping row, NOT a grid with a breakpoint. This panel's width
               doesn't track the viewport's: above `md` it's a fraction of the
               window, so a small desktop leaves it as narrow as a phone leaves it

@@ -101,7 +101,10 @@ export function SectionPresetPill({
   label: string
   title: string
   icon?: ElementType
-  onClick: () => void
+  // Takes the event, so a pill sitting inside a row that is itself clickable
+  // (Playground's Voice header, where the row folds the card) can stop its own
+  // click from doing both things.
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void
   tone?: keyof typeof PILL_TONES
   // Defaults to the tone's own historic type — 12px on the accent pill, 14px on
   // the neutral one — so nothing moves unless a caller asks it to.

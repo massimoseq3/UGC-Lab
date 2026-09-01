@@ -81,15 +81,22 @@ export default function MeetTheTeam() {
         onClick={(e) => e.stopPropagation()}
         className="relative flex max-h-[94dvh] w-full max-w-3xl flex-col overflow-hidden rounded-3xl border border-ink/10 bg-surface-1 shadow-2xl shadow-black/50"
       >
-        {/* A violet glow off the top edge, so the intro reads as part of the
-            sky it opens over rather than a green panel sitting on it. It was
-            named after a bloom `.desktop-wallpaper` used to paint; that layer
-            is gone (the two full-page screens now show the shared
-            `AppBackground` gradient), and this stayed because the modal wants
-            its own light regardless of what is behind it. */}
+        {/* A glow off the top edge, so the intro reads as lit from above rather
+            than as a flat panel. It was violet until September 2026 (it was
+            named after a bloom `.desktop-wallpaper` used to paint, and outlived
+            that layer); it is MONOCHROME now — Massimo's call — because this
+            modal is the one place eight accent colours sit in a single row, and
+            a ninth hue washing over them from the top edge is competing with the
+            thing it is meant to light.
+
+            `--color-ink` rather than a literal, so it stays a light source in
+            both themes: white over the dark panel, a soft grey haze over the
+            light one. The strength is a variable rather than two whole gradient
+            strings, and it comes DOWN in light mode — 12% white on #0a0a0a is a
+            bloom, 12% near-black on #fafafa is a bruise. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(600px_220px_at_50%_-10%,rgba(113,101,255,0.16),transparent_75%)]"
+          className="pointer-events-none absolute inset-x-0 top-0 h-48 [--team-glow:12%] bg-[radial-gradient(600px_220px_at_50%_-10%,color-mix(in_srgb,var(--color-ink)_var(--team-glow),transparent),transparent_75%)] light:[--team-glow:6%]"
         />
         <button
           onClick={close}
