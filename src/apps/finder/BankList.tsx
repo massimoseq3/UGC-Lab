@@ -12,8 +12,7 @@ import { downloadImage } from '../../utils/downloadImage'
 import { copyToClipboard } from '../../utils/clipboard'
 import GeneratingBackdrop from '../../components/GeneratingBackdrop'
 import { TileActionStack, TileActionButton, TileStarButton, TileDeleteButton } from '../../components/tileActions'
-import { sortByOrder, type SortOrder, type BankView } from './bankSort'
-import BankRows from './BankRows'
+import { sortByOrder, type SortOrder } from './bankSort'
 import { filterByQuery, type BankItem } from './bankRow'
 // The swipe file is Outliers' data shown in the Bank, and its cards have to
 // read the same in both places — one formatter, not a second copy that drifts.
@@ -82,11 +81,6 @@ interface BankListProps {
   onEdit: (id: string) => void
   onAdd: () => void
   sort: SortOrder
-  // List view's column headers set the sort; the toolbar dropdown sets the same
-  // state, so the two can never disagree about what the list is sorted by.
-  onSortChange: (v: SortOrder) => void
-  // Grid of cards or list of rows — the member's per-bank choice.
-  view: BankView
   // The toolbar's search box. Filters every bank through `describeRow`.
   query: string
   // Influencers bank sub-filter (All / Portraits / Influencer Sheets).
@@ -690,10 +684,7 @@ function VoiceCard({ item, onEdit, onDelete }: { item: VoicePreset; onEdit: () =
   )
 }
 
-export default function BankList({ bankType, onEdit, onAdd, sort, onSortChange, view, query, modelFilter = 'all', inFlightProductIds, onBulkProductFiles }: BankListProps) {
-  // A swipe row opens the Outliers detail view, never a form — in list view
-  // that has to be owned here, since the rows themselves are bank-agnostic.
-  const [openSwipeId, setOpenSwipeId] = useState<string | null>(null)
+export default function BankList({ bankType, onEdit, onAdd, sort, query, modelFilter = 'all', inFlightProductIds, onBulkProductFiles }: BankListProps) {
   const products = useBankStore((s) => s.products)
   const models = useBankStore((s) => s.models)
   const scripts = useBankStore((s) => s.scripts)
@@ -708,16 +699,6 @@ export default function BankList({ bankType, onEdit, onAdd, sort, onSortChange, 
   const deleteBRoll = useBankStore((s) => s.deleteBRoll)
   const deleteStyle = useBankStore((s) => s.deleteStyle)
   const deleteSwipe = useBankStore((s) => s.deleteSwipe)
-
-  const DELETERS: Record<BankType, (id: string) => void> = {
-    products: deleteProduct,
-    models: deleteModel,
-    scripts: deleteScript,
-    voices: deleteVoice,
-    brolls: deleteBRoll,
-    styles: deleteStyle,
-    swipes: deleteSwipe,
-  }
 
   // Sub-filter first (it's a different QUESTION from search: which kind of
   // character, not which one), then the search box.
@@ -737,28 +718,6 @@ export default function BankList({ bankType, onEdit, onAdd, sort, onSortChange, 
   // — "no results" and "nothing here yet" are different sentences.
   if (query.trim() && shown.length === 0 && source.length > 0) {
     return <NoResults query={query} />
-  }
-
-  if (view === 'list' && shown.length > 0) {
-    const openSwipe = bankType === 'swipes' ? swipes.find((s) => s.id === openSwipeId) : undefined
-    const rows = (
-      <>
-        <BankRows
-          items={shown}
-          bankType={bankType}
-          sort={sort}
-          onSort={onSortChange}
-          onEdit={bankType === 'swipes' ? setOpenSwipeId : onEdit}
-          onDelete={DELETERS[bankType]}
-        />
-        {openSwipe && <SwipeDetail item={openSwipe} onClose={() => setOpenSwipeId(null)} />}
-      </>
-    )
-    // Products keep their bulk-add dropzone in either view — dropping photos
-    // onto the bank is how most products get added.
-    return bankType === 'products'
-      ? <ProductsBankZone onBulkFiles={onBulkProductFiles}>{rows}</ProductsBankZone>
-      : rows
   }
 
   if (bankType === 'products') {
