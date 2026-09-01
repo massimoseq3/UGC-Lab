@@ -15,11 +15,26 @@ export interface Product {
   benefits: string
   offer: string
   cta: string
-  // Deep-context fields (optional — absent on rows saved before they existed).
-  // Concrete facts: ingredients, materials, specs, sizes, how it works.
-  keySpecs?: string
-  // Purchase hesitations, each paired with its counter.
+  // Purchase hesitations, each paired with its counter. Optional — absent on
+  // rows saved before it existed.
   objections?: string
+  // The research-brief fields. Everything above is what the product IS; these
+  // are what a scriptwriter reaches for once they have it, and they were added
+  // together (September 2026) because the auto-fill now writes a full intake
+  // brief rather than ten summary boxes. All optional, all free text.
+  // The named ingredient/technology/method the product hangs on, in plain words.
+  uniqueMechanism?: string
+  // What this buyer uses or does instead today, including nothing, and why
+  // each one lets them down. The richest hook source in the row.
+  currentAlternatives?: string
+  // Who should NOT buy this. Disqualification sharpens the targeting.
+  notFor?: string
+  // Credibility signals actually present, each with how strong it really is.
+  proof?: string
+  // Two first-person paragraphs: a day in their life now, then with it working.
+  beforeAfter?: string
+  // One-line script openers, each tagged with its type.
+  hookAngles?: string
   createdAt: number
   // undefined → legacy (no dot), false → draft (orange dot),
   // true → user-confirmed via Save (green dot).

@@ -1024,12 +1024,17 @@ export default function InputPanel({
             <div className="flex flex-col gap-4 p-5">
               <EditableField label="Name" value={editableContext.productName} onChange={(v) => updateField('productName', v)} />
               <EditableField label="Description" value={editableContext.productDescription} onChange={(v) => updateField('productDescription', v)} />
+              <EditableField label="Unique Mechanism" value={editableContext.uniqueMechanism} onChange={(v) => updateField('uniqueMechanism', v)} />
               <EditableField label="Target Market" value={editableContext.targetMarket} onChange={(v) => updateField('targetMarket', v)} />
               <EditableField label="Pain Points" value={editableContext.painPoints} onChange={(v) => updateField('painPoints', v)} />
-              <EditableField label="USPs" value={editableContext.usps} onChange={(v) => updateField('usps', v)} />
               <EditableField label="Benefits" value={editableContext.benefits} onChange={(v) => updateField('benefits', v)} />
-              <EditableField label="Key Specs & Facts" value={editableContext.keySpecs} onChange={(v) => updateField('keySpecs', v)} />
+              <EditableField label="Before / After" value={editableContext.beforeAfter} onChange={(v) => updateField('beforeAfter', v)} />
+              <EditableField label="Current Alternatives" value={editableContext.currentAlternatives} onChange={(v) => updateField('currentAlternatives', v)} />
+              <EditableField label="USPs" value={editableContext.usps} onChange={(v) => updateField('usps', v)} />
+              <EditableField label="Proof" value={editableContext.proof} onChange={(v) => updateField('proof', v)} />
               <EditableField label="Objections" value={editableContext.objections} onChange={(v) => updateField('objections', v)} />
+              <EditableField label="Not For" value={editableContext.notFor} onChange={(v) => updateField('notFor', v)} />
+              <EditableField label="Hook Angles" value={editableContext.hookAngles} onChange={(v) => updateField('hookAngles', v)} />
               <EditableField label="Offer" value={editableContext.offer} onChange={(v) => updateField('offer', v)} />
               <EditableField label="CTA" value={editableContext.cta} onChange={(v) => updateField('cta', v)} />
             </div>
