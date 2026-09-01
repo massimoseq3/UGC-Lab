@@ -8,12 +8,18 @@ import { usePersistedState, useProjectScopedKey } from '../../../hooks/usePersis
 import ScenesView from './ScenesView'
 import ContinuousView from './ContinuousView'
 import BrollHistoryView from './BrollHistoryView'
-import { isRetiredOneShotRow } from './brollHistoryRows'
+import { brollHistoryMode, isRetiredOneShotRow } from './brollHistoryRows'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import GridCanvas, { AwaitingBody } from '../../../components/GridCanvas'
 
 interface RightPanelProps {
   mode: BrollMode
+  // False when Continuous is switched off in Settings → Experimental. It hides
+  // Continuous sessions from History (there's no mode left to open one in — the
+  // rule the retired One-Shot rows already follow) and drops the "Line by Line"
+  // qualifier from the Storyboard tab, which only existed to tell the two
+  // storyboards apart. Nothing is deleted; the rows come back with the switch.
+  continuousEnabled: boolean
   result: BrollResult | null
   // Continuous mode (keyframe chain) state — owned by BrollStudio.
   continuousResult: ContinuousResult | null
@@ -63,6 +69,7 @@ type Tab = 'scenes' | 'history'
 export default function RightPanel(props: RightPanelProps) {
   const {
     mode,
+    continuousEnabled,
     result,
     continuousResult,
     continuousModelId,
@@ -106,10 +113,15 @@ export default function RightPanel(props: RightPanelProps) {
 
   const allHistory = useBankStore((s) => s.brollHistory)
   const deleteBrollHistory = useBankStore((s) => s.deleteBrollHistory)
-  // Sessions from the retired One-Shot mode stay on disk but aren't listed —
-  // there's no mode left to open them in. Filtered here so the tab's count and
-  // the list below always agree.
-  const brollHistory = useMemo(() => allHistory.filter((it) => !isRetiredOneShotRow(it)), [allHistory])
+  // Sessions there's no mode left to open stay on disk but aren't listed: the
+  // retired One-Shot rows always, and the Continuous ones while that mode is
+  // switched off. Filtered here so the tab's count and the list below agree.
+  const brollHistory = useMemo(
+    () => allHistory.filter((it) => (
+      !isRetiredOneShotRow(it) && (continuousEnabled || brollHistoryMode(it) !== 'continuous')
+    )),
+    [allHistory, continuousEnabled],
+  )
 
   const isContinuous = mode === 'continuous'
   const sceneCount = isContinuous
@@ -153,7 +165,9 @@ export default function RightPanel(props: RightPanelProps) {
               label: (
                 <>
                   <span className="md:hidden">Storyboard</span>
-                  <span className="hidden md:inline">{isContinuous ? 'Continuous Storyboard' : 'Line by Line Storyboard'}</span>
+                  <span className="hidden md:inline">
+                    {!continuousEnabled ? 'Storyboard' : isContinuous ? 'Continuous Storyboard' : 'Line by Line Storyboard'}
+                  </span>
                 </>
               ),
               badge: sceneCount > 0 ? sceneCount : undefined,
