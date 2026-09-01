@@ -6,7 +6,7 @@ import { useAppStore } from '../stores/appStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useThemeStore, type ThemePref } from '../stores/themeStore'
 import { useGenerationInfoStore } from '../stores/generationInfoStore'
-import { useAppVisible, useAppVisibilityStore } from '../stores/appVisibilityStore'
+import { useAppVisible, useAppVisibilityStore, useFeatureEnabled } from '../stores/appVisibilityStore'
 import SegmentedToggle from './SegmentedToggle'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
@@ -113,10 +113,12 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   const showGenerationInfo = useGenerationInfoStore((s) => s.show)
   const setShowGenerationInfo = useGenerationInfoStore((s) => s.setShow)
 
-  // Outliers — the one app a member can switch off, and it ships off. See
-  // stores/appVisibilityStore for what the switch actually moves.
+  // Outliers — the one app a member can switch off, and it ships off; B-Roll's
+  // Continuous mode is the same deal one level down. See
+  // stores/appVisibilityStore for what each switch actually moves.
   const outliersOn = useAppVisible('discover')
-  const setAppVisible = useAppVisibilityStore((s) => s.setAppVisible)
+  const continuousOn = useFeatureEnabled('broll-continuous')
+  const setOptionalEnabled = useAppVisibilityStore((s) => s.setOptionalEnabled)
 
   useEffect(() => {
     if (open) {
@@ -561,14 +563,22 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
 
             {active.id === 'experimental' && (
               <Section>
-                {/* One switch per opt-in app. Off by default — see
+                {/* One switch per opt-in app or feature. Off by default — see
                     stores/appVisibilityStore for what each one moves. */}
                 <Card>
                   <ToggleRow
                     label="Outliers"
                     hint="Ad research — the Outlier Vault, plus TikTok and Meta Ad Library search. Off hides the Bank's Swipe File tab too. Nothing is deleted."
                     checked={outliersOn}
-                    onChange={(next) => setAppVisible('discover', next)}
+                    onChange={(next) => setOptionalEnabled('discover', next)}
+                  />
+                </Card>
+                <Card>
+                  <ToggleRow
+                    label="Continuous B-Roll"
+                    hint="B-Roll's second mode — one keyframe chain instead of a shot per line. Off holds B-Roll in Line-by-Line and hides Continuous sessions in its History. Nothing is deleted."
+                    checked={continuousOn}
+                    onChange={(next) => setOptionalEnabled('broll-continuous', next)}
                   />
                 </Card>
               </Section>

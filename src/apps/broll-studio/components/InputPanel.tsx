@@ -39,6 +39,14 @@ interface InputPanelProps {
   // keyframe-chain storyboard.
   mode: BrollMode
   onModeChange: (mode: BrollMode) => void
+  // False when Continuous is switched off in Settings → Experimental — there is
+  // one mode left, so there is nothing to toggle between. The whole 57px bar
+  // goes with it, hairline included: this is the one panel header in the app
+  // that exists ONLY to hold its control, so with the control gone it was an
+  // empty band and a rule drawn across the top of the inputs. The two panes'
+  // hairlines no longer meet here, and that is the call — an empty bar to line
+  // up with a full one is 57px spent on nothing.
+  showModeToggle: boolean
   // Line-by-Line delivery — whether the cards speak. Not a mode: both produce
   // the same per-line storyboard, so it rides in the settings band.
   lineDelivery: BrollDelivery
@@ -250,6 +258,7 @@ export default function InputPanel({
   highlightField,
   mode,
   onModeChange,
+  showModeToggle,
   lineDelivery,
   onLineDeliveryChange,
 }: InputPanelProps) {
@@ -279,20 +288,23 @@ export default function InputPanel({
           deliveries produce the same per-line storyboard — so that's a toggle
           in the settings band. Sits in a 57px bar so its border-b lines up with
           the right panel's Storyboard/History strip, matching every other app's
-          aligned top rule. */}
-      <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
-        <SegmentedToggle<BrollMode>
-          className="h-10 !p-1"
-          dense
-          value={mode}
-          onChange={onModeChange}
-          accent="broll"
-          options={[
-            { value: 'line', label: 'Line-by-Line', icon: Rows3 },
-            { value: 'continuous', label: 'Continuous', icon: Box },
-          ]}
-        />
-      </div>
+          aligned top rule — and the whole bar goes when Continuous is switched
+          off, since it holds nothing else (see the prop). */}
+      {showModeToggle && (
+        <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
+          <SegmentedToggle<BrollMode>
+            className="h-10 !p-1"
+            dense
+            value={mode}
+            onChange={onModeChange}
+            accent="broll"
+            options={[
+              { value: 'line', label: 'Line-by-Line', icon: Rows3 },
+              { value: 'continuous', label: 'Continuous', icon: Box },
+            ]}
+          />
+        </div>
+      )}
 
       {/* The phone's scroll port. On a desktop this is a plain wrapper and the
           inputs column below scrolls on its own, with the settings band pinned

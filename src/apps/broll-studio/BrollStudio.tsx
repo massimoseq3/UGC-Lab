@@ -36,6 +36,7 @@ import {
   type ContinuousStoryboardOp,
 } from './continuousEdits'
 import { useSettingsStore } from '../../stores/settingsStore'
+import { useFeatureEnabled } from '../../stores/appVisibilityStore'
 import { getModel } from '../../utils/models'
 import BankPicker from '../../components/BankPicker'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
@@ -224,9 +225,17 @@ export default function BrollStudio() {
   // 'line' | 'continuous'. Dialogue rode here as a third mode for a while;
   // sanitizeBrollMode folds that value (and the retired 'oneshot') back onto
   // Line-by-Line, with the delivery recovered by the toggle below.
-  const [mode, setMode] = usePersistedState<BrollMode>(`${baseKey}:mode`, 'line', {
+  const [storedMode, setMode] = usePersistedState<BrollMode>(`${baseKey}:mode`, 'line', {
     sanitize: sanitizeBrollMode,
   })
+  // Continuous is opt-in (Settings → Experimental) and ships off. Switching it
+  // off HOLDS the app in Line-by-Line rather than rewriting what's on disk: the
+  // stored mode, the keyframe chain and its history rows are all left exactly
+  // as they are, so switching it back on reopens the session that was there.
+  // Everything downstream reads this one derived value, so a single gate here
+  // covers the toggle, the right panel, Generate and the import modal at once.
+  const continuousEnabled = useFeatureEnabled('broll-continuous')
+  const mode: BrollMode = continuousEnabled ? storedMode : 'line'
   // Line-by-Line delivery: 'dialogue' (every card the character speaking that
   // line, staged three different ways — THE DEFAULT since August 2026) or
   // 'silent' (every card silent b-roll, for a voiceover laid over in the edit).
@@ -1279,6 +1288,7 @@ export default function BrollStudio() {
           highlightField={highlightField}
           mode={mode}
           onModeChange={setMode}
+          showModeToggle={continuousEnabled}
           lineDelivery={lineDelivery}
           onLineDeliveryChange={setLineDelivery}
         />
@@ -1288,6 +1298,7 @@ export default function BrollStudio() {
       <div className={paneClass(pane === 'output', 'md:w-[70%] md:overflow-hidden')}>
         <RightPanel
           mode={mode}
+          continuousEnabled={continuousEnabled}
           result={result}
           continuousResult={continuousResult}
           continuousModelId={continuousModelId}
