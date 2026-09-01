@@ -19,7 +19,7 @@ Dock order: **Dashboard** (own 'system' group) | **Bank** | **Tools** (Outliers 
 | Create | Ad Analyzer | `ad-anatomy/` | Ad image or video → scorecard, hook / angle / structure breakdown, transcript, and reproduction-ready scene prompts. → [`src/apps/ad-anatomy/CLAUDE.md`](src/apps/ad-anatomy/CLAUDE.md) |
 | Create | Playground | `playground/` | Free-form Image / Video / Music, with model-aware reference slots and @-mentions of bank rows. → [`src/apps/playground/CLAUDE.md`](src/apps/playground/CLAUDE.md) |
 | Create | Edit | `edit-studio/` | Download + setup page for the `/video-editor` Claude skill — edited locally by Claude Code, no kie.ai involvement. → [`src/apps/edit-studio/CLAUDE.md`](src/apps/edit-studio/CLAUDE.md) |
-| System | Dashboard | `dashboard/` | Default landing page, staged as a desktop in space: value widgets over a still starfield, on the same gradient every other page shows. → [`src/apps/dashboard/CLAUDE.md`](src/apps/dashboard/CLAUDE.md) |
+| System | Dashboard | `dashboard/` | Default landing page: value widgets on the same gradient every other page shows, with no background of its own. → [`src/apps/dashboard/CLAUDE.md`](src/apps/dashboard/CLAUDE.md) |
 
 Each app's full detail — its layout, its prompt contracts, and the rationale behind what was tried and cut — lives in that app's own `CLAUDE.md`, which loads automatically when you work under its folder. Read it before changing anything in that app.
 

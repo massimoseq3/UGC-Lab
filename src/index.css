@@ -570,53 +570,6 @@ textarea,
   mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent 100%);
 }
 
-/* Starfield, dark mode only. Two tiled layers of dots at different densities,
-   which is what gives the sky depth. Light mode has no starfield: white dots
-   vanish and dark ones read as dust.
-
-   NOTHING IN THE SKY MOVES, and that is the point (September 2026). The layers
-   drifted (one tile per 3–5 minutes) and breathed (opacity, 7s and 11s), and a
-   meteor crossed every 22s. Each was cheap on its own and composited properly —
-   the drift had already been moved off `background-position` onto a `transform`
-   for exactly that reason — but this wallpaper is the backdrop of the DEFAULT
-   landing page, where ten `backdrop-filter` widgets sit on top of it. A
-   backdrop-filter has to re-run whenever its backdrop changes, so any animation
-   down here, however slow, meant ten Gaussians per frame at the display's full
-   refresh rate, forever, on a page that is otherwise idle. Measured on the
-   Dashboard before the cut: ~8% of one CPU core with the page merely on screen,
-   against 0.1% for a blank page.
-
-   The motion was never worth its price at the frame level either — the drift was
-   1.4 px/SECOND, i.e. a hundredth of a pixel per frame. The two layers now carry
-   the midpoint of their old breathe range as a flat opacity, so the sky looks
-   like a still frame of what it used to be.
-
-   `inset: 0` follows from that: the layers only bled a tile past every edge so a
-   translate could never drag an unpainted corner into view, and at ~2.3x the
-   viewport each that was tens of MB of texture for a pattern that repeats. */
-.desktop-stars-near {
-  background-image:
-    radial-gradient(1.4px 1.4px at 26px 42px, rgba(255, 255, 255, 0.75), transparent),
-    radial-gradient(1.2px 1.2px at 178px 118px, rgba(255, 255, 255, 0.6), transparent),
-    radial-gradient(1.6px 1.6px at 92px 216px, rgba(220, 245, 235, 0.7), transparent),
-    radial-gradient(1.1px 1.1px at 254px 64px, rgba(255, 255, 255, 0.5), transparent),
-    radial-gradient(1.3px 1.3px at 210px 268px, rgba(235, 230, 255, 0.6), transparent);
-  background-size: 300px 300px;
-  inset: 0;
-  opacity: 0.8;
-}
-.desktop-stars-far {
-  background-image:
-    radial-gradient(1px 1px at 62px 88px, rgba(255, 255, 255, 0.42), transparent),
-    radial-gradient(0.9px 0.9px at 148px 24px, rgba(255, 255, 255, 0.34), transparent),
-    radial-gradient(1px 1px at 18px 164px, rgba(255, 255, 255, 0.38), transparent),
-    radial-gradient(0.8px 0.8px at 128px 132px, rgba(255, 255, 255, 0.3), transparent),
-    radial-gradient(1px 1px at 190px 186px, rgba(255, 255, 255, 0.36), transparent);
-  background-size: 200px 200px;
-  inset: 0;
-  opacity: 0.78;
-}
-
 /* ── Backgrounded apps stop painting ────────────────────────────────
    An app stays mounted after its first open (App.tsx) so a dock switch never
    interrupts a running generation or throws away typed input. It is hidden
@@ -624,10 +577,10 @@ textarea,
    CSS animation in a backgrounded pane keeps running at full rate, and the
    Dashboard is the DEFAULT landing app, so for the whole session the members
    were paying, behind whatever screen they were actually on, for:
-     · the wallpaper's own animations, whatever they are at the time — this
-       note was written when that meant two full-viewport starfields plus the
-       orrery's eighteen rotations; the sky is still now and the orrery is gone,
-       so the rule below is what keeps the NEXT one from costing anything
+     · the Dashboard's own background animations, whatever they are at the
+       time — this note was written when that meant two full-viewport starfields
+       plus the orrery's eighteen rotations; both are gone, so the rule below is
+       what keeps the NEXT one from costing anything
      · every `animate-spin` on an in-flight generation elsewhere in the app
    `content-visibility: hidden` skips the subtree outright — layout, paint and
    animation. Unlike `display: none` it keeps scroll positions and does not

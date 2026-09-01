@@ -10,15 +10,19 @@ import { AI_UGC_ACADEMY_URL } from '../../utils/constants'
 import ActivityHeatmap from './ActivityHeatmap'
 import AnnouncementsTile from './AnnouncementsTile'
 import ConnectKeyCard from './ConnectKeyCard'
-import DesktopWallpaper from '../../components/DesktopWallpaper'
 import StreakRing from './StreakRing'
 import Widget, { WidgetLabel, WidgetFigure, WidgetDelta } from './Widget'
 import { WIDGET_SHELL, WIDGET_INTERACTIVE, DISPLAY_FONT, riseStyle } from './widgetStyles'
 
 // Dashboard — the workspace's "what you're getting out of this" screen and the
-// default landing page, staged as a desk in deep space: a starfield wallpaper
-// with the value widgets laid across it. Everything derives from the usage
-// ledger (bankStore.usageDays); nothing here writes data.
+// default landing page: the value widgets laid across the same `AppBackground`
+// gradient every other page shows. Everything derives from the usage ledger
+// (bankStore.usageDays); nothing here writes data.
+//
+// The starfield wallpaper is gone (September 2026, Massimo's call) — the last
+// thing this page had that no other page in the app did. The widgets sit on the
+// shared canvas now, which also means the ten backdrop-filters on them have a
+// flat gradient to blur rather than a tiled dot pattern.
 //
 // The crew used to orbit the wall as a solar system on the right — nine planets
 // on nine rotating arms, hidden below xl. It is gone (September 2026, Massimo's
@@ -104,8 +108,6 @@ export default function Dashboard() {
 
   return (
     <div className="relative flex min-h-full flex-col">
-      <DesktopWallpaper />
-
       {/* `safe center` centres the desktop on a tall window without ever
           clipping the greeting off the top when the content outgrows it. */}
       <div

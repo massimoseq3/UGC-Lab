@@ -1,6 +1,5 @@
 import { CheckCircle2, Download } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
-import DesktopWallpaper from '../../components/DesktopWallpaper'
 import { SKILL_VERSION, useSkillUpdateStore } from '../../stores/skillUpdateStore'
 import SkillFolder from './SkillFolder'
 import { downloadSkill } from './downloadSkill'
@@ -68,16 +67,13 @@ export default function EditStudio() {
   }, [markSeen])
 
   return (
-    // Same deep-space wallpaper as the Dashboard. Edit is the other page with no
-    // panels of its own — a folder and a card floating on the bare canvas — so it
-    // sits on the sky rather than in an empty room.
+    // A folder and a card floating on the bare canvas — the shared
+    // `AppBackground` gradient, same as the Dashboard and every other page.
     // overflow-x-clip, not hidden: the folder's halo is a 135%-wide radial glow
     // that hangs past both edges, and on a phone that made the whole page
     // scroll ~20px sideways. `clip` trims it without turning this into a scroll
     // container, so the pane's own vertical scroll is untouched.
     <div className="relative flex min-h-full flex-col overflow-x-clip">
-      <DesktopWallpaper />
-
       {/* Phone: one column, and the READING order is not the desktop one — the
           title says what the page is, the folder is the thing to take, the
           benefits and the setup steps follow. Desktop keeps the two columns
@@ -130,8 +126,8 @@ export default function EditStudio() {
             ))}
           </ul>
 
-          {/* Blurred, not just translucent: over the starfield a flat 60% fill
-              reads as a smudge — the blur is what makes it a pane. */}
+          {/* Blurred, not just translucent: a flat 60% fill reads as a smudge
+              — the blur is what makes it a pane. */}
           <div className="rounded-3xl border border-ink/10 bg-ink/[0.045] p-4 backdrop-blur-2xl backdrop-saturate-150 shadow-lg shadow-black/30 light:border-black/[0.05] light:bg-white/70 light:shadow-black/[0.08] md:p-5">
             <h2 className="text-[15px] font-semibold tracking-tight text-ink-100">Set it up</h2>
             <ol className="mt-3.5 space-y-3.5">
