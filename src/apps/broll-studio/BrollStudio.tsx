@@ -142,22 +142,6 @@ export default function BrollStudio() {
   const [scriptText, setScriptText] = usePersistedState(`${baseKey}:scriptText`, '')
   const [additionalContext, setAdditionalContext] = usePersistedState(`${baseKey}:context`, '')
 
-  // Panel-level "New" — wipes the input column back to a blank slate and clears
-  // the storyboard off the right-hand canvas, so a fresh take starts on an empty
-  // workspace. Still no data loss: the result, every card's images/videos and
-  // every history row stay put — the session is one History click away.
-  const handleClearInputs = () => {
-    setSelectedProductId(null)
-    setSelectedModelId(null)
-    setSelectedScriptId(null)
-    setScriptText('')
-    setAdditionalContext('')
-    // The blueprint is an input like any other — "New" clears the words it
-    // brought, so leaving its staging behind would silently shoot the next
-    // storyboard like the ad the member just cleared.
-    setAdBlueprint(null)
-    setClearedCanvasSig(canvasSigRef.current)
-  }
   const [result, setResult] = usePersistedState<BrollResult | null>(
     `${baseKey}:result`,
     null,
@@ -451,10 +435,6 @@ export default function BrollStudio() {
     : (result?.scenes.length ?? 0)
   const canvasSig = `${mode}|${sessionId}|${canvasSceneCount}`
   const canvasCleared = canvasSceneCount > 0 && clearedCanvasSig === canvasSig
-  // Read through a ref so handleClearInputs (defined above, fired from the
-  // other column) always clears whatever is on the canvas right now.
-  const canvasSigRef = useRef(canvasSig)
-  useEffect(() => { canvasSigRef.current = canvasSig }, [canvasSig])
 
   const selectedProduct = useMemo<Product | null>(
     () => (selectedProductId ? products.find((p) => p.id === selectedProductId) ?? null : null),
@@ -1276,7 +1256,6 @@ export default function BrollStudio() {
           onSelectProduct={() => setPickerMode('products')}
           onSelectModel={() => setPickerMode('models')}
           onSelectScript={() => setPickerMode('scripts')}
-          onClearInputs={handleClearInputs}
           onClearProduct={() => setSelectedProductId(null)}
           onClearModel={() => setSelectedModelId(null)}
           onClearScript={() => setSelectedScriptId(null)}

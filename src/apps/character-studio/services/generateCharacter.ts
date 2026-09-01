@@ -157,6 +157,14 @@ export interface ParsedPromptJson {
 //
 // Returns null when the text isn't JSON at all, or when nothing in it is a
 // field this form owns — the two cases the caller has to say something about.
+//
+// NOTHING CALLS THIS TODAY. The `{ }` Prompt JSON button that opened the box it
+// read for was removed in September 2026 (Massimo's call — a third prompt tool
+// in a band that already had two), and the copy half of that box now lives on
+// the panel header as a one-click Copy. The reader is kept because the door was
+// removed, not the room: pasting a character in is one control away from
+// working again, and rewriting this parser from the form's field keys is the
+// expensive half. Delete it if that idea is genuinely dead.
 export function fieldsFromPromptJson(text: string): ParsedPromptJson | null {
   let parsed: unknown
   try {

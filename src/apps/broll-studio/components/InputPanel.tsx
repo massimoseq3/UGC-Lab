@@ -8,7 +8,6 @@ import SectionCard, { StatusDot } from '../../../components/SectionCard'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import SegmentedToggle from '../../../components/SegmentedToggle'
-import ClearAllButton from '../../../components/ClearAllButton'
 import { estimatePromptCredits } from '../services/promptCost'
 import { formatCredits } from '../../../utils/models'
 
@@ -26,9 +25,6 @@ interface InputPanelProps {
   onClearScript: () => void
   onScriptTextChange: (value: string) => void
   onAdditionalContextChange: (value: string) => void
-  // Resets the input column to a blank slate. Inputs only — every generated
-  // scene, clip and history row stays exactly where it is.
-  onClearInputs: () => void
   onGenerate: () => void
   // Opens the Import-prompts popup — paste in a storyboard written outside the
   // app instead of paying for the prompt-writing call. Works in both modes.
@@ -251,7 +247,6 @@ export default function InputPanel({
   onClearScript,
   onScriptTextChange,
   onAdditionalContextChange,
-  onClearInputs,
   onGenerate,
   onImportPrompts,
   isGenerating,
@@ -339,15 +334,15 @@ export default function InputPanel({
             title="References"
             className="mb-2 flex flex-[5] flex-col max-md:flex-none"
             contentClassName="flex flex-1 flex-col gap-2"
-            left={
+            right={
               /* Bring your own prompts — write them in Claude (or anywhere) and
                  paste them in, instead of paying for the prompt-writing call.
-                 Sized and styled as ClearAllButton's twin so the two read as one
-                 pair of panel-level utilities — and named with ONE word for the
-                 same reason "New" is: these sit on a card header's edges, and in
-                 a narrow column "Import prompts" wrapped to two lines while the
-                 word beside it took one. The popup it opens is still titled
-                 Import prompts, which is where the second word belongs. */
+                 Named with ONE word because it sits in a card header's gutter
+                 and, in a 25%-wide column, "Import prompts" wrapped to two
+                 lines; the popup it opens is still titled Import prompts, which
+                 is where the second word belongs. Back on the RIGHT gutter
+                 (September 2026, Massimo's call) — it moved left when the "New"
+                 pill took this edge, and it came back when that pill went. */
               <button
                 type="button"
                 onClick={onImportPrompts}
@@ -358,7 +353,6 @@ export default function InputPanel({
                 Import
               </button>
             }
-            right={<ClearAllButton onClear={onClearInputs} label="New" />}
           >
             {/* Product and Character.
                 COLOUR: empty, they wear the same dashed surface as the Visual
