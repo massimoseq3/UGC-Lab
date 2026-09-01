@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Package, UserRound, FileText, Mic, Film, Upload, LayoutGrid, Palette, Bookmark, Search, List, X } from 'lucide-react'
+import { Plus, UserRound, Upload, LayoutGrid, Search, List, X } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useBankStore } from '../../stores/bankStore'
 import { useIsAppVisible } from '../../stores/appVisibilityStore'
@@ -20,16 +20,6 @@ import StyleForm from './StyleForm'
 import { partitionImageFiles } from './services/imageValidation'
 import { saveProductDraft, adoptDetachedExtraction } from './services/saveProductDraft'
 import type { ProductExtraction } from './services/extractProductInfo'
-
-const SIDEBAR_ICONS: Record<BankType, React.ElementType> = {
-  products: Package,
-  models: UserRound,
-  scripts: FileText,
-  voices: Mic,
-  brolls: Film,
-  styles: Palette,
-  swipes: Bookmark,
-}
 
 const BANK_TYPES: BankType[] = ['products', 'models', 'scripts', 'voices', 'brolls', 'styles', 'swipes']
 
@@ -406,7 +396,6 @@ export default function Finder() {
         banks={bankTypes}
         active={activeBank}
         counts={counts}
-        icons={SIDEBAR_ICONS}
         onSelect={selectBank}
       />
       <div className="flex min-w-0 flex-1 flex-col">
@@ -429,7 +418,7 @@ export default function Finder() {
               options={bankTypes.map((bank) => ({
                 value: bank,
                 label: BANK_CONFIG[bank].label,
-                icon: SIDEBAR_ICONS[bank],
+                icon: BANK_CONFIG[bank].icon,
                 badge: counts[bank] > 0 ? counts[bank] : undefined,
               }))}
             />

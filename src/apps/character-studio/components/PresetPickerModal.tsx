@@ -281,7 +281,11 @@ export default function PresetPickerModal({
   onClose,
   onPick,
   title = 'Character Presets',
-  subtitle = 'Pick a recipe to fill the form',
+  // No default: the scoped callers pass a subtitle that says which part of the
+  // form a pick fills, which is worth a line. The unscoped one had "Pick a
+  // recipe to fill the form" under "Character Presets" — a second reading of
+  // the title (Massimo's call, September 2026).
+  subtitle,
 }: {
   open: boolean
   onClose: () => void
@@ -655,16 +659,20 @@ export default function PresetPickerModal({
     // No backdrop-blur on the backdrop: it would make this a backdrop root
     // containing a scrolling grid of a few hundred images, and every scrolled
     // pixel would drag a full-viewport filter recompute behind it.
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" {...backdrop}>
+    <div className="modal-fade fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" {...backdrop}>
+      {/* `modal-pop` is the app's one modal arrival — see index.css. This panel
+          unmounts when it closes, so it has no closed state to transition from
+          and the keyframe runs on mount instead; `BankPicker` plays the same
+          move as a transition because it stays mounted. */}
       <div
-        className="flex h-[86vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-ink/10 bg-surface-0 shadow-2xl"
+        className="modal-pop flex h-[86vh] w-full max-w-6xl flex-col overflow-hidden rounded-3xl border border-ink/10 bg-surface-0 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex h-[57px] shrink-0 items-center justify-between gap-3 border-b border-ink/5 px-5">
           <div className="min-w-0">
             <h3 className="truncate text-sm font-semibold tracking-tight text-ink-200">{title}</h3>
-            <p className="truncate text-[11px] text-ink-600">{subtitle}</p>
+            {subtitle && <p className="truncate text-[11px] text-ink-600">{subtitle}</p>}
           </div>
           <button
             type="button"

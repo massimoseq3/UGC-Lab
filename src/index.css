@@ -503,6 +503,27 @@ textarea,
   .skeleton-group { animation: none; }
 }
 
+/* The one way a centred modal ARRIVES: a 200ms lift out of 98% with the
+   backdrop fading under it. `BankPicker` gets the same look from a `transition`
+   instead, because that one stays mounted while closed so it can play the move
+   in both directions; a modal that unmounts on close (the Characters preset
+   picker) has no closed state to transition FROM, and a keyframe that runs on
+   mount is the shape that fits. Keep the two in step — same duration, same
+   easing, same 0.98 — or opening two pickers a click apart reads as two apps. */
+@keyframes modal-pop {
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.modal-pop { animation: modal-pop 200ms ease-out; }
+@keyframes modal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.modal-fade { animation: modal-fade 200ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .modal-pop, .modal-fade { animation: none; }
+}
+
 /* Send-to field highlight flash */
 @keyframes field-flash {
   0% { box-shadow: 0 0 0 0 rgba(0, 122, 255, 0.4); }

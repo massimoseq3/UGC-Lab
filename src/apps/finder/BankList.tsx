@@ -20,6 +20,7 @@ import { filterByQuery, type BankItem } from './bankRow'
 import { formatCount } from '../discover/services/scoring'
 import SwipeDetail from './SwipeDetail'
 import { groupByDay, sectionLabel } from '../../utils/history'
+import DayPill from '../../components/DayPill'
 
 // Custom sort dropdown — replaces the native <select> so the menu is themed
 // (not the stock OS popup) and the trigger font matches the bank toggle.
@@ -272,7 +273,7 @@ function ModelCard({ item, onEdit, onDelete }: { item: Model; onEdit: () => void
   )
 }
 
-function ScriptCard({ item, onEdit, onDelete }: { item: Script; onEdit: () => void; onDelete: () => void }) {
+function ScriptCard({ item, onEdit, onDelete, showDate = true }: { item: Script; onEdit: () => void; onDelete: () => void; showDate?: boolean }) {
   const [confirm, setConfirm] = useState(false)
   const toggleStar = useBankStore((s) => s.toggleStar)
   const getProductById = useBankStore((s) => s.getProductById)
@@ -300,11 +301,15 @@ function ScriptCard({ item, onEdit, onDelete }: { item: Script; onEdit: () => vo
         <p className="whitespace-pre-wrap text-[11px] leading-relaxed text-ink-400">{item.scriptText || 'Empty script'}</p>
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-surface-1 to-transparent" />
       </div>
-      {/* Footer: linked product + date */}
-      <div className="mt-2 flex items-center gap-2">
-        {linked && <span className="truncate text-[10px] text-ink-600">{linked.productName}</span>}
-        <span className="shrink-0 text-[10px] text-ink-700">{new Date(item.createdAt).toLocaleDateString()}</span>
-      </div>
+      {/* Footer: linked product + date. The date drops out under a day-grouped
+          grid — the pill above the row already says which day this is, and
+          repeating it on every card is the noise the pills replace. */}
+      {(linked || showDate) && (
+        <div className="mt-2 flex items-center gap-2">
+          {linked && <span className="truncate text-[10px] text-ink-600">{linked.productName}</span>}
+          {showDate && <span className="shrink-0 text-[10px] text-ink-700">{new Date(item.createdAt).toLocaleDateString()}</span>}
+        </div>
+      )}
       {/* Hover action stack — star · delete. Text-card styling (ink chrome, not
           the image cards' white-on-black pills); star stays visible once set. */}
       <TileActionStack forceVisible={confirm}>
@@ -923,12 +928,26 @@ function ModelsList({ items, onEdit, onDelete, sort }: { items: Model[]; onEdit:
   )
 }
 
+const SCRIPTS_GRID = 'grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8'
+
 function ScriptsList({ items, onEdit, onDelete, sort }: { items: Script[]; onEdit: (id: string) => void; onDelete: (id: string) => void; sort: SortOrder }) {
   const sorted = useMemo(() => sortByOrder(items, sort, (s) => s.title), [items, sort])
+  // Day-grouped under a date pill, like the B-Rolls tab and every history
+  // surface: a script is written in a session, and what a member remembers
+  // about one is when they wrote it. Under a Name sort there are no days to
+  // group by, so the grid goes flat and each card shows its own date again.
+  const dayGroups = useMemo(() => dayGroupsOf(sorted, sort), [sorted, sort])
+  const card = (s: Script, showDate: boolean) => (
+    <ScriptCard key={s.id} item={s} onEdit={() => onEdit(s.id)} onDelete={() => onDelete(s.id)} showDate={showDate} />
+  )
+  if (!dayGroups) return <div className={SCRIPTS_GRID}>{sorted.map((s) => card(s, true))}</div>
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8">
-      {sorted.map((s) => (
-        <ScriptCard key={s.id} item={s} onEdit={() => onEdit(s.id)} onDelete={() => onDelete(s.id)} />
+    <div className="flex flex-col">
+      {dayGroups.map(([dayTs, dayItems]) => (
+        <div key={dayTs}>
+          <DayPill label={sectionLabel(dayTs)} />
+          <div className={SCRIPTS_GRID}>{dayItems.map((s) => card(s, false))}</div>
+        </div>
       ))}
     </div>
   )
@@ -945,26 +964,27 @@ function StylesList({ items, onEdit, onDelete, sort }: { items: StylePreset[]; o
   )
 }
 
-// Centered date-pill divider — same chrome as the history views, reused here so
-// the B-Roll bank reads as day-grouped generations rather than dated cards.
-function DayPill({ label }: { label: string }) {
-  return (
-    <div className="my-2 flex items-center justify-center">
-      <span className="rounded-full bg-ink/[0.06] px-3 py-1 text-[11px] font-medium text-ink-300">{label}</span>
-    </div>
-  )
+// Day buckets for the two banks that read as a run of dated work rather than a
+// shelf of named things — B-Rolls and Scripts. `groupByDay` is newest-day-first;
+// flip it when the member sorts oldest-first.
+//
+// Returns null under a NAME sort, which is the whole point of the helper: A→Z
+// has no days to group by, so those banks fall back to a flat grid and their
+// cards carry their own date again. (B-Rolls can't reach that branch — it sorts
+// by date only — but Scripts can, and one helper keeps the two identical.)
+function dayGroupsOf<T extends { createdAt: number }>(items: T[], sort: SortOrder): [number, T[]][] | null {
+  if (sort !== 'newest' && sort !== 'oldest') return null
+  const groups = groupByDay(items, (it) => it.createdAt)
+  return sort === 'oldest' ? groups.reverse() : groups
 }
 
 function BRollsList({ items, onEdit, onDelete, sort }: { items: BRoll[]; onEdit: (id: string) => void; onDelete: (id: string) => void; sort: SortOrder }) {
   // Group into day buckets under a date pill (like the history views), so cards
-  // no longer carry their own date. `groupByDay` is newest-day-first; flip it
-  // when the user sorts oldest-first. A grid (not masonry) lets landscape stills
-  // span three portrait columns, matching the Influencers tab.
+  // no longer carry their own date. A grid (not masonry) lets landscape stills
+  // span three portrait columns, matching the Influencers tab. This bank sorts
+  // by date only, so `dayGroupsOf` can never hand back null here.
   const sorted = useMemo(() => sortByOrder(items, sort), [items, sort])
-  const dayGroups = useMemo(() => {
-    const groups = groupByDay(sorted, (b) => b.createdAt)
-    return sort === 'oldest' ? groups.reverse() : groups
-  }, [sorted, sort])
+  const dayGroups = useMemo(() => dayGroupsOf(sorted, sort) ?? [], [sorted, sort])
   return (
     <div className="flex flex-col">
       {dayGroups.map(([dayTs, dayItems]) => (
