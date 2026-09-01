@@ -218,8 +218,8 @@ function Workspace() {
               // generations, in-flight polls and unsaved input all have to
               // survive a dock switch) — but opacity-0 does not stop a single
               // frame of work: CSS animations keep ticking, and the Dashboard
-              // is the default landing app, so its wallpaper and orrery were
-              // animating behind every other screen for the whole session.
+              // is the default landing app, so whatever its wallpaper is doing
+              // was doing it behind every other screen for the whole session.
               <div
                 key={appId}
                 data-app-pane={isActive ? 'active' : 'inactive'}
