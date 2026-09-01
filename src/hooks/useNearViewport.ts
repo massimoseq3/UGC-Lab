@@ -14,11 +14,22 @@
 // `rootMargin`, so an observer left on the viewport would only ever fire once a
 // tile was already on screen — the margin buys nothing and the media pops in
 // under the pointer.
+//
+// `once` is the half of that rule that only applies to CLIPS. Releasing is
+// about the decoder, and a still doesn't hold one: the blob read and the object
+// URL are both permanently cached the moment a picture resolves, so dropping a
+// still's <img> on the way past buys nothing and costs the member a black tile
+// on the way back — which is exactly how it was reported (Playground, September
+// 2026). A tile that opts into `once` stops observing the moment it has been
+// near, so its picture is read on approach exactly as before and then simply
+// stays. Clips keep the releasing behaviour, and hold their first frame instead
+// — see `hooks/useVideoPoster.ts`.
 import { useEffect, useRef, useState } from 'react'
 
 export default function useNearViewport<T extends HTMLElement>(
   root: React.RefObject<HTMLElement | null>,
   rootMargin = '400px 0px',
+  { once = false }: { once?: boolean } = {},
 ) {
   const ref = useRef<T | null>(null)
   const [near, setNear] = useState(false)
@@ -26,13 +37,16 @@ export default function useNearViewport<T extends HTMLElement>(
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    const io = new IntersectionObserver(([entry]) => setNear(entry.isIntersecting), {
+    const io = new IntersectionObserver(([entry]) => {
+      setNear(entry.isIntersecting)
+      if (once && entry.isIntersecting) io.disconnect()
+    }, {
       root: root.current,
       rootMargin,
     })
     io.observe(el)
     return () => io.disconnect()
-  }, [root, rootMargin])
+  }, [root, rootMargin, once])
 
   return { ref, near }
 }

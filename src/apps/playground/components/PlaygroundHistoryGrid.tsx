@@ -25,6 +25,7 @@ import type { PlaygroundMode, InFlightGen } from '../types'
 import { humanizeError } from '../../../utils/friendlyError'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
 import useNearViewport from '../../../hooks/useNearViewport'
+import { useVideoPoster } from '../../../hooks/useVideoPoster'
 export type { InFlightGen }
 
 // List-view size-slider bounds. The raw value drives the slider fill % and the
@@ -374,9 +375,13 @@ function HistoryListRow({
 }) {
   // The row's media loads once the row is near the window — see the note on
   // `scrollRef` above. Everything else about the row renders regardless.
-  const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
+  // A clip keeps releasing its decoder; a still claims once and holds its
+  // picture, since re-reading it costs nothing and un-painting it costs a black
+  // row on the way back up. See useNearViewport.
+  const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { once: entry.kind !== 'video' })
   const mediaRef = entry.kind === 'image' ? entry.data.imageUrl : entry.kind === 'video' ? entry.data.videoUrl : null
   const { url, status } = useAssetUrlState(near ? mediaRef : null)
+  const { poster, posterProps } = useVideoPoster()
   const audioUrl = useAssetUrl(entry.kind === 'music' ? entry.data.audioRef : null)
   // Native controls here, but the same one-clip-at-a-time rule as the tiles.
   const rowVideo = useExclusiveVideo()
@@ -420,7 +425,16 @@ function HistoryListRow({
             // autoplay muted on hover) looked fine. The media fragment makes it
             // seek to 0.1s, which forces that frame to decode and show. Same fix
             // as B-Roll's history CoverTile.
-            <video {...rowVideo} src={`${url}#t=0.1`} controls playsInline preload="metadata" className="absolute inset-0 h-full w-full object-contain" />
+            <video
+              {...rowVideo}
+              src={`${url}#t=0.1`}
+              {...posterProps}
+              poster={poster}
+              controls
+              playsInline
+              preload="metadata"
+              className="absolute inset-0 h-full w-full object-contain"
+            />
           ) : (
             <img
               src={url}
@@ -431,6 +445,8 @@ function HistoryListRow({
               className={`absolute inset-0 h-full w-full object-contain ${onClickImage ? 'cursor-zoom-in' : ''}`}
             />
           )
+        ) : poster ? (
+          <img src={poster} alt="" className="absolute inset-0 h-full w-full object-contain" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             {status === 'loading'
@@ -587,7 +603,10 @@ function ImageTile({
 }) {
   // `loading="lazy"` only defers the <img> — the blob behind it still came out
   // of IndexedDB for every tile in the list. This defers the read itself.
-  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
+  // `once`: a still holds no decoder, and its blob read and object URL are
+  // cached for good the moment it resolves, so dropping the picture on the way
+  // past only buys a black tile on the way back. See useNearViewport.
+  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { once: true })
   const { url, status } = useAssetUrlState(near ? item.imageUrl : null)
   const isSaved = !!item.linkedBRollId
 
@@ -680,6 +699,10 @@ function VideoTile({
   // decoder, and the browser runs out of the second long before this list does.
   const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
   const { url, status } = useAssetUrlState(near ? item.videoUrl : null)
+  // …but it keeps the frame. Handing the decoder back is what makes the grid
+  // survive sixty clips; painting nothing until the next one is built is what
+  // made scrolling back up look like a reload.
+  const { poster, posterProps } = useVideoPoster()
   // Hover-autoplay must stay muted (browsers block unmuted autoplay), but an
   // explicit Play click is a user gesture and plays in place with sound — and
   // stops whatever clip was playing elsewhere in the app.
@@ -696,7 +719,19 @@ function VideoTile({
         style={ratio}
       >
         {status === 'ready' && url ? (
-          <video {...inline.videoProps} src={url} className="h-full w-full object-cover" />
+          // `#t=0.1` for the same reason the list row carries it: with
+          // `preload="metadata"` Safari decodes no frame, so a tile nobody has
+          // hovered paints as an empty black box. It is also what makes the
+          // frame readable back off a canvas — see hooks/useVideoPoster.
+          <video
+            {...inline.videoProps}
+            {...posterProps}
+            src={`${url}#t=0.1`}
+            poster={poster}
+            className="h-full w-full object-cover"
+          />
+        ) : poster ? (
+          <img src={poster} alt="" className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             {status === 'loading'

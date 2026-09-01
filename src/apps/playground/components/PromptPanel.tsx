@@ -783,19 +783,18 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   icon={Layers}
                   title="References"
                   contentClassName="flex flex-col gap-3"
-                  /* Said ONCE for the whole card instead of once per slot. Every
-                     input in here is optional — the prompt alone is a valid
-                     generation — and the frame slots each used to carry their own
-                     "Optional" corner tag while the Omni groups carried none, so
-                     the word appeared twice and meant nothing about the four
-                     inputs that didn't have it. Motion Control is the exception
-                     and gets no pill: its two inputs really do gate the run, which
-                     is what its red dots are for. Omni also prints the 7-slot
-                     quota it charges against, which until now only ever surfaced
-                     as an error toast AFTER a member had spent it. */
-                  left={!isMotionControl ? (
+                  /* The slot quota only — the word "Optional" came off this
+                     card in September 2026 (Massimo's call). Everything in this
+                     column that isn't marked otherwise is optional; saying so on
+                     the one card that is unmistakably a pile of extras spent a
+                     pill telling members what they already knew. The quota
+                     stays: it's a live count of a limit that until it landed
+                     here only ever surfaced as an error toast AFTER a member had
+                     spent it. Motion Control still gets nothing — its two inputs
+                     really do gate the run, which is what its red dots are for. */
+                  left={isOmni && !isMotionControl ? (
                     <span className="rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500">
-                      {isOmni ? `Optional · ${omniQuotaUsed(state.refs)}/${OMNI_SLOT_QUOTA}` : 'Optional'}
+                      {`${omniQuotaUsed(state.refs)}/${OMNI_SLOT_QUOTA}`}
                     </span>
                   ) : undefined}
                   right={hasAnyRef ? (

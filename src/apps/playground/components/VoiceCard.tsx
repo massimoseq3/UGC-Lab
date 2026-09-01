@@ -76,17 +76,28 @@ export default function VoiceCard({
     <div className="shrink-0 rounded-2xl border border-ink/5 bg-ink/[0.02] p-2 card-soft-shadow">
       {/* The card's own header, not `SectionCard`'s: the fold chevron has to be
           a button of its own on the left, and with the row collapsed there is no
-          hairline to draw under it. Same three-column grid, so the pill stays
-          optically centred whatever the edges weigh. */}
-      <div className="grid min-h-[24px] grid-cols-[1fr_auto_1fr] items-center gap-1.5">
+          hairline to draw under it. Same three-column grid, so the heading stays
+          optically centred whatever the edges weigh.
+
+          The WHOLE ROW folds it, not just the chevron (Massimo's call, September
+          2026): a 24px target on a 48px bar that is otherwise dead space made
+          the fold something you had to aim at. The chevron stays a real button
+          so the control keeps its `aria-expanded` and its keyboard focus — it
+          just stops the click from folding twice on the way up. The heading is
+          the one live thing in here that isn't the fold, so it swallows its own
+          click. */}
+      <div
+        onClick={onToggleOpen}
+        className="group grid min-h-[24px] cursor-pointer grid-cols-[1fr_auto_1fr] items-center gap-1.5"
+      >
         <div className="flex min-w-0 items-center justify-start">
           <button
             type="button"
-            onClick={onToggleOpen}
+            onClick={(e) => { e.stopPropagation(); onToggleOpen() }}
             title={open ? 'Hide the voice' : 'Show the voice'}
             aria-label={open ? 'Hide the voice' : 'Show the voice'}
             aria-expanded={open}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-600 transition-colors group-hover:text-ink-300 hover:bg-ink/5 hover:text-ink-300"
           >
             {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
           </button>
@@ -102,15 +113,14 @@ export default function VoiceCard({
           icon={AudioLines}
           label="Voice"
           title="Browse voice presets"
-          onClick={() => setPresetsOpen(true)}
+          onClick={(e) => { e.stopPropagation(); setPresetsOpen(true) }}
         />
-        {/* Right edge, where the References card's Clear sits — the fold chevron
-            already owns the left. This is the second optional input in the
-            column and one of them saying so while the other doesn't reads as a
-            difference between them. */}
-        <div className="flex min-w-0 items-center justify-end">
-          <span className="truncate rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500">Optional</span>
-        </div>
+        {/* The right cell is empty and stays: it is the gutter that keeps the
+            heading centred against the chevron opposite it. The `Optional` pill
+            that used to sit here came off with the References card's own
+            (September 2026) — everything in this column that isn't marked
+            otherwise is optional, and the word only ever said so twice. */}
+        <div className="flex min-w-0 items-center justify-end" />
       </div>
 
       {open ? (
