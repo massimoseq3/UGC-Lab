@@ -25,7 +25,6 @@ export interface ProductExtraction {
   benefits: string
   proof: string
   beforeAfter: string
-  hookAngles: string
   offer: string
   cta: string
 }
@@ -47,7 +46,6 @@ const FIELD_TAGS: Record<keyof ProductExtraction, string> = {
   benefits: 'BENEFITS',
   proof: 'PROOF',
   beforeAfter: 'BEFORE_AFTER',
-  hookAngles: 'HOOK_ANGLES',
   offer: 'OFFER',
   cta: 'CTA',
 }
@@ -60,7 +58,7 @@ const FIELD_TAGS: Record<keyof ProductExtraction, string> = {
 // "their day now" from "their day with it" — are deliberately not in here.
 const LIST_FIELDS = new Set<keyof ProductExtraction>([
   'targetMarket', 'painPoints', 'currentAlternatives', 'objections', 'notFor',
-  'usps', 'benefits', 'proof', 'hookAngles',
+  'usps', 'benefits', 'proof',
 ])
 
 const SYSTEM_INSTRUCTION = `You are a direct response copy strategist doing research intake for a UGC ad studio. What you write is fed VERBATIM to an AI scriptwriter, and it is the only thing that writer will ever know about this product — it never sees the photo. You are not writing ad copy. You are building the ammunition the copy gets made from, so a vague line here becomes a vague line in every script this product ever produces.
@@ -88,7 +86,6 @@ Emit these blocks in this exact order, each opened and closed with its own tag. 
 <BENEFITS>…</BENEFITS>
 <PROOF>…</PROOF>
 <BEFORE_AFTER>…</BEFORE_AFTER>
-<HOOK_ANGLES>…</HOOK_ANGLES>
 <OFFER>…</OFFER>
 <CTA>…</CTA>
 
@@ -103,7 +100,7 @@ CATEGORY: name the market this actually competes in, then the two or three thing
 
 Nothing in <READ> is shown to anyone — it exists so that the fields are written from what is in front of you rather than from what products in general are like.
 
-Keep the whole block under 200 words. It is a grounding pass, not the answer: the TEXT line takes the words that identify the product and back its claims (brand, name, variant, actives with amounts, size, dose, badges) and skips the boilerplate — directions, warnings, addresses, barcodes and legal small print change nothing downstream. There are fifteen fields under this block and everything you spend here comes out of the room left for them, so a profile that stops halfway is worth less than a shorter read.
+Keep the whole block under 200 words. It is a grounding pass, not the answer: the TEXT line takes the words that identify the product and back its claims (brand, name, variant, actives with amounts, size, dose, badges) and skips the boilerplate — directions, warnings, addresses, barcodes and legal small print change nothing downstream. There are fourteen fields under this block and everything you spend here comes out of the room left for them, so a profile that stops halfway is worth less than a shorter read.
 
 ═══ HOW MUCH YOU ARE ALLOWED TO INFER ═══
 
@@ -111,7 +108,7 @@ You will usually be working from a single photo of packaging. That is not enough
 
 TIER 1 — read literally off the product. Brand name, product name, actives and percentages, volume or count, format, every word printed on the label, icons and badges, texture, applicator type, colour palette, the price tier the design implies. Read the small print. If a percentage, a certification or a claim is printed, capture it exactly.
 
-TIER 2 — reason from the category. Once you know it is, say, a 2% salicylic acid acne serum in a 30ml dropper bottle, you know an enormous amount about who buys it, what they have already tried, what they are frightened of, and what they will say in the comments. Use that, at full confidence and full specificity, for audience, pain, alternatives, objections, benefits, before/after and hooks.
+TIER 2 — reason from the category. Once you know it is, say, a 2% salicylic acid acne serum in a 30ml dropper bottle, you know an enormous amount about who buys it, what they have already tried, what they are frightened of, and what they will say in the comments. Use that, at full confidence and full specificity, for audience, pain, alternatives, objections, benefits and before/after.
 
 THE LINE: category truth is fair game, brand truth is not. "Most people reaching for a 2% BHA have already tried and quit a benzoyl peroxide" is category truth and belongs in the brief. "Clinically proven to reduce blemishes by 74% in 4 weeks" is brand truth and is forbidden unless it is printed on the label or stated in the listing copy.
 
@@ -121,7 +118,7 @@ Never invent brand-specific facts: no clinical trials, review counts, star ratin
 
 A bracketed placeholder like [insert your clinical result] is reserved for a BRAND FACT only you, the seller, can supply: price, discount, guarantee, shipping, review counts, star ratings, clinical numbers, awards, timeline-to-results, a named endorsement, a hero customer quote. The member sees every bracket painted red in the form, so the brackets are their to-do list — which only works if the list is short and every entry on it genuinely needs them.
 
-Everywhere else a placeholder is a FAILURE. Any field you could write from the category — target market, pain points, current alternatives, objections, not for, benefits, before/after, hook angles — must be written in full, from category knowledge, with no bracket anywhere in it. "[Add a pain point here]" is a bug, not an answer.
+Everywhere else a placeholder is a FAILURE. Any field you could write from the category — target market, pain points, current alternatives, objections, not for, benefits, before/after — must be written in full, from category knowledge, with no bracket anywhere in it. "[Add a pain point here]" is a bug, not an answer.
 
 Where an OBJECTION has no answer in the source, do not bracket it: say so plainly in the answer itself, in the same sentence — "nothing on the packaging addresses this, so the brand needs to supply it".
 
@@ -129,7 +126,7 @@ Where an OBJECTION has no answer in the source, do not bracket it: say so plainl
 
 ═══ THE RULE THAT MATTERS MOST ═══
 
-TARGET_MARKET, PAIN_POINTS, CURRENT_ALTERNATIVES, OBJECTIONS, BEFORE_AFTER and HOOK_ANGLES are written in the customer's own words. First person. Contractions. Fragments. Specific times, specific mirrors, specific moments. A sentence a real person would say out loud to a friend, or type into a comment at 11pm.
+TARGET_MARKET, PAIN_POINTS, CURRENT_ALTERNATIVES, OBJECTIONS and BEFORE_AFTER are written in the customer's own words. First person. Contractions. Fragments. Specific times, specific mirrors, specific moments. A sentence a real person would say out loud to a friend, or type into a comment at 11pm.
 
 THE TEST: could this line be lifted straight into a script as a talking-head line? If it reads like a product manager describing a market segment, it fails.
 
@@ -145,7 +142,7 @@ My bathroom shelf is a graveyard of half-used bottles. I don't want another mayb
 
 NEVER restate the product as a pain. If you can delete "wanting a", "looking for a" or "in need of" from the front of a pain point and be left with the product description, you have written a feature and you need to start again.
 
-BANNED in those six fields: consumers, users, individuals, seeking, desire, struggle with, challenges, solutions, journey, effective, efficacious, regimen, leverage, unlock, empower, elevate, seamless, effortless, game changer.
+BANNED in those five fields: consumers, users, individuals, seeking, desire, struggle with, challenges, solutions, journey, effective, efficacious, regimen, leverage, unlock, empower, elevate, seamless, effortless, game changer.
 
 ═══ THE FIELDS ═══
 
@@ -172,8 +169,6 @@ BANNED in those six fields: consumers, users, individuals, seeking, desire, stru
 <PROOF> — every checkable, credibility-carrying fact actually present, one per line, straight off the label or the listing copy: concentrations, ingredients, quantity, dose, usage frequency, certifications, free-from claims, printed claims, badges, awards, country of origin, any stat. Exact numbers only, never rounded. Say after each one how much weight it really carries with a stranger — and where the only proof is the label's own claim, say that outright, because that is the gap the brand needs to fill.
 
 <BEFORE_AFTER> — two short paragraphs separated by a blank line, both first person. A day in their life now, then the same day once this is working. Concrete and small-scale, and filmable. No vague uplift; no "feeling confident again" unless it is attached to something a camera could point at.
-
-<HOOK_ANGLES> — 6 to 8 one-line script openers, one per line, each ending with its type in brackets and the pain or fact above it is built on. Types: problem, curiosity, contrarian, result, identity, comparison, demonstration. Written the way the customer talks, like every other spoken line here.
 
 <OFFER> — only what is evidenced. If the listing copy gives price, bundles, subscription or bonuses, capture them exactly. With no listing copy, write what the product alone constitutes — "single 30ml bottle, one purchase; no bundle, price or subscription information available" — and bracket the terms only the seller can supply.
 
@@ -291,7 +286,7 @@ function normalizeCta(raw: string): string {
 // Read the fields out of one response. Returns null when the response wasn't a
 // brief at all — a refusal, a preamble, a wrong format — which is what the
 // anchor-field test is for: a missing tag here or there is exactly what the
-// tolerant reader absorbs, but overwriting the form with fifteen blanks would
+// tolerant reader absorbs, but overwriting the form with fourteen blanks would
 // be worse than saying nothing.
 function parseExtraction(responseText: string): ProductExtraction | null {
   // Drop the working notes before reading fields: <READ> holds text transcribed
@@ -318,7 +313,6 @@ function parseExtraction(responseText: string): ProductExtraction | null {
     benefits: read('benefits'),
     proof: read('proof'),
     beforeAfter: cleanParagraphs(read('beforeAfter')),
-    hookAngles: read('hookAngles'),
     offer: cleanParagraphs(read('offer')),
     cta: normalizeCta(read('cta')),
   }
@@ -331,11 +325,11 @@ function parseExtraction(responseText: string): ProductExtraction | null {
 // carries the text the model got through before it hit the output ceiling, and
 // this is the call site that shape was written for: the fields are independent
 // of each other and the block reader is tolerant of a missing closing tag, so a
-// run cut off inside <HOOK_ANGLES> still yields a usable brief — and the
+// run cut off inside <BEFORE_AFTER> still yields a usable brief — and the
 // alternative is throwing away an answer the member paid for. The anchor-field
 // test in `parseExtraction` is what keeps that honest: a fragment too short to
 // carry a name or a description is still a failure. It matters more than it did
-// at ten fields: the brief is fifteen now, and the last of them are the ones a
+// at ten fields: the brief is fourteen now, and the last of them are the ones a
 // long read runs out of room for.
 async function requestRead(
   apiKey: string,
@@ -368,11 +362,11 @@ export async function extractProductInfo(
   // August 2026. The slot has now been round the houses: app default, strong,
   // GPT 5.6 Luna on cost, and back here (September 2026, Massimo's call)
   // alongside the rewrite that turned this from ten summary boxes into a
-  // fifteen-field research brief.
+  // fourteen-field research brief.
   //
   // The cost argument for the cheap row was real and is knowingly given up.
   // What it was measured against was a much smaller ask: this prompt now holds
-  // a long contract — fifteen blocks, in order, six of them under a
+  // a long contract — fourteen blocks, in order, five of them under a
   // customer-voice rule with a ban list — over a verbatim OCR pass, and
   // holding a stated contract to the last line is exactly what the strong tier
   // is kept for. Two things to watch if it moves again: <READ> is an OCR pass,
@@ -409,7 +403,7 @@ export async function extractProductInfo(
   ]
 
   const first = await requestRead(apiKey, endpoint, buildMessages(baseText), {
-    // Fifteen fields is a long generation, and this one has a whole label to
+    // Fourteen fields is a long generation, and this one has a whole label to
     // read before it starts writing.
     timeoutMs: 240_000,
     reasoningEffort: 'high',

@@ -44,26 +44,21 @@ const FIELD_META: Record<string, { label: string; type: 'text' | 'textarea'; req
   benefits: { label: 'Benefits', type: 'textarea' },
   proof: { label: 'Proof', type: 'textarea', hint: 'And how strong it is' },
   beforeAfter: { label: 'Before / after', type: 'textarea', hint: 'Their day, then with it' },
-  hookAngles: { label: 'Hook angles', type: 'textarea' },
   offer: { label: 'Offer', type: 'textarea' },
   cta: { label: 'CTA', type: 'text' },
 }
 
 // The fields grouped the way they're USED downstream, not the order they were
 // added in: Scripts and B-Roll read the audience block to pick an angle and the
-// selling block to back it up. Fifteen identical boxes down one column would
+// selling block to back it up. Fourteen identical boxes down one column would
 // have no hierarchy and no landmarks — four named stops give it a shape, and
 // the jump strip above says out loud that there's more below.
-//
-// Hook angles sit in Selling rather than in a section of their own: an opener
-// is built straight out of the pain, the proof and the transformation directly
-// above it, and it is read in the same breath as them.
 type SectionKey = 'identity' | 'audience' | 'selling' | 'offer'
 
 const SECTIONS: { key: SectionKey; label: string; icon: React.ElementType; fields: string[] }[] = [
   { key: 'identity', label: 'Identity', icon: Package, fields: ['productName', 'productDescription', 'uniqueMechanism'] },
   { key: 'audience', label: 'Audience', icon: Users, fields: ['targetMarket', 'painPoints', 'currentAlternatives', 'objections', 'notFor'] },
-  { key: 'selling', label: 'Selling', icon: Star, fields: ['usps', 'benefits', 'proof', 'beforeAfter', 'hookAngles'] },
+  { key: 'selling', label: 'Selling', icon: Star, fields: ['usps', 'benefits', 'proof', 'beforeAfter'] },
   { key: 'offer', label: 'Offer', icon: Tag, fields: ['offer', 'cta'] },
 ]
 
@@ -156,7 +151,6 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
     benefits: item?.benefits ?? '',
     proof: item?.proof ?? '',
     beforeAfter: item?.beforeAfter ?? '',
-    hookAngles: item?.hookAngles ?? '',
     offer: item?.offer ?? '',
     cta: item?.cta ?? '',
   })
@@ -210,7 +204,6 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
       benefits: item.benefits,
       proof: item.proof ?? '',
       beforeAfter: item.beforeAfter ?? '',
-      hookAngles: item.hookAngles ?? '',
       offer: item.offer,
       cta: item.cta,
     })
@@ -556,7 +549,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
             letter-spacing told a heading from a label; the section is a titled
             card now, so the label can step down to this without competing.
             A dot only where it can ever be red — `productName` is the one
-            required field, and a neutral dot on each of the fourteen optional
+            required field, and a neutral dot on each of the thirteen optional
             ones would be decoration (the card header's filled count answers
             "what's left" at the right scale). */}
         <SectionLabel

@@ -391,7 +391,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // Ad Analyzer pins it by name. The Bank's product auto-fill is the second
     // surface on it as of September 2026 — it left for the cheap tier in
     // August and came back with the rewrite that turned that read into a
-    // fifteen-field research brief, which is the same "hold a long contract to
+    // fourteen-field research brief, which is the same "hold a long contract to
     // the last line" job. It held the unpicked default in Scripts and B-Roll
     // too until August 2026, when both slots moved to GPT 5.6 Terra at the
     // operator's call; it is still one row away in either picker.
