@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Search, Plus, FolderOpen, Check, ChevronDown } from 'lucide-react'
+import { X, Search, Plus, Check, ChevronDown } from 'lucide-react'
 import type { BankType } from '../utils/constants'
 import { BANK_CONFIG, getAppConfig } from '../utils/constants'
 import { useBankStore } from '../stores/bankStore'
@@ -316,11 +316,14 @@ export default function BankPicker({
     // Style filters nothing any more, so its per-look tallies are taken over
     // everything the other controls leave — which is what the rail is counting.
     const styleRows = all.filter((r) => Object.values(characterPasses).every((fn) => fn(r)))
-    // Styles in the LIBRARY's own order — the shot numbering the build script
-    // bakes into the row order — not by count, which would reshuffle the menu
-    // between two openings. A style only the member's own rows use is appended.
+    // Styles come from the TEMPLATES only, in the library's own order — the
+    // shot numbering the build script bakes into the row order — never by
+    // count, which would reshuffle the rail between two openings. A style only
+    // the member's own rows use would be a row that scrolls nowhere: their
+    // characters are ONE section whatever style is guessed off their free text.
+    const tplRows = characterPool.tpl.filter((r) => Object.values(characterPasses).every((fn) => fn(r)))
     const order: string[] = []
-    for (const r of [...characterPool.tpl, ...characterPool.own]) {
+    for (const r of characterPool.tpl) {
       if (r.setting && !order.includes(r.setting)) order.push(r.setting)
     }
     return {
@@ -332,12 +335,18 @@ export default function BankPicker({
           badge: <CountSlot value={genderRows.filter((r) => r.gender === k).length} />,
         })),
       ],
+      // Each count is the SIZE OF THE SECTION it scrolls to — the templates
+      // filed under that style — while "All Styles" carries the whole list,
+      // which is what the top of it holds. Counting the member's own rows into
+      // each style promised more than the section delivered: a saved template
+      // is both a bank row and a library row, so every look it belongs to read
+      // one too many.
       styles: [
         { value: '', label: 'All Styles', count: styleRows.length },
         ...order.map((k) => ({
           value: k,
           label: k,
-          count: styleRows.filter((r) => r.setting === k).length,
+          count: tplRows.filter((r) => r.setting === k).length,
         })),
       ],
     }
@@ -669,12 +678,6 @@ export default function BankPicker({
     openApp('finder')
   }
 
-  const handleManageInFinder = () => {
-    onClose()
-    sendToApp({ targetApp: 'finder', targetField: 'activeBank', data: currentBankType })
-    openApp('finder')
-  }
-
   const label = BANK_CONFIG[currentBankType].label
 
   // Render through a portal so the picker is parented at document root,
@@ -855,6 +858,31 @@ export default function BankPicker({
               <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
             </div>
           )}
+          {/* Add New rides the toolbar, in the Bank's own Add position and at
+              the Bank's own weight — it belongs beside sort, not on a slab
+              across the bottom, where a full-width primary button was the
+              loudest thing in a modal whose job is picking one of the rows
+              above it. Not offered in multi-select: the footer's Add N is that
+              mode's action, and leaving for a form would abandon the
+              selection. */}
+          {!multiSelect && supportsCreate && (
+            <button
+              type="button"
+              onClick={handleAddNew}
+              // The Bank's own Add button, and the same 40px pill as the search
+              // box and the sort menu beside it — the solid fill is what marks
+              // it as the row's one action rather than another filter, and the
+              // shared height is what keeps it from reading as a bigger
+              // control. `ml-auto` is a no-op while the row fits on one line
+              // (the search box's `flex-1` has already eaten the slack) and
+              // right-aligns the button on the line it wraps onto, so it stays
+              // under sort rather than stranded at the left margin.
+              className="ml-auto flex h-10 shrink-0 items-center gap-2 rounded-full bg-ink px-4 text-[13px] font-medium tracking-tight text-ink-900 transition-colors hover:bg-ink-100"
+            >
+              <Plus className="h-4 w-4" />
+              Add New {label.replace(/s$/, '')}
+            </button>
+          )}
         </div>
 
         {/* Item list */}
@@ -865,7 +893,7 @@ export default function BankPicker({
                 {search ? 'No matches found' : `No ${label.toLowerCase()} yet`}
               </span>
               <span className="text-xs text-ink-700">
-                {search ? 'Try a different search' : 'Add one below to get started'}
+                {search ? 'Try a different search' : supportsCreate ? 'Add one above to get started' : 'Save one from the app that makes them'}
               </span>
             </div>
           ) : dayGroups ? (
@@ -912,44 +940,23 @@ export default function BankPicker({
           )}
         </div>
 
-        {/* Footer — add new (jumps to Bank with create form) + manage */}
-        <div className="border-t border-ink/5 px-4 py-3">
-          {multiSelect ? (
+        {/* Footer — the multi-select confirm, and nothing else. A single-select
+            picker has no footer at all now: its Add New sits in the toolbar,
+            and "Manage in Bank" was a second way out of a modal that already
+            has a close button and a dock tile (Massimo's call, September
+            2026). */}
+        {multiSelect && (
+          <div className="border-t border-ink/5 px-4 py-3">
             <button
               onClick={() => { void handleConfirmMulti() }}
               disabled={selectedIds.length === 0 || adding}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-ink px-7 py-4 text-sm font-semibold text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-ink px-4 py-2.5 text-sm font-semibold text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {adding && <Spinner className="h-4 w-4" />}
               Add {selectedIds.length || ''} {selectedIds.length === 1 ? 'item' : 'items'}
             </button>
-          ) : !supportsCreate ? (
-            <button
-              onClick={handleManageInFinder}
-              className="flex w-full items-center justify-center gap-1.5 py-2 text-xs text-ink-600 transition-colors hover:text-ink-400"
-            >
-              <FolderOpen className="h-3 w-3" />
-              Manage in Bank
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={handleAddNew}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-ink px-7 py-4 text-sm font-semibold text-paper transition-colors hover:bg-ink/90"
-              >
-                <Plus className="h-4 w-4" />
-                Add New {label.replace(/s$/, '')}
-              </button>
-              <button
-                onClick={handleManageInFinder}
-                className="mt-2 flex w-full items-center justify-center gap-1.5 py-2 text-xs text-ink-600 transition-colors hover:text-ink-400"
-              >
-                <FolderOpen className="h-3 w-3" />
-                Manage in Bank
-              </button>
-            </>
-          )}
-        </div>
+          </div>
+        )}
         </div>
         </div>
         </div>

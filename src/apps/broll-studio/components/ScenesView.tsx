@@ -1681,7 +1681,7 @@ function SceneSection({
                 className="group/line -mx-1.5 flex w-full items-start justify-center gap-2 rounded-lg px-1.5 py-0.5 text-center transition-colors hover:bg-ink/[0.04]"
               >
                 <p
-                  className="text-center text-lg font-normal italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200"
+                  className="text-center text-lg font-normal not-italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200"
                   style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
                 >
                   &ldquo;{scene.scriptLine}&rdquo;
@@ -1690,7 +1690,7 @@ function SceneSection({
               </button>
             ) : (
               <p
-                className="text-center text-lg font-normal italic leading-relaxed text-ink-400"
+                className="text-center text-lg font-normal not-italic leading-relaxed text-ink-400"
                 style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
               >
                 &ldquo;{scene.scriptLine}&rdquo;

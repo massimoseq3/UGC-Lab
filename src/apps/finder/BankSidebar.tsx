@@ -62,9 +62,9 @@ export default function BankSidebar({ banks, active, counts, onSelect, showFrom 
       >
         {/* The icon takes the ROW's colour, never the bank's accent. Painting
             each glyph in `BANK_CONFIG[bank].accent` was tried first and two of
-            the seven are unreadable at any moment: Products' #4C1D95 and
-            Scripts' #24365A vanish into a dark page, and in light mode the gold
-            fails instead (2.32:1 on white — `SegmentedToggle` already says so).
+            the seven are unreadable at any moment: Scripts' #24365A vanishes
+            into a dark page, and in light mode the gold fails instead (2.32:1 on
+            white — `SegmentedToggle` already says so).
             Seven accents down one column is a paint chart anyway; they earn
             their keep on the app tiles, where each one owns a whole surface. */}
         <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
