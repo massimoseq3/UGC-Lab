@@ -78,15 +78,6 @@ export default function ScriptArchitect() {
   const [selectedProductId, setSelectedProductId] = usePersistedState<string | null>(`${baseKey}:productId`, null)
   const [additionalContext, setAdditionalContext] = usePersistedState(`${baseKey}:context`, '')
 
-  // Panel-level "New" — wipes the input column back to a blank slate. Inputs
-  // ONLY: generated variations stay in the Output pane and in the script
-  // history bank, because outputs are the user's work.
-  const handleClearInputs = () => {
-    setSource('')
-    setBrief('')
-    setSelectedProductId(null)
-    setAdditionalContext('')
-  }
   const [variations, setVariations] = usePersistedState<string[]>(`${baseKey}:variations`, [])
   // Snapshot of the mode + style that produced the *currently shown*
   // variations. The output panel labels off these (not the live left-panel
@@ -350,7 +341,6 @@ export default function ScriptArchitect() {
         <InputPanel
           mode={mode}
           onModeChange={setMode}
-          onClearInputs={handleClearInputs}
           source={source}
           onSourceChange={setSource}
           isBlueprint={isBlueprint}

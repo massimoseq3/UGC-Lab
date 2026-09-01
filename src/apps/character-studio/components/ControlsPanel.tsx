@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type ElementType, type ReactNode } from 'react'
-import { ScanFace, PersonStanding, Camera, Copy, Check, Braces } from 'lucide-react'
+import { ScanFace, PersonStanding, Camera, Copy, Check } from 'lucide-react'
 import type { TabId, CharacterProfile, FieldGroup } from '../types'
 import { TABS, PHOTOREALISM_STYLE, getTabFields } from '../types'
 
@@ -19,8 +19,7 @@ import { SectionPresetPill } from '../../../components/SectionCard'
 import LoadPresetDropdown from './LoadPresetDropdown'
 import PresetPickerModal from './PresetPickerModal'
 import PhotoExtractZone from './PhotoExtractZone'
-import PromptJsonModal from './PromptJsonModal'
-import { buildPhysicalPrompt, buildScenePrompt } from '../services/generateCharacter'
+import { buildImagePrompt, buildPhysicalPrompt, buildScenePrompt } from '../services/generateCharacter'
 import { copyToClipboard } from '../../../utils/clipboard'
 import { suspendChromeAutoHide } from '../../../hooks/useChromeAutoHide'
 
@@ -71,6 +70,31 @@ function CopyPromptButton({ text, label, title }: { text: string; label: string;
           two lines on a phone, which made a 22px pill two rows tall. The
           divider it sits on already says which tab's fields these are. */}
       {copied ? 'Copied' : <><span className="lg:hidden">Copy</span><span className="hidden lg:inline">{label}</span></>}
+    </button>
+  )
+}
+
+// The same copy, panel-scope and glyph-only: a 36px circle at the weight of
+// the canvas-clear button in every output panel's header, since it shares that
+// bar's job of holding one utility beside a toggle.
+function CopyPromptCircle({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async () => {
+    if (await copyToClipboard(text)) {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1600)
+    }
+  }
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      disabled={!text.trim()}
+      title="Copy the full prompt — every field on both tabs"
+      aria-label="Copy the full prompt"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-ink/[0.03]"
+    >
+      {copied ? <Check className="h-4 w-4 text-emerald-400 light:text-emerald-600" /> : <Copy className="h-4 w-4" />}
     </button>
   )
 }
@@ -144,7 +168,6 @@ export default function ControlsPanel({
   // paste one in. It sits in the band with the other two ways of filling this
   // form (a saved preset, an analysed photo) rather than on a tab divider,
   // because it is the only one of the three that carries every field at once.
-  const [promptJsonOpen, setPromptJsonOpen] = useState(false)
 
   const applyScopedPreset = (incoming: Record<string, string>, keys: string[]) => {
     const next = { ...profile }
@@ -198,6 +221,9 @@ export default function ControlsPanel({
   // scene/pose/camera.
   const physicalPrompt = buildPhysicalPrompt(profile)
   const scenePrompt = buildScenePrompt(profile)
+  // Both tabs at once — the same JSON the model is actually sent, and the same
+  // seed the Prompt JSON modal opens on.
+  const fullPrompt = buildImagePrompt(profile)
 
   return (
     // On a phone everything below the tab toggle is one scroller and the
@@ -211,7 +237,7 @@ export default function ControlsPanel({
           land on the same pixel — and `px-5` is the other half of that spec, so
           on a phone this pill shares its left edge with the pane tabs above it.
           It was `px-2`, from back when this toggle carried five tabs. */}
-      <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
+      <div className="flex h-[57px] shrink-0 items-center gap-2 border-b border-ink/5 px-5">
         <SegmentedToggle<TabId>
           className="h-10 !p-1"
           value={activeTab}
@@ -222,6 +248,16 @@ export default function ControlsPanel({
             icon: TAB_ICONS[tab.id],
           }))}
         />
+        {/* The WHOLE prompt, in one click. The two tab dividers below each
+            carry a copy of their own slice, and a scoped copy can't be asked
+            for the thing the model actually reads — that lived only inside the
+            Prompt JSON modal, behind a glyph, in a box built for pasting one
+            back IN. Panel-level scope, so it sits on the panel's own bar
+            rather than on a divider that belongs to one tab. Glyph-only at the
+            weight of the canvas-clear circle every output panel uses: a label
+            here would eat the toggle beside it, and the two dividers already
+            spell the word out twice. */}
+        <CopyPromptCircle text={fullPrompt} />
       </div>
 
       {/* The phone's scroll port. It starts BELOW the toggle above, which is
@@ -264,20 +300,6 @@ export default function ControlsPanel({
               onOpenLibrary={onOpenLibrary}
             />
           </div>
-          {/* The third way into this form, and the only one that reads AND
-              writes. Square and icon-only on purpose: the two rows beside it
-              already truncate their own labels at phone width, and a third
-              labelled row would take the ~25px that turns "Load Preset" into
-              "Load Pres…". The glyph is the one the box is full of. */}
-          <button
-            type="button"
-            onClick={() => setPromptJsonOpen(true)}
-            title="Prompt JSON — copy this character out, or paste one in"
-            aria-label="Prompt JSON"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-dashed border-ink/10 bg-ink/[0.02] text-ink-400 transition-colors hover:border-ink/20 hover:bg-ink/[0.05] hover:text-ink-200"
-          >
-            <Braces className="h-4 w-4" strokeWidth={1.5} />
-          </button>
         </div>
       </div>
 
@@ -306,13 +328,20 @@ export default function ControlsPanel({
               >
                 {/* Tab divider — a centered preset button on a full-width line
                     (mirrors the History date pills), marking each tab's block. The
-                    centered button doubles as the scoped preset picker; Clear sits
-                    on the left and the scoped Copy on the right of every divider.
-                    The left pill reads "New", not "Clear": it resets the input
-                    fields only — every generated character stays in the gallery
-                    and in history. */}
+                    centered button doubles as the scoped preset picker; Clear all
+                    sits on the left and the scoped Copy on the right of every
+                    divider. The scoped Copy carries one TAB's fields; the whole
+                    prompt is the circle on the panel header above. */}
                 <TabDivider
-                  left={<ClearAllButton onClear={onClear} label="New" className="!py-1 !text-[11px]" />}
+                  /* "Clear all", not "New" (September 2026, Massimo's call).
+                     It is the same ClearAllButton every other input panel
+                     wears and it still clears INPUTS ONLY — every generated
+                     character stays in the gallery and in history — which is
+                     what the shared component's "New" wording was protecting.
+                     The two-click arm, the "Confirm" state and the tooltip
+                     that spells out what survives all stay, and they are what
+                     carries that promise now the label doesn't. */
+                  left={<ClearAllButton onClear={onClear} label="Clear all" className="!py-1 !text-[11px]" />}
                   center={
                     tabIndex === 0 ? (
                       <SectionPresetPill
@@ -444,16 +473,6 @@ export default function ControlsPanel({
           />
         )}
 
-        {/* Mounted only while open, so the box is re-seeded from the live form
-            on every visit and a mangled edit is thrown away by closing it. */}
-        {promptJsonOpen && (
-          <PromptJsonModal
-            open
-            onClose={() => setPromptJsonOpen(false)}
-            profile={profile}
-            onProfileChange={onProfileChange}
-          />
-        )}
       </div>
     </div>
   )

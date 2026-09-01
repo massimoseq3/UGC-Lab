@@ -4,7 +4,7 @@ import { DEFAULT_VOICE_SETTINGS, getVoiceById, VOICE_STYLES, VOICE_PACES, VOICE_
 import { seedColor } from './seedColor'
 import Slider from './Slider'
 import Dropdown from '../../../components/Dropdown'
-import SectionCard, { StatusDot } from '../../../components/SectionCard'
+import SectionCard, { SectionPresetPill, StatusDot } from '../../../components/SectionCard'
 import ModelPicker from '../../../components/ModelPicker'
 
 // One size for every setting subheading (Style / Pace / Accent /
@@ -42,15 +42,15 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
         {/* Which TTS model reads the script. Above the Voice card because it's
             what everything below runs on — the voice, the delivery and the
             direction are all settings OF this model. Deliberately not carded:
-            a border around one row says nothing (see the root CLAUDE.md), and
-            the label alone is what it needs. No StatusDot either — there is
-            always a resolved model, and a permanent green dot is decoration.
+            a border around one row says nothing (see the root CLAUDE.md). It
+            carries no LABEL either (September 2026, Massimo's call): a picker
+            row already shows the model's name over its hint, so a small-caps
+            "MODEL" above it said the same word twice and cost the column a row
+            — the same reason there's no StatusDot, since there is always a
+            resolved model and a permanent green dot is decoration.
             The pick persists per browser under `voice-studio:tts`, which is
             the same key `resolveTtsModel()` reads at generate time. */}
-        <div className="flex flex-col gap-2">
-          <span className={SETTING_LABEL}>Model</span>
-          <ModelPicker row appId="voice-studio" task="tts" />
-        </div>
+        <ModelPicker row appId="voice-studio" task="tts" />
 
         {/* Who is speaking. The card holds one control on purpose — the header
             is what carries the preset pill, and a preset writes every setting
@@ -61,23 +61,36 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
         <SectionCard
           icon={Mic}
           title="Voice"
-          left={
-            /* Preset — Influencers' `PresetPillButton` shape, on the header of
-               the card whose contents it fills, rather than the full-width row
-               it used to be under the voice. Same reasoning as that panel's:
-               a preset isn't a setting of its own, it's a shortcut that writes
-               the settings below, so it belongs on the group's header beside
-               the name of what it loads. It also stops the card reading as two
-               equally-weighted picker rows when only one of them picks the
-               voice. On the LEFT gutter: it's the shortcut you take before
-               picking a voice by hand, so it sits ahead of the title rather
-               than after it — and it mirrors Delivery's Reset, which is a
-               header action of the other kind and keeps the right. */
-            <PresetPill
-              label={settings.presetLabel}
-              onOpen={onOpenPresetPicker}
-              onClear={() => onSettingsChange({ ...settings, presetId: undefined, presetLabel: undefined })}
+          /* The HEADING is the way into the presets (September 2026, Massimo's
+             call) — Playground's Voice card and every section title in
+             Influencers already work this way, so a dashed ring plus a chevron
+             is what a list of saved presets looks like app-wide. It replaces a
+             separate "Presets" pill in the left gutter, which made a one-control
+             card carry two controls in its header and left the title, the thing
+             the pill fills, as the only part of the row you couldn't click.
+             `size='sm'` is SectionCard's own 13px title, so it stacks with
+             "Delivery" below at one heading size. */
+          titleNode={
+            <SectionPresetPill
+              tone="neutral"
+              size="sm"
+              icon={Mic}
+              label="Voice"
+              title="Load a saved voice preset from the bank"
+              onClick={onOpenPresetPicker}
             />
+          }
+          /* Which preset the settings CAME from, and the way to detach it —
+             not a way in, which is why it is only ever the loaded state now.
+             It keeps the left gutter, mirroring Delivery's Reset opposite. */
+          left={
+            settings.presetLabel ? (
+              <PresetStamp
+                label={settings.presetLabel}
+                onOpen={onOpenPresetPicker}
+                onClear={() => onSettingsChange({ ...settings, presetId: undefined, presetLabel: undefined })}
+              />
+            ) : undefined
           }
         >
           {/* Voice — clickable, slides into picker. Its name is the row itself,
@@ -180,39 +193,26 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
   )
 }
 
-// Saved-preset pill, on the Voice card's header. Influencers' `PresetPillButton`
-// shape — dashed accent ring, glyph, chevron — so the two panels' preset
-// affordances read as the same control. Once a preset is loaded it fills in and
-// names it, with an X to detach; clearing drops the stamp only, because the
-// values it loaded are the settings the member is about to generate with.
+// Which preset the settings CAME from, on the Voice card's header — a STAMP,
+// not a way in. The way in is the card's own title (`SectionPresetPill`), so
+// this renders only once a preset is loaded: it names it, and carries the X
+// that detaches it. Clearing drops the stamp only, because the values it loaded
+// are the settings the member is about to generate with — and every hand edit
+// drops it too (see `update`), so it can never claim settings it no longer
+// describes.
 //
 // The label is capped and truncates: this sits in one gutter of the card
 // header's 3-column grid, and a long bank name would otherwise squeeze the
-// word it's sitting next to.
-function PresetPill({
+// title it's sitting next to.
+function PresetStamp({
   label,
   onOpen,
   onClear,
 }: {
-  label?: string
+  label: string
   onOpen: () => void
   onClear: () => void
 }) {
-  if (!label) {
-    return (
-      <button
-        type="button"
-        onClick={onOpen}
-        title="Load a saved voice preset from the bank"
-        className="flex min-w-0 items-center gap-1 rounded-full border border-dashed border-voice-500/30 bg-voice-500/10 px-2.5 py-1 text-[12px] font-medium text-voice-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] transition-colors hover:bg-voice-500/15"
-      >
-        <Bookmark className="h-3 w-3 shrink-0" />
-        Presets
-        <ChevronRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
-      </button>
-    )
-  }
-
   return (
     <div className="flex min-w-0 items-center gap-1 rounded-full border border-voice-500/30 bg-voice-500/15 py-1 pl-2.5 pr-1 text-[12px] font-medium text-voice-300">
       <button
