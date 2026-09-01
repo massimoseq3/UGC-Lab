@@ -3,6 +3,7 @@ import { Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, Layo
 import Spinner from '../../../components/Spinner'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState } from '../../../hooks/useAssetUrl'
+import useNearViewport from '../../../hooks/useNearViewport'
 import { getUrl } from '../../../utils/assetStore'
 import { useAppStore } from '../../../stores/appStore'
 import { usePersistedState } from '../../../hooks/usePersistedState'
@@ -75,6 +76,9 @@ export default memo(function GalleryPanel({
   // row under the generation's own id — so the same anchor resolves to the
   // pending gen first and the finished row the moment it lands.
   const [previewId, setPreviewId] = useState<string | null>(null)
+  // The gallery's scroll port, handed to every tile so its media waits until
+  // the tile is near the window (see useHistoryTileActions).
+  const galleryScrollRef = useRef<HTMLDivElement | null>(null)
   // Which mode the edit pop-up opens in. "Make Sheet" on a tile opens straight
   // into sheet mode so the user just hits Generate; a normal click is edit.
   const [previewMode, setPreviewMode] = useState<'edit' | 'sheet'>('edit')
@@ -288,8 +292,12 @@ export default memo(function GalleryPanel({
         />
       ) : (
         <>
-          {/* Scrollable gallery */}
-          <div className="min-w-0 flex-1 overflow-y-auto px-4 py-3">
+          {/* Scrollable gallery. The ref is the IntersectionObserver root every
+              tile below observes against: ancestor clipping is applied before
+              `rootMargin`, so an observer left on the viewport would only fire
+              once a tile was already on screen and the picture would pop in
+              under the pointer. */}
+          <div ref={galleryScrollRef} className="min-w-0 flex-1 overflow-y-auto px-4 py-3">
             {inFlight.length > 0 && (
               <>
                 <DayPill label={inFlight.length === 1 ? 'In progress' : `In progress · ${inFlight.length}`} />
@@ -320,6 +328,7 @@ export default memo(function GalleryPanel({
                       <div key={item.id} className={isWide(item.aspectRatio) ? 'col-span-2 lg:col-span-3' : ''}>
                         <HistoryTile
                           item={item}
+                          scrollRoot={galleryScrollRef}
                           onClick={() => openEditor(item.id)}
                           onDelete={() => deleteCharacterHistory(item.id)}
                           onMakeSheet={() => openEditor(item.id, 'sheet')}
@@ -336,6 +345,7 @@ export default memo(function GalleryPanel({
                       <HistoryListRow
                         key={item.id}
                         item={item}
+                        scrollRoot={galleryScrollRef}
                         mediaAspect={mediaAspect}
                         onClick={() => openEditor(item.id)}
                         onDelete={() => deleteCharacterHistory(item.id)}
@@ -409,8 +419,28 @@ function aspectStyle(ar: string): React.CSSProperties {
 // Save / delete / download + name-draft state for one history entry. Shared by
 // the grid tile and the list row so both views stay in lockstep. Copy-prompt and
 // make-sheet stay as parent callbacks (they reach into modal/clipboard concerns).
-function useHistoryTileActions(item: CharacterHistoryItem, onDelete: () => void | Promise<unknown>) {
-  const { url, status } = useAssetUrlState(item.imageRef)
+// `near` is how a LIST keeps its media cost proportional to the window rather
+// than to the history. The gallery is uncapped, so a working member's grid is
+// hundreds of tiles — and every one of them used to resolve its blob and hand
+// the browser a full-size picture to decode on mount, with about nine on screen.
+// `loading="lazy"` does not help: it defers a FETCH, and by the time the <img>
+// exists the blob URL has already been made. Gating the resolution itself is
+// what actually keeps the decode off, and the placeholder branch below is
+// already sized by `aspectStyle` / the row's own `aspectRatio`, so a tile
+// waiting its turn holds exactly the shape it will fill — the scroll height
+// never changes and nothing jumps as pictures arrive.
+//
+// Defaults to true so the callers with ONE item (the Single stage) are
+// unchanged; only the grid and list rows pass a scroller to observe against.
+// Re-entering the viewport is instant rather than a second read: the component
+// stays mounted while it waits, so useAssetUrlState still holds the resolved
+// entry for this ref and hands it straight back.
+//
+// This gates the PICTURE only. `handleDownload` re-resolves through getUrl on
+// its own, so every action on the tile works the same whether it has painted
+// or not.
+function useHistoryTileActions(item: CharacterHistoryItem, onDelete: () => void | Promise<unknown>, near = true) {
+  const { url, status } = useAssetUrlState(near ? item.imageRef : undefined)
   const addModel = useBankStore((s) => s.addModel)
   const deleteModel = useBankStore((s) => s.deleteModel)
   const updateCharacterHistory = useBankStore((s) => s.updateCharacterHistory)
@@ -1171,6 +1201,7 @@ function HistoryTile({
   onCopyPrompt,
   onReuse,
   onShowInSingle,
+  scrollRoot,
 }: {
   item: CharacterHistoryItem
   // Set only on the Single stage, where the tile is sized to a measured cell
@@ -1186,12 +1217,19 @@ function HistoryTile({
   onCopyPrompt: () => void
   onReuse: () => void
   onShowInSingle: () => void
+  // The gallery's scroll port. Present for the grid (hundreds of tiles, so the
+  // media waits its turn); absent on the Single stage, where there is one tile
+  // and nothing to defer.
+  scrollRoot?: React.RefObject<HTMLElement | null>
 }) {
-  const a = useHistoryTileActions(item, onDelete)
+  const ownRoot = useRef<HTMLElement | null>(null)
+  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot ?? ownRoot)
+  const a = useHistoryTileActions(item, onDelete, scrollRoot ? near : true)
   const fitted = !!frameStyle
 
   return (
     <div
+      ref={tileRef}
       onClick={onClick}
       style={frameStyle}
       className={`group relative cursor-pointer overflow-hidden border border-ink/10 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 card-soft-shadow ${
@@ -1336,6 +1374,7 @@ function HistoryListRow({
   onCopyPrompt,
   onReuse,
   onShowInSingle,
+  scrollRoot,
 }: {
   item: CharacterHistoryItem
   mediaAspect: number
@@ -1345,8 +1384,11 @@ function HistoryListRow({
   onCopyPrompt: () => void
   onReuse: () => void
   onShowInSingle: () => void
+  scrollRoot?: React.RefObject<HTMLElement | null>
 }) {
-  const a = useHistoryTileActions(item, onDelete)
+  const ownRoot = useRef<HTMLElement | null>(null)
+  const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot ?? ownRoot)
+  const a = useHistoryTileActions(item, onDelete, scrollRoot ? near : true)
   const prompt = buildImagePrompt(item.profile).trim()
 
   // Landscape (16:9) outputs always render in a 16:9 frame so they fill edge-to-
@@ -1361,7 +1403,7 @@ function HistoryListRow({
   if (item.aspectRatio) meta.push(item.aspectRatio)
 
   return (
-    <div className="flex w-full items-stretch gap-3 overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.02] card-soft-shadow">
+    <div ref={rowRef} className="flex w-full items-stretch gap-3 overflow-hidden rounded-2xl border border-ink/10 bg-ink/[0.02] card-soft-shadow">
       {/* Media — fixed-width column whose height is the slider-driven aspect
           ratio. At the slider minimum it's 16:9 so landscape fills with no bars;
           taller frames letterbox landscape on black and grow portraits. The

@@ -343,11 +343,66 @@ export async function existingRemoteAssetIds(assetIds: string[]): Promise<Set<st
   return found
 }
 
+// The mirror image of MAX_CONCURRENT_UPLOADS, and it exists for the same reason
+// one hop over. Every history bank resolves its media through getBlob, so an app
+// whose gallery holds hundreds of rows misses IndexedDB hundreds of times the
+// first time a member opens it on a NEW browser — a second device, cleared site
+// data, or Safari evicting a site it hasn't seen in a week, which is exactly the
+// shape of a member who skips one. Each miss is THREE round trips (the assets row
+// select, the presign, then the CDN GET), and they were all fired in one tick with
+// nothing holding them back: hundreds of requests competing for the same uplink as
+// whatever generation the member started, which is the failure the upload cap
+// already describes, in the direction it happens far more often.
+//
+// Four rather than the upload path's three: a download is on the critical path for
+// something a member is watching for (pictures filling a gallery), where an upload
+// is background. Still far below the point where the small requests start losing.
+//
+// The gate wraps the WHOLE function, so all three round trips of one asset run
+// inside a single slot — gating only the binary GET would leave the row selects
+// and presigns to stampede on their own.
+const MAX_CONCURRENT_DOWNLOADS = 4
+
+// The upload path above keeps its own hand-rolled copy of this, deliberately
+// untouched: it works, and rewriting a proven queue to share a helper is risk
+// spent for no behaviour change.
+function makeConcurrencyGate(max: number) {
+  let active = 0
+  const queue: Array<() => void> = []
+  return {
+    acquire(): Promise<void> {
+      if (active < max) {
+        active++
+        return Promise.resolve()
+      }
+      return new Promise<void>((resolve) => { queue.push(resolve) })
+    },
+    release(): void {
+      const next = queue.shift()
+      // Hand the slot straight over rather than decrementing and re-incrementing
+      // — the count is unchanged because it never actually goes idle.
+      if (next) next()
+      else active--
+    },
+  }
+}
+
+const downloadGate = makeConcurrencyGate(MAX_CONCURRENT_DOWNLOADS)
+
 export async function downloadAssetFromR2(assetId: string): Promise<Blob | null> {
   if (!isCloudEnabled()) return null
   const userId = useAuthStore.getState().user?.id
   if (!userId) return null
 
+  await downloadGate.acquire()
+  try {
+    return await downloadAssetInner(assetId)
+  } finally {
+    downloadGate.release()
+  }
+}
+
+async function downloadAssetInner(assetId: string): Promise<Blob | null> {
   const sb = getSupabase()
   const { data, error } = await sb.from('assets').select('id, mime_type').eq('id', assetId).maybeSingle()
   if (error || !data) return null
