@@ -73,7 +73,22 @@ export default function VoiceCard({
   return (
     // `shrink-0`: the prompt box above owns the leftover height and this is a
     // fixed sibling under it, not another claimant on the same space.
-    <div className="shrink-0 rounded-2xl border border-ink/5 bg-ink/[0.02] p-2 card-soft-shadow">
+    //
+    // No `card-soft-shadow`, unlike the References card above it. This is the
+    // LAST child of the input column, and that column is `min-h-full` with the
+    // prompt box taking every spare pixel through `grow` — so this card's bottom
+    // edge sits exactly on the scroller's clip edge at every window size, and a
+    // scroller clips its descendants' shadows. The 8px gap under it belongs to
+    // the generate band below (see the gap rule in CLAUDE.md), which is outside
+    // the scroll port and can't lend the shadow any room. So the shadow could
+    // never render downward here: what it actually drew was a soft halo down the
+    // sides that stopped dead at the bottom corners, which reads as the card
+    // being sliced off — reported in light mode (September 2026), because that
+    // is the only theme where the shadow is visible at all. Adding `pb` to the
+    // column would fix it and break something worse: bottom padding on a scroll
+    // container is scrolled content, so the gap above the band would change as
+    // you scroll.
+    <div className="shrink-0 rounded-2xl border border-ink/5 bg-ink/[0.02] p-2">
       {/* The card's own header, not `SectionCard`'s: the fold chevron has to be
           a button of its own on the left, and with the row collapsed there is no
           hairline to draw under it. Same three-column grid, so the heading stays
