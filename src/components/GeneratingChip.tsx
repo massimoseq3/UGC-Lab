@@ -6,7 +6,7 @@
 // Deliberately tiny and static: a history row is a list item, not a generation
 // surface, so it gets a status marker rather than the full GeneratingMedia face.
 
-type Family = 'broll' | 'voice' | 'playground' | 'influencers'
+type Family = 'broll' | 'voice' | 'playground' | 'influencers' | 'scripts'
 
 // Literal per-family classes — Tailwind can't build class names from props.
 const ACCENT: Record<Family, { text: string; dot: string; ring: string; wash: string }> = {
@@ -14,6 +14,7 @@ const ACCENT: Record<Family, { text: string; dot: string; ring: string; wash: st
   voice: { text: 'text-voice-300', dot: 'bg-voice-400', ring: 'ring-voice-400/40', wash: 'bg-voice-500/10' },
   playground: { text: 'text-playground-300', dot: 'bg-playground-400', ring: 'ring-playground-400/40', wash: 'bg-playground-500/10' },
   influencers: { text: 'text-influencers-300', dot: 'bg-influencers-400', ring: 'ring-influencers-400/40', wash: 'bg-influencers-500/10' },
+  scripts: { text: 'text-scripts-300', dot: 'bg-scripts-400', ring: 'ring-scripts-400/40', wash: 'bg-scripts-500/10' },
 }
 
 export function GeneratingChip({ label, family = 'broll' }: { label: string; family?: Family }) {

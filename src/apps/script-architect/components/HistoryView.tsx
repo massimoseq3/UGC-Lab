@@ -2,9 +2,10 @@ import { useMemo, useState } from 'react'
 import { Search, FileText } from 'lucide-react'
 import type { ScriptHistoryItem } from '../../../stores/types'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
-import { WRITE_STYLE_META, HOOK_CATEGORY_META, isHookCategoryChoice, parseHooks, hooksPlainText } from '../types'
+import { WRITE_STYLE_META, HOOK_CATEGORY_META, isHookCategoryChoice, parseHooks, hooksPlainText, type PendingScriptRun } from '../types'
 import { TileActionStack, TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
+import { GeneratingChip } from '../../../components/GeneratingChip'
 
 const isHooksItem = (item: ScriptHistoryItem) => item.mode === 'write' && item.writeFormat === 'hooks'
 
@@ -53,14 +54,45 @@ function countLabel(item: ScriptHistoryItem): string {
   return `${n} variation${n === 1 ? '' : 's'}`
 }
 
+// A run still being written, shaped as the row it is about to become — so the
+// in-progress card is the SAME card, badge and title included, and nothing
+// moves when the takes land. `variations: []` is what the card branches on.
+function pendingAsItem(run: PendingScriptRun): ScriptHistoryItem {
+  return {
+    id: run.id,
+    mode: run.mode,
+    variations: [],
+    inputSummary: run.inputSummary,
+    productName: run.productName,
+    writeStyle: run.writeStyle,
+    writeFormat: run.writeFormat,
+    hookCategory: run.hookCategory,
+    hookCount: run.hookCount,
+    variationCount: run.variationCount,
+    createdAt: run.startedAt,
+  }
+}
+
+// What the run is doing, in the pipeline's own words.
+function pendingStatus(run: PendingScriptRun): string {
+  if (run.mode === 'reverse-engineer') return 'Rewriting scenes…'
+  if (run.mode === 'remix') return 'Remixing…'
+  return run.writeFormat === 'hooks' ? 'Writing hooks…' : 'Writing…'
+}
+
 interface HistoryViewProps {
   items: ScriptHistoryItem[]
+  // The runs in flight, newest first. Rendered above the finished rows and
+  // never filtered by the search box: they have no takes to match on yet, and
+  // hiding the thing you just fired is the opposite of a queue.
+  pending: PendingScriptRun[]
   activeId: string | null
   onSelect: (item: ScriptHistoryItem) => void
+  onSelectPending: (run: PendingScriptRun) => void
   onDelete: (id: string) => void
 }
 
-export default function HistoryView({ items, activeId, onSelect, onDelete }: HistoryViewProps) {
+export default function HistoryView({ items, pending, activeId, onSelect, onSelectPending, onDelete }: HistoryViewProps) {
   const [query, setQuery] = useState('')
 
   const groups = useMemo(() => {
@@ -78,7 +110,7 @@ export default function HistoryView({ items, activeId, onSelect, onDelete }: His
     return groupByDay(filtered, (it) => it.createdAt)
   }, [items, query])
 
-  if (items.length === 0) {
+  if (items.length === 0 && pending.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 p-6">
         <FileText className="h-10 w-10 text-ink-800" strokeWidth={1.5} />
@@ -103,10 +135,30 @@ export default function HistoryView({ items, activeId, onSelect, onDelete }: His
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {groups.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-6 text-center">
-            <span className="text-sm text-ink-500">No matches.</span>
+        {pending.length > 0 && (
+          <div className="flex flex-col gap-3 px-5 pt-4">
+            <DayPill label={pending.length === 1 ? 'In progress' : `In progress · ${pending.length}`} className="" />
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              {pending.map((run) => (
+                <HistoryCard
+                  key={run.id}
+                  item={pendingAsItem(run)}
+                  pendingLabel={pendingStatus(run)}
+                  isActive={activeId === run.id}
+                  onSelect={() => onSelectPending(run)}
+                  onDelete={() => {}}
+                />
+              ))}
+            </div>
           </div>
+        )}
+
+        {groups.length === 0 ? (
+          pending.length === 0 && (
+            <div className="flex h-full items-center justify-center px-6 text-center">
+              <span className="text-sm text-ink-500">No matches.</span>
+            </div>
+          )
         ) : (
           <div className="flex flex-col gap-6 px-5 py-4">
             {groups.map(([dayTs, dayItems]) => (
@@ -138,11 +190,17 @@ export default function HistoryView({ items, activeId, onSelect, onDelete }: His
 // title showed none of it.
 function HistoryCard({
   item,
+  pendingLabel,
   isActive,
   onSelect,
   onDelete,
 }: {
   item: ScriptHistoryItem
+  // Set while this row's takes are still being written: the card previews what
+  // was ASKED for instead of a take it doesn't have, its footer becomes the
+  // status chip, and it carries no delete (there is nothing saved to delete —
+  // the run is in memory until it lands).
+  pendingLabel?: string
   isActive: boolean
   onSelect: () => void
   onDelete: () => void
@@ -189,20 +247,43 @@ function HistoryCard({
           WebkitMaskImage: 'linear-gradient(to bottom, #000 72%, transparent)',
         }}
       >
-        <p className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-ink-400">
-          {preview || 'Empty script'}
-        </p>
+        {pendingLabel ? (
+          // Where the take will be. The card's title already says what is being
+          // written, so the body shows the shape of what is coming rather than
+          // repeating the brief back — one breathe for the block, per
+          // `.skeleton-group`, not seven shimmering lines.
+          <div className="skeleton-group flex flex-col gap-2">
+            <div className="skeleton h-2.5 w-full" />
+            <div className="skeleton h-2.5 w-[88%]" />
+            <div className="skeleton h-2.5 w-[94%]" />
+            <div className="skeleton h-2.5 w-[62%]" />
+            <div className="mt-1.5 skeleton h-2.5 w-[92%]" />
+            <div className="skeleton h-2.5 w-[78%]" />
+          </div>
+        ) : (
+          <p className="whitespace-pre-wrap break-words text-[11px] leading-relaxed text-ink-400">
+            {preview || 'Empty script'}
+          </p>
+        )}
       </div>
 
       <div className="mt-2 flex items-center gap-1.5 text-[10px] text-ink-600">
-        <span className="truncate">{countLabel(item)}</span>
-        <span className="shrink-0">·</span>
-        <span className="shrink-0 text-ink-700">{formatRelative(item.createdAt)}</span>
+        {pendingLabel ? (
+          <GeneratingChip family="scripts" label={pendingLabel} />
+        ) : (
+          <>
+            <span className="truncate">{countLabel(item)}</span>
+            <span className="shrink-0">·</span>
+            <span className="shrink-0 text-ink-700">{formatRelative(item.createdAt)}</span>
+          </>
+        )}
       </div>
 
-      <TileActionStack forceVisible={confirm || isActive}>
-        <TileDeleteButton variant="chrome" size="sm" onDelete={onDelete} onArmedChange={setConfirm} />
-      </TileActionStack>
+      {!pendingLabel && (
+        <TileActionStack forceVisible={confirm || isActive}>
+          <TileDeleteButton variant="chrome" size="sm" onDelete={onDelete} onArmedChange={setConfirm} />
+        </TileActionStack>
+      )}
     </div>
   )
 }
