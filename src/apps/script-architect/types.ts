@@ -304,12 +304,17 @@ export function hooksToText(hooks: ParsedHook[]): string {
 export interface EditableProductContext {
   productName: string
   productDescription: string
+  uniqueMechanism: string
   targetMarket: string
   painPoints: string
+  currentAlternatives: string
+  objections: string
+  notFor: string
   usps: string
   benefits: string
-  keySpecs: string
-  objections: string
+  proof: string
+  beforeAfter: string
+  hookAngles: string
   offer: string
   cta: string
 }
@@ -320,12 +325,17 @@ export function createEditableContext(product: Product): EditableProductContext 
   return {
     productName: product.productName,
     productDescription: product.productDescription,
+    uniqueMechanism: product.uniqueMechanism ?? '',
     targetMarket: product.targetMarket,
     painPoints: product.painPoints,
+    currentAlternatives: product.currentAlternatives ?? '',
+    objections: product.objections ?? '',
+    notFor: product.notFor ?? '',
     usps: product.usps,
     benefits: product.benefits,
-    keySpecs: product.keySpecs ?? '',
-    objections: product.objections ?? '',
+    proof: product.proof ?? '',
+    beforeAfter: product.beforeAfter ?? '',
+    hookAngles: product.hookAngles ?? '',
     offer: product.offer,
     cta: product.cta,
   }

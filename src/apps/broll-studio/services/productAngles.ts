@@ -30,8 +30,12 @@ export const PRODUCT_ANGLE_LABEL = 'product-angle'
  * is the source of truth").
  *
  * Empty bank fields are dropped rather than rendered as a labelled blank. Only
- * keySpecs was ever guarded, so a product saved without USPs shipped the model
+ * one field was ever guarded, so a product saved without USPs shipped the model
  * a literal `USPs: .`
+ *
+ * The bank's Key facts & specs field was removed in September 2026, and it was
+ * the one this file called its weakest material anyway — a spec is a fact about
+ * the object, and a picture of a fact is a label.
  */
 export function buildProductContext(product: Product | null | undefined): string {
   if (!product) return ''
@@ -46,8 +50,15 @@ export function buildProductContext(product: Product | null | undefined): string
   if (product.usps?.trim()) {
     lines.push(`- USPs (what makes it different — a shot shows the DIFFERENCE it makes to someone, never the feature that causes it): ${product.usps.trim()}`)
   }
-  if (product.keySpecs?.trim()) {
-    lines.push(`- Key facts & specs (background, and the weakest material here: a spec is a fact about the object, and a picture of a fact is a label. Use one only to work out which outcome is worth showing — never draw it, as a badge, a panel, a printed claim, or numbers anywhere in frame): ${product.keySpecs.trim()}`)
+  // The one field the September 2026 research brief added that belongs in a
+  // SHOT pipeline. It is two first-person paragraphs of a day before and a day
+  // after, written small and concrete on purpose — which is a shot list in
+  // everything but name, and the only material here that already describes
+  // rooms, times of day and things a person is holding. The rest of the brief
+  // (hooks, objections, customer language, compliance) is words for the script
+  // to say, and this file's whole rule is that nothing here becomes words.
+  if (product.beforeAfter?.trim()) {
+    lines.push(`- Their day before and after (the strongest material here: it is already written as moments — a room, a time of day, a thing in someone's hands — so take the concrete DETAIL from it and stage that, never the feeling it is named for): ${product.beforeAfter.trim()}`)
   }
   return lines.length > 1 ? lines.join('\n') : ''
 }

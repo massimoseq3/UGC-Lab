@@ -388,9 +388,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // prompt contract better than the cheaper entries, and the Ad Analyzer's
     // call is one JSON object read by a person and shot against. It is also
     // the only chat surface that sends a whole VIDEO inline, which is why the
-    // Ad Analyzer pins it by name. It held the unpicked default in Scripts and
-    // B-Roll too until August 2026, when both slots moved to GPT 5.6 Terra at
-    // the operator's call; it is still one row away in either picker.
+    // Ad Analyzer pins it by name. The Bank's product auto-fill is the second
+    // surface on it as of September 2026 — it left for the cheap tier in
+    // August and came back with the rewrite that turned that read into a
+    // fifteen-field research brief, which is the same "hold a long contract to
+    // the last line" job. It held the unpicked default in Scripts and B-Roll
+    // too until August 2026, when both slots moved to GPT 5.6 Terra at the
+    // operator's call; it is still one row away in either picker.
     defaultFor: ['ad-anatomy'],
     // OpenAI-compatible variant slug on kie.ai (native 3.6 uses Google's own
     // generateContent shape; our transport speaks OpenAI chat/completions).
@@ -528,9 +532,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // reach for when a take should read better than it obeys. It held both
     // picker defaults for a stint in August 2026 and holds neither now — see
     // the Gemini 3.6 Flash entry above. It is also deliberately NOT wired to
-    // CHAT_MODEL_STRONG: that constant's one consumer is the Ad Analyzer, whose
-    // call sends a whole VIDEO inline, and the Responses API this transport
-    // speaks declares input_text / input_image only.
+    // CHAT_MODEL_STRONG: that constant's heaviest consumer is the Ad Analyzer,
+    // whose call sends a whole VIDEO inline, and the Responses API this
+    // transport speaks declares input_text / input_image only.
     chatEndpoint: '/grok/v1/responses',
     chatTransport: 'openai-responses',
     chatSlug: 'grok-4-6',

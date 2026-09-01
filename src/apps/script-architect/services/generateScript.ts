@@ -983,19 +983,33 @@ async function runWrite(input: GenerateScriptInput, take: number, takeCount: num
 // ANGLE DISCIPLINE asks for are read together rather than either side of USPs.
 // Anything added here needs the same treatment: an unlabelled field reads as
 // inert, and a labelled one competes with BENEFIT_OVER_FEATURE.
+//
+// The bank's auto-fill writes a full research brief as of September 2026. Its
+// five new fields are all here, each with its own job, ordered so the one
+// argument ANGLE DISCIPLINE asks for stays together (pain → benefit →
+// before/after → what they quit) before the material that backs it up; Proof
+// took Key Specs' place and inherited its label, plus the weighting the field
+// now carries. Hook angles are LAST on purpose, after the CTA and out of order
+// with the form: they are ready-made openers, and a model that reads them
+// before the product's own material anchors on them instead of writing.
 function productContextLines(ctx?: EditableProductContext | null): string {
   if (!ctx) return ''
   const lines: string[] = []
   if (ctx.productName) lines.push(`- Product Name: ${ctx.productName}`)
   if (ctx.productDescription) lines.push(`- Product: ${ctx.productDescription}`)
+  if (ctx.uniqueMechanism) lines.push(`- How it works (the one-sentence answer to "but how?" — say it in plain words the moment a claim needs backing, and never as the subject of a line): ${ctx.uniqueMechanism}`)
   if (ctx.targetMarket) lines.push(`- Target Market: ${ctx.targetMarket}`)
   if (ctx.painPoints) lines.push(`- Pain Points: ${ctx.painPoints}`)
   if (ctx.benefits) lines.push(`- Benefits (what the viewer actually GETS — this is what the script argues, and every other field below exists to make one of these believable): ${ctx.benefits}`)
+  if (ctx.beforeAfter) lines.push(`- Before & after (the transformation this ad dramatises — the "before" half is where a hook comes from and the "after" half is the payoff it has to land on): ${ctx.beforeAfter}`)
+  if (ctx.currentAlternatives) lines.push(`- What they do instead today (what this script is actually competing with — naming the thing they already quit is what makes a viewer feel understood, and it belongs early): ${ctx.currentAlternatives}`)
   if (ctx.usps) lines.push(`- USPs (what makes it different — put the DIFFERENCE IT MAKES in the script, never the feature on its own): ${ctx.usps}`)
-  if (ctx.keySpecs) lines.push(`- Key Facts & Specs (proof, never the subject of a line — reach for one only where it makes a benefit above believable, and say what it does for them in the same breath): ${ctx.keySpecs}`)
+  if (ctx.proof) lines.push(`- Proof (the hard facts, each weighed for how much a stranger would believe it — never the subject of a line: reach for one only where it makes a benefit above believable, say what it does for them in the same breath, and never speak a weak signal as if it were a strong one): ${ctx.proof}`)
   if (ctx.objections) lines.push(`- Objections (hesitation — counter; address the most relevant one, don't list them): ${ctx.objections}`)
+  if (ctx.notFor) lines.push(`- Who this is NOT for (a promise that only lands for these people is the wrong promise — steer the script away from it, don't spend a line disqualifying anyone): ${ctx.notFor}`)
   if (ctx.offer) lines.push(`- Offer: ${ctx.offer}`)
   if (ctx.cta) lines.push(`- Call-to-Action: ${ctx.cta}`)
+  if (ctx.hookAngles) lines.push(`- Hook angles already found (raw material for ONE opener, never a menu to read from and never lifted verbatim — take at most one, and rewrite it in this script's own voice and the assigned format's register): ${ctx.hookAngles}`)
   return lines.join('\n')
 }
 
