@@ -41,7 +41,7 @@ interface SegmentedToggleProps<T extends string> {
   accent?: SegmentedAccent
 }
 
-// 'products' maps to the gold family (deep purple #4C1D95, the product accent);
+// 'products' maps to the gold family (light blue #38BDF8, the product accent);
 // 'voice'/'broll' map to their app families. Keyed by intent, not family name.
 export type SegmentedAccent = 'ink' | 'scripts' | 'influencers' | 'products' | 'voice' | 'broll' | 'playground' | 'outliers'
 
@@ -58,7 +58,9 @@ const ACCENT_INDICATOR: Record<SegmentedAccent, string> = {
   broll: 'bg-broll-500/10 ring-1 ring-inset ring-broll-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
   playground: 'bg-playground-500/10 ring-1 ring-inset ring-playground-500/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
   // Outliers' #D9A404, as a literal: it has no Tailwind family, and the one
-  // NAMED gold (`gold-*`) is #4C1D95 — purple, the Products accent.
+  // NAMED gold (`gold-*`) is #38BDF8 — light blue, the Products accent. The
+  // family kept its name when the hex moved off the original gold; renaming it
+  // would touch every product-tinted class in the app for no behaviour change.
   outliers: 'bg-[#D9A404]/10 ring-1 ring-inset ring-[#D9A404]/20 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]',
 }
 const ACCENT_ACTIVE_TEXT: Record<SegmentedAccent, string> = {
