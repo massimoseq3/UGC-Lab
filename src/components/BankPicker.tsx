@@ -28,6 +28,8 @@ import {
   type StarterRow,
 } from '../apps/character-studio/presets/service'
 import Dropdown from './Dropdown'
+import BankSidebar from '../apps/finder/BankSidebar'
+import { SectionLabel } from './SectionCard'
 
 // A tile standing in for a template that isn't in the bank yet. Prefixed so
 // `handleSelect` can tell one from a real row by its id alone — nothing else
@@ -36,6 +38,14 @@ const TEMPLATE_ID = 'template:'
 const templateIdOf = (rowId: string) => rowId.startsWith(TEMPLATE_ID) ? rowId.slice(TEMPLATE_ID.length) : null
 
 type BankItem = AnyBankItem
+
+// How far below the scroll port's top a section heading has to sit before the
+// rail stops calling it the one you're looking at.
+const SPY_OFFSET = 64
+const STYLE_SECTION = 'style:'
+// The section a style row points at. "All Styles" (an empty value) points at
+// the head of the list, where every look is still ahead of you.
+const styleSectionKey = (style: string) => (style ? `${STYLE_SECTION}${style}` : 'bank')
 
 interface BankPickerProps {
   bankType: BankType
@@ -113,13 +123,19 @@ export default function BankPicker({
   const [templates, setTemplates] = useState<StarterRow[] | null>(null)
   // The two character facets, mirroring the Characters preset picker — a
   // picker holding the whole template library needs the same way into it.
+  // Gender filters; style does NOT. The style rail is a table of contents over
+  // one scroll, exactly as it is over there: clicking a look scrolls to it and
+  // the highlight follows the scroll back. Filtering by style was tried first
+  // in both places and reads as a set of tabs — it hides the ten other looks
+  // the moment you glance at one, when the point of the grid is that you keep
+  // scrolling through it.
   const [gender, setGender] = useState('')
-  const [styleFacet, setStyleFacet] = useState('')
+  // Which section the scroll is inside: 'bank', or `style:<look>`.
+  const [scrolledKey, setScrolledKey] = useState('bank')
   // The row currently being written into the bank ('multi' for a confirmed
   // multi-select), so the tile it was clicked on can say so.
   const [addingId, setAddingId] = useState<string | null>(null)
   const adding = addingId !== null
-  const panelRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const isDesktop = useIsDesktop()
 
@@ -192,6 +208,35 @@ export default function BankPicker({
       : itemsAfterTabFilter
   const itemsAfterFilter = filter ? itemsAfterImageFilter.filter(filter) : itemsAfterImageFilter
 
+  // The rail down the left is the Bank's own source list (`BankSidebar`),
+  // mounted here whenever the picker can reach more than ONE bank — which today
+  // means the reference-image pickers, where "a product photo or a character or
+  // a saved still" is one question. A single-bank picker gets no rail: one row
+  // in a 204px column is a label wearing a control's clothes, and the header
+  // already names the bank. Below `lg` the rail doesn't render at all and the
+  // segmented strip is the switcher.
+  const railBanks = normalizedTabs && normalizedTabs.length > 1 ? normalizedTabs.map((t) => t.type) : null
+
+  // Counts on the rail are what that tab would actually SHOW — the per-tab
+  // filter and the caller's filter applied — never the raw bank length. A rail
+  // promising 40 b-rolls beside a tab holding the 6 that have a still is worse
+  // than no count at all.
+  const railCounts = useMemo(() => {
+    const out: Record<BankType, number> = { products: 0, models: 0, scripts: 0, voices: 0, brolls: 0, styles: 0, swipes: 0 }
+    for (const t of normalizedTabs ?? []) {
+      const pool: BankItem[] =
+        t.type === 'products' ? productPool :
+        t.type === 'models' ? models.filter((m) => !!m.characterImage) :
+        t.type === 'scripts' ? scripts :
+        t.type === 'voices' ? voices :
+        t.type === 'styles' ? styles :
+        brolls
+      const afterTab = t.filter ? pool.filter(t.filter) : pool
+      out[t.type] = (filter ? afterTab.filter(filter) : afterTab).length
+    }
+    return out
+  }, [normalizedTabs, productPool, models, scripts, voices, styles, brolls, filter])
+
   // ── Characters ───────────────────────────────────────────────────────
   // The member's own rows and the template library, annotated with the two
   // facets and one search haystack apiece, so both halves of the list filter
@@ -239,8 +284,7 @@ export default function BankPicker({
   const characterPasses = useMemo(() => ({
     q: (r: { search: string }) => !q || r.search.includes(q),
     gender: (r: { gender?: string }) => !gender || r.gender === gender,
-    setting: (r: { setting?: string }) => !styleFacet || r.setting === styleFacet,
-  }), [q, gender, styleFacet])
+  }), [q, gender])
 
   const filtered = characterPool
     // A character is searched on its whole DNA — "freckles" and "wood slat
@@ -262,7 +306,9 @@ export default function BankPicker({
     const pool = (except: keyof typeof characterPasses) =>
       all.filter((r) => Object.entries(characterPasses).every(([k, fn]) => k === except || fn(r)))
     const genderRows = pool('gender')
-    const styleRows = pool('setting')
+    // Style filters nothing any more, so its per-look tallies are taken over
+    // everything the other controls leave — which is what the rail is counting.
+    const styleRows = all.filter((r) => Object.values(characterPasses).every((fn) => fn(r)))
     // Styles in the LIBRARY's own order — the shot numbering the build script
     // bakes into the row order — not by count, which would reshuffle the menu
     // between two openings. A style only the member's own rows use is appended.
@@ -280,7 +326,7 @@ export default function BankPicker({
         })),
       ],
       styles: [
-        { value: '', label: 'All Styles' },
+        { value: '', label: 'All Styles', count: styleRows.length },
         ...order.map((k) => ({
           value: k,
           label: k,
@@ -289,6 +335,22 @@ export default function BankPicker({
       ],
     }
   }, [characterPool, characterPasses])
+
+  // The Characters bank gets a rail of its own where a multi-bank picker gets
+  // the bank one: the styles were a `Dropdown` on the filter row — eleven looks
+  // behind a click, on a panel whose whole job is browsing faces — and the
+  // Characters preset picker had already moved the same list down the left.
+  // Only one rail at a time: a tabbed picker sitting on its models tab keeps
+  // the styles in the menu, because the bank switcher has the better claim on
+  // those 204px.
+  //
+  // It differs from the preset picker's rail in one way, deliberately: there
+  // the rail NAVIGATES a single scroll and never filters, here it filters,
+  // because that is what this control already did and a picker is a place you
+  // narrow down rather than browse. The chrome is `BankSidebar`'s neutral row,
+  // not that rail's influencers tint — in this component a rail is as often the
+  // bank switcher, and one shape can't be two colours depending on the tab.
+  const styleRail = !railBanks && characterFacets ? characterFacets.styles : null
 
   // Same sort options as the Bank browser. `sortOptions` is null for banks the
   // Bank doesn't sort (voices) — we then leave the list in its natural order.
@@ -328,29 +390,98 @@ export default function BankPicker({
     return out
   }, [characterPool, characterPasses])
 
-  // B-Rolls are day-grouped under a date pill, exactly as the Bank browser
-  // shows them — a still is recognised by when it was shot, and the picker is
-  // where you go looking for "the one from yesterday". `groupByDay` is
-  // newest-day-first; flip it when the user sorts oldest-first.
-  const brollDayGroups = useMemo(() => {
-    if (currentBankType !== 'brolls') return null
-    const groups = groupByDay(sorted, (item) => (item as BRoll).createdAt)
+  // Every section of the characters scroll, in render order: the member's own
+  // rows first, then one per look. The rail reads its highlight out of this and
+  // jumps into it — see `jumpToSection`.
+  const sections = useMemo(() => {
+    if (!characterPool) return []
+    const out: string[] = []
+    if (filtered.length > 0) out.push('bank')
+    for (const g of templateGroups) out.push(styleSectionKey(g.label))
+    return out
+  }, [characterPool, filtered.length, templateGroups])
+
+  // A key the search or the gender toggle has retired falls back to the FIRST
+  // section — which is what the top of a re-filtered list means, and is also
+  // the right answer for a bank with nothing in it, whose section isn't there
+  // to be scrolled to.
+  const currentKey = sections.includes(scrolledKey) ? scrolledKey : sections[0] ?? 'bank'
+  // Empty inside the member's own rows: you're in all the looks there, which is
+  // what lights "All Styles".
+  const scrolledStyle = currentKey.startsWith(STYLE_SECTION) ? currentKey.slice(STYLE_SECTION.length) : ''
+
+  // One node per rendered section, for the spy and the jump.
+  const sectionEls = useRef(new Map<string, HTMLDivElement>())
+  const gridRef = useRef<HTMLDivElement>(null)
+
+  // The last section whose heading has passed the band below the port's top is
+  // the one being looked at. Measured with rects rather than `offsetTop`: the
+  // scroller isn't a positioned element, so `offsetTop` is counted from the
+  // panel and carries the header and toolbar with it.
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    const portTop = el.getBoundingClientRect().top
+    let current = sections[0]
+    for (const key of sections) {
+      const node = sectionEls.current.get(key)
+      if (!node) continue
+      if (node.getBoundingClientRect().top - portTop > SPY_OFFSET) break
+      current = key
+    }
+    // Only on a real change — this fires on every scroll frame over a list that
+    // is eighty-odd cards by the time anyone is scrolling it this far.
+    if (current && current !== scrolledKey) setScrolledKey(current)
+  }
+
+  const jumpToSection = (key: string) => {
+    // The first section is simply the top — no measuring, and it is also what
+    // "All Styles" means once nothing filters: the whole list, from the start.
+    if (key === 'bank' || key === sections[0]) {
+      setScrolledKey(sections[0] ?? 'bank')
+      if (gridRef.current) gridRef.current.scrollTop = 0
+      return
+    }
+    const el = gridRef.current
+    const node = sectionEls.current.get(key)
+    if (!el || !node) return
+    // The spy corrects this once the scroll lands; setting it here only saves a
+    // frame of the old highlight.
+    setScrolledKey(key)
+    el.scrollTop += node.getBoundingClientRect().top - el.getBoundingClientRect().top - 12
+  }
+
+  // B-Rolls and Scripts are day-grouped under a date pill, exactly as the Bank
+  // browser shows them — a still is recognised by when it was shot and a script
+  // by the session it was written in, and the picker is where you go looking
+  // for "the one from yesterday". `groupByDay` is newest-day-first; flip it when
+  // the user sorts oldest-first. A NAME sort has no days to group by, so those
+  // banks fall back to the flat grid (B-Rolls can't reach that — it sorts by
+  // date only — but Scripts can).
+  const dayGroups = useMemo(() => {
+    if (currentBankType !== 'brolls' && currentBankType !== 'scripts') return null
+    if (sort !== 'newest' && sort !== 'oldest') return null
+    const groups = groupByDay(sorted, (item) => (item as BRoll | Script).createdAt)
     return sort === 'oldest' ? groups.reverse() : groups
   }, [sorted, sort, currentBankType])
 
   // Everything with a thumbnail (influencers, products, b-rolls, scripts) packs
   // into the same dense grid the main Bank uses — `grid-flow-row-dense`
   // backfills the hole a wide card leaves. Voices are text rows, so they stay
-  // single-column. THREE columns at every width (August 2026, Massimo's call):
-  // a phone showed two, on the theory that a third tile would be unreadable,
-  // but these are 9:16 portraits with the name written across them — at ~112px
-  // they still read, and two-up meant a 390px sheet showed four characters in a
-  // screen and a half of scrolling when the point of the picker is recognising
-  // one on sight.
+  // single-column. THREE columns on a phone (August 2026, Massimo's call): it
+  // showed two, on the theory that a third tile would be unreadable, but these
+  // are 9:16 portraits with the name written across them — at ~112px they still
+  // read, and two-up meant a 390px sheet showed four characters in a screen and
+  // a half of scrolling when the point of the picker is recognising one on
+  // sight. It climbs from there because the picker is a centred modal now
+  // rather than a 560px drawer: three columns across ~900px of content would
+  // draw each tile at nearly 300px, which is a gallery, not a picker. The
+  // ladder is the Characters preset picker's, unchanged — with the rail
+  // appearing at the same `lg` it does there, every tile in both lands at
+  // ~150px at every width, and two pickers a click apart read as one thing.
   const gridClass =
     currentBankType === 'voices'
       ? 'flex flex-col gap-2'
-      : 'grid grid-flow-row-dense grid-cols-3 items-start gap-2'
+      : 'grid grid-flow-row-dense grid-cols-3 items-start gap-2.5 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6'
 
   const renderCard = (item: BankItem) => {
     const isSelected = multiSelect && selectedIds.includes(item.id)
@@ -411,7 +542,7 @@ export default function BankPicker({
       setSelectedIds([])
       setSort('newest')
       setGender('')
-      setStyleFacet('')
+      setScrolledKey('bank')
       setAddingId(null)
       setActiveTab(bankType)
       const initialItems =
@@ -536,26 +667,46 @@ export default function BankPicker({
   const portalTarget = typeof document !== 'undefined' ? document.body : null
   if (!portalTarget) return null
 
+  // Switching bank resets only the per-tab view state (search, sort, facets) —
+  // the running multi-select is deliberately kept, so refs can be gathered from
+  // several banks and added in one go.
+  const switchBank = (t: BankType) => { setActiveTab(t); setSearch(''); setSort('newest'); setGender(''); setScrolledKey('bank') }
+
   const picker = (
     <>
       {/* Backdrop — z-[70] keeps the picker above the sidebar (z-40) and
-          above the B-Roll CardDetailModal (z-[60]) when opened from within. */}
+          above the B-Roll CardDetailModal (z-[60]) when opened from within.
+          A childless sibling, so a text-selection drag released over it can't
+          be the `click` that closes the panel — see hooks/useBackdropClose. */}
       <div
-        className={`fixed inset-0 z-[70] bg-black/50 transition-opacity duration-300 ${
+        className={`fixed inset-0 z-[70] bg-black/50 transition-opacity duration-200 ${
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
       />
 
-      {/* Panel */}
-      <div
-        ref={panelRef}
-        className={`fixed z-[80] flex flex-col border-ink/5 bg-surface-1/95 backdrop-blur-2xl transition-transform duration-300 ease-out ${
-          isDesktop
-            ? `right-0 top-0 bottom-0 w-[560px] border-l ${isOpen ? 'translate-x-0' : 'translate-x-full'}`
-            : `inset-x-0 bottom-0 top-14 border-t rounded-t-2xl ${isOpen ? 'translate-y-0' : 'translate-y-full'}`
-        }`}
-      >
+      {/* Centring wrapper. `pointer-events-none` so a click that misses the
+          panel still lands on the backdrop underneath and closes it. */}
+      <div className="pointer-events-none fixed inset-0 z-[80] flex items-end justify-center md:items-center md:p-4">
+        {/* Panel. A centred modal from `md` up (Massimo's call, September 2026)
+            rather than the 560px drawer this was: the picker is where a member
+            recognises a saved thing on sight, and a drawer that narrow makes
+            that a scroll. Wide enough for the Bank's own layout — the rail down
+            the left, search and sort across the top, day pills through the grid
+            — because the point is that picking from a bank and browsing one are
+            the same act. On a phone it stays a bottom sheet: 204px of rail is
+            more than half the screen, and one thing at a time is the rule. */}
+        <div
+          className={`pointer-events-auto flex w-full flex-col overflow-hidden border-ink/5 bg-surface-1/95 backdrop-blur-2xl ${
+            isDesktop
+              ? `h-[86vh] max-w-6xl rounded-3xl border shadow-2xl shadow-black/40 transition-all duration-200 ease-out ${
+                  isOpen ? 'scale-100 opacity-100' : 'pointer-events-none scale-[0.98] opacity-0'
+                }`
+              : `h-[calc(100%-3.5rem)] rounded-t-2xl border-t transition-transform duration-300 ease-out ${
+                  isOpen ? 'translate-y-0' : 'translate-y-full'
+                }`
+          }`}
+        >
         {/* Drag handle — mobile only */}
         {!isDesktop && (
           <div className="flex justify-center pt-2 pb-1">
@@ -563,9 +714,9 @@ export default function BankPicker({
           </div>
         )}
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-ink/5 px-5 py-3.5">
+        <div className="flex shrink-0 items-center justify-between border-b border-ink/5 px-5 py-3.5">
           <h3 className="text-sm font-semibold tracking-tight text-ink-200">
-            Select {normalizedTabs ? 'from Bank' : label.replace(/s$/, '')}
+            Select {railBanks ? 'from Bank' : label.replace(/s$/, '')}
           </h3>
           <button
             onClick={onClose}
@@ -575,27 +726,69 @@ export default function BankPicker({
           </button>
         </div>
 
-        {/* Optional bank-switch toggle — same rounded segmented control as
-            the rest of the app. */}
-        {normalizedTabs && (
-          <div className="flex items-center border-b border-ink/5 px-4 py-3">
+        <div className="flex min-h-0 flex-1">
+        {/* The Bank's own source list, from `md` up. Below that it doesn't
+            render and the segmented strip below is the switcher. */}
+        {styleRail && (
+          <div className="hidden w-[204px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-ink/5 px-3 py-4 lg:flex">
+            <div className="flex flex-col gap-0.5">
+              <SectionLabel label="Style" className="px-3 pb-1.5" />
+              {styleRail.map((o) => {
+                const active = o.value === scrolledStyle
+                return (
+                  <button
+                    key={o.value || 'all'}
+                    type="button"
+                    onClick={() => jumpToSection(styleSectionKey(o.value))}
+                    title={o.label}
+                    aria-pressed={active}
+                    className={`flex w-full items-center gap-2 rounded-full px-3 py-[7px] text-left text-[12.5px] transition-colors ${
+                      active
+                        ? 'bg-ink/[0.07] font-medium text-ink-100 ring-1 ring-inset ring-ink/10'
+                        : 'text-ink-500 hover:bg-ink/5 hover:text-ink-300'
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{o.label}</span>
+                    <span className={`shrink-0 text-[11px] ${active ? 'text-ink-400' : 'text-ink-600'}`}>
+                      <CountSlot value={o.count ?? 0} />
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        {railBanks && (
+          <BankSidebar
+            banks={railBanks}
+            active={currentBankType}
+            counts={railCounts}
+            onSelect={switchBank}
+            showFrom="lg"
+          />
+        )}
+        <div className="flex min-w-0 flex-1 flex-col">
+        {/* The rail's stand-in below `lg`, where there is no room for 204px of
+            rail beside a grid of faces. */}
+        {railBanks && (
+          <div className="flex items-center border-b border-ink/5 px-4 py-3 lg:hidden">
             <SegmentedToggle<BankType>
               value={currentBankType}
-              // Keep the running multi-select across tabs — only the per-tab
-              // view state (search, sort) resets — so the user can gather refs
-              // from several banks and add them all at once.
-              onChange={(t) => { setActiveTab(t); setSearch(''); setSort('newest'); setGender(''); setStyleFacet('') }}
-              options={normalizedTabs.map((t) => ({ value: t.type, label: BANK_CONFIG[t.type].label }))}
+              onChange={switchBank}
+              options={railBanks.map((t) => ({ value: t, label: BANK_CONFIG[t].label }))}
               dense
             />
           </div>
         )}
 
-        {/* Search + sort share one row. The sort dropdown sits beside the
-            search box at a matching height (hidden for banks the Bank doesn't
-            sort, e.g. voices). */}
-        <div className="flex items-center gap-2 border-b border-ink/5 px-4 py-3">
-          <div className="flex h-10 flex-1 items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5">
+        {/* ONE toolbar row — search, then everything that narrows what it
+            searches, then sort. The gender toggle and the styles menu had a
+            band of their own under this one, which put two rows of chrome
+            between the modal's title and the first face; they wrap onto a
+            second line only when the width genuinely can't hold them. The sort
+            dropdown is hidden for banks the Bank doesn't sort (voices). */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink/5 px-4 py-3">
+          <div className="flex h-10 min-w-[180px] flex-1 items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5">
             <Search className="h-3.5 w-3.5 shrink-0 text-ink-600" />
             <input
               ref={searchRef}
@@ -605,6 +798,32 @@ export default function BankPicker({
               className="w-full bg-transparent text-sm text-ink-200 placeholder-ink-600 outline-none"
             />
           </div>
+          {/* Gender stays a toggle — three options, all worth seeing without a
+              click. The styles menu is the rail's stand-in below `lg`, at a
+              FIXED width: its label swings from "All Styles" to "Holding
+              Product", and a trigger that resized itself would shove the
+              toggle along the row on every pick. */}
+          {characterFacets && (
+            <SegmentedToggle
+              value={gender}
+              onChange={setGender}
+              options={characterFacets.genders}
+              className="shrink-0"
+              fitContent
+              dense
+            />
+          )}
+          {characterFacets && (
+            <div className={`w-[190px] shrink-0 ${styleRail ? 'lg:hidden' : ''}`}>
+              <Dropdown
+                value={scrolledStyle}
+                onChange={(v) => jumpToSection(styleSectionKey(v))}
+                options={characterFacets.styles}
+                tier="panel"
+                dense
+              />
+            </div>
+          )}
           {sortOptions && (
             <div className="relative shrink-0">
               <select
@@ -621,38 +840,8 @@ export default function BankPicker({
           )}
         </div>
 
-        {/* Character facets, on their own row under the search — the same pair
-            the Characters preset picker carries, because this list now holds
-            the same library. Gender is a toggle (three options, all worth
-            seeing without a click); the styles are a menu, since eleven
-            segments make a strip no 560px panel fits. The menu takes a FIXED
-            width rather than fitting its content: its label swings from "All
-            Styles" to "Holding Product", and a self-resizing trigger would
-            shove the gender toggle along the row on every pick. */}
-        {characterFacets && (
-          <div className="flex items-center gap-2 border-b border-ink/5 px-4 py-3">
-            <SegmentedToggle
-              value={gender}
-              onChange={setGender}
-              options={characterFacets.genders}
-              className="shrink-0"
-              fitContent
-              dense
-            />
-            <div className="min-w-0 flex-1">
-              <Dropdown
-                value={styleFacet}
-                onChange={setStyleFacet}
-                options={characterFacets.styles}
-                tier="panel"
-                dense
-              />
-            </div>
-          </div>
-        )}
-
         {/* Item list */}
-        <div className="flex-1 overflow-y-auto px-4 py-3">
+        <div ref={gridRef} onScroll={characterFacets ? handleScroll : undefined} className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
           {sorted.length === 0 && templateGroups.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-12 text-center">
               <span className="text-sm text-ink-600">
@@ -662,9 +851,9 @@ export default function BankPicker({
                 {search ? 'Try a different search' : 'Add one below to get started'}
               </span>
             </div>
-          ) : brollDayGroups ? (
+          ) : dayGroups ? (
             <div className="flex flex-col">
-              {brollDayGroups.map(([dayTs, dayItems]) => (
+              {dayGroups.map(([dayTs, dayItems]) => (
                 <div key={dayTs}>
                   <DayPill label={sectionLabel(dayTs)} />
                   <div className={gridClass}>{dayItems.map(renderCard)}</div>
@@ -679,13 +868,20 @@ export default function BankPicker({
                something to distinguish them from. */
             <div className="flex flex-col">
               {sorted.length > 0 && (
-                <>
+                <div ref={(el) => { if (el) sectionEls.current.set('bank', el); else sectionEls.current.delete('bank') }}>
                   <DayPill label="Your Characters" className="mb-2" />
                   <div className={gridClass}>{sorted.map(renderCard)}</div>
-                </>
+                </div>
               )}
               {templateGroups.map((group, i) => (
-                <div key={group.label}>
+                <div
+                  key={group.label}
+                  ref={(el) => {
+                    const key = styleSectionKey(group.label)
+                    if (el) sectionEls.current.set(key, el)
+                    else sectionEls.current.delete(key)
+                  }}
+                >
                   <DayPill
                     label={group.label}
                     className={i === 0 && sorted.length === 0 ? 'mb-2' : 'mb-2 mt-4'}
@@ -705,7 +901,7 @@ export default function BankPicker({
             <button
               onClick={() => { void handleConfirmMulti() }}
               disabled={selectedIds.length === 0 || adding}
-              className="flex w-full items-center justify-center gap-2 rounded-full bg-ink px-4 py-2.5 text-sm font-semibold text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex w-full items-center justify-center gap-2 rounded-full bg-ink px-7 py-4 text-sm font-semibold text-paper transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {adding && <Spinner className="h-4 w-4" />}
               Add {selectedIds.length || ''} {selectedIds.length === 1 ? 'item' : 'items'}
@@ -722,7 +918,7 @@ export default function BankPicker({
             <>
               <button
                 onClick={handleAddNew}
-                className="flex w-full items-center justify-center gap-2 rounded-full bg-ink px-4 py-2.5 text-sm font-semibold text-paper transition-colors hover:bg-ink/90"
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-ink px-7 py-4 text-sm font-semibold text-paper transition-colors hover:bg-ink/90"
               >
                 <Plus className="h-4 w-4" />
                 Add New {label.replace(/s$/, '')}
@@ -736,6 +932,9 @@ export default function BankPicker({
               </button>
             </>
           )}
+        </div>
+        </div>
+        </div>
         </div>
       </div>
     </>

@@ -1,4 +1,3 @@
-import type { ElementType } from 'react'
 import type { BankType } from '../../utils/constants'
 import { BANK_CONFIG } from '../../utils/constants'
 import { SectionLabel } from '../../components/SectionCard'
@@ -29,18 +28,24 @@ import { SectionLabel } from '../../components/SectionCard'
  * here, so it sits under what owns it — and it disappears with Outliers,
  * exactly as its tab did.
  */
-export default function BankSidebar({ banks, active, counts, icons, onSelect }: {
+export default function BankSidebar({ banks, active, counts, onSelect, showFrom = 'md' }: {
   banks: BankType[]
   active: BankType
   counts: Record<BankType, number>
-  icons: Record<BankType, ElementType>
   onSelect: (bank: BankType) => void
+  // The width the rail appears at. `md` in the Bank app, which owns the whole
+  // window; `lg` inside the bank picker, whose modal is already inset from the
+  // viewport — 204px of rail beside a grid of faces needs the room, and it is
+  // the breakpoint the Characters preset picker's rail already uses.
+  showFrom?: 'md' | 'lg'
 }) {
   const owned = banks.filter((b) => b !== 'swipes')
   const fromApps = banks.filter((b) => b === 'swipes')
 
   const row = (bank: BankType) => {
-    const Icon = icons[bank]
+    // The glyph comes off `BANK_CONFIG`, which already carries one per bank —
+    // a second table here would be one more thing to keep in step.
+    const Icon = BANK_CONFIG[bank].icon
     const isActive = bank === active
     return (
       <button
@@ -74,7 +79,7 @@ export default function BankSidebar({ banks, active, counts, icons, onSelect }: 
   }
 
   return (
-    <div className="hidden w-[204px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-ink/5 px-3 py-4 md:flex">
+    <div className={`hidden w-[204px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-ink/5 px-3 py-4 ${showFrom === 'lg' ? 'lg:flex' : 'md:flex'}`}>
       <div className="flex flex-col gap-0.5">
         <SectionLabel label="Library" className="px-3 pb-1.5" />
         {owned.map(row)}
