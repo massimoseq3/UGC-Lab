@@ -17,7 +17,6 @@ export type CrabVariant =
   | 'edit-studio'
   | 'ad-anatomy'
   | 'discover'
-  | 'kie'
 
 interface Px {
   x: number
@@ -29,7 +28,6 @@ interface Px {
 
 const CRAB = '#D97757'
 const DARK = '#1F1B17'
-const GOLD = '#F2B231'
 
 // Body rows y=4..9, eyes y=5, arms y=5..6, legs y=10..11. Rows 0..3 are
 // reserved headroom for hats.
@@ -147,18 +145,6 @@ const COSTUMES: Record<CrabVariant, Px[]> = {
     { x: 11, y: 0, w: 1, h: 1, fill: '#FFD84D' }, // the ping it just caught
   ],
 
-  // kie.ai — the power source. Golden body (set in CrabSprite below) with
-  // sun rays and a little lightning bolt on the shell.
-  kie: [
-    { x: 7, y: 0, w: 2, h: 1, fill: '#FFD84D' }, // rays
-    { x: 3, y: 1, w: 1, h: 1, fill: '#FFD84D' },
-    { x: 12, y: 1, w: 1, h: 1, fill: '#FFD84D' },
-    { x: 0, y: 3, w: 1, h: 1, fill: '#FFD84D' },
-    { x: 15, y: 3, w: 1, h: 1, fill: '#FFD84D' },
-    { x: 8, y: 6, w: 1, h: 1, fill: '#C9821B' }, // bolt
-    { x: 7, y: 7, w: 1, h: 1, fill: '#C9821B' },
-    { x: 8, y: 8, w: 1, h: 1, fill: '#C9821B' },
-  ],
 }
 
 export default function CrabSprite({
@@ -174,7 +160,7 @@ export default function CrabSprite({
   className?: string
   style?: CSSProperties
 }) {
-  const bodyFill = body ?? (variant === 'kie' ? GOLD : CRAB)
+  const bodyFill = body ?? CRAB
   const rects = [...baseRects(bodyFill), ...COSTUMES[variant]]
   // The crab body is deliberately bottom-anchored (rows 0–3 are reserved hat
   // headroom, legs always reach y=12), so short-hat costumes — B-Roll's cap,

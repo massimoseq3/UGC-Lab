@@ -4,6 +4,7 @@ import type { Announcement } from '../../stores/announcementStore'
 import { useAnnouncementStore } from '../../stores/announcementStore'
 import { useAppStore } from '../../stores/appStore'
 import { getAppConfig } from '../../utils/constants'
+import { isAppVisible } from '../../stores/appVisibilityStore'
 import AnnouncementBody from './AnnouncementBody'
 import { isSafeHttpUrl, youtubeId, youtubeThumb } from './media'
 
@@ -22,7 +23,10 @@ interface CtaTarget {
 /** The card's one call to action, if it has one. An app jump beats a link. */
 function announcementCta(a: Announcement): CtaTarget | null {
   if (a.ctaApp) {
-    const app = getAppConfig(a.ctaApp)
+    // Skipped when the member has switched that app off: the jump would be
+    // bounced back to the Dashboard by RouterSync, so the card falls through to
+    // its link CTA rather than offering a button that goes somewhere else.
+    const app = isAppVisible(a.ctaApp) ? getAppConfig(a.ctaApp) : undefined
     if (app) return { label: a.ctaLabel?.trim() || `Open ${app.name}`, kind: 'app', target: a.ctaApp }
   }
   if (isSafeHttpUrl(a.ctaUrl)) {

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../stores/appStore'
 import { useAuthStore } from '../stores/authStore'
+import { isAppVisible, useAppVisibilityStore } from '../stores/appVisibilityStore'
 import {
   DEFAULT_SLUG,
   getAppIdForSlug,
@@ -19,6 +20,10 @@ export default function RouterSync() {
   const activeApp = useAppStore((s) => s.activeApp)
   const openApp = useAppStore((s) => s.openApp)
   const isAdmin = useAuthStore((s) => s.profile?.is_admin === true)
+  // Subscribed for the re-run only — the guard below reads through
+  // `isAppVisible` so the default for a non-optional app lives in one place.
+  // Switching Outliers off while sitting in it is exactly what re-fires this.
+  const appVisibility = useAppVisibilityStore((s) => s.visible)
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -47,11 +52,19 @@ export default function RouterSync() {
       return
     }
 
+    // An app switched off in Settings has no dock tile, so its URL is the only
+    // way back into it — a bookmark, or the member turning it off while it was
+    // open. Same treatment as a forbidden slug: land on the Dashboard.
+    if (!isAppVisible(targetAppId)) {
+      navigate(`/${DEFAULT_SLUG}`, { replace: true })
+      return
+    }
+
     if (useAppStore.getState().activeApp !== targetAppId) {
       openApp(targetAppId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname, isAdmin])
+  }, [location.pathname, isAdmin, appVisibility])
 
   // store → URL. Runs only when activeApp changes. Same dep-array caveat as
   // the effect above — `navigate` is omitted on purpose.

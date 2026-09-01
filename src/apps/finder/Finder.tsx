@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Package, UserRound, FileText, Mic, Film, Upload, LayoutGrid, Palette, Bookmark } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useBankStore } from '../../stores/bankStore'
+import { useIsAppVisible } from '../../stores/appVisibilityStore'
 import type { BankType } from '../../utils/constants'
 import { BANK_CONFIG } from '../../utils/constants'
 import type { Product, Model, Script, VoicePreset, BRoll, StylePreset } from '../../stores/types'
@@ -30,6 +31,13 @@ const SIDEBAR_ICONS: Record<BankType, React.ElementType> = {
 }
 
 const BANK_TYPES: BankType[] = ['products', 'models', 'scripts', 'voices', 'brolls', 'styles', 'swipes']
+
+// The Swipe File is Outliers' own bank — every row in it is filed from that
+// app, and its empty state says so. A member who has switched Outliers off in
+// Settings therefore loses the tab too: left in, it is a tab pointing at an app
+// that isn't there. Switching Outliers back on brings the tab and its rows back
+// untouched — nothing here deletes a swipe.
+const BANK_OWNER_APP: Partial<Record<BankType, string>> = { swipes: 'discover' }
 
 // One photo's trip from data URI to stored asset, remembered by the exact bytes
 // it came in as. The form autosaves, and it adopts the asset ref a save hands
@@ -108,11 +116,21 @@ const MODEL_FILTER_OPTIONS: { value: ModelFilter; label: string; icon?: React.El
 ]
 
 export default function Finder() {
-  const [activeBank, setActiveBank] = useState<BankType>('products')
+  const [selectedBank, setActiveBank] = useState<BankType>('products')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   // Influencers bank sub-filter (All / Portraits / Influencer Sheets).
   const [modelFilter, setModelFilter] = useState<ModelFilter>('all')
+
+  const isVisible = useIsAppVisible()
+  const bankTypes = BANK_TYPES.filter((bank) => {
+    const owner = BANK_OWNER_APP[bank]
+    return !owner || isVisible(owner)
+  })
+  // Derived rather than corrected in an effect: a tab can disappear under us
+  // (Settings is a modal over this app), and falling back in render means the
+  // list below is never asked for a bank whose tab isn't on screen.
+  const activeBank = bankTypes.includes(selectedBank) ? selectedBank : 'products'
 
   const consumePayload = useAppStore((s) => s.consumePayload)
   const interAppPayload = useAppStore((s) => s.interAppPayload)
@@ -388,7 +406,7 @@ export default function Finder() {
             className="h-10 !p-1"
             value={activeBank}
             onChange={(bank) => { setActiveBank(bank); closeForm() }}
-            options={BANK_TYPES.map((bank) => ({
+            options={bankTypes.map((bank) => ({
               value: bank,
               label: BANK_CONFIG[bank].label,
               icon: SIDEBAR_ICONS[bank],

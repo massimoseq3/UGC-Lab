@@ -1,18 +1,17 @@
 import { useState, type CSSProperties } from 'react'
-import { ArrowUpRight, Check, ChevronRight, Eye, EyeOff, X } from 'lucide-react'
+import { ArrowUpRight, Check, Eye, EyeOff, X, Zap } from 'lucide-react'
 import Spinner from './Spinner'
 import { useAppStore } from '../stores/appStore'
 import { useSettingsStore } from '../stores/settingsStore'
-import { getAppConfig } from '../utils/constants'
-import { TEAM } from '../utils/team'
+import { dockOrderedApps, getAppConfig } from '../utils/constants'
+import { getTeamMember } from '../utils/team'
+import { useIsAppVisible } from '../stores/appVisibilityStore'
 import type { TeamMember } from '../utils/team'
-import CrabSprite from './CrabSprite'
-import AppGlassTile from './AppGlassTile'
+import AppGlassTile, { GlassTile } from './AppGlassTile'
 import AppLogo from './AppLogo'
 import { useKeyConnect } from './useKeyConnect'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useBackdropClose } from '../hooks/useBackdropClose'
-import { SectionLabel } from './SectionCard'
 
 // NO EM DASHES IN THIS SCREEN'S COPY. Massimo's call (August 2026): this is
 // the introduction, and it should read like someone talking rather than like
@@ -42,20 +41,15 @@ import { SectionLabel } from './SectionCard'
 
 const SERIF = { fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }
 
-// Counted off TEAM rather than written out, so adding a crew member can't
+// Counted off the roster rather than written out, so adding a crew member can't
 // leave the headline claiming the old number (it said "Eight" for a day after
-// Outliers made nine).
+// Outliers made nine). Counted at RENDER time, because a member who has
+// switched an optional app off is being introduced to one teammate fewer.
 const TEAM_COUNT_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
-const teamCountWord = TEAM_COUNT_WORDS[TEAM.length] ?? String(TEAM.length)
-const DEFAULT_CAPTION = `${teamCountWord[0].toUpperCase()}${teamCountWord.slice(1)} teammates, one workspace, and everything they make lands in the shared Bank.`
-
-// The Create chain, in dock order. Category comes from constants.ts so this
-// can't drift if an app moves group.
-const WORKFLOW = TEAM.filter((m) => getAppConfig(m.appId)?.category === 'create')
-const ON_CALL = TEAM.filter((m) => {
-  const category = getAppConfig(m.appId)?.category
-  return category === 'library' || category === 'tools'
-})
+function defaultCaption(count: number): string {
+  const word = TEAM_COUNT_WORDS[count] ?? String(count)
+  return `${word[0].toUpperCase()}${word.slice(1)} teammates, one workspace, and everything they make lands in the shared Bank.`
+}
 
 export default function MeetTheTeam() {
   const open = useAppStore((s) => s.teamIntroOpen)
@@ -137,77 +131,59 @@ export default function MeetTheTeam() {
 function Crew({ onVisit }: { onVisit: (appId: string) => void }) {
   // One caption for the whole roster, driven by whatever the cursor is on.
   const [hovered, setHovered] = useState<TeamMember | null>(null)
+  const isVisible = useIsAppVisible()
+
+  // ONE chain, in the dock's own order (September 2026, Massimo's call). It was
+  // two groups — "The workflow" over "Always on call" — which split the crew by
+  // a distinction the member has no use for on the way in: Bank and the Ad
+  // Analyzer are as much part of making an ad as Scripts is, and the second
+  // heading mostly said "these three didn't fit the row above". Reading the
+  // roster off `dockOrderedApps` is what makes the chain honest — it is the
+  // literal order of the tiles waiting behind this modal, so the intro can't
+  // promise a flow the dock lays out differently.
+  const crew = dockOrderedApps()
+    .map((app) => getTeamMember(app.id))
+    // Dashboard has no teammate; an optional app switched off has no way in, so
+    // introducing its teammate would be introducing a stranger.
+    .filter((m): m is TeamMember => !!m && isVisible(m.appId))
 
   return (
     <div onMouseLeave={() => setHovered(null)}>
-      <GroupHeading>The workflow</GroupHeading>
-      {/* Five cards with the pipeline running through them. The arrows carry
-          real information — this order is the order you work in — so they only
-          appear between the Create apps, never around Bank or the tools. */}
-      {/* A 3-across grid on a phone (two rows of three), a single chain from sm
-          up. Six cards sharing one 390px line left every name truncated to
-          "Ch…" / "Scr…" / "Voi…", which introduces nobody. */}
-      {/* Each cell is items-stretch, not items-center: a two-line role
-          ("Creative Director") makes one card taller, and centring it would
-          ride that card's ICON out of line with the other five. The chevron
-          centres itself instead. */}
-      <div className="mt-2 grid grid-cols-3 gap-1 sm:flex sm:flex-nowrap sm:items-stretch sm:justify-center">
-        {WORKFLOW.map((member, i) => (
-          <div key={member.appId} className="flex min-w-0 items-stretch sm:flex-1">
-            {i > 0 && (
-              <ChevronRight
-                aria-hidden
-                className="hidden h-4 w-4 shrink-0 self-center text-ink-700 sm:block"
-                strokeWidth={2.5}
-              />
-            )}
-            <CrewCard member={member} onVisit={onVisit} onHover={setHovered} />
-          </div>
-        ))}
+      {/* The chain runs along a single rail: a hairline behind the tiles, from
+          the first teammate to the last. It replaces the chevrons the old
+          workflow row carried between cards — eight of them across a row this
+          tight read as clutter, and the rail says the same thing in one stroke.
+          It is `sm`-only, because below that the row wraps and a straight line
+          behind two-and-a-bit rows would be drawing a flow that isn't there. */}
+      <div className="relative pt-1">
+        <span aria-hidden className="absolute left-[8%] right-[8%] top-[37px] hidden h-px bg-ink/10 sm:block" />
+        {/* `flex-wrap` with thirds below `sm` rather than a grid: eight cards
+            leave an orphan row of two, and a wrapping flex row CENTRES it where
+            `grid-cols-3` would hang it off the left edge. One nowrap line from
+            `sm` up, which is the shape the rail is drawn for. */}
+        <div className="relative flex flex-wrap justify-center gap-y-1 sm:flex-nowrap sm:items-stretch">
+          {crew.map((member) => (
+            <CrewCard key={member.appId} member={member} onVisit={onVisit} onHover={setHovered} />
+          ))}
+        </div>
       </div>
 
-      {/* The caption slot: the blurb alone. The teammate's name and role used
-          to lead it — the role now sits under every card's title where it reads
-          without a hover, and repeating it here said the same words twice.
-          Fixed height so a hover never nudges the layout. */}
-      <p className="mt-3 flex min-h-[34px] items-center justify-center px-4 text-center text-[12.5px] leading-snug text-ink-400">
-        {hovered ? hovered.blurb : DEFAULT_CAPTION}
+      {/* The caption slot: it now carries the ROLE as well as the blurb, because
+          the role came off the cards. Eight names on one line leave ~78px each,
+          which is enough for "Ad Analyzer" and not for "Casting Director" under
+          it — and a job title that truncates names no job. Fixed height so a
+          hover never nudges the layout. */}
+      <p className="mt-3 flex min-h-[38px] items-center justify-center px-4 text-center text-[12.5px] leading-snug text-ink-400">
+        {hovered ? (
+          <span>
+            <span className="font-medium text-ink-200">{hovered.role}</span>
+            <span className="px-1.5 text-ink-600">·</span>
+            {hovered.blurb}
+          </span>
+        ) : (
+          defaultCaption(crew.length)
+        )}
       </p>
-
-      <GroupHeading className="mt-4">Always on call</GroupHeading>
-      {/* Column count follows the roster: hardcoded at 3, the fourth on-call
-          member (Outliers) wrapped onto a line of its own, left-aligned under
-          the others. The workflow row above is a fixed chain of five, so only
-          this half moves when an app is added. */}
-      <div
-        className="mt-2 grid gap-1"
-        style={{ gridTemplateColumns: `repeat(${ON_CALL.length}, minmax(0, 1fr))` }}
-      >
-        {ON_CALL.map((member) => (
-          <CrewCard key={member.appId} member={member} onVisit={onVisit} onHover={setHovered} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// The group heading, and it wears the app's OWN field-label treatment
-// (`SectionLabel` from components/SectionCard — Characters' GENDER / AGE RANGE,
-// the Bank forms, the B-Roll cards) rather than one of its own: 11px, medium,
-// `tracking-widest`, ink-300. It was 10px semibold at `0.14em` in ink-400,
-// which is the same "one house style too many" this screen's own headings kept
-// falling into — a word doing the same job in two places should look the same
-// in both. The hairline is this screen's, not the shared component's,
-// so it stays out here as a sibling — one on EACH side, because the label is
-// centred: this screen's own rows (the crew grid, the blurb, the key card) are
-// all centred columns, and a left-hung heading with a rule trailing off to the
-// right was the only thing on it reading from an edge.
-function GroupHeading({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`flex items-center gap-3 ${className}`}>
-      <span className="h-px flex-1 bg-ink/10" />
-      <SectionLabel label={String(children)} />
-      <span className="h-px flex-1 bg-ink/10" />
     </div>
   )
 }
@@ -238,21 +214,21 @@ function CrewCard({
       // --tint is the accent at 10%: each teammate's colour appears on demand
       // instead of eight competing swatches at rest.
       style={{ '--tint': `${app.accent}1A` } as CSSProperties}
-      className="group relative flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-2xl px-2 py-3 transition-colors duration-200 hover:bg-[var(--tint)] focus-visible:bg-[var(--tint)]"
+      className="group relative flex min-w-0 basis-1/3 flex-col items-center gap-1.5 rounded-2xl px-1.5 py-3 transition-colors duration-200 hover:bg-[var(--tint)] focus-visible:bg-[var(--tint)] sm:flex-1 sm:basis-auto"
     >
-      <span className="flex h-12 items-center transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-1">
+      {/* The tile sits ON the rail, so it needs its own opaque ground: the
+          hairline runs behind the whole row and would otherwise cut across the
+          gap either side of every icon. The hover lift carries it. */}
+      <span className="relative flex h-12 items-center rounded-2xl bg-surface-1 px-1 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] group-hover:-translate-y-1">
         <AppGlassTile app={app} />
       </span>
-      {/* The app, then the JOB it does for you. The persona's own name (Clawdia,
-          Pinchy) used to be this second line and came off in August 2026 — a
-          name introduces nobody on its own, where "Casting Director" says what
-          the app is for at a glance, which is the whole point of this screen. */}
+      {/* The name alone. The JOB it does moved into the caption slot under the
+          row when the two groups became one chain: eight cards on one line
+          leave ~78px each, and "Creative Director" clipped to "Creative Dir…"
+          names no job. The caption already followed the cursor, so the role is
+          one hover away rather than gone. */}
       <span className="w-full min-w-0">
         <span className="block truncate text-[12.5px] font-semibold tracking-tight text-ink-100">{app.name}</span>
-        {/* Wraps rather than truncates: six cards on one line leave ~90px, and
-            "Creative Director" clipped to "Creative Direct…" names no job. The
-            row is items-stretch, so a two-line role just sets the row's height. */}
-        <span className="block text-[11px] leading-tight text-ink-500">{member.role}</span>
       </span>
     </button>
   )
@@ -269,8 +245,12 @@ function KeyBlock() {
   return (
     <div className="rounded-2xl border border-ink/10 bg-ink/[0.02] p-3.5">
       <div className="flex items-center gap-3">
-        <span className="flex h-11 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-400/10">
-          <CrabSprite variant="kie" className="h-8 w-11" />
+        {/* The fuel wears the SAME face as the crew it powers: the glass
+            squircle every app tile is cut from, in kie.ai's gold, with a bolt
+            for a glyph. See ApiKeyGuide for the reasoning — the two key cards
+            carry one mark. */}
+        <span className="shrink-0">
+          <GlassTile icon={Zap} accent="#F2B231" size={44} />
         </span>
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 text-[12.5px] font-semibold tracking-tight text-ink-100">

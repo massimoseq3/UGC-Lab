@@ -92,6 +92,19 @@ export const BANK_CONFIG: Record<BankType, { label: string; icon: ElementType; a
   swipes: { label: 'Swipe File', icon: Bookmark, accent: '#D9A404' },
 }
 
+// The dock's group order, and therefore the order the work runs in: Dashboard,
+// then Bank, then the research tools, then the Create line. It lives here rather
+// than in the dock because a second surface now reads it — Meet Your Team lays
+// the crew out as ONE chain, and the intro promising an order the dock doesn't
+// keep is exactly the drift this prevents. `admin` is absent on purpose: it
+// never renders in the dock.
+export const SECTION_ORDER: AppCategory[] = ['system', 'library', 'tools', 'create']
+
+/** Every dock app, flattened into the exact left-to-right order the dock lays out. */
+export function dockOrderedApps(): AppConfig[] {
+  return SECTION_ORDER.flatMap((category) => APP_REGISTRY.filter((a) => a.category === category))
+}
+
 export function getAppConfig(appId: string): AppConfig | undefined {
   return APP_REGISTRY.find((a) => a.id === appId)
 }

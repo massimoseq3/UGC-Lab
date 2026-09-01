@@ -1,52 +1,47 @@
-import type { ReactNode } from 'react'
+import type { ElementType, ReactNode } from 'react'
 import type { AppConfig } from '../utils/constants'
-import { getTeamMember } from '../utils/team'
-import CrabSprite from './CrabSprite'
 
-// The macOS-app-icon tile: the app's accent as the fill, `glass-fill`
-// (index.css) laying the diffuse bloom and body gradient over it, the tile's
-// own rims and accent glow finishing it, and the app's crab persona peeking up
-// over the top-right corner on hover.
+// The macOS-app-icon tile: an accent as the fill, `glass-fill` (index.css)
+// laying the diffuse bloom and body gradient over it, and the tile's own rims
+// and accent glow finishing it.
 //
 // Lifted out of the dock (August 2026) so Meet Your Team wears the SAME icon a
-// member reaches for afterwards — it introduced the crew with the crab alone,
-// which is the one picture that appears nowhere else in the workspace. The crab
-// is still here, in the place the dock puts it: tucked behind the tile until
-// the pointer arrives.
+// member reaches for afterwards.
 //
-// The hover reveal rides on `group-hover:`, so the caller's own hoverable
-// element has to carry `group`.
-export default function AppGlassTile({
-  app,
+// The crab persona used to peek out of the top-right corner on hover, here and
+// therefore in the dock. It came out in September 2026 (Massimo's call): a
+// pixel-art sprite sliding out from behind a glass icon is a different visual
+// language from everything around it, and on a row of eight it fired eight
+// times as the cursor crossed the row. The crabs still live where they are the
+// subject rather than a garnish — the orrery's caption, Edit's skill folder,
+// the Outliers connect card.
+
+/**
+ * The tile itself, addressed by icon + colour rather than by app — so a mark
+ * that is NOT a dock app can wear the same face. The kie.ai key card uses it
+ * for its bolt, which is the point: the key belongs to the same set of objects
+ * as the apps it powers, so it should be cut from the same material.
+ */
+export function GlassTile({
+  icon: Icon,
+  accent,
   size = 48,
+  iconColor = '#ffffff',
   overlay,
 }: {
-  app: AppConfig
-  // Edge length in px — the tile is a square and the crab scales with it.
+  icon: ElementType
+  accent: string
+  // Edge length in px — everything inside scales with it.
   size?: number
+  iconColor?: string
   // Extra chrome positioned against the tile (the dock's update badge).
   overlay?: ReactNode
 }) {
-  const Icon = app.icon
-  // Admin's accent is near-white — a white glyph would vanish on it.
-  const iconColor = app.id === 'admin' ? '#27272a' : '#ffffff'
-  const member = getTeamMember(app.id)
   const scale = size / 48
   const radius = Math.round(14 * scale)
 
   return (
     <span className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      {/* Tucked behind the tile (z-0) and hidden until hover, then it rises and
-          fades in so the crew pokes out of the icon. Coloured in the teammate's
-          accent (not white) so it reads as "the new colour". */}
-      {member && (
-        <CrabSprite
-          variant={member.appId}
-          body={member.roleColor ?? app.accent}
-          className="pointer-events-none absolute right-0 z-0 translate-y-2 rotate-6 opacity-0 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] [filter:drop-shadow(0_1px_2px_rgba(0,0,0,0.3))] group-hover:translate-y-0 group-hover:opacity-100"
-          style={{ top: -12 * scale, height: 24 * scale, width: 22 * scale }}
-        />
-      )}
       <span
         className="glass-fill relative z-10 flex items-center justify-center overflow-hidden"
         style={{
@@ -56,13 +51,13 @@ export default function AppGlassTile({
           // The accent is the fill; `glass-fill` frosts it. Keeping the flat
           // colour here rather than baking a gradient in is what lets the
           // dock and every Generate button share one definition of glass.
-          backgroundColor: app.accent,
+          backgroundColor: accent,
           // A contact shadow, a whisper of the tile's own colour below it, then
           // the two rims. Both are lit, and the shaded band sits just ABOVE the
           // bottom one (glass-fill's last stop): light entering the top of a
           // solid piece of glass exits along its far edge, so a dark bottom rim
           // reads as a printed sticker.
-          boxShadow: `0 1px 2px rgba(0,0,0,0.2), 0 6px 14px -10px color-mix(in oklab, ${app.accent} 60%, transparent), inset 0 1px 0 rgba(255,255,255,0.32), inset 0 -1px 0 rgba(255,255,255,0.14)`,
+          boxShadow: `0 1px 2px rgba(0,0,0,0.2), 0 6px 14px -10px color-mix(in oklab, ${accent} 60%, transparent), inset 0 1px 0 rgba(255,255,255,0.32), inset 0 -1px 0 rgba(255,255,255,0.14)`,
         }}
       >
         <span
@@ -82,5 +77,27 @@ export default function AppGlassTile({
       </span>
       {overlay}
     </span>
+  )
+}
+
+/** A dock app's tile, in its own accent. */
+export default function AppGlassTile({
+  app,
+  size = 48,
+  overlay,
+}: {
+  app: AppConfig
+  size?: number
+  overlay?: ReactNode
+}) {
+  return (
+    <GlassTile
+      icon={app.icon}
+      accent={app.accent}
+      size={size}
+      // Admin's accent is near-white — a white glyph would vanish on it.
+      iconColor={app.id === 'admin' ? '#27272a' : '#ffffff'}
+      overlay={overlay}
+    />
   )
 }

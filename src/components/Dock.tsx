@@ -4,7 +4,8 @@ import { useAppStore } from '../stores/appStore'
 import { useActivityStore } from '../stores/activityStore'
 import { useChromeHidden } from '../stores/chromeStore'
 import { useSkillUpdateUnseen } from '../stores/skillUpdateStore'
-import { APP_REGISTRY, type AppCategory, type AppConfig } from '../utils/constants'
+import { useIsAppVisible } from '../stores/appVisibilityStore'
+import { APP_REGISTRY, SECTION_ORDER, type AppConfig } from '../utils/constants'
 import AppGlassTile from './AppGlassTile'
 import SettingsModal from './SettingsModal'
 
@@ -18,7 +19,8 @@ import SettingsModal from './SettingsModal'
 // Tools sit between Bank and the Create row, fenced by a divider on each side:
 // finding a winning ad and tearing it down is what you do BEFORE the production
 // line starts, so the dock reads left to right in the order the work happens.
-const SECTION_ORDER: AppCategory[] = ['system', 'library', 'tools', 'create']
+// The order itself lives in constants.ts — Meet Your Team lays the same crew
+// out in the same order and reads it from there.
 
 export default function Dock() {
   const activeApp = useAppStore((s) => s.activeApp)
@@ -31,6 +33,10 @@ export default function Dock() {
   // On a phone the dock slides away while the member reads (see
   // useChromeAutoHide) and comes back the moment they scroll up.
   const chromeHidden = useChromeHidden()
+  // Outliers ships switched off (Settings → Appearance). An app a member has
+  // turned off never renders a tile — a group left empty by that is dropped
+  // below, so its divider goes with it.
+  const isVisible = useIsAppVisible()
   const [settingsOpen, setSettingsOpen] = useState(false)
 
   // On a phone the dock is wider than the screen and scrolls, so the running
@@ -51,7 +57,7 @@ export default function Dock() {
   }, [activeApp])
 
   const groups = SECTION_ORDER.map((category) =>
-    APP_REGISTRY.filter((app) => app.category === category)
+    APP_REGISTRY.filter((app) => app.category === category && isVisible(app.id))
   ).filter((apps) => apps.length > 0)
 
   return (
