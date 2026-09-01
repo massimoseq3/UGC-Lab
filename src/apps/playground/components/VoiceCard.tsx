@@ -31,11 +31,14 @@ import { VOICE_GROUPS, VOICE_PRESETS, type VoicePreset } from '../voicePresets'
 // keeps one truncated line of the profile, which is what says it's still on; a
 // fold that hid the text entirely would read as the voice having been cleared.
 //
-// It starts FOLDED, and the header row is what makes that safe: the dashed
-// "Voice" pill is on screen either way, so nothing is hidden but the
-// field itself. An open box costs 78px in the one column that has none spare —
-// this sits directly under a prompt field whose own floor was cut to 150px to
-// keep it and its toolbar on screen at all.
+// It starts OPEN. The box is the reason the card exists, and folded-by-default
+// meant a member who had never opened it had never seen what goes in it — a
+// dashed pill next to the word Optional is easy to read as one more thing to
+// ignore. It costs 78px in the one column that has none spare (this sits
+// directly under a prompt field whose own floor was cut to 150px to keep it and
+// its toolbar on screen at all), which is exactly what the fold is for: one
+// click puts it away, and the state is persisted, so the member pays that price
+// once rather than every session.
 //
 // There is deliberately **no Clear button**: this is a plain textarea, emptying
 // it is select-all-delete, and a destructive control on a set-once field is one

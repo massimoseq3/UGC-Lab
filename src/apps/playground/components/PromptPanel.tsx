@@ -135,10 +135,9 @@ export interface PromptPanelState {
   // Whether the Voice box is folded open. Persisted with the draft because the
   // whole point of the field is setting it once and leaving it — a fold that
   // reset on reload would put a 90px box back under the prompt every session.
-  // Absent on older drafts, which start FOLDED: the header row is the whole of
-  // the card at rest — a dashed "Voice Profile" pill you can't miss — and an
-  // open box costs 78px of the one column that has none to spare, above a
-  // prompt field that had its own floor cut to 150px to stay on screen.
+  // Absent (a fresh draft, or one saved before this shipped) means OPEN: the
+  // field is the reason the card is there, and a member who has never opened it
+  // has never seen what it takes. Folding it away is the one-click part.
   voiceOpen?: boolean
 }
 
@@ -1062,9 +1061,9 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               {state.mode === 'video' && !isMotionControl && (
                 <VoiceCard
                   value={state.voiceProfile ?? ''}
-                  open={state.voiceOpen ?? false}
+                  open={state.voiceOpen ?? true}
                   onChange={(voiceProfile) => onChange({ ...state, voiceProfile })}
-                  onToggleOpen={() => onChange({ ...state, voiceOpen: !(state.voiceOpen ?? false) })}
+                  onToggleOpen={() => onChange({ ...state, voiceOpen: !(state.voiceOpen ?? true) })}
                 />
               )}
 
