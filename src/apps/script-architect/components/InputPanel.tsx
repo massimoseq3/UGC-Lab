@@ -1034,7 +1034,6 @@ export default function InputPanel({
               <EditableField label="Proof" value={editableContext.proof} onChange={(v) => updateField('proof', v)} />
               <EditableField label="Objections" value={editableContext.objections} onChange={(v) => updateField('objections', v)} />
               <EditableField label="Not For" value={editableContext.notFor} onChange={(v) => updateField('notFor', v)} />
-              <EditableField label="Hook Angles" value={editableContext.hookAngles} onChange={(v) => updateField('hookAngles', v)} />
               <EditableField label="Offer" value={editableContext.offer} onChange={(v) => updateField('offer', v)} />
               <EditableField label="CTA" value={editableContext.cta} onChange={(v) => updateField('cta', v)} />
             </div>

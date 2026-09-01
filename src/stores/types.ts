@@ -33,8 +33,6 @@ export interface Product {
   proof?: string
   // Two first-person paragraphs: a day in their life now, then with it working.
   beforeAfter?: string
-  // One-line script openers, each tagged with its type.
-  hookAngles?: string
   createdAt: number
   // undefined → legacy (no dot), false → draft (orange dot),
   // true → user-confirmed via Save (green dot).

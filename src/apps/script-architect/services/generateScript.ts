@@ -985,13 +985,24 @@ async function runWrite(input: GenerateScriptInput, take: number, takeCount: num
 // inert, and a labelled one competes with BENEFIT_OVER_FEATURE.
 //
 // The bank's auto-fill writes a full research brief as of September 2026. Its
-// five new fields are all here, each with its own job, ordered so the one
+// four new fields are all here, each with its own job, ordered so the one
 // argument ANGLE DISCIPLINE asks for stays together (pain → benefit →
 // before/after → what they quit) before the material that backs it up; Proof
 // took Key Specs' place and inherited its label, plus the weighting the field
-// now carries. Hook angles are LAST on purpose, after the CTA and out of order
-// with the form: they are ready-made openers, and a model that reads them
-// before the product's own material anchors on them instead of writing.
+// now carries.
+//
+// The brief shipped with a fifth, HOOK ANGLES — 6 to 8 ready-made openers —
+// and it came out within the day. It was labelled as hard as anything in this
+// function ("raw material for ONE opener, never a menu to read from and never
+// lifted verbatim") and that was not enough, because the failure isn't the
+// model disobeying the label: a list of finished openers is simply the most
+// usable thing in the prompt, and it wins on availability. Reported from
+// REMIX, where it does the most damage — the source ad's hook was excellent
+// and its SHAPE was the thing to adapt, and instead the take opened on a
+// product hook angle and the source's structure was gone. REMIX_SOURCE_FIDELITY
+// cannot out-argue a field that hands the model a finished first line. Every
+// other field here is material a hook gets BUILT from; nothing in this string
+// may arrive pre-built.
 function productContextLines(ctx?: EditableProductContext | null): string {
   if (!ctx) return ''
   const lines: string[] = []
@@ -1009,7 +1020,6 @@ function productContextLines(ctx?: EditableProductContext | null): string {
   if (ctx.notFor) lines.push(`- Who this is NOT for (a promise that only lands for these people is the wrong promise — steer the script away from it, don't spend a line disqualifying anyone): ${ctx.notFor}`)
   if (ctx.offer) lines.push(`- Offer: ${ctx.offer}`)
   if (ctx.cta) lines.push(`- Call-to-Action: ${ctx.cta}`)
-  if (ctx.hookAngles) lines.push(`- Hook angles already found (raw material for ONE opener, never a menu to read from and never lifted verbatim — take at most one, and rewrite it in this script's own voice and the assigned format's register): ${ctx.hookAngles}`)
   return lines.join('\n')
 }
 

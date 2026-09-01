@@ -314,7 +314,6 @@ export interface EditableProductContext {
   benefits: string
   proof: string
   beforeAfter: string
-  hookAngles: string
   offer: string
   cta: string
 }
@@ -335,7 +334,6 @@ export function createEditableContext(product: Product): EditableProductContext 
     benefits: product.benefits,
     proof: product.proof ?? '',
     beforeAfter: product.beforeAfter ?? '',
-    hookAngles: product.hookAngles ?? '',
     offer: product.offer,
     cta: product.cta,
   }
