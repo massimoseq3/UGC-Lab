@@ -7,6 +7,7 @@ import { isCloudEnabled } from '../../lib/supabase'
 import { creditsToUsd } from '../../utils/models'
 import { computeUsageMetrics, dailyMinutesSaved, usageDayStart } from '../../utils/usage'
 import { AI_UGC_ACADEMY_URL } from '../../utils/constants'
+import AppLogo from '../../components/AppLogo'
 import ActivityHeatmap from './ActivityHeatmap'
 import AnnouncementsTile from './AnnouncementsTile'
 import ConnectKeyCard from './ConnectKeyCard'
@@ -115,10 +116,14 @@ export default function Dashboard() {
         style={{ justifyContent: 'safe center' }}
       >
         <div className="flex flex-col gap-3.5">
-          {/* Centred on a PHONE, where the bento under it is centred too.
-              From `sm` the wall is the desktop wall and this reads from the
-              left edge like every other page in the app. */}
-          <header className="text-center sm:text-left">
+          {/* Centred at EVERY width (Massimo's call, September 2026) — the
+              brand mark sits over the greeting, and a logo aligned left over a
+              wall of centred tiles reads as a page header rather than as the
+              masthead of the desktop under it. It used to read from the left
+              edge from `sm` up, like every other page in the app; this one
+              isn't a working surface, it's the landing page. */}
+          <header className="flex flex-col items-center text-center">
+            <AppLogo className="mb-1.5 h-12 w-12 md:h-14 md:w-14" />
             {/* ONE face for the whole line — `DISPLAY_FONT`, italic,
                 `tracking-tighter` (Massimo's call, August 2026). It was two
                 for a while, Geist for the salutation and the serif for the
