@@ -27,6 +27,7 @@ import { humanizeError } from '../../../utils/friendlyError'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
 import useNearViewport from '../../../hooks/useNearViewport'
 import { useVideoPoster } from '../../../hooks/useVideoPoster'
+import { useThumbUrl } from '../../../hooks/useThumbUrl'
 export type { InFlightGen }
 
 // List-view size-slider bounds. The raw value drives the slider fill % and the
@@ -380,8 +381,12 @@ function HistoryListRow({
   // re-reading it costs nothing and un-painting it costs a black row on the way
   // back up. See useNearViewport.
   const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: entry.kind === 'video' })
-  const mediaRef = entry.kind === 'image' ? entry.data.imageUrl : entry.kind === 'video' ? entry.data.videoUrl : null
-  const { url, status } = useAssetUrlState(near ? mediaRef : null)
+  // A still is drawn from a thumbnail sized to the media column (see
+  // hooks/useThumbUrl); a clip is the clip. The row element is what's measured
+  // — the media column is a fixed share of it.
+  const still = useThumbUrl(near && entry.kind === 'image' ? entry.data.imageUrl : null, rowRef)
+  const clip = useAssetUrlState(near && entry.kind === 'video' ? entry.data.videoUrl : null)
+  const { url, status } = entry.kind === 'image' ? still : clip
   const { poster, posterProps } = useVideoPoster()
   // Music rows play from their own artwork, with the waveform under the prompt
   // — the same transport the grid tile and Voiceovers' history cards use.
@@ -623,7 +628,11 @@ function ImageTile({
   // ABOVE the scroll position and shove the grid around under the pointer.
   // See useNearViewport.
   const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
-  const { url, status } = useAssetUrlState(near ? item.imageUrl : null)
+  // …and what it loads is a thumbnail sized to this tile, not the still the
+  // model returned: a 4K picture is 36 MB decoded whatever size it's drawn at,
+  // and a gallery of them is what made scrolling hitch. The full picture is
+  // still what the preview modal, Download and Save read. See utils/thumbStore.
+  const { url, status } = useThumbUrl(near ? item.imageUrl : null, tileRef)
   const isSaved = !!item.linkedBRollId
 
   return (

@@ -7,7 +7,8 @@ import type { ModelFilter } from './Finder'
 import { useBankStore } from '../../stores/bankStore'
 import { useAppStore } from '../../stores/appStore'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
-import { getAsBase64, isAssetRef } from '../../utils/assetStore'
+import { useThumbUrl } from '../../hooks/useThumbUrl'
+import { getAsBase64, getUrl, isAssetRef } from '../../utils/assetStore'
 import { downloadImage } from '../../utils/downloadImage'
 import { copyToClipboard } from '../../utils/clipboard'
 import GeneratingBackdrop from '../../components/GeneratingBackdrop'
@@ -92,6 +93,14 @@ interface BankListProps {
 // undefined → legacy product (predates the draft system, no dot).
 // false → draft awaiting user review (orange dot).
 // true → confirmed via Save in the form (green dot).
+// The FULL picture behind a card, for Download: the card itself draws a
+// thumbnail (useThumbUrl), so the thumbnail's URL is never what gets saved.
+// A row whose picture is a plain data:/http: URL (no asset ref) is handed back
+// as-is, the way useAssetUrl always passed those through.
+async function fullPictureUrl(ref: string): Promise<string | null> {
+  return isAssetRef(ref) ? getUrl(ref) : ref
+}
+
 function productState(p: Product): 'legacy' | 'draft' | 'confirmed' {
   if (p.confirmed === undefined) return 'legacy'
   return p.confirmed ? 'confirmed' : 'draft'
@@ -99,19 +108,24 @@ function productState(p: Product): 'legacy' | 'draft' | 'confirmed' {
 
 function ProductCard({ item, onEdit, onDelete, inFlight }: { item: Product; onEdit: () => void; onDelete: () => void; inFlight?: boolean }) {
   const [confirm, setConfirm] = useState(false)
-  const resolvedImage = useAssetUrl(item.productImage)
+  // The card draws a thumbnail sized to itself (utils/thumbStore); Download
+  // resolves the full picture on its own.
+  const cardRef = useRef<HTMLDivElement | null>(null)
+  const { url: resolvedImage } = useThumbUrl(item.productImage, cardRef)
   const toggleStar = useBankStore((s) => s.toggleStar)
   const state = productState(item)
   const photoCount = 1 + (item.extraImages?.length ?? 0)
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!resolvedImage) return
-    downloadImage(resolvedImage, `product-${item.productName || item.id.slice(0, 8)}`)
+    if (!item.productImage) return
+    const full = await fullPictureUrl(item.productImage)
+    if (full) downloadImage(full, `product-${item.productName || item.id.slice(0, 8)}`)
   }
 
   return (
     <div
+      ref={cardRef}
       onClick={onEdit}
       className="group relative aspect-square cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
     >
@@ -169,7 +183,10 @@ function ModelCard({ item, onEdit, onDelete }: { item: Model; onEdit: () => void
   const [confirm, setConfirm] = useState(false)
   const [copied, setCopied] = useState(false)
   const toggleStar = useBankStore((s) => s.toggleStar)
-  const resolvedImage = useAssetUrl(item.characterImage)
+  // Thumbnail sized to the card (utils/thumbStore); Download resolves the full
+  // picture on its own.
+  const cardRef = useRef<HTMLDivElement | null>(null)
+  const { url: resolvedImage } = useThumbUrl(item.characterImage, cardRef)
   // A saved character sheet stamps `sheetImage`; surface it with a badge.
   const isSheet = !!item.sheetImage
   // A preset is a saved recipe with no generated image. Instead of a blank
@@ -179,10 +196,11 @@ function ModelCard({ item, onEdit, onDelete }: { item: Model; onEdit: () => void
   // entries — typically character sheets — span three portrait columns.
   const [landscape, setLandscape] = useState(false)
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!resolvedImage) return
-    downloadImage(resolvedImage, `model-${item.name || item.id.slice(0, 8)}`)
+    if (!item.characterImage) return
+    const full = await fullPictureUrl(item.characterImage)
+    if (full) downloadImage(full, `model-${item.name || item.id.slice(0, 8)}`)
   }
 
   // Copy the influencer's DNA profile to the clipboard as formatted JSON — the
@@ -200,6 +218,7 @@ function ModelCard({ item, onEdit, onDelete }: { item: Model; onEdit: () => void
 
   return (
     <div
+      ref={cardRef}
       onClick={onEdit}
       className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow ${landscape ? 'col-span-3' : ''}`}
     >
@@ -336,15 +355,22 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
   // first video and let the browser show its first frame as the thumbnail.
   const hasImage = !!item.imageUrl
   const firstVideoUrl = item.videos?.[0]?.url ?? item.videoUrl
-  const resolvedImage = useAssetUrl(hasImage ? item.imageUrl : undefined)
+  // A still is drawn from a thumbnail sized to the card (utils/thumbStore) —
+  // this tab is a wall of full-size generations at ~200px each. Download
+  // resolves the full picture on its own.
+  const cardRef = useRef<HTMLDivElement | null>(null)
+  const { url: resolvedImage } = useThumbUrl(hasImage ? item.imageUrl : undefined, cardRef)
   const resolvedVideo = useAssetUrl(!hasImage ? firstVideoUrl : undefined)
   const isVideoOnly = !hasImage && !!resolvedVideo
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    const target = resolvedImage ?? resolvedVideo
-    if (!target) return
-    downloadImage(target, `broll-${item.id.slice(0, 8)}`, resolvedImage ? 'png' : 'mp4')
+    if (hasImage) {
+      const full = await fullPictureUrl(item.imageUrl)
+      if (full) downloadImage(full, `broll-${item.id.slice(0, 8)}`, 'png')
+      return
+    }
+    if (resolvedVideo) downloadImage(resolvedVideo, `broll-${item.id.slice(0, 8)}`, 'mp4')
   }
 
   // Copies the FULL prompt, not the truncated card preview.
@@ -375,7 +401,7 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
   }
 
   return (
-    <div onClick={onEdit} className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:bg-ink/[0.05] hover:-translate-y-px card-soft-shadow ${landscape ? 'col-span-2 sm:col-span-3' : ''}`}>
+    <div ref={cardRef} onClick={onEdit} className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:bg-ink/[0.05] hover:-translate-y-px card-soft-shadow ${landscape ? 'col-span-2 sm:col-span-3' : ''}`}>
       {/* Thumbnail — portrait by default; landscape stills go wide (aspect-video)
           and span three columns, matching the Influencers sheet behaviour. */}
       <div className={`relative w-full overflow-hidden ${landscape ? 'aspect-video' : 'aspect-[9/16]'}`}>
