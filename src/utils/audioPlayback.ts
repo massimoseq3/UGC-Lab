@@ -1,10 +1,12 @@
-// Audio plumbing shared by the History cards and the bottom player: the
-// one-clip-at-a-time slot, asset-ref resolution, and the Web Audio rig the
-// live waveform reads its levels from.
-import { getUrl } from '../../../utils/assetStore'
+// Audio plumbing shared by every surface that plays a generated clip —
+// Voiceovers' history cards and bottom player, Playground's music tiles: the
+// one-clip-at-a-time slot, asset-ref resolution, and the peak decoder the
+// waveform strip draws from. It lived in voice-studio until Playground's music
+// history wanted the same player.
+import { getUrl } from './assetStore'
 
-// One voiceover plays at a time, app-wide — the History cards and the bottom
-// player share this slot, so pressing play on a card pauses whoever held it
+// One clip plays at a time, app-wide — every audio surface shares this slot,
+// so pressing play on a card pauses whoever held it
 // (the video tiles get the same rule from `useInlineVideo`). Callers register a
 // stable pause function; the slot only ever pauses, never seeks or unloads.
 let holder: (() => void) | null = null
@@ -108,7 +110,7 @@ export async function waveformPeaks(ref: string, bars = WAVEFORM_BARS): Promise<
       peakCache.set(ref, peaks)
       return peaks
     } catch (err) {
-      console.warn('[voice] waveform decode failed', err)
+      console.warn('[audio] waveform decode failed', err)
       return null
     } finally {
       decoding.delete(ref)
