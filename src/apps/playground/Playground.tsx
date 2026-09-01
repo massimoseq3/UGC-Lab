@@ -17,6 +17,7 @@ import {
   finishPlaygroundMusicTask,
 } from './service'
 import PromptPanel, { type PromptPanelState, type PromptRef } from './components/PromptPanel'
+import { composePlaygroundPrompt } from './composePrompt'
 import PlaygroundHistoryGrid from './components/PlaygroundHistoryGrid'
 import { getDefaultModel, getModel, mixedImageInputPolicy, type AspectRatio, type ImageResolution, type VideoMode } from '../../utils/models'
 import type { PlaygroundMode, InFlightGen } from './types'
@@ -225,8 +226,25 @@ export default function Playground() {
     if (targetField === 'prompt' && typeof data === 'string') {
       setState((s) => ({ ...s, prompt: data }))
     } else if (targetField === 'videoPrompt' && typeof data === 'string') {
-      // Reverse Engineer scene prompt → land in video mode with the prompt prefilled.
-      setState((s) => ({ ...s, mode: 'video', prompt: data }))
+      // A scene or shot prompt from Scripts / the Ad Analyzer → land in video
+      // mode with the prompt prefilled. Everything ELSE on the draft is left
+      // alone, which is what makes this worth a button per shot: the Voice box,
+      // the references and the model all survive, so sending shot after shot
+      // only ever swaps the words.
+      //
+      // The mode flip stashes like `handleModeChange` does, and restores the
+      // Video tab's own refs. Without the stash an image draft is silently
+      // overwritten by the incoming prompt; without the restore you arrive on a
+      // video prompt carrying the Image tab's attachments. Read through
+      // `stateRef`, which this effect's sibling above has already refreshed.
+      const draft = stateRef.current
+      if (draft.mode === 'video') {
+        setState((s) => ({ ...s, prompt: data }))
+      } else {
+        setPromptStash((prev) => ({ ...prev, [draft.mode]: { prompt: draft.prompt, refs: draft.refs } }))
+        const restored = promptStashRef.current.video ?? { prompt: '', refs: [] }
+        setState((s) => ({ ...s, mode: 'video', prompt: data, refs: restored.refs }))
+      }
     } else if (targetField === 'imageRef' && typeof data === 'string') {
       setState((s) => ({
         ...s,
@@ -346,7 +364,6 @@ export default function Playground() {
   }, [addToast, setInFlight])
 
   async function handleSubmit() {
-    const promptText = state.prompt.trim()
     if (!state.modelId) return
 
     // On a phone only one pane is on screen — follow the run to the grid.
@@ -362,6 +379,12 @@ export default function Playground() {
     // and makes the prompt optional but the character image + driving video
     // required. Everything else infers the mode from the attached frames.
     const isMotionControl = mode === 'video' && !!getModel(state.modelId)?.motionControl
+    // The prompt as the model will actually see it — the member's text with the
+    // Voice box's profile on the end. Composed here rather than folded into
+    // `state.prompt` so the box keeps holding it across a Clear, an Enhance and
+    // the next idea, and read from `promptText` everywhere below so the tile,
+    // the history row and Copy prompt all show the string that was sent.
+    const promptText = composePlaygroundPrompt(state, isMotionControl)
     let inferredVideoMode: VideoMode = isMotionControl ? 'motion-control' : inferVideoMode(refsSnapshot)
     // Reconcile the inferred mode with what the picked model actually declares,
     // in BOTH directions, because the pictures reach the model either way:
@@ -406,7 +429,9 @@ export default function Playground() {
         inferredVideoMode = 'reference-to-video'
       }
     }
-    if (!isMotionControl && !promptText) return
+    // The member's own text, not the composed string: a voice profile with no
+    // prompt in front of it isn't a generation (and the button is already grey).
+    if (!isMotionControl && !state.prompt.trim()) return
     if (isMotionControl) {
       const hasImg = refsSnapshot.some((r) => r.slot === 'motion-image')
       const hasVid = refsSnapshot.some((r) => r.slot === 'motion-video')
@@ -743,6 +768,31 @@ export default function Playground() {
     }))
   }, [addToast, setState, setPromptStash])
 
+  // Put a past generation's prompt back in the box, replacing what's there.
+  //
+  // The grid is filtered to the active mode, so a card's prompt always belongs
+  // to the tab it lands in and no mode switch is involved. Everything ELSE on
+  // the draft is left alone — the Voice box, the references, the model — which
+  // is the same contract the Scripts handoff runs on: reusing a prompt swaps
+  // the words and nothing else.
+  //
+  // It genuinely REPLACES, with no undo of its own (`PromptPanel`'s stack only
+  // tracks changes made inside the box). That's what the button says it does,
+  // and it's how every other prompt handoff into this app already behaves.
+  //
+  // `useCallback` is not optional here: the history grid is `memo`'d against
+  // hundreds of rows, and a fresh identity per render re-renders the whole list
+  // on every keystroke in the prompt box. See the note on `stateRef` above.
+  const handleReusePrompt = useCallback((prompt: string) => {
+    const text = prompt.trim()
+    if (!text) return
+    setState((s) => ({ ...s, prompt: text }))
+    // On a phone only one pane is on screen and it's the grid you pressed this
+    // from — follow the prompt to the panel that now holds it. No toast: the
+    // box visibly changes, which is better feedback than a line of copy.
+    setPane('prompt')
+  }, [setState])
+
   // Filter the history grid to the active mode. Users frequently bounce
   // between modes and want to see what they just made, not noise from the
   // other tabs.
@@ -783,6 +833,7 @@ export default function Playground() {
             inFlight={inFlight}
             filterMode={filterMode}
             onAnimateImage={handleAnimateImage}
+            onReusePrompt={handleReusePrompt}
           />
         </div>
       </div>

@@ -436,6 +436,170 @@ function splitSpokenLines(body: string): SceneSegment[] {
   return segments
 }
 
+// A SHOT marker inside a scene body — `[0:00–0:04]`, `[0:13]`, parens
+// tolerated. The Ad Analyzer's contract asks for one per camera cut and a
+// blueprint rewrite is told to preserve them, so one scene routinely holds
+// three or four shots inside a single paragraph. Deliberately a second copy of
+// the shape `ad-anatomy/utils/scenePrompt.ts` matches: that one reads a raw
+// prompt string, this one walks segments that already carry their spans.
+const SHOT_MARKER = /[[(](\d{1,2}:\d{2})(?:\s*[-–—]\s*(\d{1,2}:\d{2}))?[\])]/g
+
+interface SceneBeat {
+  // `0:00–0:04`, normalised to an en dash — or null for the prose in front of
+  // the first marker, which in a single-shot scene is the whole body.
+  time: string | null
+  segments: SceneSegment[]
+}
+
+// Regroup a scene's segments into the SHOTS they were written as. A shot is
+// what gets generated as one clip, so it — not the scene — is the unit a
+// member takes out of here; copying one meant hand-selecting a run of prose
+// out of the middle of a paragraph.
+//
+// The split happens INSIDE a direction segment as well as between segments:
+// two consecutive shots with no dialogue between them arrive as one direction
+// with two markers in it. Spans ride through untouched (offsets into the scene
+// body), so every block still edits the exact characters it was rendered from.
+function groupSceneBeats(segments: SceneSegment[]): SceneBeat[] {
+  const beats: SceneBeat[] = []
+  let current: SceneBeat = { time: null, segments: [] }
+  // A beat with nothing in it is dropped — which is what removes the empty
+  // untimed run in front of a scene that opens on its first marker.
+  const close = () => {
+    if (current.segments.length) beats.push(current)
+  }
+  const addDirection = (seg: SceneSegment, from: number, to: number) => {
+    const slice = seg.text.slice(from, to)
+    const text = slice.trim()
+    if (!text) return
+    // Only the ends were trimmed, so indexOf lands on the true offset.
+    const at = seg.start + from + slice.indexOf(text)
+    current.segments.push({ kind: 'direction', text, start: at, end: at + text.length })
+  }
+  for (const seg of segments) {
+    if (seg.kind !== 'direction') {
+      current.segments.push(seg)
+      continue
+    }
+    let cursor = 0
+    SHOT_MARKER.lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = SHOT_MARKER.exec(seg.text)) !== null) {
+      // Mid-word brackets aren't shot markers.
+      if (match.index > 0 && !/\s/.test(seg.text[match.index - 1])) continue
+      addDirection(seg, cursor, match.index)
+      close()
+      current = { time: match[2] ? `${match[1]}–${match[2]}` : match[1], segments: [] }
+      cursor = match.index + match[0].length
+    }
+    addDirection(seg, cursor, seg.text.length)
+  }
+  close()
+  return beats
+}
+
+// The audio direction every scene carries — "NO background music, NO
+// soundtrack, NO score, only spoken dialogue and natural room ambience". The
+// prompt contract writes it ONCE per scene while it governs every shot in it,
+// so it's lifted out of the last block, rendered as the scene's own footer, and
+// appended to whatever a shot's Copy hands over: a clip generated from one shot
+// needs that line as much as the scene does, and a member copying a shot has no
+// reason to know it was written at the bottom of the paragraph.
+const AUDIO_NOTE = /\bno\s+(?:background\s+music|soundtrack|score)\b/i
+// A real one runs ~90 characters. The cap is what stops a model that drops the
+// phrase mid-paragraph from handing the rest of the shot over as "audio".
+const AUDIO_NOTE_MAX = 300
+
+// Lift it off the END of the scene's last direction, when it sits there. Only a
+// suffix is ever taken: cutting a sentence out of the MIDDLE would leave the
+// prose either side of it non-contiguous, and every edit on this card is a
+// splice of one contiguous span. Mutates `beats`, which its caller builds fresh
+// inside the same memo.
+function liftAudioNote(beats: SceneBeat[]): SceneSegment | null {
+  const beat = beats[beats.length - 1]
+  const seg = beat?.segments[beat.segments.length - 1]
+  if (!seg || seg.kind !== 'direction') return null
+  const at = seg.text.search(AUDIO_NOTE)
+  if (at < 0) return null
+  // Back up to the start of the sentence the phrase sits in, then run to the end
+  // of the block — the note is often two sentences ("…NO score. Only spoken
+  // dialogue and natural room ambience.").
+  const before = seg.text.slice(0, at)
+  const from = Math.max(before.lastIndexOf('.'), before.lastIndexOf('!'), before.lastIndexOf('?'), before.lastIndexOf('\n')) + 1
+  const tail = seg.text.slice(from)
+  const note = tail.trim()
+  if (!note || note.length > AUDIO_NOTE_MAX) return null
+  const noteStart = seg.start + from + tail.indexOf(note)
+  const rest = seg.text.slice(0, from).trim()
+  if (rest) {
+    // `seg.text` is already trimmed, so what's left still starts where it did.
+    beat.segments[beat.segments.length - 1] = { kind: 'direction', text: rest, start: seg.start, end: seg.start + rest.length }
+  } else {
+    beat.segments.pop()
+    if (!beat.segments.length) beats.pop()
+  }
+  return { kind: 'direction', text: note, start: noteStart, end: noteStart + note.length }
+}
+
+// The two icon buttons every scene and shot header carries.
+//
+// **Icon only** (September 2026, Massimo's call): the word "Copy" sat beside a
+// copy glyph in a row that also holds a scene label, a timecode pill and a
+// delete — three of the four things in it explaining themselves twice. The
+// wording survives as the tooltip and the accessible name. The card header's
+// "Copy Full Script" keeps its label, because that one says WHAT it copies and
+// is the only thing distinguishing it from the per-scene button under it.
+function IconPillButton({
+  onClick,
+  icon: Icon,
+  title,
+  active = false,
+  className = '',
+}: {
+  onClick: () => void
+  icon: typeof Copy
+  title: string
+  // Renders the green tick instead of the glyph — the copy button's 2s flash.
+  active?: boolean
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink/5 ${className}`}
+    >
+      {active ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Icon className="h-3 w-3" />}
+    </button>
+  )
+}
+
+// Hand one shot (or one whole scene) to Playground as the video prompt.
+//
+// It REPLACES the prompt there and leaves the rest of that draft alone — the
+// Voice box most of all, which is the whole reason this earns a button beside
+// Copy: sending shot after shot only ever swaps the words, where copy → switch
+// app → clear the prompt → paste was four actions with the voice profile at
+// risk in the middle of every one of them.
+function SendToPlaygroundButton({ text, unit }: { text: string; unit: 'shot' | 'scene' }) {
+  const sendToApp = useAppStore((s) => s.sendToApp)
+  const addToast = useAppStore((s) => s.addToast)
+  const send = () => {
+    sendToApp({ targetApp: 'playground', targetField: 'videoPrompt', data: text })
+    addToast(`${unit === 'shot' ? 'Shot' : 'Scene'} sent to Playground`)
+  }
+  return (
+    <IconPillButton
+      onClick={send}
+      icon={ImagePlay}
+      title={`Send this ${unit} to Playground as the video prompt`}
+      className="hover:text-emerald-400 light:hover:text-emerald-600"
+    />
+  )
+}
+
 // The spoken line — the thing that gets read aloud. Tinted, set at reading
 // size, and separately copyable, because it's what leaves this app.
 function SpokenLine({ speaker, text, onChange }: { speaker: string | null; text: string; onChange?: (next: string) => void }) {
@@ -1068,15 +1232,15 @@ function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene'
           <Mic className="h-3 w-3 text-scripts-300" strokeWidth={2} />
           {label}
         </span>
-        <button
-          onClick={handleCopy}
-          title={copied ? 'Copied' : 'Copy the voice profile'}
-          aria-label={copied ? 'Copied' : 'Copy the voice profile'}
-          className="absolute right-0 top-1/2 flex -translate-y-1/2 shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
-        >
-          {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
-          <span className="max-md:hidden">{copied ? 'Copied' : 'Copy'}</span>
-        </button>
+        <div className="absolute right-0 top-1/2 -translate-y-1/2">
+          <IconPillButton
+            onClick={handleCopy}
+            icon={Copy}
+            active={copied}
+            title={copied ? 'Copied' : 'Copy the voice profile'}
+            className="hover:text-ink-300"
+          />
+        </div>
       </div>
       {/* Always-on field, not click-to-edit: this block is plain prose with
           nothing tinted in it, so a textarea styled as the paragraph looks
@@ -1225,15 +1389,13 @@ function HookLineCard({ hook, index, onChange }: { hook: ParsedHook; index: numb
             </span>
           )}
         </span>
-        <button
+        <IconPillButton
           onClick={handleCopy}
+          icon={Copy}
+          active={copied}
           title={copied ? 'Copied' : 'Copy this hook'}
-          aria-label={copied ? 'Copied' : 'Copy this hook'}
-          className="flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
-        >
-          {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
-          <span className="max-md:hidden">{copied ? 'Copied' : 'Copy'}</span>
-        </button>
+          className="hover:text-ink-300"
+        />
       </div>
       <EditableText
         value={hook.text}
@@ -1248,6 +1410,10 @@ function HookLineCard({ hook, index, onChange }: { hook: ParsedHook; index: numb
   )
 }
 
+// Every editable block on this panel is a form field, and the fields are what
+// the prose lives in.
+const PANEL_FIELD = 'input, textarea, [contenteditable="true"]'
+
 // The other half of the `select-none` chrome rule. Marking a header or a Copy
 // button unselectable keeps it out of the highlight, but it ALSO tells Chrome to
 // leave an existing selection alone when you press on it — the behaviour a
@@ -1255,9 +1421,26 @@ function HookLineCard({ hook, index, onChange }: { hook: ParsedHook; index: numb
 // stuck: clicking the nearest thing to "somewhere else" (a scene header, a copy
 // button) did nothing to it. Collapse it ourselves, which is what a click on
 // ordinary page background does anyway.
+//
+// That fixed half of it. The other half is that every block of prose here is a
+// TEXTAREA — the take is edited in place, so a highlight you drag across a
+// scene direction or a spoken line is the FIELD's own selection, which
+// `window.getSelection()` doesn't own and `removeAllRanges` can't touch. The
+// browser keeps painting it for as long as the field holds focus, and pressing
+// unselectable chrome doesn't take focus away (Safari never focuses a button on
+// click), so the highlight outlived every click that should have cleared it and
+// the only way out was to start another drag somewhere else. Blurring the field
+// is what actually clears it — and it commits the edit exactly as clicking into
+// another field already does.
 function clearSelectionOnChrome(e: React.MouseEvent) {
   const target = e.target as Element | null
-  if (!target || getComputedStyle(target).userSelect !== 'none') return
+  if (!target) return
+  // A press that lands IN a field is the browser's own business: it moves the
+  // caret there and drops whatever was selected before.
+  if (target.closest(PANEL_FIELD)) return
+  const active = document.activeElement
+  if (active instanceof HTMLElement && active.matches(PANEL_FIELD)) active.blur()
+  if (getComputedStyle(target).userSelect !== 'none') return
   const selection = window.getSelection()
   if (selection && !selection.isCollapsed) selection.removeAllRanges()
 }
@@ -1292,11 +1475,17 @@ function SceneChunkCard({
       addToast('Copy failed', 'error')
     }
   }
-  // Split the paragraph into direction + spoken lines. A body with nothing in
-  // quotes (a silent scene, or a shape the parser doesn't recognise) falls back
-  // to the plain prose block, so nothing can render as an empty card.
-  const segments = useMemo(() => splitSpokenLines(chunk.body), [chunk.body])
-  const hasSpoken = segments.some((s) => s.kind === 'line')
+  // Split the paragraph into direction + spoken lines, then regroup those into
+  // the SHOTS the scene was written as. A body with neither a quoted line nor a
+  // shot marker (a silent single-shot beat, or a shape the parser doesn't
+  // recognise) comes back null and falls through to the plain prose block, so
+  // nothing can render as an empty card.
+  const { beats, audioNote } = useMemo(() => {
+    const grouped = groupSceneBeats(splitSpokenLines(chunk.body))
+    const spoken = grouped.some((b) => b.segments.some((seg) => seg.kind === 'line'))
+    if (!spoken && !grouped.some((b) => b.time)) return { beats: null, audioNote: null }
+    return { beats: grouped, audioNote: liftAudioNote(grouped) }
+  }, [chunk.body])
   const { label, time } = splitHeaderTime(chunk.header)
   const duration = time ? rangeDurationLabel(time) : null
   return (
@@ -1336,15 +1525,17 @@ function SceneChunkCard({
           </span>
         )}
         <div className="absolute right-0 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
-          <button
+          {/* A scene with no shot markers has no shot row to carry these, so the
+              scene header is the only place a single-take beat can be sent
+              from. */}
+          <SendToPlaygroundButton text={chunk.body} unit="scene" />
+          <IconPillButton
             onClick={handleCopy}
+            icon={Copy}
+            active={copied}
             title={copied ? 'Copied' : 'Copy this scene'}
-            aria-label={copied ? 'Copied' : 'Copy this scene'}
-            className="flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium text-ink-600 transition-colors hover:bg-ink/5 hover:text-ink-300"
-          >
-            {copied ? <Check className="h-3 w-3 text-green-400 light:text-green-600" /> : <Copy className="h-3 w-3" />}
-            <span className="max-md:hidden">{copied ? 'Copied' : 'Copy'}</span>
-          </button>
+            className="hover:text-ink-300"
+          />
           {/* The house two-click delete, in its panel skin — never a modal. It
               cuts the scene out of the take and renumbers what's left, and it
               rides the card's undo stack like every other edit here. */}
@@ -1363,32 +1554,31 @@ function SceneChunkCard({
         // One dim line of the body, so a folded scene is still findable — the
         // point is to get it out of the way, not to hide which one it is.
         <p className="truncate px-1 text-[12px] font-light tracking-tight text-ink-600">{chunk.body}</p>
-      ) : hasSpoken ? (
+      ) : beats ? (
         <div className="flex flex-col gap-2">
-          {segments.map((segment, i) =>
-            segment.kind === 'line' ? (
-              <SpokenLine
-                key={i}
-                speaker={segment.speaker}
-                text={segment.text}
-                onChange={onEditRange ? (next) => onEditRange(chunk.bodyStart + segment.start, chunk.bodyStart + segment.end, next) : undefined}
-              />
-            ) : (
-              // Direction is context for the shot, not the script — set a step
-              // down in size and weight so the eye lands on the line first.
-              // A live field with the [CHARACTER] / [PRODUCT] slots washed in
-              // behind it: the tint is what used to force this block to be
-              // click-to-edit, and it survives while you type now.
-              <TokenField
-                key={i}
-                value={segment.text}
-                onCommit={onEditRange ? (next) => onEditRange(chunk.bodyStart + segment.start, chunk.bodyStart + segment.end, next) : undefined}
-                ariaLabel="Scene direction"
-                className="-mx-1.5 -my-1 w-[calc(100%+0.75rem)] rounded-lg transition-colors hover:bg-ink/[0.04]"
-                padClass="px-1.5 py-1"
-                textClass="text-[12.5px] font-light leading-relaxed tracking-tight text-ink-400"
-              />
-            ),
+          {beats.map((beat, i) => (
+            <SceneBeatBlock
+              key={i}
+              beat={beat}
+              body={chunk.body}
+              audioNote={audioNote?.text ?? null}
+              onEditRange={onEditRange ? (start, end, next) => onEditRange(chunk.bodyStart + start, chunk.bodyStart + end, next) : undefined}
+            />
+          ))}
+          {audioNote && (
+            // Outside every shot box, because it belongs to the SCENE rather
+            // than to whichever shot it happened to be written at the end of —
+            // which is also why each shot's Copy carries a copy of it. Dimmer
+            // than a direction: nothing here gets shot, it rides along with
+            // whatever does.
+            <TokenField
+              value={audioNote.text}
+              onCommit={onEditRange ? (next) => onEditRange(chunk.bodyStart + audioNote.start, chunk.bodyStart + audioNote.end, next) : undefined}
+              ariaLabel="Scene audio direction"
+              className="-mx-1.5 -my-1 w-[calc(100%+0.75rem)] rounded-lg transition-colors hover:bg-ink/[0.04]"
+              padClass="px-1.5 py-1"
+              textClass="text-[12px] font-light leading-relaxed tracking-tight text-ink-600"
+            />
           )}
         </div>
       ) : (
@@ -1405,6 +1595,117 @@ function SceneChunkCard({
           textClass="text-[13px] font-light leading-relaxed tracking-tight text-ink-100"
         />
       )}
+    </div>
+  )
+}
+
+// One SHOT inside a scene — its `[0:00–0:04]` marker as a pill, the direction
+// and the spoken line(s) that belong to it, and its own Copy. This is the block
+// a member actually takes out of here: a clip is generated per shot, so copying
+// one meant hand-selecting a run of prose out of the middle of a paragraph,
+// with the scene's Copy (the whole body) and the line's Copy (the words alone)
+// as the only two things a button could give you. Both of those survive — the
+// line still copies for a voiceover, the scene still copies whole.
+//
+// An untimed beat (a single-shot scene, or the prose in front of the first
+// marker) renders bare, exactly as the whole scene used to: a box and a header
+// around the only thing in the card would say nothing.
+function SceneBeatBlock({
+  beat,
+  body,
+  audioNote,
+  onEditRange,
+}: {
+  beat: SceneBeat
+  // The scene body the beat's spans are offsets into. Copy SLICES the shot's
+  // words out of it verbatim rather than rebuilding them from the parse, which
+  // trims, strips connectives and peels the attribution cue off the direction.
+  body: string
+  // The scene's audio direction, appended to this shot's copy — written once
+  // per scene, true of every shot in it.
+  audioNote: string | null
+  // Spans are BODY-relative; the caller adds the chunk's own offset.
+  onEditRange?: (start: number, end: number, next: string) => void
+}) {
+  const [copied, setCopied] = useState(false)
+  const addToast = useAppStore((s) => s.addToast)
+  const rendered = beat.segments.map((segment, i) =>
+    segment.kind === 'line' ? (
+      <SpokenLine
+        key={i}
+        speaker={segment.speaker}
+        text={segment.text}
+        onChange={onEditRange ? (next) => onEditRange(segment.start, segment.end, next) : undefined}
+      />
+    ) : (
+      // Direction is context for the shot, not the script — set a step down in
+      // size and weight so the eye lands on the line first. A live field with
+      // the [CHARACTER] / [PRODUCT] slots washed in behind it: the tint is what
+      // used to force this block to be click-to-edit, and it survives while you
+      // type now.
+      <TokenField
+        key={i}
+        value={segment.text}
+        onCommit={onEditRange ? (next) => onEditRange(segment.start, segment.end, next) : undefined}
+        ariaLabel="Scene direction"
+        className="-mx-1.5 -my-1 w-[calc(100%+0.75rem)] rounded-lg transition-colors hover:bg-ink/[0.04]"
+        padClass="px-1.5 py-1"
+        textClass="text-[12.5px] font-light leading-relaxed tracking-tight text-ink-400"
+      />
+    ),
+  )
+  if (!beat.time) return <div className="flex flex-col gap-2">{rendered}</div>
+
+  const first = beat.segments[0]
+  const last = beat.segments[beat.segments.length - 1]
+  // A line's span is the WORDS INSIDE its quote marks — that's what keeps an
+  // edit from deleting the quotes the scene parser finds the line by — so a
+  // shot ending on dialogue has to take its closing mark back, or every copy of
+  // it hands over an unclosed quote.
+  const closes = last.kind === 'line' && /["”]/.test(body[last.end] ?? '') ? 1 : 0
+  const source = body.slice(first.start, last.end + closes)
+  // The marker itself stays behind: what gets pasted is one clip's prompt, and
+  // a timecode inside it is a direction the video model tries to render.
+  const text = audioNote && !source.includes(audioNote) ? `${source}\n\n${audioNote}` : source
+  const duration = rangeDurationLabel(beat.time)
+
+  const handleCopy = async () => {
+    const ok = await copyToClipboard(text)
+    if (ok) {
+      setCopied(true)
+      addToast('Shot copied to clipboard')
+      setTimeout(() => setCopied(false), 2000)
+    } else {
+      addToast('Copy failed', 'error')
+    }
+  }
+
+  return (
+    <div className="rounded-xl bg-surface-0 p-2.5">
+      <div className="mb-1.5 flex select-none items-center justify-between gap-2">
+        {/* The scene header's pill, one step quieter so the scene still leads:
+            the range, then how long the shot RUNS — which is the number it gets
+            generated at, and two clock times to subtract if the pill won't say
+            it. */}
+        <span className="shrink-0 rounded-full bg-scripts-500/10 px-2 py-0.5 text-[10px] font-semibold tabular-nums tracking-tight text-scripts-300">
+          {beat.time}
+          {duration && <span className="text-scripts-300/60"> · {duration}</span>}
+        </span>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {/* Both act on the SAME string — the shot's own words plus the
+              scene's audio note — so what lands in Playground is what the
+              clipboard would have given you. */}
+          <SendToPlaygroundButton text={text} unit="shot" />
+          <IconPillButton
+            onClick={handleCopy}
+            icon={Copy}
+            active={copied}
+            title={copied ? 'Copied' : "Copy this shot: its direction, its lines, and the scene's audio note"}
+            className="hover:text-ink-300"
+          />
+        </div>
+      </div>
+      <div className="flex flex-col gap-2">{rendered}</div>
     </div>
   )
 }
