@@ -3,7 +3,6 @@ import {
   Image as ImageIcon,
   Film,
   Music as MusicIcon,
-  Camera,
   ChevronRight,
   Volume2,
   VolumeX,
@@ -13,7 +12,6 @@ import {
   Eraser,
 } from 'lucide-react'
 import ModelPicker from '../../../components/ModelPicker'
-import SectionCard from '../../../components/SectionCard'
 import ModelSidePanel from '../../../components/ModelSidePanel'
 import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
@@ -45,6 +43,7 @@ import RefTiles from '../../../components/video/RefTiles'
 import MediaRefStrip, { type MediaRefValue } from '../../../components/video/MediaRefStrip'
 import { readMediaDuration } from '../../../utils/media'
 import OmniInputsSection from './OmniInputsSection'
+import { OMNI_SLOT_QUOTA, omniImageCapacity, omniQuotaUsed } from '../omniQuota'
 import MotionControlSection from './MotionControlSection'
 import { useAppStore } from '../../../stores/appStore'
 import type { BankType } from '../../../utils/constants'
@@ -56,6 +55,7 @@ import { CONTINUOUS_STYLES, styleBriefFor, styleBriefForStill } from '../../../u
 import { useBankStore } from '../../../stores/bankStore'
 import SlideOver from '../../../components/SlideOver'
 import ExpandTextModal, { BracketHighlightArea } from '../../../components/ExpandableText'
+import SectionCard from '../../../components/SectionCard'
 import PromptToolbar from '../../../components/PromptToolbar'
 import MentionPopover from './MentionPopover'
 import type { PlaygroundMode, BankReference } from '../types'
@@ -294,17 +294,11 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
   // `maxReferenceImages` in the registry); anything undeclared keeps the
   // panel's historical 9. The Gemini Omni family is the exception: its image
   // cap is whatever its 7-slot quota leaves after characters (×1 each) and the
-  // source clip (×2), so it's computed here rather than read off the entry.
-  // Frames count as images against that quota — on 1.0 they ARE images (folded
-  // into `image_urls` below), and on Flash 1.1, which has real frame fields,
-  // they still spend a slot. Same sum `omniQuotaUsed` in OmniInputsSection
-  // charges, which is what keeps the two readouts agreeing.
-  const omniImageCap = 7
-    - state.refs.filter((r) => r.slot === 'omni-character').length
-    - (state.refs.some((r) => r.slot === 'omni-clip') ? 2 : 0)
-    - state.refs.filter((r) => r.slot === 'start' || r.slot === 'end').length
+  // source clip (×2), so it's derived rather than read off the entry — from
+  // `../omniQuota`, the one place that arithmetic is written, shared with the
+  // header's readout and with the checks OmniInputsSection refuses on.
   const maxRefs = model?.omniInputs
-    ? Math.max(0, omniImageCap)
+    ? omniImageCapacity(state.refs)
     : model?.maxReferenceImages ?? 9
   const refsAllowed = model?.supportsReferenceImages ?? false
   const supportsFrames = !!model?.modes?.includes('image-to-video') || !!model?.modes?.includes('frames-to-video')
@@ -774,6 +768,21 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   icon={Layers}
                   title="References"
                   contentClassName="flex flex-col gap-3"
+                  /* Said ONCE for the whole card instead of once per slot. Every
+                     input in here is optional — the prompt alone is a valid
+                     generation — and the frame slots each used to carry their own
+                     "Optional" corner tag while the Omni groups carried none, so
+                     the word appeared twice and meant nothing about the four
+                     inputs that didn't have it. Motion Control is the exception
+                     and gets no pill: its two inputs really do gate the run, which
+                     is what its red dots are for. Omni also prints the 7-slot
+                     quota it charges against, which until now only ever surfaced
+                     as an error toast AFTER a member had spent it. */
+                  left={!isMotionControl ? (
+                    <span className="rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500">
+                      {isOmni ? `Optional · ${omniQuotaUsed(state.refs)}/${OMNI_SLOT_QUOTA}` : 'Optional'}
+                    </span>
+                  ) : undefined}
                   right={hasAnyRef ? (
                     <button
                       type="button"
@@ -962,31 +971,6 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                     so it isn't clipped. */}
                 <div className="relative flex min-h-0 grow flex-col">
                   <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.03] transition-colors focus-within:border-ink/20 focus-within:bg-ink/[0.05]">
-                    {/* UGC Prompt Presets & Visual Styles — header row inside the
-                        box. Opens the slide-in picker. One line at h-12, matching
-                        the model picker trigger in the footer: it's the same kind
-                        of control (tap a row, a panel slides in) and it was two
-                        lines tall at the top of the field the prompt is trying to
-                        fill. The old second line explained what a preset does —
-                        the picker itself does that better, and once.
-                        The visual styles ride in this SAME row rather than in a
-                        second one: both do exactly one thing to the prompt below
-                        (append a block of direction to it), and a column this
-                        narrow can't spare another 48px row above the box the
-                        whole panel exists to fill. */}
-                    {presetsApplicable && (
-                      <button
-                        type="button"
-                        onClick={() => setPresetOpen(true)}
-                        className="flex h-12 w-full shrink-0 items-center gap-2.5 border-b border-dashed border-ink/10 px-3 text-left transition-colors hover:bg-ink/[0.04]"
-                      >
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-playground-500/10 text-playground-400">
-                          <Camera className="h-3.5 w-3.5" />
-                        </span>
-                        <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink-100">UGC Prompt Presets &amp; Visual Styles</p>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
-                      </button>
-                    )}
                     {/* `grow` with no basis-0: the field's base size is its own
                         content and grow only tops it up to the free space. It's
                         the scroll port once the text outruns the column, which is
@@ -1015,6 +999,19 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                     />
                     <PromptToolbar
                       accent="playground"
+                      /* Presets moved OFF the top of the box and into this row
+                         (September 2026). It was a 48px labelled header inside
+                         the prompt box — the field's own chrome ate 48px above
+                         and 38px below before a single line of the prompt, in the
+                         one panel whose whole job is that field. As a pill it
+                         leads the toolbar it belongs to: everything in this row
+                         acts on the prompt, and appending a preset is exactly
+                         that. The slide-over it opens still carries the full
+                         "UGC Prompt Presets & Visual Styles" title, so the long
+                         name is one click away rather than permanently on
+                         screen. */
+                      onPresets={presetsApplicable ? () => setPresetOpen(true) : undefined}
+                      presetsTitle="UGC prompt presets and visual styles"
                       onEnhance={handleEnhancePrompt}
                       enhanceTitle="Enhance prompt"
                       enhanceDisabled={!state.prompt.trim()}

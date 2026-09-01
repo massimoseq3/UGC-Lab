@@ -15,6 +15,7 @@ export function RefGroup({
   max,
   filled,
   required = false,
+  tag,
   note,
   children,
 }: {
@@ -31,9 +32,14 @@ export function RefGroup({
   // one: it refuses to run without BOTH a character image and a driving video,
   // so those two empty slots really are why nothing generates.
   required?: boolean
-  // Trailing hint on the label row, for a limit the member would otherwise only
-  // meet as an error after the upload (Motion Control's clip ceiling).
-  note?: string
+  // A tag sitting INLINE with the label, right after it — for a word about the
+  // group itself ("Optional"), which belongs beside its name rather than adrift
+  // at the far end of the row.
+  tag?: ReactNode
+  // Trailing hint pinned to the RIGHT of the label row, for a limit the member
+  // would otherwise only meet as an error after the upload (Motion Control's
+  // clip ceiling).
+  note?: ReactNode
   children: ReactNode
 }) {
   return (
@@ -46,6 +52,7 @@ export function RefGroup({
             {count}/{max}
           </span>
         )}
+        {tag}
         {note && <span className="ml-auto text-[10px] tabular-nums text-ink-600">{note}</span>}
       </div>
       {children}
@@ -180,7 +187,10 @@ export function MediaCard({
   )
 }
 
-// Dashed "add" card matching MediaCard's height, for uploading a clip.
+// Dashed "add" card matching MediaCard's height — the one "attach something"
+// shape in the panel, used for a clip, a character, a voice, and (empty) a
+// frame slot. The label truncates: these sit three-across in the Attachments
+// row, which on a phone leaves each one about 100px.
 export function MediaAddCard({
   icon: Icon,
   label,
@@ -188,6 +198,7 @@ export function MediaAddCard({
   onClick,
   disabled = false,
   triggerRef,
+  className = '',
 }: {
   icon: LucideIcon
   label: string
@@ -195,6 +206,9 @@ export function MediaAddCard({
   onClick: () => void
   disabled?: boolean
   triggerRef?: RefObject<HTMLButtonElement | null>
+  // Placement only — a flex basis for the wrapping Attachments row. The card's
+  // own look never rides in here.
+  className?: string
 }) {
   return (
     <button
@@ -206,14 +220,14 @@ export function MediaAddCard({
         disabled
           ? 'cursor-not-allowed opacity-40'
           : 'hover:border-ink/30 hover:bg-ink/[0.05]'
-      }`}
+      } ${className}`}
     >
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-ink/[0.05] text-ink-500">
         <Icon className="h-3.5 w-3.5" />
       </span>
       <div className="flex min-w-0 flex-col">
-        <span className="text-[12px] font-medium leading-tight text-ink-300">{label}</span>
-        {helper && <span className="text-[10px] leading-tight text-ink-600">{helper}</span>}
+        <span className="truncate text-[12px] font-medium leading-tight text-ink-300">{label}</span>
+        {helper && <span className="truncate text-[10px] leading-tight text-ink-600">{helper}</span>}
       </div>
     </button>
   )

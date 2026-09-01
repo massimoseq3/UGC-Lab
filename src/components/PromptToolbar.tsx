@@ -1,9 +1,10 @@
-import { Sparkles, RefreshCw, Eraser, Undo2, Redo2 } from 'lucide-react'
+import { Sparkles, RefreshCw, Eraser, Undo2, Redo2, Camera } from 'lucide-react'
 import Spinner from './Spinner'
 import { ExpandButton } from './ExpandableText'
 
-// The footer strip under every editable prompt box — Enhance / Regenerate /
-// Clear on the left, undo-redo behind a hairline, Expand on the right.
+// The footer strip under every editable prompt box — an optional Presets
+// opener, then Enhance / Regenerate / Clear, undo-redo behind a hairline, and
+// Expand on the right.
 //
 // It had drifted into six hand-rolled copies (Playground, Scripts × 2, B-Roll's
 // card modal, and Continuous' frame + clip modals), each with its own label
@@ -31,6 +32,12 @@ const ICON = 'flex h-6 w-6 items-center justify-center rounded-full text-ink-400
 
 export interface PromptToolbarProps {
   accent: PromptToolbarAccent
+  // Presets — opens a picker that APPENDS to the box. Playground only, where it
+  // replaced a 48px labelled header row sitting on top of the prompt field. It
+  // leads the row rather than joining the edit verbs because it's the only one
+  // that opens something instead of acting on the text that's already there.
+  onPresets?: () => void
+  presetsTitle?: string
   // Enhance — the one action every prompt box has. `busy` swaps its glyph for a
   // spinner and is the caller's single in-flight flag (it also blocks the rest).
   onEnhance: () => void
@@ -57,6 +64,8 @@ export interface PromptToolbarProps {
 
 export default function PromptToolbar({
   accent,
+  onPresets,
+  presetsTitle,
   onEnhance,
   enhanceTitle,
   enhanceDisabled = false,
@@ -79,6 +88,18 @@ export default function PromptToolbar({
   return (
     <div className="flex shrink-0 items-center justify-between gap-2 px-2 py-1.5">
       <div className="flex min-w-0 items-center gap-0.5">
+        {onPresets && (
+          <button
+            type="button"
+            title={presetsTitle ?? 'Presets'}
+            onClick={onPresets}
+            disabled={busy}
+            className={`${PILL} ${ACCENT_HOVER[accent]}`}
+          >
+            <Camera className="h-3 w-3 shrink-0" />
+            Presets
+          </button>
+        )}
         <button
           type="button"
           title={enhanceTitle}
