@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, UserRound, Upload, LayoutGrid, Search, List, X } from 'lucide-react'
+import { Plus, UserRound, Upload, LayoutGrid, Search, X } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useBankStore } from '../../stores/bankStore'
 import { useIsAppVisible } from '../../stores/appVisibilityStore'
@@ -10,7 +10,7 @@ import { saveFromDataUrl } from '../../utils/assetStore'
 import BankList, { SortControl } from './BankList'
 import BankSidebar from './BankSidebar'
 import SegmentedToggle from '../../components/SegmentedToggle'
-import { useBankSort, useBankView, type BankView } from './bankSort'
+import { useBankSort } from './bankSort'
 import ProductForm from './ProductForm'
 import ModelForm from './ModelForm'
 import ScriptForm from './ScriptForm'
@@ -193,7 +193,6 @@ export default function Finder() {
   }
 
   const [sort, setSort, sortOptions] = useBankSort(activeBank)
-  const [view, setView] = useBankView(activeBank)
 
   // Bumped to force the open Product form to re-seed from its row — see
   // `handleDetachExtraction`. Read through a ref there so the callback stays
@@ -428,20 +427,17 @@ export default function Finder() {
               shape the B-Roll history bar already uses. Above `md` it's one 57px
               band and the field sits inline. */}
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 md:flex-nowrap md:gap-3">
-            {/* How the list is LOOKED at — searched, and drawn. On a phone the two
-                share the row under the buttons (`md:contents` dissolves this
-                  wrapper above `md`, so on a desktop they're just two more items in
-                  this row). They were loose items with `flex-wrap` first, and at
-                  375px the Products tab pushed Add onto a line of its own: a header
-                  of four stacked rows on the screen with the least to give. */}
+            {/* The search field. On a phone it takes a full row of its own under
+                the buttons (`order-last`) rather than squeezing in beside them,
+                which at 375px pushed Add onto a line of its own on the Products
+                tab: a header of four stacked rows on the screen with the least to
+                give. Above `md` its width is FIXED rather than `flex-1`: what a
+                growing field takes width from is the bank switcher, the one
+                control this screen exists for. Six tabs want ~820px, and a field
+                that ate the leftover scrolled "Visual Styles" off the end of the
+                strip on a 1440px laptop. */}
               {counts[activeBank] > 0 && !showForm && (
-                <div className="flex items-center gap-2 max-md:order-last max-md:w-full md:contents">
-                {/* Fixed widths rather than `flex-1` above `md`: what a growing field
-                    takes width FROM is the bank switcher, the one control this screen
-                    exists for. Six tabs want ~820px, and a field that ate the
-                    leftover scrolled "Visual Styles" off the end of the strip on a
-                    1440px laptop. */}
-                <div className="relative shrink-0 max-md:w-auto max-md:flex-1 md:w-[140px] 2xl:w-[230px]">
+                <div className="relative shrink-0 max-md:order-last max-md:w-full md:w-[140px] 2xl:w-[230px]">
                   <Search className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
                   <input
                     value={query}
@@ -462,22 +458,6 @@ export default function Finder() {
                       <X className="h-3.5 w-3.5" />
                     </button>
                   )}
-                </div>
-                <SegmentedToggle<BankView>
-                  fitContent
-                  // `dense` for the segment padding only — the height stays the
-                  // toolbar's 40px. Two glyphs and no labels don't need a full-size
-                  // segment's 32px of padding each, and this row is fighting the
-                  // bank switcher for width.
-                  dense
-                  className="h-10 !p-1 shrink-0"
-                  value={view}
-                  onChange={setView}
-                  options={[
-                    { value: 'grid', label: '', ariaLabel: 'Grid view', icon: LayoutGrid },
-                    { value: 'list', label: '', ariaLabel: 'List view', icon: List },
-                  ]}
-                />
                 </div>
             )}
             {/* Influencers sub-filter — sized to match the main bank toggle
@@ -580,8 +560,6 @@ export default function Finder() {
               onEdit={handleEdit}
               onAdd={handleAdd}
               sort={sort}
-              onSortChange={setSort}
-              view={view}
               query={query}
               modelFilter={modelFilter}
               inFlightProductIds={inFlightIds}
