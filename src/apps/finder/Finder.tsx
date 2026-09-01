@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Package, UserRound, FileText, Mic, Film, Upload, LayoutGrid, Palette, Bookmark } from 'lucide-react'
+import { Plus, Package, UserRound, FileText, Mic, Film, Upload, LayoutGrid, Palette, Bookmark, Search, List, X } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import { useBankStore } from '../../stores/bankStore'
 import { useIsAppVisible } from '../../stores/appVisibilityStore'
@@ -8,8 +8,9 @@ import { BANK_CONFIG } from '../../utils/constants'
 import type { Product, Model, Script, VoicePreset, BRoll, StylePreset } from '../../stores/types'
 import { saveFromDataUrl } from '../../utils/assetStore'
 import BankList, { SortControl } from './BankList'
+import BankSidebar from './BankSidebar'
 import SegmentedToggle from '../../components/SegmentedToggle'
-import { useBankSort } from './bankSort'
+import { useBankSort, useBankView, type BankView } from './bankSort'
 import ProductForm from './ProductForm'
 import ModelForm from './ModelForm'
 import ScriptForm from './ScriptForm'
@@ -121,6 +122,9 @@ export default function Finder() {
   const [showForm, setShowForm] = useState(false)
   // Influencers bank sub-filter (All / Portraits / Influencer Sheets).
   const [modelFilter, setModelFilter] = useState<ModelFilter>('all')
+  // The toolbar search. Cleared on every bank switch: a query carried across
+  // tabs lands on an empty grid whose tab reads "24", which looks like a bug.
+  const [query, setQuery] = useState('')
 
   const isVisible = useIsAppVisible()
   const bankTypes = BANK_TYPES.filter((bank) => {
@@ -199,6 +203,7 @@ export default function Finder() {
   }
 
   const [sort, setSort, sortOptions] = useBankSort(activeBank)
+  const [view, setView] = useBankView(activeBank)
 
   // Bumped to force the open Product form to re-seed from its row — see
   // `handleDetachExtraction`. Read through a ref there so the callback stays
@@ -388,138 +393,213 @@ export default function Finder() {
   // on desktop, instead of scrolling the whole page.
   const fixedFormLayout = showForm && (activeBank === 'products' || activeBank === 'models')
 
+  const selectBank = (bank: BankType) => { setActiveBank(bank); setQuery(''); closeForm() }
+
   return (
-    <div className="flex h-full flex-col">
-      {/* Header — single fixed-height row: bank toggle on the left, actions on
-          the right, with the separator footing flush under the toggle. Mirrors
-          the Influencers gallery header so the toggle reads the same height as
-          the other main toggles across the app. */}
-      {/* Two rows on a phone: the six bank tabs plus Sort plus Add can't share
-          390px, and squeezing them left the bank switcher — the one control
-          this screen is for — as a sliver reading "P…". The toggle takes its own
-          full-width row and the actions sit under it. md+ is the single 57px
-          band, unchanged. */}
-      <div className="flex shrink-0 flex-col gap-2 border-b border-ink/5 px-3 py-2 md:h-[57px] md:flex-row md:items-center md:justify-between md:gap-3 md:px-5 md:py-0">
-        <div className="min-w-0 overflow-x-auto scrollbar-hide scroll-fade-r md:flex-1">
-          <SegmentedToggle<BankType>
-            fitContent
-            className="h-10 !p-1"
-            value={activeBank}
-            onChange={(bank) => { setActiveBank(bank); closeForm() }}
-            options={bankTypes.map((bank) => ({
-              value: bank,
-              label: BANK_CONFIG[bank].label,
-              icon: SIDEBAR_ICONS[bank],
-              badge: counts[bank] > 0 ? counts[bank] : undefined,
-            }))}
-          />
-        </div>
-        <div className="flex shrink-0 items-center justify-end gap-2 md:gap-3">
-          {/* Influencers sub-filter — sized to match the main bank toggle
-              (h-10 !p-1). Only the Influencers bank has the portrait/sheet
-              split. */}
-          {activeBank === 'models' && counts.models > 0 && !showForm && (
-            <SegmentedToggle<ModelFilter>
+    // Sidebar + column, Finder's own shape. The banks moved off the top row and
+    // down the left in September 2026: the strip and the toolbar were fighting
+    // over one 57px line, and with search and the view switcher on it the last
+    // tab scrolled off the end at 1440px. Below `md` there is no sidebar and the
+    // tab strip is still the switcher.
+    <div className="flex h-full">
+      <BankSidebar
+        banks={bankTypes}
+        active={activeBank}
+        counts={counts}
+        icons={SIDEBAR_ICONS}
+        onSelect={selectBank}
+      />
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Header — one 57px band from `md` up: the bank's name on the left (the
+            sidebar says which one is selected; this says it in words, and gives
+            the row a left edge), actions on the right. On a phone it's two rows,
+            the tab strip and then the actions: the six tabs plus Sort plus Add
+            can't share 390px, and squeezing them left the switcher as a sliver
+            reading "P…". */}
+        <div className="flex shrink-0 flex-col gap-2 border-b border-ink/5 px-3 py-2 md:h-[57px] md:flex-row md:items-center md:justify-between md:gap-3 md:px-5 md:py-0">
+          <h2 className="hidden shrink-0 text-[15px] font-medium tracking-tight text-ink-100 md:block">
+            {BANK_CONFIG[activeBank].label}
+          </h2>
+          <div className="min-w-0 flex-1 overflow-x-auto scrollbar-hide scroll-fade-r md:hidden">
+            <SegmentedToggle<BankType>
               fitContent
-              accent="influencers"
-              className="h-10 !p-1 shrink-0"
-              value={modelFilter}
-              onChange={setModelFilter}
-              options={MODEL_FILTER_OPTIONS.map((o) => ({
-                value: o.value,
-                label: o.label,
-                icon: o.icon,
+              className="h-10 !p-1"
+              value={activeBank}
+              onChange={selectBank}
+              options={bankTypes.map((bank) => ({
+                value: bank,
+                label: BANK_CONFIG[bank].label,
+                icon: SIDEBAR_ICONS[bank],
+                badge: counts[bank] > 0 ? counts[bank] : undefined,
               }))}
             />
-          )}
-          {sortOptions && counts[activeBank] > 0 && !showForm && (
-            <SortControl value={sort} onChange={setSort} options={sortOptions} />
-          )}
-          {activeBank === 'products' && !showForm && (
-            <>
-              <input
-                ref={bulkInputRef}
-                type="file"
-                accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  const files = Array.from(e.target.files ?? [])
-                  e.target.value = ''
-                  if (files.length > 0) handleBulkFiles(files)
-                }}
-              />
-              <button
-                onClick={() => bulkInputRef.current?.click()}
-                title="Bulk add"
-                className="flex h-10 items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.04] px-3.5 text-[13px] font-medium tracking-tight text-ink-300 transition-colors hover:bg-ink/[0.08] md:px-5"
-              >
-                <Upload className="h-4 w-4" />
-                {/* Icon-only on phones — the label crowded the toolbar. */}
-                <span className="hidden sm:inline">Bulk add</span>
-              </button>
-            </>
-          )}
-          <button
-            onClick={handleAdd}
-            className="flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-[13px] font-medium tracking-tight text-ink-900 transition-colors hover:bg-ink-100"
-          >
-            <Plus className="h-4 w-4" />
-            Add
-          </button>
-        </div>
-      </div>
-
-      {/* Content area — list or form. Forms render unboxed so they get the
-          full width of the section. Products/Influencers use a fixed-left /
-          scroll-right layout on desktop so the image stays put while the
-          details scroll (no whole-page scroll). */}
-      <div className={`flex-1 overflow-y-auto p-5 ${fixedFormLayout ? 'lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden' : ''}`}>
-        {showForm ? (
-          <div className={`mx-auto ${['products', 'models', 'brolls', 'scripts', 'styles'].includes(activeBank) ? 'max-w-5xl' : 'max-w-md'} ${fixedFormLayout ? 'w-full lg:flex lg:min-h-0 lg:flex-1 lg:flex-col' : ''}`}>
-            {activeBank === 'products' && (
-              <ProductForm
-                // Remount when the form is pointed at a different row (or at a
-                // new product): its fields are local state, and without this
-                // pressing Add with a form already open kept the last
-                // product's values — which autosave would then write to a row
-                // of its own. `editingId` doesn't change while autosaving, so
-                // typing never remounts the form.
-                key={`${editingId ?? 'new'}:${formSeed}`}
-                item={editingProduct}
-                onSave={handleSaveProduct}
-                onAutosave={handleAutosaveProduct}
-                onCancel={closeForm}
-                onDetachExtraction={handleDetachExtraction}
-              />
-            )}
-            {activeBank === 'models' && (
-              <ModelForm item={editingModel} onSave={handleSaveModel} onCancel={closeForm} />
-            )}
-            {activeBank === 'scripts' && (
-              <ScriptForm item={editingScript} onSave={handleSaveScript} onCancel={closeForm} />
-            )}
-            {activeBank === 'voices' && (
-              <VoiceForm item={editingVoice} onSave={handleSaveVoice} onCancel={closeForm} />
-            )}
-            {activeBank === 'brolls' && (
-              <BRollForm item={editingBRoll} onSave={handleSaveBRoll} onCancel={closeForm} />
-            )}
-            {activeBank === 'styles' && (
-              <StyleForm item={editingStyle} onSave={handleSaveStyle} onCancel={closeForm} />
-            )}
           </div>
-        ) : (
-          <BankList
-            bankType={activeBank}
-            onEdit={handleEdit}
-            onAdd={handleAdd}
-            sort={sort}
-            modelFilter={modelFilter}
-            inFlightProductIds={inFlightIds}
-            onBulkProductFiles={handleBulkFiles}
-          />
-        )}
+          {/* The row wraps on a phone rather than squeezing: the search field takes
+              a full row of its own under the buttons (`order-last`), which is the
+              shape the B-Roll history bar already uses. Above `md` it's one 57px
+              band and the field sits inline. */}
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 md:flex-nowrap md:gap-3">
+            {/* How the list is LOOKED at — searched, and drawn. On a phone the two
+                share the row under the buttons (`md:contents` dissolves this
+                  wrapper above `md`, so on a desktop they're just two more items in
+                  this row). They were loose items with `flex-wrap` first, and at
+                  375px the Products tab pushed Add onto a line of its own: a header
+                  of four stacked rows on the screen with the least to give. */}
+              {counts[activeBank] > 0 && !showForm && (
+                <div className="flex items-center gap-2 max-md:order-last max-md:w-full md:contents">
+                {/* Fixed widths rather than `flex-1` above `md`: what a growing field
+                    takes width FROM is the bank switcher, the one control this screen
+                    exists for. Six tabs want ~820px, and a field that ate the
+                    leftover scrolled "Visual Styles" off the end of the strip on a
+                    1440px laptop. */}
+                <div className="relative shrink-0 max-md:w-auto max-md:flex-1 md:w-[140px] 2xl:w-[230px]">
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    // Just "Search": the field is narrow enough at `md` that
+                    // "Search visual styles" clips mid-word, and the tab it sits
+                    // beside already says which bank is being searched.
+                    placeholder="Search"
+                    className="h-10 w-full rounded-full border border-ink/10 bg-ink/[0.04] pl-9 pr-8 text-[13px] font-medium tracking-tight text-ink-200 outline-none transition-colors placeholder:font-normal placeholder:text-ink-500 focus:border-ink/20"
+                  />
+                  {query && (
+                    <button
+                      type="button"
+                      onClick={() => setQuery('')}
+                      title="Clear search"
+                      className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-ink/[0.08] hover:text-ink-200"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <SegmentedToggle<BankView>
+                  fitContent
+                  // `dense` for the segment padding only — the height stays the
+                  // toolbar's 40px. Two glyphs and no labels don't need a full-size
+                  // segment's 32px of padding each, and this row is fighting the
+                  // bank switcher for width.
+                  dense
+                  className="h-10 !p-1 shrink-0"
+                  value={view}
+                  onChange={setView}
+                  options={[
+                    { value: 'grid', label: '', ariaLabel: 'Grid view', icon: LayoutGrid },
+                    { value: 'list', label: '', ariaLabel: 'List view', icon: List },
+                  ]}
+                />
+                </div>
+            )}
+            {/* Influencers sub-filter — sized to match the main bank toggle
+                (h-10 !p-1). Only the Influencers bank has the portrait/sheet
+                split. */}
+            {activeBank === 'models' && counts.models > 0 && !showForm && (
+              <SegmentedToggle<ModelFilter>
+                fitContent
+                accent="influencers"
+                className="h-10 !p-1 shrink-0"
+                value={modelFilter}
+                onChange={setModelFilter}
+                options={MODEL_FILTER_OPTIONS.map((o) => ({
+                  value: o.value,
+                  label: o.label,
+                  icon: o.icon,
+                }))}
+              />
+            )}
+            {sortOptions && counts[activeBank] > 0 && !showForm && (
+              <SortControl value={sort} onChange={setSort} options={sortOptions} />
+            )}
+            {activeBank === 'products' && !showForm && (
+              <>
+                <input
+                  ref={bulkInputRef}
+                  type="file"
+                  accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? [])
+                    e.target.value = ''
+                    if (files.length > 0) handleBulkFiles(files)
+                  }}
+                />
+                <button
+                  onClick={() => bulkInputRef.current?.click()}
+                  title="Bulk add"
+                  className="flex h-10 items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.04] px-3.5 text-[13px] font-medium tracking-tight text-ink-300 transition-colors hover:bg-ink/[0.08] md:px-5"
+                >
+                  <Upload className="h-4 w-4" />
+                  {/* Icon-only on phones — the label crowded the toolbar. */}
+                  <span className="hidden sm:inline">Bulk Add</span>
+                </button>
+              </>
+            )}
+            <button
+              onClick={handleAdd}
+              className="flex h-10 items-center gap-2 rounded-full bg-ink px-5 text-[13px] font-medium tracking-tight text-ink-900 transition-colors hover:bg-ink-100"
+            >
+              <Plus className="h-4 w-4" />
+              Add
+            </button>
+          </div>
+        </div>
+
+        {/* Content area — list or form. Forms render unboxed so they get the
+            full width of the section. Products/Influencers use a fixed-left /
+            scroll-right layout on desktop so the image stays put while the
+            details scroll (no whole-page scroll). */}
+        <div className={`flex-1 overflow-y-auto p-5 ${fixedFormLayout ? 'lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden' : ''}`}>
+          {showForm ? (
+            <div className={`mx-auto ${['products', 'models', 'brolls', 'scripts', 'styles'].includes(activeBank) ? 'max-w-5xl' : 'max-w-md'} ${fixedFormLayout ? 'w-full lg:flex lg:min-h-0 lg:flex-1 lg:flex-col' : ''}`}>
+              {activeBank === 'products' && (
+                <ProductForm
+                  // Remount when the form is pointed at a different row (or at a
+                  // new product): its fields are local state, and without this
+                  // pressing Add with a form already open kept the last
+                  // product's values — which autosave would then write to a row
+                  // of its own. `editingId` doesn't change while autosaving, so
+                  // typing never remounts the form.
+                  key={`${editingId ?? 'new'}:${formSeed}`}
+                  item={editingProduct}
+                  onSave={handleSaveProduct}
+                  onAutosave={handleAutosaveProduct}
+                  onCancel={closeForm}
+                  onDetachExtraction={handleDetachExtraction}
+                />
+              )}
+              {activeBank === 'models' && (
+                <ModelForm item={editingModel} onSave={handleSaveModel} onCancel={closeForm} />
+              )}
+              {activeBank === 'scripts' && (
+                <ScriptForm item={editingScript} onSave={handleSaveScript} onCancel={closeForm} />
+              )}
+              {activeBank === 'voices' && (
+                <VoiceForm item={editingVoice} onSave={handleSaveVoice} onCancel={closeForm} />
+              )}
+              {activeBank === 'brolls' && (
+                <BRollForm item={editingBRoll} onSave={handleSaveBRoll} onCancel={closeForm} />
+              )}
+              {activeBank === 'styles' && (
+                <StyleForm item={editingStyle} onSave={handleSaveStyle} onCancel={closeForm} />
+              )}
+            </div>
+          ) : (
+            <BankList
+              bankType={activeBank}
+              onEdit={handleEdit}
+              onAdd={handleAdd}
+              sort={sort}
+              onSortChange={setSort}
+              view={view}
+              query={query}
+              modelFilter={modelFilter}
+              inFlightProductIds={inFlightIds}
+              onBulkProductFiles={handleBulkFiles}
+            />
+          )}
+        </div>
       </div>
     </div>
   )

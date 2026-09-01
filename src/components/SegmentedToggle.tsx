@@ -5,6 +5,12 @@ export interface SegmentedToggleOption<T extends string> {
   value: T
   label: ReactNode
   icon?: ElementType
+  // Accessible name for an ICON-ONLY segment (`label: ''`). It has to ride on
+  // the button rather than as an `sr-only` span inside the label, because that
+  // span is still a flex child: it measures 0px wide but the segment's `gap`
+  // is laid out after the icon anyway, so the glyph sits half a gap left of
+  // centre. Visibly, on the Bank's grid/list switcher.
+  ariaLabel?: string
   // Small count chip rendered after the label (e.g. history length).
   badge?: ReactNode
 }
@@ -127,6 +133,7 @@ export default function SegmentedToggle<T extends string>({
             ref={(el) => { buttonRefs.current.set(opt.value, el) }}
             type="button"
             onClick={() => onChange(opt.value)}
+            aria-label={opt.ariaLabel}
             className={`relative z-[1] flex min-w-0 ${
               fitContent === 'md' ? 'flex-1 md:flex-none' : fitContent ? '' : 'flex-1'
             } items-center justify-center rounded-full font-medium tracking-tight transition-colors duration-200 ${
