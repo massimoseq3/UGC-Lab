@@ -376,10 +376,10 @@ function HistoryListRow({
 }) {
   // The row's media loads once the row is near the window — see the note on
   // `scrollRef` above. Everything else about the row renders regardless.
-  // A clip keeps releasing its decoder; a still claims once and holds its
-  // picture, since re-reading it costs nothing and un-painting it costs a black
-  // row on the way back up. See useNearViewport.
-  const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { once: entry.kind !== 'video' })
+  // A clip keeps releasing its decoder; a still holds what it loaded, since
+  // re-reading it costs nothing and un-painting it costs a black row on the way
+  // back up. See useNearViewport.
+  const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: entry.kind === 'video' })
   const mediaRef = entry.kind === 'image' ? entry.data.imageUrl : entry.kind === 'video' ? entry.data.videoUrl : null
   const { url, status } = useAssetUrlState(near ? mediaRef : null)
   const { poster, posterProps } = useVideoPoster()
@@ -616,11 +616,13 @@ function ImageTile({
   onAnimate?: () => void
 }) {
   // `loading="lazy"` only defers the <img> — the blob behind it still came out
-  // of IndexedDB for every tile in the list. This defers the read itself.
-  // `once`: a still holds no decoder, and its blob read and object URL are
-  // cached for good the moment it resolves, so dropping the picture on the way
-  // past only buys a black tile on the way back. See useNearViewport.
-  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { once: true })
+  // of IndexedDB for every tile in the list. This defers the read itself. It
+  // never gives the picture back: a still holds no decoder, its blob read and
+  // object URL are cached for good the moment it resolves, and this tile is
+  // sized by the picture — so dropping one on the way past would resize a tile
+  // ABOVE the scroll position and shove the grid around under the pointer.
+  // See useNearViewport.
+  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
   const { url, status } = useAssetUrlState(near ? item.imageUrl : null)
   const isSaved = !!item.linkedBRollId
 
@@ -711,7 +713,9 @@ function VideoTile({
 }) {
   // Off-window tiles hold no clip: a <video> each is a blob in memory and a
   // decoder, and the browser runs out of the second long before this list does.
-  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
+  // Safe to release where a still isn't, because the frame below is sized by
+  // the tile's own aspect ratio and so keeps its height either way.
+  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: true })
   const { url, status } = useAssetUrlState(near ? item.videoUrl : null)
   // …but it keeps the frame. Handing the decoder back is what makes the grid
   // survive sixty clips; painting nothing until the next one is built is what

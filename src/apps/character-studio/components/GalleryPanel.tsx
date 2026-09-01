@@ -1223,6 +1223,10 @@ function HistoryTile({
   scrollRoot?: React.RefObject<HTMLElement | null>
 }) {
   const ownRoot = useRef<HTMLElement | null>(null)
+  // Loaded on approach and kept — never released. A loaded tile is sized by the
+  // picture and the placeholder by a declared aspect ratio, so a tile that gave
+  // its picture back changed height ~400px ABOVE the scroll position and walked
+  // the whole masonry column under the pointer. See useNearViewport.
   const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot ?? ownRoot)
   const a = useHistoryTileActions(item, onDelete, scrollRoot ? near : true)
   const fitted = !!frameStyle
@@ -1387,6 +1391,7 @@ function HistoryListRow({
   scrollRoot?: React.RefObject<HTMLElement | null>
 }) {
   const ownRoot = useRef<HTMLElement | null>(null)
+  // Same rule as the grid tile: read on approach, then keep it.
   const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot ?? ownRoot)
   const a = useHistoryTileActions(item, onDelete, scrollRoot ? near : true)
   const prompt = buildImagePrompt(item.profile).trim()
