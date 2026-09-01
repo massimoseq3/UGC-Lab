@@ -258,9 +258,16 @@ export default function BankPicker({
         search: buildSearch([m.name], flat),
       }
     })
-    const saved = new Set(models.map((m) => m.presetId).filter(Boolean))
+    // A template that has already been saved STAYS in its style section — it
+    // used to be dropped from the library the moment it was picked, so the face
+    // you found under "Desk & Office" was simply not there the next time you
+    // went looking for it (it had moved silently into Your Characters at the
+    // top). That was invisible while the styles were a dropdown; with the rail
+    // it also quietly shrank a section's count on every pick. Picking it again
+    // costs nothing — `materialize` re-finds the row it already made rather
+    // than making a second one — and the Characters preset picker has always
+    // listed a saved starter in both places, so this is the two agreeing.
     const tpl = (templates ?? [])
-      .filter((t) => !saved.has(t.id))
       .map((t) => ({
         model: {
           id: `${TEMPLATE_ID}${t.id}`,
@@ -278,7 +285,7 @@ export default function BankPicker({
       }))
       .filter((r) => (!currentTabFilter || currentTabFilter(r.model)) && (!filter || filter(r.model)))
     return { own, tpl }
-  }, [currentBankType, itemsAfterFilter, models, templates, currentTabFilter, filter])
+  }, [currentBankType, itemsAfterFilter, templates, currentTabFilter, filter])
 
   const q = search.trim().toLowerCase()
   const characterPasses = useMemo(() => ({
@@ -640,7 +647,17 @@ export default function BankPicker({
     }
     setAddingId(null)
     if (picked.length === 0) return
-    onSelectMany(picked)
+    // A saved template is listed twice — once in its style section, once under
+    // Your Characters — and both tiles resolve to the same bank row, so a
+    // selection spanning the pair would otherwise add that character twice.
+    const seen = new Set<string>()
+    const unique: BankItem[] = []
+    for (const it of picked) {
+      if (seen.has(it.id)) continue
+      seen.add(it.id)
+      unique.push(it)
+    }
+    onSelectMany(unique)
     onClose()
   }
 
