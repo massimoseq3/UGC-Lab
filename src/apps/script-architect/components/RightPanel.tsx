@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { ScriptHistoryItem } from '../../../stores/types'
-import type { RemixAngle, ScriptMode, WriteFormat } from '../types'
+import type { PendingScriptRun, RemixAngle, ScriptMode, WriteFormat } from '../types'
 import OutputPanel from './OutputPanel'
 import HistoryView from './HistoryView'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -23,7 +23,11 @@ interface RightPanelProps {
   // number of hooks the next Generate will actually write.
   hookCount: number
   linkedProductId: string | null
-  isGenerating: boolean
+  // Every run still being written. They are History rows from the moment they
+  // are fired, so they no longer own the Output pane — and there can be several,
+  // since Generate keeps working while one writes.
+  pendingRuns: PendingScriptRun[]
+  onWatchPending: (run: PendingScriptRun) => void
   error: string | null
   // Commits an inline edit of take `index` back to the persisted output state.
   onEditVariation: (index: number, text: string) => void
@@ -47,7 +51,8 @@ export default function RightPanel({
   hookCategoryLabel,
   hookCount,
   linkedProductId,
-  isGenerating,
+  pendingRuns,
+  onWatchPending,
   error,
   onEditVariation,
   voiceProfile,
@@ -59,17 +64,35 @@ export default function RightPanel({
 }: RightPanelProps) {
   const [tab, setTab] = useState<Tab>('output')
 
+  // The pane is a slot addressed by id, so "is it watching something write?" is
+  // a lookup, not a flag. Non-null is the one state that draws the writing face.
+  const watchedRun = pendingRuns.find((r) => r.id === activeHistoryId) ?? null
+
   // "Clear the canvas" state. Holds a signature of the output that was cleared,
   // so the next generation (or a history restore) fills the panel again on its
   // own. Nothing is deleted — every take is already in the History tab; this
   // exists so the last run isn't sitting on camera while a new one is filmed.
   const [clearedSig, setClearedSig] = useState<string | null>(null)
-  const outputSig = `${variations.length}|${(variations[0] ?? '').slice(0, 64)}`
-  const cleared = !isGenerating && variations.length > 0 && clearedSig === outputSig
+  const outputSig = `${activeHistoryId ?? ''}|${variations.length}|${(variations[0] ?? '').slice(0, 64)}`
+  const cleared = !watchedRun && variations.length > 0 && clearedSig === outputSig
+
+  // Picking from History is a request to SEE that run, so it always uncovers
+  // the canvas — including when the run picked is the one that was cleared,
+  // which the signature alone reads as "still the thing I cleared" and left
+  // blank. That was reported as history rows not opening at all.
+  const showInOutput = () => {
+    setClearedSig(null)
+    setTab('output')
+  }
 
   const handleSelectHistory = (item: ScriptHistoryItem) => {
     onSelectHistory(item)
-    setTab('output')
+    showInOutput()
+  }
+
+  const handleWatchPending = (run: PendingScriptRun) => {
+    onWatchPending(run)
+    showInOutput()
   }
 
   return (
@@ -83,10 +106,10 @@ export default function RightPanel({
           onChange={setTab}
           options={[
             { value: 'output', label: 'Output' },
-            { value: 'history', label: 'History', badge: history.length > 0 ? history.length : undefined },
+            { value: 'history', label: 'History', badge: history.length + pendingRuns.length || undefined },
           ]}
         />
-        {tab === 'output' && !cleared && !isGenerating && variations.length > 0 && (
+        {tab === 'output' && !cleared && !watchedRun && variations.length > 0 && (
           <button
             type="button"
             title="Clear the canvas"
@@ -110,7 +133,7 @@ export default function RightPanel({
             hookCategoryLabel={hookCategoryLabel}
             hookCount={hookCount}
             linkedProductId={linkedProductId}
-            isGenerating={isGenerating}
+            pendingRun={watchedRun}
             error={error}
             // What a "new set of takes" is, is the parent's knowledge: a run,
             // or the history row being shown. The panel scrolls back to the top
@@ -123,8 +146,10 @@ export default function RightPanel({
         ) : (
           <HistoryView
             items={history}
+            pending={pendingRuns}
             activeId={activeHistoryId}
             onSelect={handleSelectHistory}
+            onSelectPending={handleWatchPending}
             onDelete={onDeleteHistory}
           />
         )}

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useRef, useState, useEffect } from 'react'
 import { FileText, PenLine } from 'lucide-react'
 import { useAppStore } from '../../stores/appStore'
 import MobilePaneTabs from '../../components/MobilePaneTabs'
@@ -10,7 +10,7 @@ import InputPanel from './components/InputPanel'
 import RightPanel from './components/RightPanel'
 import { generateScript } from './services/generateScript'
 import { humanizeError } from '../../utils/friendlyError'
-import { WRITE_STYLE_META, HOOK_CATEGORY_META, detectSceneBlueprint, isWriteStyle, isWriteFormat, isWriteLength, isRemixLength, isHookCategoryChoice, isHookCount, isVariationCount, parseHooks, DEFAULT_VARIATION_COUNT, DEFAULT_HOOK_COUNT, DEFAULT_REMIX_LENGTH, type ScriptMode, type ScriptUiMode, type EditableProductContext, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type HookCount, type VariationCount, type RemixAngle } from './types'
+import { WRITE_STYLE_META, HOOK_CATEGORY_META, detectSceneBlueprint, isWriteStyle, isWriteFormat, isWriteLength, isRemixLength, isHookCategoryChoice, isHookCount, isVariationCount, parseHooks, DEFAULT_VARIATION_COUNT, DEFAULT_HOOK_COUNT, DEFAULT_REMIX_LENGTH, type ScriptMode, type ScriptUiMode, type EditableProductContext, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type HookCount, type VariationCount, type RemixAngle, type PendingScriptRun } from './types'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
 
 interface ReverseEngineerPayload {
@@ -103,15 +103,29 @@ export default function ScriptArchitect() {
   const [outputHookCategory, setOutputHookCategory] = usePersistedState<HookCategoryChoice>(`${baseKey}:outputHookCategory`, 'auto', {
     sanitize: (v) => (isHookCategoryChoice(v) ? v : 'auto'),
   })
+  // What the Output pane is showing: a finished history row, or one of the runs
+  // still writing (both are addressed by the same id — see PendingScriptRun).
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(null)
-  const [isGenerating, setIsGenerating] = useState(false)
+  // Every run in flight, newest first — so the in-progress block and the
+  // day-grouped rows under it read as one most-recent-first list rather than as
+  // two orderings. They are HISTORY rows from the moment they are fired, so
+  // Generate never stands down: press it again and a second card joins the
+  // queue, exactly as pressing a media app's Generate twice queues two tiles.
+  const [pendingRuns, setPendingRuns] = useState<PendingScriptRun[]>([])
   const [error, setError] = useState<string | null>(null)
+  // The one thing a run's async tail has to read back AFTER its await, and the
+  // one it can't: the closure captured the render's `activeHistoryId`, and by
+  // the time a script lands the member has usually moved the pane. Holds the id
+  // of the still-writing run the pane is parked on, or null when it is parked
+  // on finished work — which is exactly the question "may this run take the
+  // pane when it lands?" asks. See the landing guard in handleGenerate.
+  const watchedRunIdRef = useRef<string | null>(null)
   // Phone-only: which of the two panes is on screen (ignored from md up).
   const [pane, setPane] = useState<'input' | 'output'>('input')
   const [highlightField, setHighlightField] = useState<string | null>(null)
 
-  // Pulse the dock dot while the script LLM call runs.
-  useReportActivity('script-architect', isGenerating)
+  // Pulse the dock dot while any script is being written.
+  useReportActivity('script-architect', pendingRuns.length > 0)
 
   const interAppPayload = useAppStore((s) => s.interAppPayload)
   const consumePayload = useAppStore((s) => s.consumePayload)
@@ -170,6 +184,30 @@ export default function ScriptArchitect() {
     consumePayload()
   }, [interAppPayload, activeApp, consumePayload, getProductById, setMode, setSource, setSelectedProductId])
 
+  // Park the Output pane on `run` and pin the labels the cards read off. Both
+  // the moment a run is fired and the moment it lands go through this, so the
+  // writing face and the takes it turns into can't describe the run
+  // differently — and a member who browsed History mid-run, which moves every
+  // one of these, gets them put back.
+  const pinRun = (run: PendingScriptRun) => {
+    setActiveHistoryId(run.id)
+    setOutputMode(run.mode)
+    setOutputStyle(run.writeStyle)
+    setOutputFormat(run.writeFormat)
+    setOutputHookCategory(run.hookCategory)
+  }
+
+  // The same slot with nothing in it yet: the run as fired, or as clicked back
+  // to from its in-progress card. Either way the pane is now watching a run
+  // that is still writing, which is what the guard below reads.
+  const showRunEmpty = (run: PendingScriptRun) => {
+    watchedRunIdRef.current = run.id
+    pinRun(run)
+    setVariations([])
+    setOutputAngles(null)
+    setOutputVoiceProfile('')
+  }
+
   const handleGenerate = async (productContext: EditableProductContext | null) => {
     // Write New's brief is optional: an empty brief hands the model creative
     // license rather than blocking generation (avoids decision paralysis for
@@ -184,17 +222,28 @@ export default function ScriptArchitect() {
     if (!sourceFilled) return
     if (mode === 'write' && !selectedProduct && !brief.trim()) return
 
-    setIsGenerating(true)
+    const inputSource = mode === 'write' ? brief : source
+    // Mint the run's id before the call: it names the in-progress card in
+    // History, it is what the Output pane is parked on while the run writes,
+    // and it becomes the finished row's id — so the card never changes
+    // identity under the member watching it.
+    const run: PendingScriptRun = {
+      id: crypto.randomUUID(),
+      mode: resolvedMode,
+      writeStyle,
+      writeFormat,
+      hookCategory,
+      hookCount,
+      variationCount,
+      productName: selectedProduct?.productName,
+      inputSummary: inputSource.slice(0, 200),
+      startedAt: Date.now(),
+    }
+    setPendingRuns((prev) => [run, ...prev])
     setError(null)
-    setActiveHistoryId(null)
     // On a phone only one pane is on screen — follow the run to the takes.
     setPane('output')
-    // Lock the output's labelling context to this run up front, so the
-    // loading copy and the resulting cards reflect what was generated.
-    setOutputMode(resolvedMode)
-    setOutputStyle(writeStyle)
-    setOutputFormat(writeFormat)
-    setOutputHookCategory(hookCategory)
+    showRunEmpty(run)
     // Route the merged source into the field the resolved pipeline reads.
     const winningTranscript = resolvedMode === 'remix' ? source : ''
     const reversePrompt = resolvedMode === 'reverse-engineer' ? source : ''
@@ -218,13 +267,8 @@ export default function ScriptArchitect() {
         productContext,
         additionalContext,
       })
-      setVariations(result.variations)
-      setOutputAngles(result.angles ?? null)
-      setOutputVoiceProfile(result.voiceProfile ?? '')
-
-      const inputSource = mode === 'write' ? brief : source
       const item: ScriptHistoryItem = {
-        id: crypto.randomUUID(),
+        id: run.id,
         mode: resolvedMode,
         variations: result.variations,
         inputSummary: inputSource.slice(0, 200),
@@ -246,7 +290,20 @@ export default function ScriptArchitect() {
         createdAt: Date.now(),
       }
       addScriptHistory(item)
-      setActiveHistoryId(item.id)
+      // The finished run takes the pane, even if the member wandered off into a
+      // finished row while it wrote — that is what they pressed Generate for.
+      // The one thing it will not do is steal the pane from ANOTHER run still
+      // being written: watching a script arrive is the one state where being
+      // yanked away loses something you can't get back with a click.
+      const watchingAnotherRun =
+        watchedRunIdRef.current !== null && watchedRunIdRef.current !== run.id
+      if (!watchingAnotherRun) {
+        watchedRunIdRef.current = null
+        pinRun(run)
+        setVariations(result.variations)
+        setOutputAngles(result.angles ?? null)
+        setOutputVoiceProfile(result.voiceProfile ?? '')
+      }
 
       const hooksReturned = writeFormat === 'hooks' ? parseHooks(result.variations[0] ?? '').length : 0
       // Count what actually came back rather than the configured batch size, so
@@ -260,14 +317,23 @@ export default function ScriptArchitect() {
       )
     } catch (err) {
       const msg = humanizeError(err, 'Script generation failed. Check your API key and try again.')
-      setError(msg)
+      // Only the pane parked on THIS run should turn into its error; anyone
+      // reading something else gets the toast and keeps their page. The pane
+      // the run was fired into is already empty, which is the state OutputPanel
+      // renders an error in.
+      if (watchedRunIdRef.current === run.id) {
+        watchedRunIdRef.current = null
+        setError(msg)
+      }
       useAppStore.getState().addToast(msg, 'error')
     } finally {
-      setIsGenerating(false)
+      setPendingRuns((prev) => prev.filter((r) => r.id !== run.id))
     }
   }
 
   const handleSelectHistory = (item: ScriptHistoryItem) => {
+    // The pane is on finished work now, so a run that lands may take it back.
+    watchedRunIdRef.current = null
     setMode(item.mode === 'write' ? 'write' : 'remix')
     setVariations(item.variations)
     setActiveHistoryId(item.id)
@@ -314,6 +380,15 @@ export default function ScriptArchitect() {
         if (isHookCount(item.hookCount)) setHookCount(item.hookCount)
       }
     }
+  }
+
+  // Clicking an in-progress card puts the Output pane back on that run. It
+  // restores no inputs: the run's own inputs are still in the left panel unless
+  // the member has since loaded another row, and silently undoing that edit is
+  // not what clicking a status card asks for.
+  const handleWatchPending = (run: PendingScriptRun) => {
+    setError(null)
+    showRunEmpty(run)
   }
 
   const handleDeleteHistory = (id: string) => {
@@ -367,7 +442,6 @@ export default function ScriptArchitect() {
           additionalContext={additionalContext}
           onAdditionalContextChange={setAdditionalContext}
           onGenerate={handleGenerate}
-          isGenerating={isGenerating}
           highlightField={highlightField}
         />
       </div>
@@ -383,7 +457,8 @@ export default function ScriptArchitect() {
           hookCategoryLabel={HOOK_CATEGORY_META[outputHookCategory].label}
           hookCount={hookCount}
           linkedProductId={selectedProduct?.id ?? null}
-          isGenerating={isGenerating}
+          pendingRuns={pendingRuns}
+          onWatchPending={handleWatchPending}
           error={error}
           onEditVariation={(index, text) =>
             setVariations((prev) => prev.map((v, i) => (i === index ? text : v)))

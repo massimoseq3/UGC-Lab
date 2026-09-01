@@ -8,7 +8,7 @@ import { rangeDurationLabel } from '../../../utils/timecode'
 import TokenField from './TokenField'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
-import { REMIX_ANGLE_LABEL, remixAnglesForCount, HOOK_CATEGORY_META, DEFAULT_HOOK_COUNT, parseHooks, hooksPlainText, hooksToText, spokenLinesOnly, type ParsedHook, type RemixAngle, type ScriptMode, type WriteFormat } from '../types'
+import { REMIX_ANGLE_LABEL, remixAnglesForCount, HOOK_CATEGORY_META, DEFAULT_HOOK_COUNT, parseHooks, hooksPlainText, hooksToText, spokenLinesOnly, type ParsedHook, type PendingScriptRun, type RemixAngle, type ScriptMode, type WriteFormat } from '../types'
 import { suspendChromeAutoHide } from '../../../hooks/useChromeAutoHide'
 
 interface OutputPanelProps {
@@ -27,7 +27,11 @@ interface OutputPanelProps {
   // Hooks format only — the live count, for the empty + loading copy.
   hookCount?: number
   linkedProductId: string | null
-  isGenerating?: boolean
+  // Set only while this pane is parked on a run that is still writing. It
+  // carries the run's own mode/format/count rather than the live selectors:
+  // browsing History mid-run moves those, and the loading copy has to keep
+  // describing the thing being written.
+  pendingRun?: PendingScriptRun | null
   error?: string | null
   // Identifies the RUN these takes came from (a generation, or the history row
   // being shown). The panel scrolls back to the first take when this changes —
@@ -1716,7 +1720,7 @@ function SceneBeatBlock({
 // inset) — a Tailwind class can't be built from a variable.
 const SWITCHER_H = 53
 
-export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, hookCount = DEFAULT_HOOK_COUNT, linkedProductId, isGenerating, error, runId, onEditVariation, voiceProfile, onEditVoiceProfile }: OutputPanelProps) {
+export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, hookCount = DEFAULT_HOOK_COUNT, linkedProductId, pendingRun, error, runId, onEditVariation, voiceProfile, onEditVoiceProfile }: OutputPanelProps) {
   // Resolve the linked product so saved scripts get a meaningful default title
   // ("<Product> — Hook-Led Script").
   const products = useBankStore((s) => s.products)
@@ -1789,12 +1793,12 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
   // the cards themselves follow `mode` (what actually produced them).
   const copyMode = liveMode ?? mode
 
-  if (isGenerating) {
-    const message = copyMode === 'write'
-      ? (writeFormat === 'hooks'
-          ? ['Reading your brief...', 'Digging through the hook library...', `Writing ${hookCount} hooks...`, 'Cutting the weak ones...']
+  if (pendingRun) {
+    const message = pendingRun.mode === 'write'
+      ? (pendingRun.writeFormat === 'hooks'
+          ? ['Reading your brief...', 'Digging through the hook library...', `Writing ${pendingRun.hookCount} hooks...`, 'Cutting the weak ones...']
           : ['Reading your brief...', 'Writing the takes...', 'Making it sound human...', 'Tightening the hooks...'])
-      : copyMode === 'remix'
+      : pendingRun.mode === 'remix'
         ? ['Building the angles...', 'Sending parallel requests...', 'Writing variations...', 'Polishing final drafts...']
         : ['Reading scene blueprint...', 'Mapping product into structure...', 'Rewriting scenes...', 'Preserving structure...']
     return (

@@ -1,6 +1,5 @@
 import { useState, type ComponentType } from 'react'
 import { Package, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkles, Shuffle, FishingHook, Video, Clock, Layers } from 'lucide-react'
-import Spinner from '../../../components/Spinner'
 import type { Product, Script } from '../../../stores/types'
 import { WRITE_LENGTHS, REMIX_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNTS, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type HookCount, type VariationCount } from '../types'
 import { useBankStore } from '../../../stores/bankStore'
@@ -52,7 +51,6 @@ interface InputPanelProps {
   additionalContext: string
   onAdditionalContextChange: (value: string) => void
   onGenerate: (context: EditableProductContext | null) => void
-  isGenerating: boolean
   highlightField?: string | null
 }
 
@@ -85,7 +83,6 @@ export default function InputPanel({
   additionalContext,
   onAdditionalContextChange,
   onGenerate,
-  isGenerating,
   highlightField,
 }: InputPanelProps) {
   const [productPickerOpen, setProductPickerOpen] = useState(false)
@@ -952,17 +949,16 @@ export default function InputPanel({
               the pointer. `:hover` still matches one, so the blocker state
               ("Paste a script to remix") repainted under the cursor and read as
               clickable. */}
+          {/* Never disabled by a run in flight, and never wearing a spinner:
+              a fired script becomes an in-progress card in History and the
+              writing face in the Output pane, so the button is free to queue
+              the next one. The only thing that greys it is a missing input. */}
           <button
             onClick={() => onGenerate(editableContext)}
-            disabled={!canGenerate || isGenerating}
+            disabled={!canGenerate}
             className="flex w-full items-center justify-center gap-2.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-scripts-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] btn-soft-shadow transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:"
           >
-            {isGenerating ? (
-              <>
-                <Spinner className="h-4 w-4" />
-                <span>{mode === 'write' ? (writeFormat === 'hooks' ? `Writing ${hookCount} Hooks...` : `Writing ${variationCount} Takes...`) : blueprintActive ? 'Rewriting Scene Prompts...' : `Generating ${variationCount} Script Variations...`}</span>
-              </>
-            ) : blocker ? (
+            {blocker ? (
               <>
                 <blocker.icon className="h-4 w-4" strokeWidth={2.5} />
                 <span>{blocker.label}</span>

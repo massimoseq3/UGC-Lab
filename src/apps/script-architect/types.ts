@@ -433,3 +433,27 @@ export function remixAnglesForCount(count: number): RemixAngle[] | null {
   if (count > 0 && count <= REMIX_ANGLES.length) return REMIX_ANGLES.slice(0, count)
   return null
 }
+
+// A run that is still being written. Held in memory only, and deliberately not
+// in `scriptHistory`: a script is a streaming chat completion with no task id
+// to re-attach to, so a row persisted to the bank would be a zombie after a
+// refresh — the bank holds finished work. The id is minted before the call and
+// reused for the finished `ScriptHistoryItem`, so the card the member is
+// watching stays the same card once the takes land, and so the output pane can
+// address the run that is still writing exactly the way it addresses a row.
+export interface PendingScriptRun {
+  id: string
+  // The pipeline that actually ran, and the labelling context it was fired
+  // with — a member browsing History mid-run moves the live selectors, and the
+  // loading copy has to describe the run rather than whatever they left behind.
+  mode: ScriptMode
+  writeStyle: WriteStyle
+  writeFormat: WriteFormat
+  hookCategory: HookCategoryChoice
+  hookCount: number
+  variationCount: number
+  productName?: string
+  // What was asked for, shown in place of the take a finished card previews.
+  inputSummary: string
+  startedAt: number
+}
