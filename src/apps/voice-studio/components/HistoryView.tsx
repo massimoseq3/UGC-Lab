@@ -6,14 +6,14 @@ import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history
 import { seedColor } from './seedColor'
 import { GeneratingChip, GeneratingPulseRing } from '../../../components/GeneratingChip'
 import DayPill from '../../../components/DayPill'
-import Waveform from './Waveform'
+import Waveform from '../../../components/Waveform'
 import {
   claimAudioSlot,
   formatClock,
   releaseAudioSlot,
   resolveAudioUrl,
   waveformPeaks,
-} from './audio'
+} from '../../../utils/audioPlayback'
 
 // A voiceover that's been fired but hasn't landed yet. Rendered as a card at the
 // top of History so a queued batch reads as a queue — several can run at once.

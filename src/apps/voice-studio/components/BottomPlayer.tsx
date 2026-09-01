@@ -3,7 +3,7 @@ import { Play, Pause, RotateCcw, RotateCw, Download, ChevronDown, AlignLeft } fr
 import type { VoiceHistoryItem } from '../../../stores/types'
 import { getUrl } from '../../../utils/assetStore'
 import { seedColor } from './seedColor'
-import { claimAudioSlot, releaseAudioSlot } from './audio'
+import { claimAudioSlot, releaseAudioSlot } from '../../../utils/audioPlayback'
 
 interface BottomPlayerProps {
   item: VoiceHistoryItem

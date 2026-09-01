@@ -14,7 +14,8 @@ import { usePersistedState } from '../../../hooks/usePersistedState'
 import { sectionLabel, groupByDay } from '../../../utils/history'
 import { downloadImage } from '../../../utils/downloadImage'
 import type { ImageHistoryItem, VideoHistoryItem, MusicHistoryItem } from '../../../stores/types'
-import AudioTile from './AudioTile'
+import AudioTile, { MusicArtwork, MusicWaveStrip } from './AudioTile'
+import { useAudioPlayback } from '../../../hooks/useAudioPlayback'
 import GenerationProgress from '../../../components/GenerationProgress'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
@@ -382,7 +383,13 @@ function HistoryListRow({
   const mediaRef = entry.kind === 'image' ? entry.data.imageUrl : entry.kind === 'video' ? entry.data.videoUrl : null
   const { url, status } = useAssetUrlState(near ? mediaRef : null)
   const { poster, posterProps } = useVideoPoster()
-  const audioUrl = useAssetUrl(entry.kind === 'music' ? entry.data.audioRef : null)
+  // Music rows play from their own artwork, with the waveform under the prompt
+  // — the same transport the grid tile and Voiceovers' history cards use.
+  const coverUrl = useAssetUrl(entry.kind === 'music' ? entry.data.coverImageRef ?? null : null)
+  const musicPlayer = useAudioPlayback(
+    entry.kind === 'music' ? entry.data.audioRef : null,
+    entry.kind === 'music' ? entry.data.durationSeconds ?? 0 : 0,
+  )
   // Native controls here, but the same one-clip-at-a-time rule as the tiles.
   const rowVideo = useExclusiveVideo()
   const prompt = entry.data.prompt
@@ -400,8 +407,11 @@ function HistoryListRow({
     if (entry.data.durationSeconds) meta.push(`${entry.data.durationSeconds}s`)
     if (entry.data.aspectRatio) meta.push(entry.data.aspectRatio)
   } else {
+    // Instrumental is a chip on the artwork already — the pills carry what it
+    // doesn't say.
     if (entry.data.durationSeconds) meta.push(`${Math.round(entry.data.durationSeconds)}s`)
-    meta.push(entry.data.instrumental ? 'Instrumental' : 'With lyrics')
+    else if (musicPlayer.duration > 0) meta.push(`${Math.round(musicPlayer.duration)}s`)
+    if (!entry.data.instrumental) meta.push('With lyrics')
   }
 
   return (
@@ -412,10 +422,13 @@ function HistoryListRow({
           moves right. */}
       <div className="relative min-w-0 flex-[3] bg-black light:bg-[#EAEAEC]" style={{ aspectRatio: frameAspect }}>
         {entry.kind === 'music' ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-ink/[0.04]">
-            <MusicIcon className="h-8 w-8 text-ink-600" />
-            {entry.data.title && <span className="px-4 text-center text-[12px] text-ink-400">{entry.data.title}</span>}
-          </div>
+          <MusicArtwork
+            coverUrl={coverUrl}
+            instrumental={entry.data.instrumental}
+            isPlaying={musicPlayer.isPlaying}
+            onToggle={musicPlayer.toggle}
+            className="absolute inset-0"
+          />
         ) : status === 'ready' && url ? (
           entry.kind === 'video' ? (
             // `#t=0.1` is load-bearing, not decoration: with `preload="metadata"`
@@ -466,6 +479,9 @@ function HistoryListRow({
             same reading order Characters' list row uses, so a row looks the
             same across the two apps. Hidden when generation info is off. */}
         <ModelPill modelId={entry.data.modelId} className="self-start" />
+        {entry.kind === 'music' && entry.data.title && (
+          <p className="truncate text-[13px] font-semibold text-ink-100">{entry.data.title}</p>
+        )}
         {meta.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             {meta.map((m) => (
@@ -478,9 +494,7 @@ function HistoryListRow({
             {prompt}
           </div>
         )}
-        {entry.kind === 'music' && audioUrl && (
-          <audio src={audioUrl} controls className="h-8 w-full" />
-        )}
+        {entry.kind === 'music' && <MusicWaveStrip player={musicPlayer} className="shrink-0" />}
         {/* Canonical action order: download · save · copy · [reuse] · [animate] · delete. */}
         <div className="flex items-center gap-1">
           <ListRowButton title="Download" onClick={onDownload}>
