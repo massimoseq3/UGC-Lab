@@ -49,18 +49,58 @@ export function starredFirst<T>(items: T[]): T[] {
   return [...items.filter(isStarred), ...items.filter((it) => !isStarred(it))]
 }
 
+// Which orders each bank offers. One table, read by the toolbar dropdown AND
+// by the list view's column headers — a header that sets an order its own bank
+// can't hold is worse than no header. B-Rolls is the one that matters: it sorts
+// by date only (its grid is day-grouped, and its "name" is a paragraph-long
+// prompt), so its Name column doesn't sort.
+export const SORT_OPTIONS_BY_BANK: Record<BankType, { value: SortOrder; label: string }[]> = {
+  products: SORT_OPTIONS_WITH_NAME,
+  models: SORT_OPTIONS_WITH_NAME,
+  scripts: SORT_OPTIONS_WITH_NAME,
+  voices: SORT_OPTIONS_WITH_NAME,
+  styles: SORT_OPTIONS_WITH_NAME,
+  swipes: SORT_OPTIONS_WITH_NAME,
+  brolls: SORT_OPTIONS_DATE_ONLY,
+}
+
+export function canSortByName(bankType: BankType): boolean {
+  return SORT_OPTIONS_BY_BANK[bankType].some((o) => o.value === 'name-asc')
+}
+
 export function useBankSort(bankType: BankType): [SortOrder, (v: SortOrder) => void, { value: SortOrder; label: string }[] | null] {
   const [productsSort, setProductsSort] = usePersistedState<SortOrder>('finder:sort:products', 'newest')
   const [modelsSort, setModelsSort] = usePersistedState<SortOrder>('finder:sort:models', 'newest')
   const [scriptsSort, setScriptsSort] = usePersistedState<SortOrder>('finder:sort:scripts', 'newest')
   const [brollsSort, setBrollsSort] = usePersistedState<SortOrder>('finder:sort:brolls', 'newest')
   const [stylesSort, setStylesSort] = usePersistedState<SortOrder>('finder:sort:styles', 'newest')
+  // Voices and the swipe file sorted by nothing until the list view gave every
+  // bank clickable column headers — a header that can't sort its own column is
+  // worse than no header, so these two got the same treatment as the rest.
+  const [voicesSort, setVoicesSort] = usePersistedState<SortOrder>('finder:sort:voices', 'newest')
+  const [swipesSort, setSwipesSort] = usePersistedState<SortOrder>('finder:sort:swipes', 'newest')
+  const options = SORT_OPTIONS_BY_BANK[bankType] ?? null
   switch (bankType) {
-    case 'styles': return [stylesSort, setStylesSort, SORT_OPTIONS_WITH_NAME]
-    case 'products': return [productsSort, setProductsSort, SORT_OPTIONS_WITH_NAME]
-    case 'models': return [modelsSort, setModelsSort, SORT_OPTIONS_WITH_NAME]
-    case 'scripts': return [scriptsSort, setScriptsSort, SORT_OPTIONS_WITH_NAME]
-    case 'brolls': return [brollsSort, setBrollsSort, SORT_OPTIONS_DATE_ONLY]
+    case 'styles': return [stylesSort, setStylesSort, options]
+    case 'products': return [productsSort, setProductsSort, options]
+    case 'models': return [modelsSort, setModelsSort, options]
+    case 'scripts': return [scriptsSort, setScriptsSort, options]
+    case 'voices': return [voicesSort, setVoicesSort, options]
+    case 'swipes': return [swipesSort, setSwipesSort, options]
+    case 'brolls': return [brollsSort, setBrollsSort, options]
     default: return ['newest', () => {}, null]
   }
+}
+
+// Grid or list — the Bank's two ways of looking at the same rows.
+//
+// A picture is what a product, a character or a still IS, so those banks are
+// grids; a script and a voice preset are a name and a date wearing a card, and
+// a wall of identical rectangles is the worst way to find one. Rather than
+// pick a shape per bank, the member picks — and the choice is remembered PER
+// BANK, because it's a different answer for Characters than it is for Scripts.
+export type BankView = 'grid' | 'list'
+
+export function useBankView(bankType: BankType): [BankView, (v: BankView) => void] {
+  return usePersistedState<BankView>(`finder:view:${bankType}`, 'grid')
 }

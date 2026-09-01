@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, type ElementType } from 'react'
-import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, ChevronDown, Sparkles, Check, LayoutGrid, Copy, Bookmark, Star, Palette, Eye, Heart, MessageCircle, Share2 } from 'lucide-react'
+import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, ChevronDown, Sparkles, Check, LayoutGrid, Copy, Bookmark, Star, Palette, Eye, Heart, MessageCircle, Share2, Search } from 'lucide-react'
 import Spinner from '../../components/Spinner'
 import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, SwipeItem } from '../../stores/types'
 import type { BankType } from '../../utils/constants'
@@ -12,7 +12,9 @@ import { downloadImage } from '../../utils/downloadImage'
 import { copyToClipboard } from '../../utils/clipboard'
 import GeneratingBackdrop from '../../components/GeneratingBackdrop'
 import { TileActionStack, TileActionButton, TileStarButton, TileDeleteButton } from '../../components/tileActions'
-import { sortByOrder, type SortOrder } from './bankSort'
+import { sortByOrder, type SortOrder, type BankView } from './bankSort'
+import BankRows from './BankRows'
+import { filterByQuery, type BankItem } from './bankRow'
 // The swipe file is Outliers' data shown in the Bank, and its cards have to
 // read the same in both places — one formatter, not a second copy that drifts.
 import { formatCount } from '../discover/services/scoring'
@@ -79,6 +81,13 @@ interface BankListProps {
   onEdit: (id: string) => void
   onAdd: () => void
   sort: SortOrder
+  // List view's column headers set the sort; the toolbar dropdown sets the same
+  // state, so the two can never disagree about what the list is sorted by.
+  onSortChange: (v: SortOrder) => void
+  // Grid of cards or list of rows — the member's per-bank choice.
+  view: BankView
+  // The toolbar's search box. Filters every bank through `describeRow`.
+  query: string
   // Influencers bank sub-filter (All / Portraits / Influencer Sheets).
   modelFilter?: ModelFilter
   inFlightProductIds?: Set<string>
@@ -676,7 +685,10 @@ function VoiceCard({ item, onEdit, onDelete }: { item: VoicePreset; onEdit: () =
   )
 }
 
-export default function BankList({ bankType, onEdit, onAdd, sort, modelFilter = 'all', inFlightProductIds, onBulkProductFiles }: BankListProps) {
+export default function BankList({ bankType, onEdit, onAdd, sort, onSortChange, view, query, modelFilter = 'all', inFlightProductIds, onBulkProductFiles }: BankListProps) {
+  // A swipe row opens the Outliers detail view, never a form — in list view
+  // that has to be owned here, since the rows themselves are bank-agnostic.
+  const [openSwipeId, setOpenSwipeId] = useState<string | null>(null)
   const products = useBankStore((s) => s.products)
   const models = useBankStore((s) => s.models)
   const scripts = useBankStore((s) => s.scripts)
@@ -692,13 +704,65 @@ export default function BankList({ bankType, onEdit, onAdd, sort, modelFilter = 
   const deleteStyle = useBankStore((s) => s.deleteStyle)
   const deleteSwipe = useBankStore((s) => s.deleteSwipe)
 
+  const DELETERS: Record<BankType, (id: string) => void> = {
+    products: deleteProduct,
+    models: deleteModel,
+    scripts: deleteScript,
+    voices: deleteVoice,
+    brolls: deleteBRoll,
+    styles: deleteStyle,
+    swipes: deleteSwipe,
+  }
+
+  // Sub-filter first (it's a different QUESTION from search: which kind of
+  // character, not which one), then the search box.
+  const source: BankItem[] =
+    bankType === 'products' ? products
+    : bankType === 'models' ? filterModels(models, modelFilter)
+    : bankType === 'scripts' ? scripts
+    : bankType === 'voices' ? voices
+    : bankType === 'brolls' ? brolls
+    : bankType === 'styles' ? styles
+    : swipes
+  const shown = filterByQuery(source, bankType, query)
+
+  // Both new lenses are handled ONCE here rather than seven times below: the
+  // cards differ per bank, the rows and the haystack don't (`bankRow.ts`).
+  // A bank that is genuinely empty still gets its own empty state further down
+  // — "no results" and "nothing here yet" are different sentences.
+  if (query.trim() && shown.length === 0 && source.length > 0) {
+    return <NoResults query={query} />
+  }
+
+  if (view === 'list' && shown.length > 0) {
+    const openSwipe = bankType === 'swipes' ? swipes.find((s) => s.id === openSwipeId) : undefined
+    const rows = (
+      <>
+        <BankRows
+          items={shown}
+          bankType={bankType}
+          sort={sort}
+          onSort={onSortChange}
+          onEdit={bankType === 'swipes' ? setOpenSwipeId : onEdit}
+          onDelete={DELETERS[bankType]}
+        />
+        {openSwipe && <SwipeDetail item={openSwipe} onClose={() => setOpenSwipeId(null)} />}
+      </>
+    )
+    // Products keep their bulk-add dropzone in either view — dropping photos
+    // onto the bank is how most products get added.
+    return bankType === 'products'
+      ? <ProductsBankZone onBulkFiles={onBulkProductFiles}>{rows}</ProductsBankZone>
+      : rows
+  }
+
   if (bankType === 'products') {
     return (
       <ProductsBankZone onBulkFiles={onBulkProductFiles}>
         {products.length === 0 ? (
           <EmptyState icon={Package} label="products" singular="product" onAdd={onAdd} />
         ) : (
-          <ProductsList items={products} onEdit={onEdit} onDelete={deleteProduct} sort={sort} inFlightIds={inFlightProductIds} />
+          <ProductsList items={shown as Product[]} onEdit={onEdit} onDelete={deleteProduct} sort={sort} inFlightIds={inFlightProductIds} />
         )}
       </ProductsBankZone>
     )
@@ -706,11 +770,7 @@ export default function BankList({ bankType, onEdit, onAdd, sort, modelFilter = 
 
   if (bankType === 'models') {
     if (models.length === 0) return <EmptyState icon={UserRound} label="characters" singular="character" onAdd={onAdd} />
-    // Sub-filter: portraits have no sheetImage, sheets do.
-    const filtered =
-      modelFilter === 'portraits' ? models.filter((m) => !m.sheetImage)
-      : modelFilter === 'sheets' ? models.filter((m) => !!m.sheetImage)
-      : models
+    const filtered = shown as Model[]
     if (filtered.length === 0) {
       const label = modelFilter === 'sheets' ? 'character sheets' : 'portraits'
       return (
@@ -727,14 +787,14 @@ export default function BankList({ bankType, onEdit, onAdd, sort, modelFilter = 
 
   if (bankType === 'scripts') {
     if (scripts.length === 0) return <EmptyState icon={FileText} label="scripts" singular="script" onAdd={onAdd} />
-    return <ScriptsList items={scripts} onEdit={onEdit} onDelete={deleteScript} sort={sort} />
+    return <ScriptsList items={shown as Script[]} onEdit={onEdit} onDelete={deleteScript} sort={sort} />
   }
 
   if (bankType === 'voices') {
     if (voices.length === 0) return <EmptyState icon={Mic} label="voice presets" singular="voice preset" onAdd={onAdd} />
     return (
       <div className="flex flex-col gap-2">
-        {voices.map((v) => (
+        {sortByOrder(shown as VoicePreset[], sort, (v) => v.label).map((v) => (
           <VoiceCard key={v.id} item={v} onEdit={() => onEdit(v.id)} onDelete={() => deleteVoice(v.id)} />
         ))}
       </div>
@@ -743,7 +803,7 @@ export default function BankList({ bankType, onEdit, onAdd, sort, modelFilter = 
 
   if (bankType === 'styles') {
     if (styles.length === 0) return <EmptyState icon={Palette} label="visual styles" singular="visual style" onAdd={onAdd} />
-    return <StylesList items={styles} onEdit={onEdit} onDelete={deleteStyle} sort={sort} />
+    return <StylesList items={shown as StylePreset[]} onEdit={onEdit} onDelete={deleteStyle} sort={sort} />
   }
 
   if (bankType === 'swipes') {
@@ -760,12 +820,34 @@ export default function BankList({ bankType, onEdit, onAdd, sort, modelFilter = 
         </div>
       )
     }
-    return <SwipesList items={swipes} onDelete={deleteSwipe} sort={sort} />
+    return <SwipesList items={shown as SwipeItem[]} onDelete={deleteSwipe} sort={sort} />
   }
 
   // brolls
   if (brolls.length === 0) return <EmptyState icon={Film} label="b-rolls" singular="b-roll" onAdd={onAdd} />
-  return <BRollsList items={brolls} onEdit={onEdit} onDelete={deleteBRoll} sort={sort} />
+  return <BRollsList items={shown as BRoll[]} onEdit={onEdit} onDelete={deleteBRoll} sort={sort} />
+}
+
+// Sub-filter: portraits have no sheetImage, sheets do.
+function filterModels(models: Model[], filter: ModelFilter): Model[] {
+  if (filter === 'portraits') return models.filter((m) => !m.sheetImage)
+  if (filter === 'sheets') return models.filter((m) => !!m.sheetImage)
+  return models
+}
+
+// A search that found nothing. Deliberately not the bank's empty state: an
+// "Add your first product" button under a query that simply didn't match reads
+// as though the bank were empty, when the member can see the count on the tab.
+function NoResults({ query }: { query: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 py-20 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-ink/[0.04]">
+        <Search className="h-7 w-7 text-ink-700" strokeWidth={1.5} />
+      </div>
+      <p className="text-sm font-medium text-ink-500">No matches for "{query}"</p>
+      <p className="text-xs text-ink-700">Try fewer words, or clear the search.</p>
+    </div>
+  )
 }
 
 // Wraps the entire products view (empty-state OR grid) with a multi-file dropzone
