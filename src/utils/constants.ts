@@ -33,7 +33,7 @@ export const AI_UGC_ACADEMY_URL = 'https://www.skool.com/ugcos/classroom/bd64d8b
 
 // 'system' is the Dashboard's own leading dock group (its divider separates it
 // from Bank); admin never renders in the dock.
-export type AppCategory = 'library' | 'create' | 'tools' | 'admin' | 'system'
+export type AppCategory = 'library' | 'create' | 'deliver' | 'tools' | 'admin' | 'system'
 
 export interface AppConfig {
   id: string
@@ -58,7 +58,12 @@ export const APP_REGISTRY: AppConfig[] = [
   { id: 'voice-studio', name: 'Voiceovers', icon: Mic, accent: '#007AFF', category: 'create' },
   { id: 'broll-studio', name: 'B-Roll', icon: Film, accent: '#7165FF', category: 'create' },
   { id: 'playground', name: 'Playground', icon: ImagePlay, accent: '#015C52', category: 'create' },
-  { id: 'edit-studio', name: 'Edit', icon: Scissors, accent: '#F77646', category: 'create' },
+  // Edit is fenced off in a group of its own, so a divider falls to the right
+  // of Playground: it is where the production line ENDS, and the one app that
+  // generates nothing in the browser — it hands out a Claude skill the member
+  // runs locally. Its position in the row is unchanged; the hairline is the
+  // only thing the group adds.
+  { id: 'edit-studio', name: 'Edit', icon: Scissors, accent: '#F77646', category: 'deliver' },
   // Tools sit in their own fenced group between Bank and the Create row — a
   // divider on each side — because research is what happens before the
   // production line, not after it. Outliers leads the group because the loop
@@ -74,6 +79,7 @@ export const APP_REGISTRY: AppConfig[] = [
 export const CATEGORY_LABELS: Record<AppCategory, string> = {
   library: 'Library',
   create: 'Create',
+  deliver: 'Deliver',
   tools: 'Tools',
   admin: 'Admin',
   system: 'System',
@@ -90,6 +96,19 @@ export const BANK_CONFIG: Record<BankType, { label: string; icon: ElementType; a
   styles: { label: 'Visual Styles', icon: Palette, accent: '#0D9488' },
   // The swipe file behind Outliers — same gold accent as the app that fills it.
   swipes: { label: 'Swipe File', icon: Bookmark, accent: '#D9A404' },
+}
+
+// The dock's group order, and therefore the order the work runs in: Dashboard,
+// then Bank, then the research tools, then the Create line. It lives here rather
+// than in the dock because a second surface now reads it — Meet Your Team lays
+// the crew out as ONE chain, and the intro promising an order the dock doesn't
+// keep is exactly the drift this prevents. `admin` is absent on purpose: it
+// never renders in the dock.
+export const SECTION_ORDER: AppCategory[] = ['system', 'library', 'tools', 'create', 'deliver']
+
+/** Every dock app, flattened into the exact left-to-right order the dock lays out. */
+export function dockOrderedApps(): AppConfig[] {
+  return SECTION_ORDER.flatMap((category) => APP_REGISTRY.filter((a) => a.category === category))
 }
 
 export function getAppConfig(appId: string): AppConfig | undefined {

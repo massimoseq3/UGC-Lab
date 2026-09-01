@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react'
 import { useAppStore } from '../../stores/appStore'
 import { getAppConfig } from '../../utils/constants'
 import { TEAM } from '../../utils/team'
+import { useIsAppVisible } from '../../stores/appVisibilityStore'
 import CrabSprite from '../../components/CrabSprite'
 import { DISPLAY_FONT } from './widgetStyles'
 
@@ -37,7 +38,10 @@ const CENTRE = SIZE / 2
 // delay is what sets each planet's starting angle: it drops the animation into
 // a period already in progress, so they don't launch from a single line.
 // There must be one entry here per TEAM member — the two are zipped by index,
-// so a crew member with no orbit simply never renders.
+// so a crew member with no orbit simply never renders. A member who has switched
+// an optional app off (Outliers) drops out of the crew, and the list is sliced
+// to what is left: the rings and the planets come off the SAME array, so the
+// outermost ring can never be left orbiting nothing.
 const ORBITS = [
   { radius: 55, period: 300, offset: -16 },   //  20°
   { radius: 70, period: 366, offset: -160 },  // 155°
@@ -52,8 +56,11 @@ const ORBITS = [
 
 export default function SolarSystem({ className = '' }: { className?: string }) {
   const openApp = useAppStore((s) => s.openApp)
+  const isVisible = useIsAppVisible()
   const [hovered, setHovered] = useState<number | null>(null)
-  const active = hovered === null ? null : TEAM[hovered]
+  const crew = TEAM.filter((m) => isVisible(m.appId))
+  const orbits = ORBITS.slice(0, crew.length)
+  const active = hovered === null ? null : crew[hovered]
   const activeApp = active ? getAppConfig(active.appId) : null
 
   return (
@@ -64,7 +71,7 @@ export default function SolarSystem({ className = '' }: { className?: string }) 
         onMouseLeave={() => setHovered(null)}
       >
         {/* Orbit paths */}
-        {ORBITS.map((orbit) => (
+        {orbits.map((orbit) => (
           <span
             key={orbit.radius}
             aria-hidden
@@ -83,9 +90,9 @@ export default function SolarSystem({ className = '' }: { className?: string }) 
             a sunspot. The corona and the colour carry it. */}
         <span className="absolute left-1/2 top-1/2 h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle_at_38%_32%,#FFF3D2,#F7C65A_38%,#F2B231_62%,#D18E1E)] shadow-[0_0_38px_-2px_rgba(242,178,49,0.7)]" />
 
-        {TEAM.map((member, i) => {
+        {crew.map((member, i) => {
           const app = getAppConfig(member.appId)
-          const orbit = ORBITS[i]
+          const orbit = orbits[i]
           if (!app || !orbit) return null
           const Icon = app.icon
           const spin: CSSProperties = {

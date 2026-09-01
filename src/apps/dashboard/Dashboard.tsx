@@ -78,6 +78,14 @@ export default function Dashboard() {
 
   const hasActivity = metrics.totalGenerations > 0
 
+  // Whether each figure tile has floor art under its number. Both charts render
+  // NOTHING before there is data (Sparkline bails on a flat zero peak, SpendBar
+  // on nothing spent elsewhere), which used to leave the figure hanging off the
+  // label with the whole bottom half of the tile empty under it. Mirrors each
+  // chart's own bail condition, so the tile and its floor can't disagree.
+  const hasSpark = spark.some((minutes) => minutes > 0)
+  const hasSpend = metrics.officialUsd > 0
+
   // One line under the ring, carrying the record the arc is measured against —
   // and saying so outright on the day you match it, which is the whole point of
   // drawing the streak as a closing ring.
@@ -194,8 +202,16 @@ export default function Dashboard() {
                     floor art (a bar plus two captions) is taller than a
                     sparkline and pushes its block further up. The text stacks
                     from the label down in both, so hero / caption / delta line
-                    up across the pair, and only the CHART takes `mt-auto`. */}
-                <div className="w-full pt-4">
+                    up across the pair, and only the CHART takes `mt-auto`.
+
+                    With no floor art yet it CENTRES instead (Massimo's call,
+                    September 2026): a "0 min" pinned under the label left the
+                    bottom half of the tile visibly empty, which reads as a
+                    widget missing a piece rather than one waiting for its first
+                    generation. The pair still line up with each other, because
+                    neither has a chart to be pushed up by — which is exactly
+                    the condition the rule above is about. */}
+                <div className={`w-full ${hasSpark ? 'pt-4' : 'flex flex-1 flex-col justify-center'}`}>
                   <WidgetFigure value={formatTimeSaved(metrics.minutesSaved)} />
                   {/* The workdays line is the figure in a second unit and
                       nothing else — "≈ 7.6 workdays of production and
@@ -221,7 +237,8 @@ export default function Dashboard() {
               {/* Money saved */}
               <Widget index={slot(2)} className="col-span-6 items-center text-center lg:col-span-4">
                 <WidgetLabel icon={PiggyBank} label="Money saved" />
-                <div className="w-full pt-4">
+                {/* Centres with no bar under it — see Time saved above. */}
+                <div className={`w-full ${hasSpend ? 'pt-4' : 'flex flex-1 flex-col justify-center'}`}>
                   <WidgetFigure value={formatUsd(metrics.usdSaved)} />
                   <p className="mt-1.5 text-[12px] leading-snug text-ink-500">
                     vs official APIs
@@ -285,17 +302,23 @@ export default function Dashboard() {
                 style={riseStyle(slot(4))}
                 className={`widget-rise group relative col-span-6 flex flex-col items-center justify-center gap-3 p-4 text-center lg:col-span-4 ${WIDGET_SHELL} ${WIDGET_INTERACTIVE}`}
               >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-dashboard-500/15">
-                  <GraduationCap className="h-6 w-6 text-dashboard-400" strokeWidth={1.75} />
+                {/* Disc and title step up from `sm` (Massimo's call, September
+                    2026): this tile carries two short words where the other
+                    five carry a figure, so at the five's supporting sizes it
+                    read as the quietest thing on a wall of equal squares. The
+                    phone keeps the smaller pair — the tile is half a screen
+                    wide there and "AI UGC Academy" is one line by a hair. */}
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] bg-dashboard-500/15 sm:h-[52px] sm:w-[52px] sm:rounded-[17px]">
+                  <GraduationCap className="h-6 w-6 text-dashboard-400 sm:h-7 sm:w-7" strokeWidth={1.75} />
                 </span>
                 <span>
                   <span
-                    className="block text-[15px] italic font-normal leading-tight tracking-tight text-ink-50"
+                    className="block text-[15px] italic font-normal leading-tight tracking-tight text-ink-50 sm:text-[18px]"
                     style={DISPLAY_FONT}
                   >
                     AI UGC Academy
                   </span>
-                  <span className="mt-0.5 block text-[11px] leading-snug text-ink-500">Trainings</span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-ink-500 sm:text-[12px]">Trainings</span>
                 </span>
                 {/* Out of flow — in it, the arrow costs the title 28px it
                     doesn't have. Gone entirely below `sm`, where the tile is

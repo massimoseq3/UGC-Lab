@@ -6,6 +6,7 @@ import { useAppStore } from '../stores/appStore'
 import { useSettingsStore } from '../stores/settingsStore'
 import { useThemeStore, type ThemePref } from '../stores/themeStore'
 import { useGenerationInfoStore } from '../stores/generationInfoStore'
+import { useAppVisible, useAppVisibilityStore } from '../stores/appVisibilityStore'
 import SegmentedToggle from './SegmentedToggle'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
@@ -41,7 +42,7 @@ type StorageState =
 // One pane per concern, listed in the left rail. 'api' is the landing pane —
 // it's the setting the app can't run without, and the Dashboard's connect-key
 // card opens Settings expecting it.
-type SectionId = 'api' | 'account' | 'appearance' | 'storage' | 'advanced' | 'about'
+type SectionId = 'api' | 'account' | 'appearance' | 'experimental' | 'storage' | 'advanced' | 'about'
 
 const DEFAULT_SECTION: SectionId = 'api'
 
@@ -111,6 +112,11 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   // model named on every tile.
   const showGenerationInfo = useGenerationInfoStore((s) => s.show)
   const setShowGenerationInfo = useGenerationInfoStore((s) => s.setShow)
+
+  // Outliers — the one app a member can switch off, and it ships off. See
+  // stores/appVisibilityStore for what the switch actually moves.
+  const outliersOn = useAppVisible('discover')
+  const setAppVisible = useAppVisibilityStore((s) => s.setAppVisible)
 
   useEffect(() => {
     if (open) {
@@ -284,6 +290,10 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
     { id: 'api', label: 'API keys', icon: Key, alert: !hasKey },
     ...(cloudOn && profile ? [{ id: 'account' as const, label: 'Account', icon: User }] : []),
     { id: 'appearance', label: 'Appearance', icon: Palette },
+    // The opt-in apps. Its own pane rather than a card under Appearance: what
+    // renders in the dock is not a matter of how the workspace looks, and this
+    // is the list that grows every time something ships behind a switch.
+    { id: 'experimental', label: 'Experimental', icon: FlaskConical },
     ...(cloudOn ? [{ id: 'storage' as const, label: 'Storage', icon: HardDrive }] : []),
     ...(showAdvanced ? [{ id: 'advanced' as const, label: profile?.is_admin ? 'Admin' : 'Advanced', icon: Shield }] : []),
     { id: 'about', label: 'About', icon: FileText },
@@ -437,99 +447,105 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                   )}
                 </Card>
 
-                <Card>
-                  <div className="flex items-center justify-between">
-                    <label className="text-[12px] font-medium text-ink-300">
-                      ScrapeCreators key
-                      <span className="ml-1.5 text-[11px] font-normal text-ink-600">(for Outliers)</span>
-                    </label>
-                    <a
-                      href="https://scrapecreators.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-[11px] text-ink-500 transition-colors hover:text-ink-300"
-                    >
-                      Get key
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                  <div className="relative mt-2">
-                    <input
-                      type={showSc ? 'text' : 'password'}
-                      value={scDraft}
-                      onChange={(e) => {
-                        setScDraft(e.target.value)
-                        setScTestResult(null)
-                      }}
-                      placeholder="Paste your ScrapeCreators key"
-                      className="w-full rounded-full border border-ink/10 bg-ink/5 px-4 py-2.5 pr-10 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSc(!showSc)}
-                      aria-label={showSc ? 'Hide ScrapeCreators key' : 'Show ScrapeCreators key'}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-500 transition-colors hover:text-ink-300"
-                    >
-                      {showSc ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
+                {/* The ScrapeCreators key powers Outliers and nothing else,
+                    so it goes with the app: a member who has switched Outliers
+                    off is not asked for a key they have no use for. The saved
+                    value is kept, and comes back with the app. */}
+                {outliersOn && (
+                  <Card>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[12px] font-medium text-ink-300">
+                        ScrapeCreators key
+                        <span className="ml-1.5 text-[11px] font-normal text-ink-600">(for Outliers)</span>
+                      </label>
+                      <a
+                        href="https://scrapecreators.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-[11px] text-ink-500 transition-colors hover:text-ink-300"
+                      >
+                        Get key
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                    <div className="relative mt-2">
+                      <input
+                        type={showSc ? 'text' : 'password'}
+                        value={scDraft}
+                        onChange={(e) => {
+                          setScDraft(e.target.value)
+                          setScTestResult(null)
+                        }}
+                        placeholder="Paste your ScrapeCreators key"
+                        className="w-full rounded-full border border-ink/10 bg-ink/5 px-4 py-2.5 pr-10 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowSc(!showSc)}
+                        aria-label={showSc ? 'Hide ScrapeCreators key' : 'Show ScrapeCreators key'}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-500 transition-colors hover:text-ink-300"
+                      >
+                        {showSc ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
 
-                  <div className="mt-2.5 flex items-center gap-2 text-[11px] text-ink-500">
-                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${storedScKey ? 'bg-emerald-500' : 'bg-ink/20'}`} />
-                    {storedScKey ? 'Key saved.' : 'No key saved yet.'}
-                  </div>
+                    <div className="mt-2.5 flex items-center gap-2 text-[11px] text-ink-500">
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${storedScKey ? 'bg-emerald-500' : 'bg-ink/20'}`} />
+                      {storedScKey ? 'Key saved.' : 'No key saved yet.'}
+                    </div>
 
-                  {(() => {
-                    const trimmedDraft = scDraft.trim()
-                    const hasPendingChange = trimmedDraft !== storedScKey
-                    const disabled = scSaving || scSaved || !hasPendingChange
-                    const primary = hasPendingChange && !scSaving && !scSaved
-                    return (
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={handleTestSc}
-                          disabled={!trimmedDraft || scTesting}
-                          className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-ink/[0.03]"
-                        >
-                          {scTesting ? <Spinner className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5 text-ink-400" />}
-                          {scTesting ? 'Testing…' : 'Test connection'}
-                        </button>
-                        <button
-                          onClick={handleSaveSc}
-                          disabled={disabled}
-                          className={`flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-[13px] font-medium transition-colors ${
-                            scSaved
-                              ? 'bg-emerald-500/15 text-emerald-300 light:text-emerald-700'
-                              : primary
-                                ? 'bg-ink text-ink-900 hover:bg-ink-200'
-                                : 'bg-ink/10 text-ink-400 disabled:cursor-not-allowed disabled:opacity-60'
-                          }`}
-                        >
-                          {scSaving ? (
-                            <>
-                              <Spinner className="h-4 w-4" />
-                              <span>Saving…</span>
-                            </>
-                          ) : scSaved ? (
-                            <>
-                              <Check className="h-4 w-4" />
-                              <span>Saved</span>
-                            </>
-                          ) : (
-                            'Save'
-                          )}
-                        </button>
-                      </div>
-                    )
-                  })()}
+                    {(() => {
+                      const trimmedDraft = scDraft.trim()
+                      const hasPendingChange = trimmedDraft !== storedScKey
+                      const disabled = scSaving || scSaved || !hasPendingChange
+                      const primary = hasPendingChange && !scSaving && !scSaved
+                      return (
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={handleTestSc}
+                            disabled={!trimmedDraft || scTesting}
+                            className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-4 py-2.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-ink/[0.03]"
+                          >
+                            {scTesting ? <Spinner className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5 text-ink-400" />}
+                            {scTesting ? 'Testing…' : 'Test connection'}
+                          </button>
+                          <button
+                            onClick={handleSaveSc}
+                            disabled={disabled}
+                            className={`flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-[13px] font-medium transition-colors ${
+                              scSaved
+                                ? 'bg-emerald-500/15 text-emerald-300 light:text-emerald-700'
+                                : primary
+                                  ? 'bg-ink text-ink-900 hover:bg-ink-200'
+                                  : 'bg-ink/10 text-ink-400 disabled:cursor-not-allowed disabled:opacity-60'
+                            }`}
+                          >
+                            {scSaving ? (
+                              <>
+                                <Spinner className="h-4 w-4" />
+                                <span>Saving…</span>
+                              </>
+                            ) : scSaved ? (
+                              <>
+                                <Check className="h-4 w-4" />
+                                <span>Saved</span>
+                              </>
+                            ) : (
+                              'Save'
+                            )}
+                          </button>
+                        </div>
+                      )
+                    })()}
 
-                  {scTestResult && (
-                    <Banner tone={scTestResult.ok ? 'ok' : 'error'} className="mt-3">
-                      {scTestResult.message}
-                    </Banner>
-                  )}
-                </Card>
+                    {scTestResult && (
+                      <Banner tone={scTestResult.ok ? 'ok' : 'error'} className="mt-3">
+                        {scTestResult.message}
+                      </Banner>
+                    )}
+                  </Card>
+                )}
 
                 <p className="text-[11px] leading-relaxed text-ink-500">
                   Stored only in this browser. Do not share with anyone.
@@ -540,6 +556,21 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
             {active.id === 'appearance' && (
               <Section>
                 <ThemeToggle />
+              </Section>
+            )}
+
+            {active.id === 'experimental' && (
+              <Section>
+                {/* One switch per opt-in app. Off by default — see
+                    stores/appVisibilityStore for what each one moves. */}
+                <Card>
+                  <ToggleRow
+                    label="Outliers"
+                    hint="Ad research — the Outlier Vault, plus TikTok and Meta Ad Library search. Off hides the Bank's Swipe File tab too. Nothing is deleted."
+                    checked={outliersOn}
+                    onChange={(next) => setAppVisible('discover', next)}
+                  />
+                </Card>
               </Section>
             )}
 
@@ -845,32 +876,12 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                     to record a clean screen never touches anyone else. */}
                 {showDemoTool && (
                   <Card>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="min-w-0">
-                        <span className="block text-[12px] font-medium text-ink-300">Generation info</span>
-                        <span className="mt-1 block text-[11px] leading-relaxed text-ink-500">
-                          Name the model on generated media — Playground's list rows and
-                          preview, and B-Roll's cards. On for everyone; this switch is
-                          yours alone and only affects this browser.
-                        </span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setShowGenerationInfo(!showGenerationInfo)}
-                        role="switch"
-                        aria-checked={showGenerationInfo}
-                        aria-label="Show generation info"
-                        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                          showGenerationInfo ? 'bg-emerald-500' : 'bg-ink/20'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            showGenerationInfo ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    </div>
+                    <ToggleRow
+                      label="Generation info"
+                      hint="Name the model on generated media — Playground's list rows and preview, and B-Roll's cards. On for everyone; this switch is yours alone and only affects this browser."
+                      checked={showGenerationInfo}
+                      onChange={setShowGenerationInfo}
+                    />
                   </Card>
                 )}
 
@@ -943,6 +954,45 @@ const LEGAL_LINKS = [
 // A pane — stacked cards, evenly spaced.
 function Section({ children }: { children: ReactNode }) {
   return <div className="space-y-3">{children}</div>
+}
+
+// A labelled switch inside a Card — the one toggle shape in this modal. The
+// label doubles as the accessible name, so a new row can't ship without one.
+function ToggleRow({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string
+  hint: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <span className="min-w-0">
+        <span className="block text-[12px] font-medium text-ink-300">{label}</span>
+        <span className="mt-1 block text-[11px] leading-relaxed text-ink-500">{hint}</span>
+      </span>
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+          checked ? 'bg-emerald-500' : 'bg-ink/20'
+        }`}
+      >
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            checked ? 'translate-x-6' : 'translate-x-1'
+          }`}
+        />
+      </button>
+    </div>
+  )
 }
 
 function Card({ children }: { children: ReactNode }) {

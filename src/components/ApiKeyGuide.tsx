@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { ArrowUpRight, Check, Eye, EyeOff, X } from 'lucide-react'
+import { ArrowUpRight, Check, Eye, EyeOff, X, Zap } from 'lucide-react'
 import Spinner from './Spinner'
+import { GlassTile } from './AppGlassTile'
 import { useBackdropClose } from '../hooks/useBackdropClose'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
-import CrabSprite from './CrabSprite'
 import { useKeyConnect } from './useKeyConnect'
 
 // Getting started, shown from the menu bar's no-key alert and the Dashboard's
@@ -52,9 +52,12 @@ export default function ApiKeyGuide({ onClose, onOpenSettings }: { onClose: () =
         </button>
 
         <div className="relative p-5 lg:p-6">
-          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-400/10">
-            <CrabSprite variant="kie" className="h-8 w-[2.7rem]" />
-          </span>
+          {/* The fuel wears the SAME face as the apps it powers (September 2026,
+              Massimo's call): the glass squircle every dock tile is cut from,
+              in kie.ai's gold. A flat tinted disc beside a row of glass icons
+              read as a different kind of object — and this one belongs to the
+              set, since nothing in that row generates anything without it. */}
+          <GlassTile icon={Zap} accent="#F2B231" size={44} />
           <h2 className="mt-3 text-lg font-semibold tracking-tight text-ink-100">
             {connected ? 'You’re connected' : 'Connect your kie.ai API key'}
           </h2>
