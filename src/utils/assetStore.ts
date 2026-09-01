@@ -2,6 +2,7 @@ import { downloadAssetFromR2, deleteAssetFromR2, uploadAssetToR2 } from '../lib/
 import { isCloudEnabled } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { useAppStore } from '../stores/appStore'
+import { deleteThumbs, resetThumbStore } from './thumbStore'
 
 const DB_NAME = 'ai-ugc-lab-assets'
 const DB_VERSION = 1
@@ -311,6 +312,8 @@ export async function resetAssetStore(): Promise<void> {
   }
   urlCache.clear()
   fallbackStore = null
+  // The tile-sized copies are pictures too (utils/thumbStore.ts).
+  await resetThumbStore()
 
   // Drop the open connection so deleteDatabase doesn't have to wait on it.
   if (dbPromise) {
@@ -344,6 +347,8 @@ export async function deleteAsset(refOrId: string): Promise<void> {
   }
 
   await idbDelete(assetId)
+  // …and every tile-sized copy made from it (utils/thumbStore.ts).
+  await deleteThumbs(assetId)
 
   if (cloudActive()) {
     try {
