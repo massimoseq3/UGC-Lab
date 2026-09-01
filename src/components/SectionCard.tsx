@@ -1,4 +1,5 @@
-import type { ElementType, ReactNode } from 'react'
+import type { ElementType, ReactNode, RefObject } from 'react'
+import { ChevronRight } from 'lucide-react'
 
 // The grouped section card, lifted out of the Influencers controls column —
 // the one place in the app where a long input column reads as designed rather
@@ -15,6 +16,7 @@ import type { ElementType, ReactNode } from 'react'
 export default function SectionCard({
   icon: Icon,
   title,
+  titleNode,
   left,
   right,
   children,
@@ -23,6 +25,11 @@ export default function SectionCard({
 }: {
   icon?: ElementType
   title: string
+  // Replaces the centred icon + title with something that is itself a control —
+  // a `SectionPresetPill`, where the heading IS the way into that section's
+  // presets. `title` is still required and becomes the accessible name, so a
+  // card can't end up with no name at all.
+  titleNode?: ReactNode
   // Small pills pinned to the header's edges. Absolutely positioned so the
   // title stays optically centred whatever they weigh.
   left?: ReactNode
@@ -41,14 +48,81 @@ export default function SectionCard({
       <div className="mb-2.5 grid min-h-[22px] grid-cols-[1fr_auto_1fr] items-center gap-1.5">
         <div className="flex min-w-0 justify-start">{left}</div>
         <div className="flex min-w-0 items-center justify-center gap-1.5">
-          {Icon && <Icon className="h-3.5 w-3.5 shrink-0 text-ink-100" strokeWidth={1.75} />}
-          <h4 className="truncate text-[13px] font-semibold tracking-tight text-ink-100">{title}</h4>
+          {titleNode ?? (
+            <>
+              {Icon && <Icon className="h-3.5 w-3.5 shrink-0 text-ink-100" strokeWidth={1.75} />}
+              <h4 className="truncate text-[13px] font-semibold tracking-tight text-ink-100">{title}</h4>
+            </>
+          )}
         </div>
         <div className="flex min-w-0 justify-end">{right}</div>
       </div>
       <div className="mb-2.5 border-t border-ink/10" />
       <div className={contentClassName}>{children}</div>
     </div>
+  )
+}
+
+// Preset pill — a section heading that IS the way into that section's presets.
+// Lifted out of Influencers' controls column (September 2026) when Playground's
+// Voice card wanted the same shape; one shape, two tones, because the two live
+// at different altitudes in the same column. The TAB divider's pill is the loud
+// one (glassy influencers tint, matching the Portrait/Sheet toggle so the two
+// read as one accent family), and every SECTION title inside that tab wears the
+// same dashed pill in plain ink. Eight accent pills down one column would make
+// the divider that separates two tabs no louder than the headings under it — a
+// section title is still a title first, so the neutral tone keeps the heading's
+// own type (`text-sm font-semibold`) and only borrows the chrome that says
+// "this is a button": the dashed ring and the chevron.
+const PILL_TONES = {
+  accent: 'border-influencers-500/30 bg-influencers-500/10 text-influencers-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-influencers-500/15',
+  neutral: 'border-ink/15 bg-ink/[0.03] text-ink-100 hover:border-ink/25 hover:bg-ink/[0.06]',
+} as const
+
+// Type, kept out of the tone so a caller can match the heading altitude it sits
+// at without also changing its colour. `sm` is `SectionCard`'s own 13px title —
+// for a pill standing in for that heading in a column of ordinary cards, where
+// 14px next to a 13px "References" one card up reads as two title sizes.
+const PILL_SIZES = {
+  accent: 'text-[12px] font-medium',
+  md: 'text-sm font-semibold tracking-tight',
+  sm: 'text-[13px] font-semibold tracking-tight',
+} as const
+
+export function SectionPresetPill({
+  label,
+  title,
+  icon: Icon,
+  onClick,
+  tone = 'accent',
+  size,
+  buttonRef,
+}: {
+  label: string
+  title: string
+  icon?: ElementType
+  onClick: () => void
+  tone?: keyof typeof PILL_TONES
+  // Defaults to the tone's own historic type — 12px on the accent pill, 14px on
+  // the neutral one — so nothing moves unless a caller asks it to.
+  size?: keyof typeof PILL_SIZES
+  // For a caller that anchors a popover to the pill rather than opening a modal.
+  buttonRef?: RefObject<HTMLButtonElement | null>
+}) {
+  return (
+    <button
+      ref={buttonRef}
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`flex items-center gap-1.5 rounded-full border border-dashed px-3 py-1 transition-colors ${PILL_TONES[tone]} ${
+        PILL_SIZES[size ?? (tone === 'accent' ? 'accent' : 'md')]
+      }`}
+    >
+      {Icon && <Icon className="h-3.5 w-3.5 shrink-0" />}
+      {label}
+      <ChevronRight className={`h-3.5 w-3.5 shrink-0 ${tone === 'neutral' ? 'text-ink-400' : ''}`} strokeWidth={2} />
+    </button>
   )
 }
 

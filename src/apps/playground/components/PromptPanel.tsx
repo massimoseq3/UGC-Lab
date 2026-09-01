@@ -57,6 +57,7 @@ import SlideOver from '../../../components/SlideOver'
 import ExpandTextModal, { BracketHighlightArea } from '../../../components/ExpandableText'
 import SectionCard from '../../../components/SectionCard'
 import PromptToolbar from '../../../components/PromptToolbar'
+import VoiceCard from './VoiceCard'
 import MentionPopover from './MentionPopover'
 import type { PlaygroundMode, BankReference } from '../types'
 import { VIDEO_PRESETS, IMAGE_PRESETS, type Preset } from '../presets'
@@ -124,6 +125,21 @@ export interface PromptPanelState {
   // Kling Motion Control: how the output character is oriented. Defaults to
   // 'video' (follow the driving clip). Unused by other models.
   characterOrientation?: 'image' | 'video'
+  // Video only: the voice profile appended to the prompt at generate time (see
+  // `composePrompt.ts`). Its own field rather than part of `prompt`
+  // because it is the one thing in a UGC video prompt that must NOT change
+  // between generations — so it has to survive Clear, Enhance, Undo and a whole
+  // new idea, none of which the prompt box does. Absent on drafts saved before
+  // it shipped; every read goes through `?? ''`.
+  voiceProfile?: string
+  // Whether the Voice box is folded open. Persisted with the draft because the
+  // whole point of the field is setting it once and leaving it — a fold that
+  // reset on reload would put a 90px box back under the prompt every session.
+  // Absent on older drafts, which start FOLDED: the header row is the whole of
+  // the card at rest — a dashed "Voice Profile" pill you can't miss — and an
+  // open box costs 78px of the one column that has none to spare, above a
+  // prompt field that had its own floor cut to 150px to stay on screen.
+  voiceOpen?: boolean
 }
 
 interface PromptPanelProps {
@@ -1035,6 +1051,22 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   )}
                 </div>
               </div>
+
+              {/* Voice — directly under the prompt box, appended to the end of
+                  it at generate time. It's a field of its own because the
+                  profile is the one part of a UGC video prompt that must stay
+                  identical across every clip of an ad: in the prompt box it had
+                  to be re-pasted two lines under every rewrite, and it went with
+                  Clear. Video only (and not Motion Control, which has no audio)
+                  — a voice says nothing about a still or a music track. */}
+              {state.mode === 'video' && !isMotionControl && (
+                <VoiceCard
+                  value={state.voiceProfile ?? ''}
+                  open={state.voiceOpen ?? false}
+                  onChange={(voiceProfile) => onChange({ ...state, voiceProfile })}
+                  onToggleOpen={() => onChange({ ...state, voiceOpen: !(state.voiceOpen ?? false) })}
+                />
+              )}
 
             </div>
           </div>

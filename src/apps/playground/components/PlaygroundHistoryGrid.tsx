@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useState, useEffect } from 'react'
-import {
+import { ArrowLeft,
   Download, Bookmark, Check, Film, Image as ImageIcon, Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy, LayoutGrid, List, Maximize2,
 } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
@@ -47,6 +47,10 @@ interface PlaygroundHistoryGridProps {
   // Carry a finished still over to the Video tab as its start frame, with the
   // prompt that made it. Omitted → the Animate action is hidden.
   onAnimateImage?: (item: ImageHistoryItem) => void
+  // Put this generation's prompt back in the prompt box, replacing what's
+  // there. Threaded to every card shape rather than lifted onto one, because
+  // the grid, the list and the preview modal are three different action rows.
+  onReusePrompt?: (prompt: string) => void
 }
 
 // Memoized: this grid renders every generation the member has ever made (the
@@ -56,7 +60,7 @@ interface PlaygroundHistoryGridProps {
 // all stable while typing, so the subtree is skipped entirely.
 //
 // Keep them stable: `onAnimateImage` is wrapped in useCallback by the parent.
-export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAnimateImage }: PlaygroundHistoryGridProps) {
+export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAnimateImage, onReusePrompt }: PlaygroundHistoryGridProps) {
   const imageHistory = useBankStore((s) => s.imageHistory)
   const videoHistory = useBankStore((s) => s.videoHistory)
   const musicHistory = useBankStore((s) => s.musicHistory)
@@ -227,6 +231,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                         onSave={() => handleSaveImage(entry.data)}
                         onDelete={() => deleteImageHistory(entry.data.id)}
                         onCopyPrompt={() => handleCopyPrompt(entry.data.prompt)}
+                        onReuse={onReusePrompt && entry.data.prompt ? () => onReusePrompt(entry.data.prompt) : undefined}
                         onAnimate={onAnimateImage ? () => onAnimateImage(entry.data) : undefined}
                       />
                     )}
@@ -237,6 +242,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                         onClick={() => setPreviewItem(entry)}
                         onDelete={() => deleteVideoHistory(entry.data.id)}
                         onCopyPrompt={() => handleCopyPrompt(entry.data.prompt)}
+                        onReuse={onReusePrompt && entry.data.prompt ? () => onReusePrompt(entry.data.prompt) : undefined}
                       />
                     )}
                     {entry.kind === 'music' && (
@@ -248,6 +254,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                         }}
                         onDelete={() => deleteMusicHistory(entry.data.id)}
                         onCopyPrompt={() => handleCopyPrompt(entry.data.prompt)}
+                        onReuse={onReusePrompt && entry.data.prompt ? () => onReusePrompt(entry.data.prompt) : undefined}
                       />
                     )}
                   </div>
@@ -265,6 +272,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                     scrollRoot={scrollRef}
                     onClickImage={entry.kind === 'image' ? () => setPreviewItem(entry) : undefined}
                     onCopyPrompt={() => handleCopyPrompt(entry.data.prompt)}
+                    onReuse={onReusePrompt && entry.data.prompt ? () => onReusePrompt(entry.data.prompt) : undefined}
                     onSave={entry.kind === 'image' ? () => handleSaveImage(entry.data) : undefined}
                     onAnimate={entry.kind === 'image' && onAnimateImage ? () => onAnimateImage(entry.data) : undefined}
                     onDownload={async () => {
@@ -305,6 +313,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
               ? () => onAnimateImage(previewItem.data)
               : undefined
           }
+          onReuse={onReusePrompt && previewItem.data.prompt ? () => onReusePrompt(previewItem.data.prompt) : undefined}
         />
       )}
     </div>
@@ -345,6 +354,7 @@ function HistoryListRow({
   scrollRoot,
   onClickImage,
   onCopyPrompt,
+  onReuse,
   onSave,
   onDownload,
   onDelete,
@@ -356,6 +366,7 @@ function HistoryListRow({
   scrollRoot: React.RefObject<HTMLElement | null>
   onClickImage?: () => void
   onCopyPrompt: () => void
+  onReuse?: () => void
   onSave?: () => void
   onDownload: () => void
   onDelete: () => void
@@ -454,7 +465,7 @@ function HistoryListRow({
         {entry.kind === 'music' && audioUrl && (
           <audio src={audioUrl} controls className="h-8 w-full" />
         )}
-        {/* Canonical action order: download · save · copy · [animate] · delete. */}
+        {/* Canonical action order: download · save · copy · [reuse] · [animate] · delete. */}
         <div className="flex items-center gap-1">
           <ListRowButton title="Download" onClick={onDownload}>
             <Download className="h-4 w-4" />
@@ -471,6 +482,11 @@ function HistoryListRow({
           {prompt && (
             <ListRowButton title="Copy prompt" onClick={onCopyPrompt}>
               <Copy className="h-4 w-4" />
+            </ListRowButton>
+          )}
+          {onReuse && (
+            <ListRowButton title="Reuse this prompt" onClick={onReuse}>
+              <ArrowLeft className="h-4 w-4" />
             </ListRowButton>
           )}
           {onAnimate && (
@@ -556,6 +572,7 @@ function ImageTile({
   onSave,
   onDelete,
   onCopyPrompt,
+  onReuse,
   onAnimate,
 }: {
   item: ImageHistoryItem
@@ -565,6 +582,7 @@ function ImageTile({
   onSave: () => void
   onDelete: () => void
   onCopyPrompt: () => void
+  onReuse?: () => void
   onAnimate?: () => void
 }) {
   // `loading="lazy"` only defers the <img> — the blob behind it still came out
@@ -616,6 +634,17 @@ function ImageTile({
               <Copy className="h-4 w-4" />
             </TileActionButton>
           )}
+          {/* Reuse — put this prompt back in the box, replacing what's
+              there. It sits right after Copy prompt because the two are
+              siblings: one hands the words to the clipboard, the other hands
+              them straight back to the field, which is what you actually
+              wanted every time you copied one. The arrow points LEFT, at the
+              panel the prompt is going to. */}
+          {onReuse && (
+            <TileActionButton title="Reuse this prompt" onClick={(e) => { e.stopPropagation(); onReuse() }}>
+              <ArrowLeft className="h-4 w-4" />
+            </TileActionButton>
+          )}
           {onAnimate && (
             <TileActionButton
               title="Animate in Video"
@@ -638,12 +667,14 @@ function VideoTile({
   onClick,
   onDelete,
   onCopyPrompt,
+  onReuse,
 }: {
   item: VideoHistoryItem
   scrollRoot: React.RefObject<HTMLElement | null>
   onClick: () => void
   onDelete: () => void
   onCopyPrompt: () => void
+  onReuse?: () => void
 }) {
   // Off-window tiles hold no clip: a <video> each is a blob in memory and a
   // decoder, and the browser runs out of the second long before this list does.
@@ -721,6 +752,11 @@ function VideoTile({
           {item.prompt && (
             <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
               <Copy className="h-4 w-4" />
+            </TileActionButton>
+          )}
+          {onReuse && (
+            <TileActionButton title="Reuse this prompt" onClick={(e) => { e.stopPropagation(); onReuse() }}>
+              <ArrowLeft className="h-4 w-4" />
             </TileActionButton>
           )}
           <TileDeleteButton onDelete={onDelete} />
@@ -803,12 +839,14 @@ function PreviewModal({
   onSave,
   isSaving,
   onAnimate,
+  onReuse,
 }: {
   entry: HistoryEntry
   onClose: () => void
   onSave: () => void
   isSaving: boolean
   onAnimate?: () => void
+  onReuse?: () => void
 }) {
   const imageUrl = useAssetUrl(entry.kind === 'image' ? entry.data.imageUrl : null)
   const videoUrl = useAssetUrl(entry.kind === 'video' ? entry.data.videoUrl : null)
@@ -955,6 +993,16 @@ function PreviewModal({
               <ModalBarButton onClick={handleCopyPrompt} tone={copied ? 'saved' : 'accent'}>
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 <span>{copied ? 'Copied' : 'Copy prompt'}</span>
+              </ModalBarButton>
+            )}
+            {/* Beside Copy prompt, because this is the surface where an output
+                is actually judged — "make another like this one" is the decision
+                you came here to take. Closes on the way out, since what it
+                changed is behind the overlay. */}
+            {onReuse && (
+              <ModalBarButton onClick={() => { onReuse(); onClose() }}>
+                <ArrowLeft className="h-4 w-4" />
+                <span>Reuse prompt</span>
               </ModalBarButton>
             )}
             {/* Save-to-bank is stills-only — videos are download-only. */}

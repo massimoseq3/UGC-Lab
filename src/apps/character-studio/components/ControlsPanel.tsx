@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type ElementType, type ReactNode } from 'react'
-import { ScanFace, PersonStanding, Camera, Copy, Check, ChevronRight, Braces } from 'lucide-react'
+import { ScanFace, PersonStanding, Camera, Copy, Check, Braces } from 'lucide-react'
 import type { TabId, CharacterProfile, FieldGroup } from '../types'
 import { TABS, PHOTOREALISM_STYLE, getTabFields } from '../types'
 
@@ -15,6 +15,7 @@ import ChipField from './ChipField'
 import GenerateBar from './GenerateBar'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import ClearAllButton from '../../../components/ClearAllButton'
+import { SectionPresetPill } from '../../../components/SectionCard'
 import LoadPresetDropdown from './LoadPresetDropdown'
 import PresetPickerModal from './PresetPickerModal'
 import PhotoExtractZone from './PhotoExtractZone'
@@ -73,51 +74,6 @@ function CopyPromptButton({ text, label, title }: { text: string; label: string;
     </button>
   )
 }
-
-// Preset pill — opens the shared preset picker but scoped to a slice of the
-// form. One shape, two tones, because the two live at different altitudes in
-// the same column: the TAB divider's pill is the loud one (glassy influencers
-// tint, matching the Portrait/Sheet toggle so the two read as one accent
-// family), and every SECTION title inside that tab wears the same dashed pill
-// in plain ink. Eight accent pills down one column would make the divider that
-// separates two tabs no louder than the headings under it — a section title is
-// still a title first, so the neutral tone keeps the heading's own type
-// (`text-sm font-semibold`) and only borrows the chrome that says "this is a
-// button": the dashed ring and the chevron.
-const PILL_TONES = {
-  accent:
-    'border-influencers-500/30 bg-influencers-500/10 text-influencers-300 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] hover:bg-influencers-500/15 text-[12px] font-medium',
-  neutral:
-    'border-ink/15 bg-ink/[0.03] text-ink-100 hover:border-ink/25 hover:bg-ink/[0.06] text-sm font-semibold tracking-tight',
-} as const
-
-function PresetPillButton({
-  label,
-  title,
-  icon: Icon,
-  onClick,
-  tone = 'accent',
-}: {
-  label: string
-  title: string
-  icon?: ElementType
-  onClick: () => void
-  tone?: keyof typeof PILL_TONES
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      className={`flex items-center gap-1.5 rounded-full border border-dashed px-3 py-1 transition-colors ${PILL_TONES[tone]}`}
-    >
-      {Icon && <Icon className="h-3.5 w-3.5" />}
-      {label}
-      <ChevronRight className={`h-3.5 w-3.5 ${tone === 'neutral' ? 'text-ink-400' : ''}`} strokeWidth={2} />
-    </button>
-  )
-}
-
 
 interface ControlsPanelProps {
   profile: CharacterProfile
@@ -359,14 +315,14 @@ export default function ControlsPanel({
                   left={<ClearAllButton onClear={onClear} label="New" className="!py-1 !text-[11px]" />}
                   center={
                     tabIndex === 0 ? (
-                      <PresetPillButton
+                      <SectionPresetPill
                         label="Physical Presets"
                         title="Load only the physical fields from a preset"
                         icon={TAB_ICONS.physical}
                         onClick={() => setPhysicalPresetOpen(true)}
                       />
                     ) : (
-                      <PresetPillButton
+                      <SectionPresetPill
                         label="Scene & Pose Presets"
                         title="Load only the scene & pose fields from a preset"
                         icon={TAB_ICONS.scene}
@@ -392,7 +348,7 @@ export default function ControlsPanel({
                           above it, in ink rather than the influencers accent,
                           filling only this group's fields. */}
                       <h4 className="mb-3 flex justify-center">
-                        <PresetPillButton
+                        <SectionPresetPill
                           tone="neutral"
                           label={group.label}
                           title={`Load only the ${group.label.toLowerCase()} fields from a preset`}

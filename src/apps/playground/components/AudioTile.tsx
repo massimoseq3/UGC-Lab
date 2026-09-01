@@ -1,4 +1,4 @@
-import { Download, Copy, Music as MusicIcon } from 'lucide-react'
+import { ArrowLeft, Download, Copy, Music as MusicIcon } from 'lucide-react'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import type { MusicHistoryItem } from '../../../stores/types'
 import { TileDeleteButton } from '../../../components/tileActions'
@@ -9,11 +9,13 @@ interface AudioTileProps {
   onDelete: () => void
   // Copy this track's prompt to the clipboard.
   onCopyPrompt: () => void
+  // Put this track's prompt back in the prompt box, replacing what's there.
+  onReuse?: () => void
 }
 
 // Audio history tile. Cover thumbnail (or gradient placeholder) + native
 // audio player + copy/download/delete. Sits inside the day-bucketed history grid.
-export default function AudioTile({ item, onDownload, onDelete, onCopyPrompt }: AudioTileProps) {
+export default function AudioTile({ item, onDownload, onDelete, onCopyPrompt, onReuse }: AudioTileProps) {
   const audioUrl = useAssetUrl(item.audioRef)
   const coverUrl = useAssetUrl(item.coverImageRef)
 
@@ -46,7 +48,7 @@ export default function AudioTile({ item, onDownload, onDelete, onCopyPrompt }: 
         )}
 
         {/* Horizontal variant of the standard action order: download · copy ·
-            delete (no save — music doesn't go to a bank). */}
+            [reuse] · delete (no save — music doesn't go to a bank). */}
         <div className="mt-1.5 flex items-center justify-end gap-1">
           <button
             type="button"
@@ -64,6 +66,16 @@ export default function AudioTile({ item, onDownload, onDelete, onCopyPrompt }: 
           >
             <Copy className="h-3.5 w-3.5" />
           </button>
+          {onReuse && (
+            <button
+              type="button"
+              title="Reuse this prompt"
+              onClick={onReuse}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.05] hover:text-ink-200"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </button>
+          )}
           <TileDeleteButton variant="chrome" size="sm" alwaysVisible onDelete={onDelete} />
         </div>
       </div>
