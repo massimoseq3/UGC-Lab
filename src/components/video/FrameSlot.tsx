@@ -4,6 +4,7 @@ import { fileToDataUri } from '../../utils/kie'
 import type { BankType } from '../../utils/constants'
 import BankPicker from '../BankPicker'
 import SlotActionMenu from './SlotActionMenu'
+import { MediaAddCard } from './refInputParts'
 import { bankItemToDataUri, type BankItem } from './bankImage'
 import type { VideoInputValue } from './VideoInputSlot'
 
@@ -20,14 +21,20 @@ interface FrameSlotProps {
   disabledNote?: string
 }
 
-// A 2:1 drop-zone for a single frame (start / end). Empty it's a labelled
-// dashed tile with an "Optional" tag; filled it shows the frame with a remove
-// button. Upload or pick from a bank; whole-panel drag-and-drop is wired by the
-// parent straight into the value. Kept deliberately short — the two slots sit
-// directly above the prompt box and every pixel here is a pixel it loses, which
-// is why the box is 2:1 rather than the 16:9 it started as. The frame inside is
-// `object-contain`, so the box's ratio only sets how tall the slot is; a 9:16
-// UGC still letterboxes either way.
+// A single frame slot (start / end), and it is TWO shapes rather than one.
+// EMPTY it's the same 40px `MediaAddCard` every other attach-something control
+// in the panel wears; FILLED it opens out to a 2:1 tile showing the frame. An
+// empty slot needs room for one word and a filled one needs room for the
+// picture, and the single 2:1 shape paid the picture's price either way: 124px
+// of dashed box holding a 28px icon, twice over, directly above the prompt box
+// the whole panel exists to fill. With nothing attached — the normal state —
+// that was the biggest block in the References card by some way.
+// The frame inside is `object-contain`, so the 2:1 only sets how tall a FILLED
+// slot is; a 9:16 UGC still letterboxes either way. Upload or pick from a bank;
+// whole-panel drag-and-drop is wired by the parent straight into the value.
+// The "Optional" tag that used to ride in the empty corner is gone: the
+// References card header now says it once for every slot inside it, rather than
+// four times over in four different registers.
 export default function FrameSlot({
   label,
   value,
@@ -71,34 +78,19 @@ export default function FrameSlot({
     )
   }
 
+  // Stretched by the grid when its sibling is filled, so a lone attached frame
+  // sits beside a full-height drop target rather than a 40px card pinned to the
+  // top of an 84px gap. `MediaAddCard` centres its own content either way.
   return (
     <>
-      <button
-        ref={triggerRef}
-        type="button"
+      <MediaAddCard
+        icon={ImageIcon}
+        label={label}
+        helper={disabled ? disabledNote : undefined}
         disabled={disabled}
+        triggerRef={triggerRef}
         onClick={() => setActionMenu((v) => !v)}
-        className={`group relative flex aspect-[2/1] w-full flex-col items-center justify-center gap-1 rounded-2xl border border-dashed border-ink/15 bg-ink/[0.02] transition-colors ${
-          disabled
-            ? 'cursor-not-allowed opacity-40'
-            : 'hover:border-ink/30 hover:bg-ink/[0.04]'
-        }`}
-      >
-        {!disabled && (
-          <span className="absolute right-2 top-2 rounded-full bg-ink/[0.06] px-1.5 py-0.5 text-[9px] text-ink-500">
-            Optional
-          </span>
-        )}
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-ink/[0.05] text-ink-400 transition-colors group-hover:text-ink-200">
-          <ImageIcon className="h-3.5 w-3.5" />
-        </span>
-        <span className="text-[11px] font-medium text-ink-400 transition-colors group-hover:text-ink-200">
-          {label}
-        </span>
-        {disabled && disabledNote && (
-          <span className="text-[10px] text-ink-600">{disabledNote}</span>
-        )}
-      </button>
+      />
 
       {!disabled && (
         <SlotActionMenu
