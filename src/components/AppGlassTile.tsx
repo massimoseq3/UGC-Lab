@@ -13,8 +13,9 @@ import type { AppConfig } from '../utils/constants'
 // pixel-art sprite sliding out from behind a glass icon is a different visual
 // language from everything around it, and on a row of eight it fired eight
 // times as the cursor crossed the row. The crabs still live where they are the
-// subject rather than a garnish — the orrery's caption, Edit's skill folder,
-// the Outliers connect card.
+// subject rather than a garnish — Meet Your Team, Edit's skill folder, the
+// Outliers connect card. (The orrery's caption was a fourth until the orrery
+// itself came out, days later.)
 
 /**
  * The tile itself, addressed by icon + colour rather than by app — so a mark

@@ -570,53 +570,30 @@ textarea,
   mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent 100%);
 }
 
-/* ---- Desktop wallpaper ----
-   The Dashboard is staged as a macOS desktop — a wallpaper with widgets sitting
-   on it — and Edit shares the same sky. Three soft blooms, and all three are
-   now MONOCHROME: neutral light in both top corners and along the bottom, so
-   the sky reads as this product's desktop rather than a stock gradient without
-   leading on any one app's colour. Each bloom has been an accent and lost it —
-   the top left was Dashboard emerald, the top right B-Roll violet, the bottom
-   the crab's gold (August 2026) — for the same reason every time: an accent in
-   the sky competes with the nine accents of the planets orbiting in front of
-   it, which is the one thing on this page that has to read as colour, and the
-   gold was the last and widest of them, washing the whole lower half warm.
-   Monochrome means the light itself, not a grey wash — white in dark mode, a
-   soft shadow in light, where a white bloom on a white canvas would be
-   invisible; the top-right is the brighter of the two corners because it
-   carries its own where the left sits behind the widgets. Painted as radial
-   gradients, not blurred divs: same softness, none of the filter/compositing
-   cost of a full-screen blur behind nine backdrop-blurred widgets. */
-.desktop-wallpaper {
-  background-image:
-    radial-gradient(820px 620px at 2% -12%, rgba(255, 255, 255, 0.07), transparent 70%),
-    radial-gradient(680px 560px at 99% 0%, rgba(255, 255, 255, 0.10), transparent 72%),
-    radial-gradient(940px 600px at 52% 116%, rgba(255, 255, 255, 0.09), transparent 70%);
-}
-[data-theme="light"] .desktop-wallpaper {
-  background-image:
-    radial-gradient(760px 560px at 4% -10%, rgba(24, 24, 27, 0.07), transparent 70%),
-    radial-gradient(620px 520px at 97% 2%, rgba(24, 24, 27, 0.09), transparent 72%),
-    radial-gradient(880px 560px at 55% 114%, rgba(24, 24, 27, 0.08), transparent 70%);
-}
-
 /* Starfield, dark mode only. Two tiled layers of dots at different densities,
-   each drifting and breathing on its own period — offset periods are what read
-   as twinkling; pulsing one layer alone just reads as flicker. Deliberately slow
-   enough (3–5 min per tile) that it registers as depth rather than motion.
-   Light mode has no starfield: white dots vanish and dark ones read as dust.
+   which is what gives the sky depth. Light mode has no starfield: white dots
+   vanish and dark ones read as dust.
 
-   Drift animates `transform`, NOT `background-position`. Both move the pattern
-   by exactly one tile so the loop is seamless either way, but a background
-   position is a paint property: the compositor can't run it, so the browser
-   repainted a full-viewport layer on every frame for as long as the Dashboard
-   was on screen — and re-ran the backdrop-filter of all nine widgets sitting on
-   top of it. A transform is composited: the layer is painted once and moved on
-   the GPU. The cost is that each layer now bleeds one tile past every edge (so
-   the translate never drags an unpainted corner into view); the wallpaper root
-   clips it. Geometry lives here rather than on a Tailwind `inset-0` for the
-   same reason — the bleed IS the mechanism, so it belongs beside the keyframes
-   that need it. */
+   NOTHING IN THE SKY MOVES, and that is the point (September 2026). The layers
+   drifted (one tile per 3–5 minutes) and breathed (opacity, 7s and 11s), and a
+   meteor crossed every 22s. Each was cheap on its own and composited properly —
+   the drift had already been moved off `background-position` onto a `transform`
+   for exactly that reason — but this wallpaper is the backdrop of the DEFAULT
+   landing page, where ten `backdrop-filter` widgets sit on top of it. A
+   backdrop-filter has to re-run whenever its backdrop changes, so any animation
+   down here, however slow, meant ten Gaussians per frame at the display's full
+   refresh rate, forever, on a page that is otherwise idle. Measured on the
+   Dashboard before the cut: ~8% of one CPU core with the page merely on screen,
+   against 0.1% for a blank page.
+
+   The motion was never worth its price at the frame level either — the drift was
+   1.4 px/SECOND, i.e. a hundredth of a pixel per frame. The two layers now carry
+   the midpoint of their old breathe range as a flat opacity, so the sky looks
+   like a still frame of what it used to be.
+
+   `inset: 0` follows from that: the layers only bled a tile past every edge so a
+   translate could never drag an unpainted corner into view, and at ~2.3x the
+   viewport each that was tens of MB of texture for a pattern that repeats. */
 .desktop-stars-near {
   background-image:
     radial-gradient(1.4px 1.4px at 26px 42px, rgba(255, 255, 255, 0.75), transparent),
@@ -625,9 +602,8 @@ textarea,
     radial-gradient(1.1px 1.1px at 254px 64px, rgba(255, 255, 255, 0.5), transparent),
     radial-gradient(1.3px 1.3px at 210px 268px, rgba(235, 230, 255, 0.6), transparent);
   background-size: 300px 300px;
-  inset: -300px;
-  will-change: transform;
-  animation: star-drift 210s linear infinite, star-breathe-a 7s ease-in-out infinite;
+  inset: 0;
+  opacity: 0.8;
 }
 .desktop-stars-far {
   background-image:
@@ -637,57 +613,8 @@ textarea,
     radial-gradient(0.8px 0.8px at 128px 132px, rgba(255, 255, 255, 0.3), transparent),
     radial-gradient(1px 1px at 190px 186px, rgba(255, 255, 255, 0.36), transparent);
   background-size: 200px 200px;
-  inset: -200px;
-  will-change: transform;
-  animation: star-drift-far 320s linear infinite, star-breathe-b 11s ease-in-out infinite;
-}
-@keyframes star-drift {
-  from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(300px, 300px, 0); }
-}
-@keyframes star-drift-far {
-  from { transform: translate3d(0, 0, 0); }
-  to   { transform: translate3d(200px, 200px, 0); }
-}
-@keyframes star-breathe-a {
-  0%, 100% { opacity: 0.6; }
-  50%      { opacity: 1; }
-}
-@keyframes star-breathe-b {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.55; }
-}
-
-/* One meteor every ~22s. The traverse is 5% of the cycle, so the layer is
-   invisible almost the whole time — a rare event you catch out of the corner of
-   your eye, not an effect running on the page.
-   The rotation MUST match the translate: the bar's bright end is its head (the
-   gradient runs white → transparent left to right), so it has to point along the
-   direction of travel. Travel is down-left — atan2(205, -460), i.e. 24° below
-   horizontal — which is rotate(-24deg), not +24. With the sign flipped the
-   streak sat 48° off its own path and the meteor flew sideways, head last. */
-@keyframes meteor {
-  0%      { opacity: 0; transform: translate3d(0, 0, 0) rotate(-24deg); }
-  1%      { opacity: 0.55; }
-  5%      { opacity: 0; transform: translate3d(-460px, 205px, 0) rotate(-24deg); }
-  100%    { opacity: 0; transform: translate3d(-460px, 205px, 0) rotate(-24deg); }
-}
-/* `backwards` (plus the base opacity) is load-bearing, not tidiness: a meteor
-   with an animation-delay renders with its OWN style until the animation starts,
-   and a bare streak is opacity 1 with no transform — so the delayed meteor hung
-   in the corner as a static white dash for its first 11 seconds and then began
-   behaving. Every meteor also starts delayed, so the sky is calm on arrival
-   rather than firing one the instant the page mounts. */
-.desktop-meteor {
-  background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0));
-  opacity: 0;
-  animation: meteor 22s linear infinite backwards;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .desktop-stars-near,
-  .desktop-stars-far { animation: none; }
-  .desktop-meteor { display: none; }
+  inset: 0;
+  opacity: 0.78;
 }
 
 /* ── Backgrounded apps stop painting ────────────────────────────────
@@ -697,10 +624,10 @@ textarea,
    CSS animation in a backgrounded pane keeps running at full rate, and the
    Dashboard is the DEFAULT landing app, so for the whole session the members
    were paying, behind whatever screen they were actually on, for:
-     · two full-viewport starfields animating `background-position`, which the
-       compositor cannot handle — it repaints the layer every frame
-     · two more full-viewport opacity animations (the "breathe")
-     · the orrery's sixteen rotations (eight arms + eight counter-rotations)
+     · the wallpaper's own animations, whatever they are at the time — this
+       note was written when that meant two full-viewport starfields plus the
+       orrery's eighteen rotations; the sky is still now and the orrery is gone,
+       so the rule below is what keeps the NEXT one from costing anything
      · every `animate-spin` on an in-flight generation elsewhere in the app
    `content-visibility: hidden` skips the subtree outright — layout, paint and
    animation. Unlike `display: none` it keeps scroll positions and does not
@@ -721,29 +648,6 @@ textarea,
 [data-app-pane='inactive'],
 [data-app-pane='inactive'] * {
   animation-play-state: paused !important;
-}
-
-/* Orbits. The arm carries a planet around the sun; the planet counter-rotates
-   on the same period so its glyph never turns upside down. Periods are minutes,
-   not seconds — at interaction speed a planet is a stationary target, and the
-   movement only registers if you sit and watch. Hovering anywhere in the system
-   freezes every orbit, so picking one is never a moving-target problem. */
-@keyframes orbit-arm {
-  to { transform: rotate(360deg); }
-}
-@keyframes orbit-counter {
-  to { transform: rotate(-360deg); }
-}
-.orbit-arm { animation: orbit-arm linear infinite; }
-.orbit-counter { animation: orbit-counter linear infinite; }
-.solar-system:hover .orbit-arm,
-.solar-system:hover .orbit-counter,
-.solar-system:focus-within .orbit-arm,
-.solar-system:focus-within .orbit-counter {
-  animation-play-state: paused;
-}
-@media (prefers-reduced-motion: reduce) {
-  .orbit-arm, .orbit-counter { animation: none; }
 }
 
 /* Widgets land in a short stagger when the desktop opens — the one orchestrated
