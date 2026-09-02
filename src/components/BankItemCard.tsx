@@ -1,9 +1,7 @@
-import { useRef } from 'react'
 import { Package, UserRound, Mic, Film, Star, Palette } from 'lucide-react'
 import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, AnyBankItem } from '../stores/types'
 import type { BankType } from '../utils/constants'
 import { useAssetUrl } from '../hooks/useAssetUrl'
-import { useThumbUrl } from '../hooks/useThumbUrl'
 
 type BankItem = AnyBankItem
 
@@ -193,13 +191,9 @@ function ImageCard({
   selectedStyle?: React.CSSProperties
   onLandscape?: (landscape: boolean) => void
 }) {
-  // A card draws a thumbnail sized to itself, never the full still — see
-  // utils/thumbStore. Anything that needs the whole picture resolves `src`.
-  const cardRef = useRef<HTMLButtonElement | null>(null)
-  const { url: resolvedUrl } = useThumbUrl(src, cardRef)
+  const resolvedUrl = useAssetUrl(src)
   return (
     <button
-      ref={cardRef}
       onClick={onClick}
       style={selectedStyle}
       className={`group relative block w-full overflow-hidden rounded-2xl border text-left transition-all ${

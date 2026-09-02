@@ -2,7 +2,7 @@ import { memo, useMemo, useRef, useState, useEffect } from 'react'
 import { Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil, Frame, History, ArrowLeft } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import { useBankStore } from '../../../stores/bankStore'
-import { useThumbUrl } from '../../../hooks/useThumbUrl'
+import { useAssetUrlState } from '../../../hooks/useAssetUrl'
 import useNearViewport from '../../../hooks/useNearViewport'
 import { getUrl } from '../../../utils/assetStore'
 import { useAppStore } from '../../../stores/appStore'
@@ -439,19 +439,8 @@ function aspectStyle(ar: string): React.CSSProperties {
 // This gates the PICTURE only. `handleDownload` re-resolves through getUrl on
 // its own, so every action on the tile works the same whether it has painted
 // or not.
-//
-// And the picture it loads is a THUMBNAIL sized to `measure` (the tile, row
-// or stage element), never the still itself — a 1024² portrait is 4 MB
-// decoded whatever size it's drawn at, and a gallery of hundreds is what made
-// scrolling hitch. Download, save-to-bank and the edit modal all read the full
-// picture through `item.imageRef` as before. See utils/thumbStore.
-function useHistoryTileActions(
-  item: CharacterHistoryItem,
-  onDelete: () => void | Promise<unknown>,
-  near: boolean,
-  measure: React.RefObject<HTMLElement | null>,
-) {
-  const { url, status } = useThumbUrl(near ? item.imageRef : undefined, measure)
+function useHistoryTileActions(item: CharacterHistoryItem, onDelete: () => void | Promise<unknown>, near = true) {
+  const { url, status } = useAssetUrlState(near ? item.imageRef : undefined)
   const addModel = useBankStore((s) => s.addModel)
   const deleteModel = useBankStore((s) => s.deleteModel)
   const updateCharacterHistory = useBankStore((s) => s.updateCharacterHistory)
@@ -998,9 +987,7 @@ function SingleCard({
   onCopyPrompt: () => void
   onReuse: () => void
 }) {
-  // One picture, always loaded; the thumbnail is sized to the stage frame.
-  const stageRef = useRef<HTMLDivElement | null>(null)
-  const a = useHistoryTileActions(item, onDelete, true, stageRef)
+  const a = useHistoryTileActions(item, onDelete)
   const natural = useNaturalRatio()
 
   return (
@@ -1012,7 +999,6 @@ function SingleCard({
       <Stage aspectRatio={natural.ratio ?? item.aspectRatio}>
         {(frameStyle) => (
           <div
-            ref={stageRef}
             onClick={onClick}
             className="group relative cursor-pointer overflow-hidden rounded-xl border border-ink/10 bg-black light:bg-zinc-200 shadow-[0_24px_60px_-24px_rgba(0,0,0,0.75)]"
             style={frameStyle}
@@ -1237,12 +1223,8 @@ function HistoryTile({
   scrollRoot?: React.RefObject<HTMLElement | null>
 }) {
   const ownRoot = useRef<HTMLElement | null>(null)
-  // Loaded on approach and kept — never released. A loaded tile is sized by the
-  // picture and the placeholder by a declared aspect ratio, so a tile that gave
-  // its picture back changed height ~400px ABOVE the scroll position and walked
-  // the whole masonry column under the pointer. See useNearViewport.
   const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot ?? ownRoot)
-  const a = useHistoryTileActions(item, onDelete, scrollRoot ? near : true, tileRef)
+  const a = useHistoryTileActions(item, onDelete, scrollRoot ? near : true)
   const fitted = !!frameStyle
 
   return (
@@ -1405,9 +1387,8 @@ function HistoryListRow({
   scrollRoot?: React.RefObject<HTMLElement | null>
 }) {
   const ownRoot = useRef<HTMLElement | null>(null)
-  // Same rule as the grid tile: read on approach, then keep it.
   const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot ?? ownRoot)
-  const a = useHistoryTileActions(item, onDelete, scrollRoot ? near : true, rowRef)
+  const a = useHistoryTileActions(item, onDelete, scrollRoot ? near : true)
   const prompt = buildImagePrompt(item.profile).trim()
 
   // Landscape (16:9) outputs always render in a 16:9 frame so they fill edge-to-
