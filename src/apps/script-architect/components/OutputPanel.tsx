@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Copy, Check, Bookmark, ArrowUpRight, Mic, Film, PenLine, AlertCircle, ImagePlay, Pencil, X, Undo2, Redo2, Quote, ChevronDown, ChevronRight } from 'lucide-react'
+import { Copy, Check, Bookmark, ArrowUpRight, Mic, Film, PenLine, AlertCircle, ImagePlay, Palette, Pencil, X, Undo2, Redo2, Quote, ChevronDown, ChevronRight } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 import GridCanvas from '../../../components/GridCanvas'
 import AutoGrowTextarea from '../../../components/AutoGrowTextarea'
@@ -208,17 +208,41 @@ function renumberScenes(text: string): string {
   return text.replace(SCENE_NUMBER, (_m, lead: string, word: string, gap: string) => `${lead}${word}${gap}${++n}`)
 }
 
+// The look every scene in a blueprint is shot in — the master style block. The
+// Ad Analyzer writes it in front of its scenes and the scene rewrite is told to
+// lead with the same block, so by contract it sits BEFORE the first header;
+// matched wherever it lands anyway, since a model that reproduces it after the
+// voice profile is a shape we'd rather render than lose. `MASTER` is optional
+// for the same reason it is on the voice header — the two producers word it
+// differently and that word sat between the markers and the label.
+const STYLE_HEADER_REGEX = /(^|\n)[=\s]*(?:MASTER\s+)?VISUAL STYLE\b[^\n]*\n?/i
+
 // Content that precedes the first "--- Scene N ---" header — used by the scene
 // formats to carry a leading "=== VOICE PROFILE ... ===" block. Stripped of its
 // own divider markers so it renders as a clean voice card above the scenes.
+//
+// The style block is preamble too, and this is the fallback that runs when the
+// take carries NO voice header at all — so without the cut below, a rewrite
+// that emitted a style block and no voice profile would render the same
+// paragraph twice, once on each card.
 function extractIntro(text: string): string {
   const idx = text.search(SCENE_REGEX)
   if (idx <= 0) return ''
-  return text
-    .slice(0, idx)
+  return dropStyleBlock(text.slice(0, idx))
     .replace(/^[=\s]*VOICE PROFILE[^\n]*\n/i, '')
     .replace(/^[=\s]+|[=\s]+$/g, '')
     .trim()
+}
+
+// Cuts a "=== MASTER VISUAL STYLE ... ===" block out of a preamble — its header
+// and its body, which runs to the next labelled block or to the end.
+function dropStyleBlock(intro: string): string {
+  const match = intro.match(STYLE_HEADER_REGEX)
+  if (!match || match.index == null) return intro
+  const headerStart = match.index + match[1].length
+  const bodyStart = headerStart + (match[0].length - match[1].length)
+  const nextBlock = intro.slice(bodyStart).search(VOICE_HEADER_REGEX)
+  return intro.slice(0, headerStart) + (nextBlock < 0 ? '' : intro.slice(bodyStart + nextBlock))
 }
 
 // Matches the voice-profile header line wherever it appears — the model is told
@@ -262,8 +286,15 @@ function splitVoiceProfile(text: string): { body: string; rest: string; bodyStar
   // "===" divider lines from the body.
   const regionStart = headerStart + (match[0].length - match[1].length)
   const nextScene = text.slice(regionStart).search(SCENE_REGEX)
+  // A model that appends BOTH labelled blocks after the last scene puts the
+  // style block inside the voice block's region, so the region ends at
+  // whichever labelled thing comes first. `appended` still keys on the scene
+  // header alone — it asks whether the voice block sits after the scenes, and a
+  // style block following it doesn't change that answer.
+  const nextStyle = text.slice(regionStart).search(STYLE_HEADER_REGEX)
   const appended = nextScene < 0
-  const region = appended ? text.slice(regionStart) : text.slice(regionStart, regionStart + nextScene)
+  const ends = [nextScene, nextStyle].filter((i) => i >= 0)
+  const region = ends.length > 0 ? text.slice(regionStart, regionStart + Math.min(...ends)) : text.slice(regionStart)
   const body = region.replace(/^[=\s]+|[=\s]+$/g, '').trim()
   // Appended → the scenes are everything before it. Leading → the whole text,
   // since the block sits in front of the first header and is dropped anyway.
@@ -275,6 +306,31 @@ function splitVoiceProfile(text: string): { body: string; rest: string; bodyStar
     return { body, rest, bodyStart: regionStart + lead, bodyEnd: regionStart + lead + body.length }
   }
   return { body: extractIntro(rest), rest }
+}
+
+// Pulls the master visual style block out of a scene blueprint — the look the
+// whole ad is rendered in, stated once so it can't drift between clips. It
+// leads the document by contract, so its body runs from its header to the first
+// thing that isn't it: the first scene header, or the voice profile block on a
+// take that put the two labelled blocks together.
+//
+// Read off the FULL take text, not off `splitVoiceProfile`'s `rest` — a leading
+// block is preamble either way, and the span has to be an offset into `text`
+// for the in-place edit to splice back over the right characters.
+function splitVisualStyle(text: string): { body: string; start: number; end: number } | null {
+  const match = text.match(STYLE_HEADER_REGEX)
+  if (!match || match.index == null) return null
+  const headerStart = match.index + match[1].length
+  const regionStart = headerStart + (match[0].length - match[1].length)
+  const nextScene = text.slice(regionStart).search(SCENE_REGEX)
+  const nextVoice = text.slice(regionStart).search(VOICE_HEADER_REGEX)
+  const ends = [nextScene, nextVoice].filter((i) => i >= 0)
+  const region = ends.length > 0 ? text.slice(regionStart, regionStart + Math.min(...ends)) : text.slice(regionStart)
+  const body = region.replace(/^[=\s]+|[=\s]+$/g, '').trim()
+  if (!body) return null
+  // Only the ends were stripped, so indexOf lands on the true offset.
+  const lead = region.indexOf(body)
+  return { body, start: regionStart + lead, end: regionStart + lead + body.length }
 }
 
 // Where the last "--- Scene N ---" header starts, or -1. Used to tell an
@@ -722,14 +778,19 @@ function VariationCard({
   // Pull the voice-profile block (wherever it sits) out FIRST, then split the
   // remaining text into scenes — otherwise the appended profile gets merged into
   // the last scene's body.
-  const { scenes, voiceProfile, voiceSpan } = useMemo(() => {
-    if (isHooks) return { scenes: null, voiceProfile: '', voiceSpan: null }
+  const { scenes, voiceProfile, voiceSpan, visualStyle, styleSpan } = useMemo(() => {
+    if (isHooks) return { scenes: null, voiceProfile: '', voiceSpan: null, visualStyle: '', styleSpan: null }
     const { body, rest, bodyStart, bodyEnd } = splitVoiceProfile(text)
     const parsed = splitScenes(rest)
+    // Both master blocks belong to a blueprint; a plain spoken take that
+    // happens to contain the words has no scenes for them to govern.
+    const style = parsed ? splitVisualStyle(text) : null
     return {
       scenes: parsed,
       voiceProfile: parsed ? body : '',
       voiceSpan: bodyStart != null && bodyEnd != null ? { start: bodyStart, end: bodyEnd } : null,
+      visualStyle: style?.body ?? '',
+      styleSpan: style ? { start: style.start, end: style.end } : null,
     }
   }, [text, isHooks])
 
@@ -1061,6 +1122,17 @@ function VariationCard({
           </>
         ) : scenes ? (
           <>
+            {visualStyle && (
+              <BlueprintBlockCard
+                icon={Palette}
+                label="Visual Style · same in every scene"
+                body={visualStyle}
+                ariaLabel="Visual style"
+                copyToast="Visual style copied to clipboard"
+                copyTitle="Copy the visual style"
+                onChange={onEdit && styleSpan ? (next) => replaceRange(styleSpan.start, styleSpan.end, next) : undefined}
+              />
+            )}
             {voiceProfile && (
               <VoiceProfileCard
                 body={voiceProfile}
@@ -1206,24 +1278,39 @@ function VariationCard({
   )
 }
 
-// The shared voice spec for a scene blueprint — the same on-camera voice every
-// scene's clip should be read in. Rendered once, ABOVE the scenes: it's pasted
-// into every scene's prompt, so it's the first thing copied, and at the bottom
-// of a ten-scene column most members never scrolled far enough to find it. The
-// model still emits it last (the prompt says so); `splitVoiceProfile` lifts it
-// out either way, so only the render order moved.
-//
-// A remix run reuses the card for its own brief, which arrives from its own
-// call rather than out of a take (see `runRemixVoiceProfile`) — hence `label`,
-// since nothing there has scenes and the profile is attached to no variation.
-function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene', onChange }: { body: string; label?: string; onChange?: (next: string) => void }) {
+// A blueprint's master block — one paragraph that governs every scene in the
+// take, rendered once ABOVE them. Two of them exist and they are the two things
+// that must NOT drift between clips (the same pair the Ad Analyzer writes):
+// the VOICE the scenes are read in, and the LOOK they are rendered in. Both are
+// pasted in front of every scene's prompt, so both are the first thing copied,
+// and at the bottom of a ten-scene column most members never scrolled far
+// enough to find them. The model still emits the voice profile last (the prompt
+// says so) and the visual style first; the splitters lift each one out wherever
+// it landed, so only the render order moved.
+function BlueprintBlockCard({
+  icon: Icon,
+  label,
+  body,
+  ariaLabel,
+  copyToast,
+  copyTitle,
+  onChange,
+}: {
+  icon: typeof Copy
+  label: string
+  body: string
+  ariaLabel: string
+  copyToast: string
+  copyTitle: string
+  onChange?: (next: string) => void
+}) {
   const [copied, setCopied] = useState(false)
   const addToast = useAppStore((s) => s.addToast)
   const handleCopy = async () => {
     const ok = await copyToClipboard(body)
     if (ok) {
       setCopied(true)
-      addToast('Voice profile copied to clipboard')
+      addToast(copyToast)
       setTimeout(() => setCopied(false), 2000)
     } else {
       addToast('Copy failed', 'error')
@@ -1233,7 +1320,7 @@ function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene'
     <div className="rounded-2xl border border-scripts-500/15 bg-scripts-500/[0.04] p-3 card-soft-shadow">
       <div className="relative mb-2 flex select-none items-center justify-center gap-2 px-8">
         <span className="flex items-center gap-1.5 text-center text-[10px] font-semibold uppercase tracking-tight text-scripts-300">
-          <Mic className="h-3 w-3 text-scripts-300" strokeWidth={2} />
+          <Icon className="h-3 w-3 text-scripts-300" strokeWidth={2} />
           {label}
         </span>
         <div className="absolute right-0 top-1/2 -translate-y-1/2">
@@ -1241,7 +1328,7 @@ function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene'
             onClick={handleCopy}
             icon={Copy}
             active={copied}
-            title={copied ? 'Copied' : 'Copy the voice profile'}
+            title={copied ? 'Copied' : copyTitle}
             className="hover:text-ink-300"
           />
         </div>
@@ -1249,11 +1336,11 @@ function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene'
       {/* Always-on field, not click-to-edit: this block is plain prose with
           nothing tinted in it, so a textarea styled as the paragraph looks
           identical and costs nothing — the same rule a spoken line and a script
-          paragraph follow. Multi-line, since a voice profile is a paragraph. */}
+          paragraph follow. Multi-line, since both blocks are a paragraph. */}
       <EditableText
         value={body}
         onCommit={onChange}
-        ariaLabel="Voice profile"
+        ariaLabel={ariaLabel}
         className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100"
         render={(
           <div className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100">
@@ -1262,6 +1349,24 @@ function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene'
         )}
       />
     </div>
+  )
+}
+
+// The voice half, and the one shape with a second caller: a remix run reuses
+// the card for its own brief, which arrives from its own call rather than out
+// of a take (see `runRemixVoiceProfile`) — hence `label`, since nothing there
+// has scenes and the profile is attached to no variation.
+function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene', onChange }: { body: string; label?: string; onChange?: (next: string) => void }) {
+  return (
+    <BlueprintBlockCard
+      icon={Mic}
+      label={label}
+      body={body}
+      ariaLabel="Voice profile"
+      copyToast="Voice profile copied to clipboard"
+      copyTitle="Copy the voice profile"
+      onChange={onChange}
+    />
   )
 }
 

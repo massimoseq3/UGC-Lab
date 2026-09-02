@@ -5,6 +5,7 @@ import { kieChatCompletions, LONG_CHAT_TIMEOUT_MS, type ChatMessage } from '../.
 import { getChatTarget, type ChatTarget } from '../../../utils/models'
 import { exemplarBlock, familiesForWriteStyle } from './exemplarBlock'
 import { VOICE_PROFILE_SPEC } from '../../../utils/voiceProfile'
+import { STYLE_BRIEF_SPEC } from '../../../utils/visualStyle'
 
 // Scripts is one of the two apps where the MEMBER picks the writer (the other
 // is B-Roll) — this is prose a person reads, so the intelligence/cost trade is
@@ -382,13 +383,23 @@ ${BANNED_AI_PATTERNS}
 
 ${CORPUS_EVIDENCE}
 
+MASTER VISUAL STYLE — at the very START of your output, BEFORE the first scene, emit one labelled block:
+=== MASTER VISUAL STYLE (every scene is shot in this look) ===
+This is the ONE look the whole ad is shot or rendered in, stated once so it can never drift between clips. Each scene is generated as its own clip, so this paragraph is what rides in front of every one of them.
+
+IF THE SOURCE BLUEPRINT ALREADY CARRIES A "=== MASTER VISUAL STYLE ... ===" BLOCK, REPRODUCE ITS PARAGRAPH VERBATIM — the look is the half of the winner that is NOT being swapped. You are replacing the character, the product and the words, never the medium the ad is shot in. Otherwise, read the look off the source's own scene direction and write it yourself:
+
+${STYLE_BRIEF_SPEC}
+
+The block describes HOW the ad looks, never WHAT is in it: no character, no product, no brand name, no location, no story, and never a [CHARACTER] or [PRODUCT] token — it gets pasted in front of prompts for a different product, so any subject matter carried into it is a bug. It is IN ADDITION to the scenes and replaces nothing: every scene keeps its own camera, framing and lighting direction exactly as rule 4 requires, and nothing is lifted out of a scene to live up here.
+
 VOICE PROFILE — at the very END of your output, AFTER the last scene, emit one labeled block:
 === VOICE PROFILE (same voice in every scene) ===
 ${VOICE_PROFILE_SPEC}
 Anchor it to how [CHARACTER] is acting across the scenes so the read feels native to this ad.
 
 OUTPUT FORMAT — CRITICAL:
-- Start directly with the scenes. After the last scene, add a blank line, then the "=== VOICE PROFILE ... ===" block described above (it comes LAST, not first).
+- Start with the "=== MASTER VISUAL STYLE ... ===" block, then a blank line, then the scenes. After the last scene, add a blank line, then the "=== VOICE PROFILE ... ===" block described above (it comes LAST). Those two labelled blocks are the only text outside the scenes.
 - Reproduce each "--- Scene N: <label> (MM:SS-MM:SS) ---" header EXACTLY as given. If the source carries no scene headers at all — it is one unbroken shot — write a single "--- Scene 1: <short shot name> ---" header of your own above it. The output is ALWAYS a headed blueprint, whatever shape the input arrived in.
 - Below each header, write the rewritten scene prompt as one self-contained block — visual direction first, then the rewritten dialogue line(s) embedded inline using the same speaker-attribution pattern as the input, with the spoken words in double quotes: She says: "…". Spoken words are plain English — no tokens inside the quotes.
 - In every scene, include an explicit audio direction: NO background music, NO soundtrack, NO score — only the spoken dialogue and natural ambient/diegetic sound (music is added later in editing).
