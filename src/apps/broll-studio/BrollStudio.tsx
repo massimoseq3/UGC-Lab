@@ -790,7 +790,11 @@ export default function BrollStudio() {
   // call finished in this page load or was resumed after a reload. Everything
   // is read off the row rather than the panel: the row stamped the delivery and
   // style at Generate, and either may have been changed while it wrote.
-  const adoptStoryboard = (row: BrollHistoryItem) => {
+  // `warning` is a storyboard that landed but stopped short of the end of the
+  // script. It REPLACES the ready toast rather than following it: two toasts
+  // where the first says "ready" is how a member reads past the one that
+  // matters and finds the missing half by scrolling.
+  const adoptStoryboard = (row: BrollHistoryItem, warning?: string) => {
     const rowMode = brollHistoryMode(row)
     setSessionId(row.id)
     setSessionMode(rowMode)
@@ -803,7 +807,10 @@ export default function BrollStudio() {
       setContinuousClipStates({})
       setContinuousSelections({})
       setContinuousResult((row.continuousResult as ContinuousResult | undefined) ?? null)
-      useAppStore.getState().addToast('Storyboard ready — pick a keyframe per frame, then animate', 'success')
+      useAppStore.getState().addToast(
+        warning ?? 'Storyboard ready — pick a keyframe per frame, then animate',
+        warning ? 'error' : 'success',
+      )
       return
     }
     const delivery = row.lineDelivery ?? 'silent'
@@ -811,8 +818,8 @@ export default function BrollStudio() {
     setCardStates({})
     setResult((row.result as BrollResult | null) ?? null)
     useAppStore.getState().addToast(
-      delivery === 'dialogue' ? 'Dialogue scenes ready' : 'B-roll scenes ready',
-      'success',
+      warning ?? (delivery === 'dialogue' ? 'Dialogue scenes ready' : 'B-roll scenes ready'),
+      warning ? 'error' : 'success',
     )
   }
 
@@ -823,7 +830,7 @@ export default function BrollStudio() {
     setPendingStoryboardId('')
     if (outcome.ok) {
       const row = useBankStore.getState().brollHistory.find((r) => r.id === rowId)
-      if (row) adoptStoryboard(row)
+      if (row) adoptStoryboard(row, outcome.warning)
       return
     }
     // A null message means the row was deleted while it wrote — that's the
