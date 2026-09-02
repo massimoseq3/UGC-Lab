@@ -26,8 +26,6 @@ import type { PlaygroundMode, InFlightGen } from '../types'
 import { humanizeError } from '../../../utils/friendlyError'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
 import useNearViewport from '../../../hooks/useNearViewport'
-import { useVideoPoster } from '../../../hooks/useVideoPoster'
-import { useThumbUrl } from '../../../hooks/useThumbUrl'
 export type { InFlightGen }
 
 // List-view size-slider bounds. The raw value drives the slider fill % and the
@@ -377,17 +375,9 @@ function HistoryListRow({
 }) {
   // The row's media loads once the row is near the window — see the note on
   // `scrollRef` above. Everything else about the row renders regardless.
-  // A clip keeps releasing its decoder; a still holds what it loaded, since
-  // re-reading it costs nothing and un-painting it costs a black row on the way
-  // back up. See useNearViewport.
-  const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: entry.kind === 'video' })
-  // A still is drawn from a thumbnail sized to the media column (see
-  // hooks/useThumbUrl); a clip is the clip. The row element is what's measured
-  // — the media column is a fixed share of it.
-  const still = useThumbUrl(near && entry.kind === 'image' ? entry.data.imageUrl : null, rowRef)
-  const clip = useAssetUrlState(near && entry.kind === 'video' ? entry.data.videoUrl : null)
-  const { url, status } = entry.kind === 'image' ? still : clip
-  const { poster, posterProps } = useVideoPoster()
+  const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
+  const mediaRef = entry.kind === 'image' ? entry.data.imageUrl : entry.kind === 'video' ? entry.data.videoUrl : null
+  const { url, status } = useAssetUrlState(near ? mediaRef : null)
   // Music rows play from their own artwork, with the waveform under the prompt
   // — the same transport the grid tile and Voiceovers' history cards use.
   const coverUrl = useAssetUrl(entry.kind === 'music' ? entry.data.coverImageRef ?? null : null)
@@ -443,16 +433,7 @@ function HistoryListRow({
             // autoplay muted on hover) looked fine. The media fragment makes it
             // seek to 0.1s, which forces that frame to decode and show. Same fix
             // as B-Roll's history CoverTile.
-            <video
-              {...rowVideo}
-              src={`${url}#t=0.1`}
-              {...posterProps}
-              poster={poster}
-              controls
-              playsInline
-              preload="metadata"
-              className="absolute inset-0 h-full w-full object-contain"
-            />
+            <video {...rowVideo} src={`${url}#t=0.1`} controls playsInline preload="metadata" className="absolute inset-0 h-full w-full object-contain" />
           ) : (
             <img
               src={url}
@@ -463,8 +444,6 @@ function HistoryListRow({
               className={`absolute inset-0 h-full w-full object-contain ${onClickImage ? 'cursor-zoom-in' : ''}`}
             />
           )
-        ) : poster ? (
-          <img src={poster} alt="" className="absolute inset-0 h-full w-full object-contain" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             {status === 'loading'
@@ -621,18 +600,9 @@ function ImageTile({
   onAnimate?: () => void
 }) {
   // `loading="lazy"` only defers the <img> — the blob behind it still came out
-  // of IndexedDB for every tile in the list. This defers the read itself. It
-  // never gives the picture back: a still holds no decoder, its blob read and
-  // object URL are cached for good the moment it resolves, and this tile is
-  // sized by the picture — so dropping one on the way past would resize a tile
-  // ABOVE the scroll position and shove the grid around under the pointer.
-  // See useNearViewport.
+  // of IndexedDB for every tile in the list. This defers the read itself.
   const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
-  // …and what it loads is a thumbnail sized to this tile, not the still the
-  // model returned: a 4K picture is 36 MB decoded whatever size it's drawn at,
-  // and a gallery of them is what made scrolling hitch. The full picture is
-  // still what the preview modal, Download and Save read. See utils/thumbStore.
-  const { url, status } = useThumbUrl(near ? item.imageUrl : null, tileRef)
+  const { url, status } = useAssetUrlState(near ? item.imageUrl : null)
   const isSaved = !!item.linkedBRollId
 
   return (
@@ -722,14 +692,8 @@ function VideoTile({
 }) {
   // Off-window tiles hold no clip: a <video> each is a blob in memory and a
   // decoder, and the browser runs out of the second long before this list does.
-  // Safe to release where a still isn't, because the frame below is sized by
-  // the tile's own aspect ratio and so keeps its height either way.
-  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: true })
+  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
   const { url, status } = useAssetUrlState(near ? item.videoUrl : null)
-  // …but it keeps the frame. Handing the decoder back is what makes the grid
-  // survive sixty clips; painting nothing until the next one is built is what
-  // made scrolling back up look like a reload.
-  const { poster, posterProps } = useVideoPoster()
   // Hover-autoplay must stay muted (browsers block unmuted autoplay), but an
   // explicit Play click is a user gesture and plays in place with sound — and
   // stops whatever clip was playing elsewhere in the app.
@@ -746,19 +710,7 @@ function VideoTile({
         style={ratio}
       >
         {status === 'ready' && url ? (
-          // `#t=0.1` for the same reason the list row carries it: with
-          // `preload="metadata"` Safari decodes no frame, so a tile nobody has
-          // hovered paints as an empty black box. It is also what makes the
-          // frame readable back off a canvas — see hooks/useVideoPoster.
-          <video
-            {...inline.videoProps}
-            {...posterProps}
-            src={`${url}#t=0.1`}
-            poster={poster}
-            className="h-full w-full object-cover"
-          />
-        ) : poster ? (
-          <img src={poster} alt="" className="h-full w-full object-cover" />
+          <video {...inline.videoProps} src={url} className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             {status === 'loading'

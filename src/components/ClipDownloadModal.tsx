@@ -202,7 +202,7 @@ function ClipTile({
   // Only tiles near the scroll window hold a clip — this list runs to every
   // video the member has ever made, and mounting all of them at once left the
   // grid black while the tab stalled. See hooks/useNearViewport.
-  const { ref: tileRef, near } = useNearViewport<HTMLButtonElement>(scrollRoot, undefined, { release: true })
+  const { ref: tileRef, near } = useNearViewport<HTMLButtonElement>(scrollRoot)
   const url = useAssetUrl(near ? entry.ref : null)
   return (
     <div className="flex flex-col gap-1.5">
