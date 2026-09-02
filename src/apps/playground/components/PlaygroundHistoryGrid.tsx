@@ -1,6 +1,6 @@
 import { memo, useMemo, useRef, useState, useEffect } from 'react'
 import { ArrowLeft,
-  Download, Bookmark, Check, Film, Image as ImageIcon, Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy, LayoutGrid, List, Maximize2,
+  Download, Bookmark, Check, CheckSquare, Film, Image as ImageIcon, Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy, LayoutGrid, List, Maximize2,
 } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import { useBankStore } from '../../../stores/bankStore'
@@ -13,6 +13,7 @@ import { getModel } from '../../../utils/models'
 import { usePersistedState } from '../../../hooks/usePersistedState'
 import { sectionLabel, groupByDay } from '../../../utils/history'
 import { downloadImage } from '../../../utils/downloadImage'
+import { downloadAssetsZip } from '../../../utils/downloadZip'
 import type { ImageHistoryItem, VideoHistoryItem, MusicHistoryItem } from '../../../stores/types'
 import AudioTile, { MusicArtwork, MusicWaveStrip } from './AudioTile'
 import { useAudioPlayback } from '../../../hooks/useAudioPlayback'
@@ -74,6 +75,15 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
 
   const [savingIds, setSavingIds] = useState<Set<string>>(() => new Set())
   const [previewItem, setPreviewItem] = useState<HistoryEntry | null>(null)
+  // Pick-several-clips-and-zip mode. It lives on the grid itself rather than in
+  // a modal listing the clips a second time (B-Roll's `ClipDownloadModal` shape,
+  // which this app tried and dropped): the wall of tiles you are already
+  // scrolling IS the picker, so choosing four takes out of a week of them is
+  // four clicks in the view you found them in. Nothing is preselected — this
+  // list runs back weeks, and pre-ticking it would mean unticking dozens.
+  const [selecting, setSelecting] = useState(false)
+  const [picked, setPicked] = useState<Set<string>>(() => new Set())
+  const [zipping, setZipping] = useState(false)
   // Grid (masonry) vs List (stacked rows). Persisted globally so the choice
   // sticks across reloads and modes — mirrors the competitor's List/Grid switch.
   const [viewMode, setViewMode] = usePersistedState<'grid' | 'list'>('ai-ugc-lab:playground:history-view', 'grid')
@@ -110,12 +120,48 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
 
   const visibleInFlight = filterMode ? inFlight.filter((g) => g.mode === filterMode) : inFlight
 
-  // No zip picker here. B-Roll keeps one because its list is ONE storyboard —
-  // a finite set of takes you export together as an edit. Playground's is every
-  // clip the member has ever generated, which is a reel to scroll, not a
-  // deliverable to package; every tile already downloads in one tap from its own
-  // hover stack. `ClipDownloadModal` still lives in `src/components/` for
-  // B-Roll's two modes.
+  // The clips this grid is currently showing, newest first — what Select works
+  // over, and the order they land in the zip.
+  const videoEntries = useMemo(
+    () => entries.filter((e): e is Extract<HistoryEntry, { kind: 'video' }> => e.kind === 'video'),
+    [entries],
+  )
+  // Selecting is a GRID gesture: the tile is the checkbox. A list row is a card
+  // you read and play, not a thing you tick, so the control doesn't offer
+  // itself there — and switching views or tabs drops a selection that would
+  // otherwise be invisible while it survived.
+  const canSelect = viewMode === 'grid' && videoEntries.length > 0
+  useEffect(() => {
+    setSelecting(false)
+    setPicked(new Set())
+  }, [filterMode, viewMode])
+
+  const pickedCount = videoEntries.reduce((n, e) => n + (picked.has(e.data.id) ? 1 : 0), 0)
+  const allPicked = pickedCount === videoEntries.length && videoEntries.length > 0
+
+  const togglePicked = (id: string) =>
+    setPicked((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+  async function handleDownloadZip() {
+    if (zipping || pickedCount === 0) return
+    setZipping(true)
+    const clips = videoEntries.filter((e) => picked.has(e.data.id)).map((e) => e.data)
+    const outcome = await zipClips(clips)
+    setZipping(false)
+    if (outcome.ok) {
+      addToast(`Downloading ${outcome.count} clip${outcome.count === 1 ? '' : 's'} as a zip`, 'success')
+      setSelecting(false)
+      setPicked(new Set())
+    } else {
+      addToast(outcome.message, 'error')
+    }
+  }
+
   // The scroller every tile observes itself against — see hooks/useNearViewport.
   // This list is uncapped, so without it a member with a few dozen clips paid
   // for every one of them (a blob read each, a decoder each) on mount.
@@ -169,6 +215,34 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
           Matches the prompt panel's h-[57px] mode-toggle bar so the left/right
           tabs sit on the same line. */}
       <div className="flex h-[57px] shrink-0 items-center justify-end gap-3 border-b border-ink/5 px-4">
+        {/* Selecting takes over the header rather than raising a band under the
+            scroll port: the bar is already there, already pinned, and already
+            where the gesture was started from — a second strip at the other end
+            of the panel made a member look away from the clips to read a count
+            about them. There's no "N of M selected" tally: the count rides on
+            the Download button, and a second copy of it beside Select all was
+            the thing that clipped that link at panel width (this pane's width
+            doesn't track the viewport's, so no breakpoint fixes it). */}
+        {selecting && (
+          <button
+            type="button"
+            onClick={() => setPicked(allPicked ? new Set() : new Set(videoEntries.map((e) => e.data.id)))}
+            className="mr-auto shrink-0 text-[11px] font-medium text-ink-400 underline-offset-2 transition-colors hover:text-ink-200 hover:underline"
+          >
+            {allPicked ? 'Clear all' : 'Select all'}
+          </button>
+        )}
+        {selecting && (
+          <button
+            type="button"
+            onClick={() => void handleDownloadZip()}
+            disabled={zipping || pickedCount === 0}
+            className="flex h-10 shrink-0 items-center gap-1.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-playground-500 px-4 text-xs font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:brightness-100"
+          >
+            {zipping ? <Spinner className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
+            {zipping ? 'Zipping…' : `Download ${pickedCount} clip${pickedCount === 1 ? '' : 's'}`}
+          </button>
+        )}
         {viewMode === 'list' && (
           <div className="flex items-center gap-2.5" title="Card size">
             <Maximize2 className="h-3.5 w-3.5 text-ink-500" />
@@ -187,6 +261,24 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
               aria-label="List card size"
             />
           </div>
+        )}
+        {canSelect && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelecting((on) => !on)
+              setPicked(new Set())
+            }}
+            title={selecting ? 'Leave select mode' : 'Pick clips to download as a zip'}
+            className={`flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium transition-colors ${
+              selecting
+                ? 'border-playground-500/50 bg-playground-500/15 text-playground-200 light:text-playground-700'
+                : 'border-ink/10 text-ink-400 hover:bg-ink/5 hover:text-ink-200'
+            }`}
+          >
+            {selecting ? <X className="h-3.5 w-3.5" /> : <CheckSquare className="h-3.5 w-3.5" />}
+            {selecting ? 'Cancel' : 'Select'}
+          </button>
         )}
         <ViewToggle value={viewMode} onChange={setViewMode} />
       </div>
@@ -240,6 +332,9 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                       <VideoTile
                         item={entry.data}
                         scrollRoot={scrollRef}
+                        selecting={selecting}
+                        selected={picked.has(entry.data.id)}
+                        onToggleSelect={() => togglePicked(entry.data.id)}
                         onClick={() => setPreviewItem(entry)}
                         onDelete={() => deleteVideoHistory(entry.data.id)}
                         onCopyPrompt={() => handleCopyPrompt(entry.data.prompt)}
@@ -681,6 +776,9 @@ function ImageTile({
 function VideoTile({
   item,
   scrollRoot,
+  selecting,
+  selected,
+  onToggleSelect,
   onClick,
   onDelete,
   onCopyPrompt,
@@ -688,6 +786,12 @@ function VideoTile({
 }: {
   item: VideoHistoryItem
   scrollRoot: React.RefObject<HTMLElement | null>
+  // In select mode the whole tile IS the checkbox — it toggles instead of
+  // opening the preview, and the play / mute / action chrome stands down so a
+  // click anywhere on the picture means one thing.
+  selecting?: boolean
+  selected?: boolean
+  onToggleSelect?: () => void
   onClick: () => void
   onDelete: () => void
   onCopyPrompt: () => void
@@ -709,12 +813,23 @@ function VideoTile({
       <div
         ref={tileRef}
         {...inline.hoverProps}
-        onClick={onClick}
-        className="group relative cursor-pointer overflow-hidden rounded-lg border border-ink/10 light:border-ink/5 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 light:hover:border-ink/10 hover:-translate-y-px card-soft-shadow"
+        onClick={selecting ? onToggleSelect : onClick}
+        title={selecting ? (selected ? 'Leave out of the zip' : 'Add to the zip') : undefined}
+        className={`group relative cursor-pointer overflow-hidden rounded-lg border transition-all hover:-translate-y-px card-soft-shadow bg-black light:bg-zinc-200 ${
+          selecting && selected
+            ? 'border-playground-500/70 ring-2 ring-playground-500/40'
+            : 'border-ink/10 light:border-ink/5 hover:border-ink/20 light:hover:border-ink/10'
+        }`}
         style={ratio}
       >
         {status === 'ready' && url ? (
-          <video {...inline.videoProps} src={url} className="h-full w-full object-cover" />
+          <video
+            {...inline.videoProps}
+            src={url}
+            className={`h-full w-full object-cover transition-opacity ${
+              selecting && !selected ? 'opacity-60 group-hover:opacity-100' : ''
+            }`}
+          />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             {status === 'loading'
@@ -756,29 +871,46 @@ function VideoTile({
             pausing first to reach them. It sits top-right, clear of the
             play/pause and mute buttons on the left, and only fades in on
             hover — so it never covers a clip you're just watching. */}
-        <TileActionStack>
-          <TileActionButton
-            title="Download"
-            onClick={async (e) => {
-              e.stopPropagation()
-              const u = await getUrl(item.videoUrl)
-              if (u) downloadImage(u, `playground-${item.id}`, 'mp4')
-            }}
+        {!selecting && (
+          <TileActionStack>
+            <TileActionButton
+              title="Download"
+              onClick={async (e) => {
+                e.stopPropagation()
+                const u = await getUrl(item.videoUrl)
+                if (u) downloadImage(u, `playground-${item.id}`, 'mp4')
+              }}
+            >
+              <Download className="h-4 w-4" />
+            </TileActionButton>
+            {item.prompt && (
+              <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
+                <Copy className="h-4 w-4" />
+              </TileActionButton>
+            )}
+            {onReuse && (
+              <TileActionButton title="Reuse this prompt" onClick={(e) => { e.stopPropagation(); onReuse() }}>
+                <ArrowLeft className="h-4 w-4" />
+              </TileActionButton>
+            )}
+            <TileDeleteButton onDelete={onDelete} />
+          </TileActionStack>
+        )}
+
+        {/* The tick takes the top-RIGHT corner the action stack vacates, leaving
+            the left edge to play/mute: picking clips is exactly when you want to
+            watch them, so the transport stays live and both its handlers
+            stopPropagation so pressing one never ticks the tile. The tick itself
+            is not a button — the whole tile already carries that click. */}
+        {selecting && (
+          <span
+            className={`pointer-events-none absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full border transition-colors ${
+              selected ? 'border-playground-300 bg-playground-500 text-white' : 'border-white/40 bg-black/50'
+            }`}
           >
-            <Download className="h-4 w-4" />
-          </TileActionButton>
-          {item.prompt && (
-            <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
-              <Copy className="h-4 w-4" />
-            </TileActionButton>
-          )}
-          {onReuse && (
-            <TileActionButton title="Reuse this prompt" onClick={(e) => { e.stopPropagation(); onReuse() }}>
-              <ArrowLeft className="h-4 w-4" />
-            </TileActionButton>
-          )}
-          <TileDeleteButton onDelete={onDelete} />
-        </TileActionStack>
+            {selected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+          </span>
+        )}
       </div>
   )
 }
@@ -1113,6 +1245,42 @@ function ModalBarButton({
 }
 
 // ── Shared bits ─────────────────────────────────────────────────
+
+// Zip the picked clips. Module scope on purpose: a try/catch inside the
+// component body makes the React Compiler skip the whole component, and this
+// grid is the one that must not re-render while the member types next to it.
+// It returns a verdict rather than throwing, so the caller stays branch-simple.
+async function zipClips(
+  clips: VideoHistoryItem[],
+): Promise<{ ok: true; count: number } | { ok: false; message: string }> {
+  try {
+    const stamp = new Date().toISOString().slice(0, 10)
+    const count = await downloadAssetsZip(
+      clips.map((clip, i) => ({
+        ref: clip.videoUrl,
+        // The index prefix is what keeps names unique (two takes of one prompt
+        // slug the same) and holds the zip in the order the grid showed them.
+        name: `${String(i + 1).padStart(2, '0')}-${fileSlug(clip.prompt)}`,
+      })),
+      `playground-clips-${stamp}`,
+    )
+    return { ok: true, count }
+  } catch (err) {
+    return { ok: false, message: humanizeError(err, 'Could not download the clips.') }
+  }
+}
+
+// A prompt is the only name a Playground clip has — trimmed to something a
+// file system will take, and never empty.
+function fileSlug(prompt: string | undefined): string {
+  const slug = (prompt ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48)
+    .replace(/-+$/, '')
+  return slug || 'clip'
+}
 
 function aspectStyle(ar: string): React.CSSProperties {
   const [w, h] = ar.split(':').map(Number)
