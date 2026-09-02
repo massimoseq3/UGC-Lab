@@ -375,7 +375,10 @@ function HistoryListRow({
 }) {
   // The row's media loads once the row is near the window — see the note on
   // `scrollRef` above. Everything else about the row renders regardless.
-  const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
+  // Only a CLIP releases: the media frame here is a fixed aspect, so a clip
+  // coming and going moves nothing, while a still that released would resize
+  // this row from above the viewport. See useNearViewport.
+  const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: entry.kind === 'video' })
   const mediaRef = entry.kind === 'image' ? entry.data.imageUrl : entry.kind === 'video' ? entry.data.videoUrl : null
   const { url, status } = useAssetUrlState(near ? mediaRef : null)
   // Music rows play from their own artwork, with the waveform under the prompt
@@ -692,7 +695,8 @@ function VideoTile({
 }) {
   // Off-window tiles hold no clip: a <video> each is a blob in memory and a
   // decoder, and the browser runs out of the second long before this list does.
-  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
+  // Safe to release because the tile's height is `ratio`, not the clip's.
+  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: true })
   const { url, status } = useAssetUrlState(near ? item.videoUrl : null)
   // Hover-autoplay must stay muted (browsers block unmuted autoplay), but an
   // explicit Play click is a user gesture and plays in place with sound — and
