@@ -470,6 +470,38 @@ export function extractChatTaskText(record: TaskRecord): string | null {
   return null
 }
 
+/**
+ * Did a CHAT run through the JOBS transport stop because it ran out of output
+ * tokens? The streaming transport has read the stop reason since it shipped
+ * (`hitTokenLimit` → `TruncatedResponseError`); this one never did, and the
+ * difference mattered because the jobs route is the one the longest output in
+ * the app takes — B-Roll's storyboard runs here precisely so it survives a
+ * reload. A cut-off answer therefore arrived looking clean, and the tolerant
+ * tag readers downstream rendered it as a SHORT storyboard with no error
+ * anywhere: half a script's worth of scenes, and paid image and video
+ * generations fired against a script that never got written.
+ *
+ * `resultJson` carries the provider's own envelope, so the same three shapes
+ * the streaming side knows are all that's needed — they're checked together
+ * because the record doesn't say which transport produced it, and the keys
+ * they look at don't overlap. A `resultJson` holding raw model text rather
+ * than an envelope says nothing either way, and answers false.
+ */
+export function chatTaskHitTokenLimit(record: TaskRecord): boolean {
+  let envelope: unknown
+  try {
+    envelope = JSON.parse(record.resultJson || '""')
+  } catch {
+    return false
+  }
+  if (!envelope || typeof envelope !== 'object') return false
+  return (
+    hitTokenLimit(envelope, 'openai-chat') ||
+    hitTokenLimit(envelope, 'claude-messages') ||
+    hitTokenLimit(envelope, 'openai-responses')
+  )
+}
+
 // Generous, because a 30s video is tens of MB on a slow line — but NOT
 // unbounded, which is what this was. This runs at the TAIL of a generation kie
 // has already finished and billed for, so a stalled CDN read meant the result

@@ -28,7 +28,9 @@ import {
   createTask,
   pollTask,
   extractChatTaskText,
+  chatTaskHitTokenLimit,
   kieChatCompletions,
+  TruncatedResponseError,
   CHAT_POLL_ATTEMPTS,
   LONG_CHAT_TIMEOUT_MS,
   type ChatMessage,
@@ -40,6 +42,15 @@ import type { BrollHistoryItem } from '../../../stores/types'
 import { humanizeError } from '../../../utils/friendlyError'
 import type { BrollInput } from '../types'
 import { buildBrollMessages, buildBrollResult } from './generateBroll'
+import {
+  isStoryboardShort,
+  sceneCount,
+  trimToLastCompleteScene,
+  continuationMessages,
+  stitchStoryboard,
+  MAX_STORYBOARD_CONTINUATIONS,
+  type StoryboardMode,
+} from './storyboardCompletion'
 import {
   buildContinuousMessages,
   parseContinuousResult,
@@ -53,7 +64,19 @@ export type StoryboardRequest =
 
 // `error: null` means the row was deleted while the call ran — the member
 // cancelled it, so there is nothing to tell them.
-export type StoryboardOutcome = { ok: true } | { ok: false; error: string | null }
+//
+// `warning` is the storyboard that landed but stopped short of the end of the
+// script (see storyboardCompletion.ts) and could not be completed by asking for
+// the rest. It is deliberately NOT an error: what came back is real work the
+// member paid for and the scenes in it are usable, so it is adopted exactly as
+// a whole one is — the warning only replaces the "Storyboard ready" toast, so
+// nobody is left to discover the missing half by scrolling.
+export type StoryboardOutcome =
+  | { ok: true; warning?: string }
+  | { ok: false; error: string | null }
+
+export const STORYBOARD_INCOMPLETE_WARNING =
+  'The storyboard stopped before the end of your script — the model ran out of room. Generate again, or split a long script into two runs.'
 
 type Listener = (rowId: string, outcome: StoryboardOutcome) => void
 
@@ -119,7 +142,16 @@ async function startChatTask(apiKey: string, modelId: string, messages: ChatMess
   }
 }
 
-async function pollChatText(taskId: string): Promise<string> {
+/**
+ * A model's answer, plus whether it stopped because it ran out of output
+ * tokens. Both transports can say so — the streaming one throws
+ * `TruncatedResponseError` (whose `partial` is exactly this text), the jobs one
+ * reports the stop reason on the record — and until this was plumbed through,
+ * neither answer reached the storyboard: a cut-off run looked like a short ad.
+ */
+type ProducedText = { text: string; truncated: boolean }
+
+async function pollChatText(taskId: string): Promise<ProducedText> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const record = await pollTask(apiKey, taskId, { maxPollAttempts: CHAT_POLL_ATTEMPTS })
   const text = extractChatTaskText(record)
@@ -128,10 +160,27 @@ async function pollChatText(taskId: string): Promise<string> {
       `Storyboard task ${taskId} succeeded but no text could be extracted. Raw resultJson: ${record.resultJson?.slice(0, 400)}`,
     )
   }
-  return text
+  return { text, truncated: chatTaskHitTokenLimit(record) }
 }
 
-async function produceText(rowId: string, messages: ChatMessage[]): Promise<string> {
+// The streaming fallback. `TruncatedResponseError` carries the partial for
+// exactly this reason — a cut-off storyboard is salvageable and continuable,
+// where re-running it from scratch costs the member the whole call again.
+async function streamChatText(apiKey: string, modelId: string, messages: ChatMessage[]): Promise<ProducedText> {
+  try {
+    const text = await kieChatCompletions(apiKey, getChatTarget(modelId), messages, {
+      timeoutMs: LONG_CHAT_TIMEOUT_MS,
+    })
+    return { text, truncated: false }
+  } catch (err) {
+    if (err instanceof TruncatedResponseError && err.partial.trim()) {
+      return { text: err.partial, truncated: true }
+    }
+    throw err
+  }
+}
+
+async function produceText(rowId: string, messages: ChatMessage[]): Promise<ProducedText> {
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const modelId = resolveScriptModel('broll-studio')
   const taskId = await startChatTask(apiKey, modelId, messages)
@@ -142,7 +191,67 @@ async function produceText(rowId: string, messages: ChatMessage[]): Promise<stri
     await patchRow(rowId, { storyboardTaskId: taskId })
     return pollChatText(taskId)
   }
-  return kieChatCompletions(apiKey, getChatTarget(modelId), messages, { timeoutMs: LONG_CHAT_TIMEOUT_MS })
+  return streamChatText(apiKey, modelId, messages)
+}
+
+/**
+ * A continuation turn. Deliberately does NOT persist its taskId over the first
+ * one: a reload mid-continuation would then re-attach to the tail and adopt
+ * half a storyboard's second half as the whole thing. Leaving the first task on
+ * the row means a reload resumes what it always did — the opening run — which
+ * is short but coherent, and says so.
+ */
+async function continueText(messages: ChatMessage[]): Promise<ProducedText> {
+  const apiKey = useSettingsStore.getState().getKieApiKey()
+  const modelId = resolveScriptModel('broll-studio')
+  const taskId = await startChatTask(apiKey, modelId, messages)
+  return taskId ? pollChatText(taskId) : streamChatText(apiKey, modelId, messages)
+}
+
+/**
+ * The storyboard, written all the way to the end of the script — asking for the
+ * rest when the first answer stops short, rather than rendering half an ad.
+ *
+ * The loop stops on the first of three things: the answer covers the script,
+ * the model has nothing left to add (a continuation that produces no new
+ * scene), or we've asked enough times. In every one of those the text we keep
+ * is the longest we ever held — a continuation that adds nothing never costs
+ * the member what the previous round already wrote.
+ */
+async function produceStoryboardText(
+  rowId: string,
+  mode: StoryboardMode,
+  scriptText: string,
+  messages: ChatMessage[],
+): Promise<{ text: string; complete: boolean }> {
+  let { text, truncated } = await produceText(rowId, messages)
+  const done = () => !truncated && !isStoryboardShort(scriptText, text)
+
+  for (let attempt = 0; attempt < MAX_STORYBOARD_CONTINUATIONS && !done(); attempt++) {
+    const head = trimToLastCompleteScene(text, mode)
+    // Not one scene closed: there is nothing coherent to continue from, and a
+    // fresh ask would just be the same call again.
+    if (!head) break
+    console.info(
+      `[broll] storyboard stopped short (truncated=${truncated}) — asking for the rest (${attempt + 1}/${MAX_STORYBOARD_CONTINUATIONS})`,
+    )
+    // A failed continuation must never cost the member the storyboard the first
+    // call already wrote and already billed for. It ends the loop and the run
+    // settles with the scenes in hand, plus the warning saying they stop short.
+    let more: ProducedText
+    try {
+      more = await continueText(continuationMessages(messages, head, mode))
+    } catch (err) {
+      console.warn('[broll] storyboard continuation failed — keeping what landed', err)
+      break
+    }
+    const next = stitchStoryboard(head, more.text, mode)
+    if (sceneCount(next, mode) <= sceneCount(text, mode)) break
+    text = next
+    truncated = more.truncated
+  }
+
+  return { text, complete: done() }
 }
 
 // ── Parsing ──────────────────────────────────────────────────────────────
@@ -179,11 +288,14 @@ function parseStoryboard(row: BrollHistoryItem, text: string): Partial<BrollHist
 
 // ── Running ──────────────────────────────────────────────────────────────
 
-async function runJob(rowId: string, produce: () => Promise<string>): Promise<void> {
+async function runJob(
+  rowId: string,
+  produce: () => Promise<{ text: string; complete: boolean }>,
+): Promise<void> {
   if (running.has(rowId)) return
   running.add(rowId)
   try {
-    const text = await produce()
+    const { text, complete } = await produce()
     const row = rowById(rowId)
     if (!row) {
       notify(rowId, { ok: false, error: null })
@@ -195,7 +307,7 @@ async function runJob(rowId: string, produce: () => Promise<string>): Promise<vo
       storyboardTaskId: undefined,
       storyboardError: undefined,
     })
-    notify(rowId, { ok: true })
+    notify(rowId, complete ? { ok: true } : { ok: true, warning: STORYBOARD_INCOMPLETE_WARNING })
   } catch (err) {
     // The row only keeps the friendly copy, so without this the raw kie message
     // — the one that says WHICH rejection this was — is gone for good.
@@ -218,7 +330,7 @@ export function startStoryboard(rowId: string, req: StoryboardRequest): void {
     const messages = req.mode === 'line'
       ? await buildBrollMessages(req.input)
       : await buildContinuousMessages(req.input)
-    return produceText(rowId, messages)
+    return produceStoryboardText(rowId, req.mode, req.input.scriptText, messages)
   })
 }
 
@@ -231,7 +343,15 @@ export function resumeStoryboard(row: BrollHistoryItem): boolean {
   const taskId = row.storyboardTaskId
   if (row.storyboardStatus !== 'writing' || !taskId || running.has(row.id)) return false
   console.info(`[broll] resuming storyboard task ${taskId}`)
-  void runJob(row.id, () => pollChatText(taskId))
+  // A resumed run cannot be continued: the messages that produced it went down
+  // with the previous page, and rebuilding them from the row would drop the
+  // product and character context the storyboard was written against. So it is
+  // checked and reported rather than repaired — the member is told it stopped
+  // short instead of finding out by scrolling.
+  void runJob(row.id, async () => {
+    const { text, truncated } = await pollChatText(taskId)
+    return { text, complete: !truncated && !isStoryboardShort(row.scriptText ?? '', text) }
+  })
   return true
 }
 
