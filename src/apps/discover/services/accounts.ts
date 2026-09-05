@@ -46,9 +46,19 @@ export function parseInstagramHandle(input: string): string | null {
   const raw = input.trim()
   if (!raw) return null
 
-  // Not a url — treat as a handle. Instagram allows letters, digits, dots and
-  // underscores, up to 30.
-  if (!/[./]/.test(raw) || /^@/.test(raw)) {
+  // Is this a LINK or a NAME? Decided on the things that only a link has: a
+  // scheme, a path separator, or Instagram's own host. It used to be decided
+  // on "contains a dot", which quietly rejected a huge share of real accounts
+  // — a dot is legal in an Instagram handle and extremely common, so typing
+  // `honeydew.skin` was read as a hostname, failed the instagram.com check and
+  // came back "that doesn't look like an Instagram account".
+  const looksLikeLink = /^https?:\/\//i.test(raw)
+    || raw.includes('/')
+    || /^(www\.)?instagram\.com$/i.test(raw)
+
+  if (!looksLikeLink) {
+    // The @ is optional and always has been on Instagram itself — a member
+    // typing the bare name means the same thing, so infer it.
     const handle = raw.replace(/^@/, '').toLowerCase()
     return /^[a-z0-9._]{1,30}$/.test(handle) ? handle : null
   }

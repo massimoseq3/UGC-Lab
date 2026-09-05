@@ -113,6 +113,14 @@ interface AccountsBrowserProps {
   accounts: TrackedAccount[]
   selectedId: string | null
   onSelect: (id: string) => void
+  /**
+   * An account that was just tracked and should have its first page bought.
+   *
+   * Passed in rather than inferred, because "the member just asked for this
+   * one" is knowledge Discover has and this component cannot derive.
+   */
+  pendingLoadId: string | null
+  onPendingLoadDone: () => void
   filters: AccountFilters
   onFiltersChange: (next: (f: AccountFilters) => AccountFilters) => void
   apiKey: string
@@ -129,7 +137,7 @@ interface AccountsBrowserProps {
 }
 
 export default function AccountsBrowser({
-  accounts, selectedId, onSelect, filters, onFiltersChange, apiKey, onCredits,
+  accounts, selectedId, onSelect, pendingLoadId, onPendingLoadDone, filters, onFiltersChange, apiKey, onCredits,
   onAnalyze, onRemix, onSave, onDownload, onOpen, savedKeys, busyId, busyKind,
 }: AccountsBrowserProps) {
   const baseKey = useProjectScopedKey('discover')
@@ -205,42 +213,51 @@ export default function AccountsBrowser({
   }, [apiKey, onCredits, addToast, setCache])
 
   /**
-   * ARRIVING on this tab costs nothing. PICKING an account costs a credit.
-   *
-   * The distinction is the whole rule, and the vault section of this app's
-   * CLAUDE.md is why it's worth the ref dance: billing for the act of looking
-   * is a mistake Outliers has already made once. A member whose cached reels
-   * have aged out past the 24h window would otherwise be charged a credit per
-   * tracked account simply for opening the app on the tab they left it on.
-   *
-   * So the account that is selected when the tab loads is treated as already
-   * handled; anything the member selects AFTERWARDS — a click in the rail, or
-   * the row `handleTrack` just created — is a deliberate ask and fetches. An
-   * arriving account with nothing cached shows the priced Refresh instead.
-   *
-   * Seeded on the first render that actually HAS accounts, not on mount: the
-   * bank hydrates a tick later, so seeding an empty set on render one would
-   * make the restored selection look like a fresh pick and bill for it.
-   */
-  const arrivedWith = useRef<string | null | undefined>(undefined)
-  if (arrivedWith.current === undefined && accounts.length > 0) {
-    arrivedWith.current = selected?.id ?? null
-  }
-
-  /**
    * Accounts already asked for, so a rejected fetch isn't retried forever.
    *
-   * Without it a failed load leaves the cache empty and the effect fires again
-   * on the next render — a retry loop that spends a credit each time round.
+   * Without it a failed load leaves the cache empty and any re-entry fetches
+   * again — a retry loop that spends a credit each time round.
    */
   const attempted = useRef<Set<string>>(new Set())
+
+  /** Buys a first page for an account that has none, once. */
+  const loadIfEmpty = useCallback((account: TrackedAccount) => {
+    if (!apiKey) return
+    if (cacheRef.current[account.id] || attempted.current.has(account.id)) return
+    attempted.current.add(account.id)
+    void load(account, undefined)
+  }, [apiKey, load])
+
+  /**
+   * ARRIVING on this tab costs nothing. ASKING for an account costs a credit.
+   *
+   * That distinction is the whole rule — billing for the act of looking is a
+   * mistake Outliers has already made once, and a member whose cached reels
+   * aged out past the 24h window would otherwise be charged a credit per
+   * tracked account just for opening the app on the tab they left it on.
+   *
+   * It is enforced by WHO CALLS `load`, not by a heuristic about which
+   * selection looks fresh. Only two things ask: a click in the rail
+   * (`handleSelect`) and the row `handleTrack` just created (`pendingLoadId`).
+   * Rendering never does, so arrival cannot spend anything by construction.
+   *
+   * The heuristic this replaced compared the selection against whatever was
+   * selected on the first render that had accounts — which silently failed for
+   * the FIRST account a member ever tracked, since that render was also the
+   * one that seeded the comparison. Tracking somebody and getting an empty
+   * grid was that bug.
+   */
   useEffect(() => {
-    if (!selected || !apiKey) return
-    if (arrivedWith.current === undefined || selected.id === arrivedWith.current) return
-    if (cache[selected.id] || attempted.current.has(selected.id)) return
-    attempted.current.add(selected.id)
-    void load(selected, undefined)
-  }, [selected, apiKey, cache, load])
+    if (!pendingLoadId) return
+    const account = accounts.find((a) => a.id === pendingLoadId)
+    if (account) loadIfEmpty(account)
+    onPendingLoadDone()
+  }, [pendingLoadId, accounts, loadIfEmpty, onPendingLoadDone])
+
+  const handleSelect = useCallback((account: TrackedAccount) => {
+    onSelect(account.id)
+    loadIfEmpty(account)
+  }, [onSelect, loadIfEmpty])
 
   const handleUntrack = useCallback((account: TrackedAccount) => {
     void useBankStore.getState().deleteTrackedAccount(account.id)
@@ -286,7 +303,7 @@ export default function AccountsBrowser({
             account={account}
             selected={account.id === selectedId}
             busy={loadingId === account.id}
-            onSelect={() => onSelect(account.id)}
+            onSelect={() => handleSelect(account)}
             onUntrack={() => handleUntrack(account)}
           />
         ))}

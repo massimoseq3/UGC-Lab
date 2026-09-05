@@ -16,6 +16,7 @@ import {
   downloadResultVideo,
   fetchResultTranscript,
   saveVideoFileToDisk,
+  type DownloadProgress,
 } from '../discover/services/handoff'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
 import { useAppStore } from '../../stores/appStore'
@@ -40,16 +41,19 @@ import type { SwipeItem } from '../../stores/types'
 async function downloadWithRefresh(
   result: DiscoverResult,
   refresh: () => Promise<string | null>,
+  onProgress?: (p: DownloadProgress) => void,
 ): Promise<File> {
   try {
-    if (result.videoUrl) return await downloadResultVideo(result)
+    if (result.videoUrl) return await downloadResultVideo(result, onProgress)
   } catch {
     // Expired, pulled, or region-blocked — indistinguishable from here, and the
     // answer is the same either way: ask the platform for a current link.
   }
   const fresh = await refresh()
   if (!fresh) throw new Error('This ad’s video could not be reached.')
-  return await downloadResultVideo({ ...result, videoUrl: fresh })
+  // Restarts the count: the first attempt's bytes are not part of this file.
+  onProgress?.({ received: 0, total: null })
+  return await downloadResultVideo({ ...result, videoUrl: fresh }, onProgress)
 }
 
 interface SwipeDetailProps {
@@ -72,6 +76,9 @@ export default function SwipeDetail({ item, onClose }: SwipeDetailProps) {
   const [mediaDead, setMediaDead] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [busy, setBusy] = useState<DiscoverAction | null>(null)
+  // Tens of megabytes on a saved ad too, so the same rule: a spinner with no
+  // number for the whole download reads as a stuck one.
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null)
 
   // A transcript bought here is written back to the row, so the swipe file is
   // where you pay for the words once rather than once per visit.
@@ -126,7 +133,7 @@ export default function SwipeDetail({ item, onClose }: SwipeDetailProps) {
   const handleAnalyze = useCallback(async () => {
     setBusy('analyze')
     try {
-      const file = await downloadWithRefresh(result, refresh)
+      const file = await downloadWithRefresh(result, refresh, setDownloadProgress)
       sendToApp({
         targetApp: 'ad-anatomy',
         targetField: 'adVideo',
@@ -143,14 +150,16 @@ export default function SwipeDetail({ item, onClose }: SwipeDetailProps) {
 
   const handleDownload = useCallback(async () => {
     setBusy('download')
+    setDownloadProgress({ received: 0, total: null })
     try {
       // Re-resolves first so the saved-to-disk path gets the same second chance
       // Analyze does, rather than failing on a link that expired weeks ago.
-      saveVideoFileToDisk(await downloadWithRefresh(result, refresh), result)
+      saveVideoFileToDisk(await downloadWithRefresh(result, refresh, setDownloadProgress), result)
     } catch (e) {
       addToast(humanizeError(e, "Couldn't download that video. Try opening the original instead."), 'error')
     } finally {
       setBusy(null)
+      setDownloadProgress(null)
     }
   }, [result, refresh, addToast])
 
@@ -192,6 +201,7 @@ export default function SwipeDetail({ item, onClose }: SwipeDetailProps) {
       onRemix={handleRemix}
       onDownload={() => void handleDownload()}
       busy={busy}
+      downloadProgress={downloadProgress}
       onMediaError={() => setMediaDead(true)}
       mediaOverlay={needsRestore ? (
         <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 bg-gradient-to-t from-black/85 to-transparent px-4 pb-5 pt-10 text-center">
