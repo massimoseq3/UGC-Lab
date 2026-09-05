@@ -4,12 +4,17 @@ import { create } from 'zustand'
 // single features inside an app. One map, one localStorage blob, because it is
 // one question: which parts of this workspace does this person want on screen?
 //
-// Outliers is the optional APP, and it ships OFF: ad research is a side quest
-// next to the production line, and a dock tile for something most members never
-// open is clutter every one of them pays for. Switching it on brings back the
-// whole app, not just the tile — its dock entry, its planet on the Dashboard,
-// its teammate in the intro, and the Bank's Swipe File tab, which is Outliers'
-// own bank and points at an app that isn't there without it.
+// Outliers is the optional APP, and it ships ON (September 2026, Massimo's
+// call): it shipped off on the reasoning that ad research is a side quest next
+// to the production line, and enough members went looking for it that the tile
+// is worth more than the row it costs. It stays in this list — switching it off
+// takes the whole app, not just the tile: its dock entry, its planet on the
+// Dashboard, its teammate in the intro, and the Bank's Swipe File tab, which is
+// Outliers' own bank and points at an app that isn't there without it.
+//
+// A default here is only the fallback for a member who has never touched the
+// switch, so flipping it moves everyone who never opted out and nobody who did
+// — a stored `false` is a real choice and outlives the default.
 //
 // B-Roll's Continuous mode is the optional FEATURE, and it ships OFF too: the
 // keyframe chain is a second shape of workspace beside Line-by-Line, and for a
@@ -32,7 +37,7 @@ import { create } from 'zustand'
 const STORAGE_KEY = 'ai-ugc-lab-optional-apps'
 
 export const OPTIONAL_APPS: Array<{ id: string; defaultOn: boolean }> = [
-  { id: 'discover', defaultOn: false },
+  { id: 'discover', defaultOn: true },
 ]
 
 /** Optional features — not apps, so they have no dock tile or route to hide. */

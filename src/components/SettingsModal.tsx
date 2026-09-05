@@ -113,8 +113,8 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   const showGenerationInfo = useGenerationInfoStore((s) => s.show)
   const setShowGenerationInfo = useGenerationInfoStore((s) => s.setShow)
 
-  // Outliers — the one app a member can switch off, and it ships off; B-Roll's
-  // Continuous mode is the same deal one level down. See
+  // Outliers — the one app a member can switch off, and it ships on; B-Roll's
+  // Continuous mode is the same deal one level down, and ships off. See
   // stores/appVisibilityStore for what each switch actually moves.
   const outliersOn = useAppVisible('discover')
   const continuousOn = useFeatureEnabled('broll-continuous')
@@ -563,7 +563,8 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
 
             {active.id === 'experimental' && (
               <Section>
-                {/* One switch per opt-in app or feature. Off by default — see
+                {/* One switch per optional app or feature — each carries its
+                    own default (Outliers on, Continuous off); see
                     stores/appVisibilityStore for what each one moves. */}
                 <Card>
                   <ToggleRow
