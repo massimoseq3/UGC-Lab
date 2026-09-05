@@ -8,6 +8,7 @@ import { useExclusiveVideo } from '../../../hooks/useInlineVideo'
 import { engagementRate, formatCount, formatMultiple, formatRate } from '../services/scoring'
 import type { DiscoverAction, TranscriptState } from '../Discover'
 import type { DiscoverResult } from '../types'
+import type { DownloadProgress } from '../services/handoff'
 
 interface ResultDetailModalProps {
   result: DiscoverResult
@@ -28,6 +29,8 @@ interface ResultDetailModalProps {
   onSave?: (result: DiscoverResult) => void
   /** Saves the ad's video to the member's own disk. */
   onDownload: (result: DiscoverResult) => void
+  /** How far the in-flight download has got, when one is running. */
+  downloadProgress?: DownloadProgress | null
   saved?: boolean
   busy?: DiscoverAction | null
   /**
@@ -49,6 +52,7 @@ export default function ResultDetailModal({
   onRemix,
   onSave,
   onDownload,
+  downloadProgress,
   saved = false,
   busy = null,
   onMediaError,
@@ -349,26 +353,49 @@ export default function ResultDetailModal({
                 {isTikTok ? 'Open on TikTok' : isInstagram ? 'Open on Instagram' : 'Open in Meta Ad Library'}
                 <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
               </button>
-              {/* Glyph only: the row's other two buttons carry sentences, and a
-                  third label would squeeze all three past reading. */}
-              <button
-                type="button"
-                onClick={() => onDownload(result)}
-                disabled={busy === 'download' || !result.videoUrl}
-                title="Download the video"
-                aria-label="Download the video"
-                className="flex w-11 shrink-0 items-center justify-center rounded-full border border-ink/10 py-2.5 text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {busy === 'download'
-                  ? <Spinner className="h-4 w-4" />
-                  : <Download className="h-4 w-4" />}
-              </button>
             </div>
+
+            {/* Its own full-width row, and labelled. It was a 44px glyph
+                wedged beside two sentence-long buttons — the smallest target
+                in the modal, for the action a member reaches for most on a
+                reel worth keeping. The width is also what makes room for the
+                progress, which a 44px circle had nowhere to put: a reel is
+                tens of megabytes, and a bare spinner for the whole of it is
+                what made a working download read as a stuck one. */}
+            <button
+              type="button"
+              onClick={() => onDownload(result)}
+              disabled={busy === 'download' || !result.videoUrl}
+              title={result.videoUrl ? 'Save the video to your computer' : 'This result has no video to download'}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-ink/10 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy === 'download'
+                ? <Spinner className="h-4 w-4" />
+                : <Download className="h-4 w-4" />}
+              {busy === 'download' ? downloadLabel(downloadProgress) : 'Download video'}
+            </button>
           </footer>
         </div>
       </div>
     </div>
   )
+}
+
+/**
+ * "Downloading… 12.4 MB" / "Downloading… 47%".
+ *
+ * A percentage only when the server told us the total, which cross-origin it
+ * usually hasn't — `Content-Range` and `Content-Length` are not CORS-safelisted
+ * on a ranged response. Megabytes are the honest fallback: a number that keeps
+ * moving is the whole point, and inventing a percentage off a guessed total
+ * would stall at "99%" on every long reel.
+ */
+function downloadLabel(progress: DownloadProgress | null | undefined): string {
+  if (!progress || progress.received === 0) return 'Downloading…'
+  if (progress.total && progress.total > 0) {
+    return `Downloading… ${Math.min(99, Math.round((progress.received / progress.total) * 100))}%`
+  }
+  return `Downloading… ${(progress.received / 1_048_576).toFixed(1)} MB`
 }
 
 /**

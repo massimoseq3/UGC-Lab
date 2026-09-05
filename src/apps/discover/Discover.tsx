@@ -17,7 +17,7 @@ import { useAppStore } from '../../stores/appStore'
 import { useBankStore } from '../../stores/bankStore'
 import { humanizeError } from '../../utils/friendlyError'
 import { applyMinViews, isPreviewable, mergeResults, runSearch, sortResults } from './services/search'
-import { downloadResultVideo, fetchResultTranscript, saveRemoteImage, saveResultVideoToDisk, saveThumbnail } from './services/handoff'
+import { downloadResultVideo, fetchResultTranscript, saveRemoteImage, saveResultVideoToDisk, saveThumbnail, type DownloadProgress } from './services/handoff'
 import { resolveAccount } from './services/accounts'
 import { DEFAULT_ACCOUNT_FILTERS, DEFAULT_FILTERS, type AccountFilters, type DiscoverFilters, type DiscoverPlatform, type DiscoverResult, type DiscoverSort, type DiscoverView } from './types'
 
@@ -271,6 +271,10 @@ export default function Discover() {
   // search record: there is no page to restore and nothing to re-run.
   const [accountInput, setAccountInput] = useState('')
   const [tracking, setTracking] = useState(false)
+  // The account a Track press just created, handed to AccountsBrowser so it
+  // buys that first page. Tracking somebody and being shown an empty grid was
+  // the whole complaint; the browser can't infer this on its own.
+  const [pendingLoadId, setPendingLoadId] = useState<string | null>(null)
   const [selectedAccountId, setSelectedAccountId] = usePersistedState<string | null>(
     `${baseKey}:account`,
     null,
@@ -326,6 +330,10 @@ export default function Discover() {
   const [openResult, setOpenResult] = useState<DiscoverResult | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [busyKind, setBusyKind] = useState<DiscoverAction | null>(null)
+  // How far the in-flight download has got. A reel is tens of megabytes and
+  // the button used to show a bare spinner for the whole of it, which is what
+  // made a working download read as a stuck one.
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null)
 
   // Transcripts, keyed by card. Fetched at most once per card and reused by
   // Remix, so pulling the words and then sending them is ONE credit rather than
@@ -446,6 +454,7 @@ export default function Discover() {
         followerCount: profile.followerCount,
       })
       setSelectedAccountId(id)
+      setPendingLoadId(id)
       setAccountInput('')
     } catch (e) {
       addToast(humanizeError(e, "Couldn't look up that account. Try again in a moment."), 'error')
@@ -455,6 +464,10 @@ export default function Discover() {
     // `setSelectedAccountId` is useState's own setter via usePersistedState —
     // declared rather than disabled, see patchSearch.
   }, [accountInput, apiKey, tracking, addToast, setSelectedAccountId])
+
+  // Stable identity: AccountsBrowser takes it as an effect dependency, and a
+  // fresh arrow every render would re-run that effect on every keystroke.
+  const clearPendingLoad = useCallback(() => setPendingLoadId(null), [])
 
   const handleAnalyze = useCallback(async (result: DiscoverResult) => {
     setBusyId(result.id)
@@ -482,13 +495,15 @@ export default function Discover() {
   const handleDownload = useCallback(async (result: DiscoverResult) => {
     setBusyId(result.id)
     setBusyKind('download')
+    setDownloadProgress({ received: 0, total: null })
     try {
-      await saveResultVideoToDisk(result)
+      await saveResultVideoToDisk(result, setDownloadProgress)
     } catch (e) {
       addToast(humanizeError(e, "Couldn't download that video. Try opening the original instead."), 'error')
     } finally {
       setBusyId(null)
       setBusyKind(null)
+      setDownloadProgress(null)
     }
   }, [addToast])
 
@@ -933,6 +948,8 @@ export default function Discover() {
           accounts={trackedAccounts}
           selectedId={selectedAccountId}
           onSelect={setSelectedAccountId}
+          pendingLoadId={pendingLoadId}
+          onPendingLoadDone={clearPendingLoad}
           filters={accountFilters}
           onFiltersChange={setAccountFilters}
           apiKey={apiKey}
@@ -1038,6 +1055,7 @@ export default function Discover() {
           onRemix={handleRemix}
           onSave={handleSave}
           onDownload={handleDownload}
+          downloadProgress={downloadProgress}
           saved={savedKeys.has(`${openResult.platform}:${openResult.id}`)}
           busy={busyId === openResult.id ? busyKind : null}
         />
