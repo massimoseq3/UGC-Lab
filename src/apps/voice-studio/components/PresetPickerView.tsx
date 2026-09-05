@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowLeft, Search, Play, Pause, Check } from 'lucide-react'
+import { Search, Play, Pause, Check } from 'lucide-react'
 import type { VoicePreset } from '../../../stores/types'
 import { useBankStore } from '../../../stores/bankStore'
 import { seedColor } from './seedColor'
@@ -8,13 +8,12 @@ import { useVoicePreview } from './useVoicePreview'
 interface PresetPickerViewProps {
   selectedId?: string
   onSelect: (preset: VoicePreset) => void
-  onClose: () => void
 }
 
-// Saved voices from the bank, picked the same way voices are: an in-panel view
-// that takes over the side panel, not a slide-over. Same header / search /
-// row shape as VoicePickerView so the two steps read as one flow.
-export default function PresetPickerView({ selectedId, onSelect, onClose }: PresetPickerViewProps) {
+// Saved voices from the bank. The BODY of a picker — search plus the row list;
+// `PickerModal` supplies the shell and the title, and `VoicePickerView` fills
+// the same shell with the same row shape, so the two steps read as one flow.
+export default function PresetPickerView({ selectedId, onSelect }: PresetPickerViewProps) {
   const presets = useBankStore((s) => s.voices)
   const [query, setQuery] = useState('')
   const { previewingId, loadingId, toggle } = useVoicePreview()
@@ -64,7 +63,7 @@ export default function PresetPickerView({ selectedId, onSelect, onClose }: Pres
               isPlaying || isLoading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
             }`}
           >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 translate-x-px fill-current" />}
           </span>
         </button>
 
@@ -86,22 +85,7 @@ export default function PresetPickerView({ selectedId, onSelect, onClose }: Pres
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b border-ink/5 px-5 py-4">
-        <button
-          onClick={onClose}
-          className="flex h-8 w-8 items-center justify-center rounded-full text-ink-300 transition-colors hover:bg-ink/5 hover:text-ink-100"
-          aria-label="Back to settings"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div className="min-w-0 flex-1">
-          <div className="text-base font-semibold tracking-tight text-ink-100">Select a preset</div>
-          <div className="text-xs text-ink-400">Loads the voice, delivery, scene and tone</div>
-        </div>
-      </div>
-
+    <>
       {/* Search — hidden when the bank is empty, there'd be nothing to search */}
       {presets.length > 0 && (
         <div className="border-b border-ink/5 px-5 py-4">
@@ -117,21 +101,25 @@ export default function PresetPickerView({ selectedId, onSelect, onClose }: Pres
         </div>
       )}
 
+      {/* The list is what sizes the modal: it grows to its content under the
+          panel's own max-height and only then scrolls. An empty state pads
+          rather than filling the height — `h-full` inside a content-sized
+          panel collapses to nothing. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {presets.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-8 text-center">
+          <div className="px-8 py-16 text-center">
             <span className="text-sm text-ink-500">
               No saved voices yet. Save a voice to the Bank and it shows up here.
             </span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-6 text-center">
+          <div className="px-6 py-16 text-center">
             <span className="text-sm text-ink-500">No presets match that search.</span>
           </div>
         ) : (
           <div className="flex flex-col gap-0.5 p-2">{filtered.map(renderRow)}</div>
         )}
       </div>
-    </div>
+    </>
   )
 }

@@ -5,7 +5,6 @@ import { seedColor } from './seedColor'
 import Slider from './Slider'
 import Dropdown from '../../../components/Dropdown'
 import SectionCard, { SectionPresetPill, StatusDot } from '../../../components/SectionCard'
-import ModelPicker from '../../../components/ModelPicker'
 
 // One size for every setting subheading (Style / Pace / Accent /
 // Expressiveness / Tone / Scene). Influencers' small-caps field register: the
@@ -38,20 +37,12 @@ export default function SettingsView({ settings, onSettingsChange, onOpenVoicePi
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
-      <div className="flex flex-col gap-3 px-5 pb-6 pt-2">
-        {/* Which TTS model reads the script. Above the Voice card because it's
-            what everything below runs on — the voice, the delivery and the
-            direction are all settings OF this model. Deliberately not carded:
-            a border around one row says nothing (see the root CLAUDE.md). It
-            carries no LABEL either (September 2026, Massimo's call): a picker
-            row already shows the model's name over its hint, so a small-caps
-            "MODEL" above it said the same word twice and cost the column a row
-            — the same reason there's no StatusDot, since there is always a
-            resolved model and a permanent green dot is decoration.
-            The pick persists per browser under `voice-studio:tts`, which is
-            the same key `resolveTtsModel()` reads at generate time. */}
-        <ModelPicker row appId="voice-studio" task="tts" />
-
+      {/* The model row is NOT here any more (September 2026, Massimo's call).
+          It led this column for a month, on the reasoning that the voice, the
+          delivery and the direction are all settings OF the model — true, but
+          it reads better directly above the button that spends it, which is
+          where `GenerateBar` renders it now. */}
+      <div className="flex flex-col gap-3 px-5 pb-6 pt-4">
         {/* Who is speaking. The card holds one control on purpose — the header
             is what carries the preset pill, and a preset writes every setting
             in this panel, so it needs a home above the first of them rather

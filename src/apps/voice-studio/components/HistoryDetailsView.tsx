@@ -149,7 +149,7 @@ export default function HistoryDetailsView({ item, onClose, onRestoreText, onRes
             onClick={togglePlay}
             className="flex items-center justify-center gap-2 rounded-full border border-ink/10 bg-ink/[0.02] px-4 py-2.5 text-sm font-medium text-ink-200 transition-colors hover:bg-ink/[0.05]"
           >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 translate-x-px fill-current" />}
             {isPlaying ? 'Pause' : 'Play'}
           </button>
           <button

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
-import { ArrowLeft, Search, Play, Pause, Check } from 'lucide-react'
-import type { VoiceOption, VoicePitch } from '../types'
-import { VOICES, PITCH_ORDER, PITCH_LABELS } from '../types'
+import { Search, Play, Pause, Check } from 'lucide-react'
+import type { Gender, VoiceOption } from '../types'
+import { VOICES } from '../types'
 
 import { seedColor } from './seedColor'
 import { useVoicePreview } from './useVoicePreview'
@@ -9,24 +9,34 @@ import { useVoicePreview } from './useVoicePreview'
 interface VoicePickerViewProps {
   selectedId: string
   onSelect: (voice: VoiceOption) => void
-  onClose: () => void
 }
 
-// Filter chips: All + each pitch band, highest → lowest (PITCH_ORDER).
-type PitchFilter = 'All' | VoicePitch
-const PITCH_FILTERS: PitchFilter[] = ['All', ...PITCH_ORDER]
+// Filter chips, and the headings the list is grouped under: All, then the two
+// genders. It was Google's four published PITCH bands (higher / middle /
+// lower-middle / lower) until September 2026 (Massimo's call). Pitch is real
+// data and it stays on the row's type, but it isn't the question anyone opens
+// this list with — a UGC ad is cast as a woman or a man reading to camera, and
+// four bands split each of those across four headings, so finding "a warm
+// female read" meant scanning all four. The avatar metals follow the same
+// split (see `seedColor`), so the disc and the heading agree.
+type GenderFilter = 'All' | Gender
+const GENDER_FILTERS: GenderFilter[] = ['All', 'Female', 'Male']
+const GENDER_ORDER: Gender[] = ['Female', 'Male']
 
-export default function VoicePickerView({ selectedId, onSelect, onClose }: VoicePickerViewProps) {
+// The BODY of the voice picker — search, pitch chips and the grouped list.
+// `PickerModal` supplies the shell and the title; `PresetPickerView` fills the
+// same shell with the same row shape.
+export default function VoicePickerView({ selectedId, onSelect }: VoicePickerViewProps) {
   const [query, setQuery] = useState('')
-  const [pitchFilter, setPitchFilter] = useState<PitchFilter>('All')
+  const [genderFilter, setGenderFilter] = useState<GenderFilter>('All')
   const { previewingId, loadingId, toggle } = useVoicePreview()
 
-  // Filter by query + pitch, then group by pitch band (highest → lowest) with a
-  // header per group, so members can scan voices by register.
+  // Filter by query + gender, then group by gender with a header per group, so
+  // the list reads as the two casts it is.
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase()
     const filtered = VOICES.filter((v) => {
-      if (pitchFilter !== 'All' && v.pitch !== pitchFilter) return false
+      if (genderFilter !== 'All' && v.gender !== genderFilter) return false
       if (!q) return true
       return (
         v.name.toLowerCase().includes(q) ||
@@ -34,10 +44,10 @@ export default function VoicePickerView({ selectedId, onSelect, onClose }: Voice
         v.category.toLowerCase().includes(q)
       )
     })
-    return PITCH_ORDER
-      .map((p) => [p, filtered.filter((v) => v.pitch === p)] as const)
+    return GENDER_ORDER
+      .map((g) => [g, filtered.filter((v) => v.gender === g)] as const)
       .filter(([, list]) => list.length > 0)
-  }, [query, pitchFilter])
+  }, [query, genderFilter])
 
   const totalCount = groups.reduce((n, [, list]) => n + list.length, 0)
 
@@ -76,7 +86,7 @@ export default function VoicePickerView({ selectedId, onSelect, onClose }: Voice
               isPlaying || isLoading ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
             }`}
           >
-            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 translate-x-px fill-current" />}
           </span>
         </button>
 
@@ -99,22 +109,7 @@ export default function VoicePickerView({ selectedId, onSelect, onClose }: Voice
   }
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b border-ink/5 px-5 py-4">
-        <button
-          onClick={onClose}
-          className="flex h-8 w-8 items-center justify-center rounded-full text-ink-300 transition-colors hover:bg-ink/5 hover:text-ink-100"
-          aria-label="Back to settings"
-        >
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div className="min-w-0 flex-1">
-          <div className="text-base font-semibold tracking-tight text-ink-100">Select a voice</div>
-          <div className="text-xs text-ink-400">Click a voice to hear a sample</div>
-        </div>
-      </div>
-
+    <>
       {/* Search */}
       <div className="border-b border-ink/5 px-5 py-4">
         <div className="relative">
@@ -127,31 +122,34 @@ export default function VoicePickerView({ selectedId, onSelect, onClose }: Voice
           />
         </div>
 
-        {/* Pitch filter chips — All, then highest → lowest */}
+        {/* Gender filter chips — All, then the two casts */}
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {PITCH_FILTERS.map((p) => {
-            const active = pitchFilter === p
+          {GENDER_FILTERS.map((p) => {
+            const active = genderFilter === p
             return (
               <button
                 key={p}
-                onClick={() => setPitchFilter(p)}
+                onClick={() => setGenderFilter(p)}
                 className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                   active
                     ? 'bg-voice-500/25 text-voice-200'
                     : 'bg-ink/[0.05] text-ink-300 hover:bg-ink/[0.08] hover:text-ink-100'
                 }`}
               >
-                {p === 'All' ? 'All' : PITCH_LABELS[p]}
+                {p}
               </button>
             )
           })}
         </div>
       </div>
 
-      {/* Voice list — grouped by pitch band with a header per group */}
+      {/* Voice list — grouped by gender with a header per group. It sizes
+          the modal up to the panel's max-height and scrolls past it; the empty
+          state pads rather than filling, since `h-full` inside a content-sized
+          panel collapses. */}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {totalCount === 0 ? (
-          <div className="flex h-full items-center justify-center px-6 text-center">
+          <div className="px-6 py-16 text-center">
             <span className="text-sm text-ink-500">No voices match these filters.</span>
           </div>
         ) : (
@@ -159,7 +157,7 @@ export default function VoicePickerView({ selectedId, onSelect, onClose }: Voice
             {groups.map(([p, list]) => (
               <div key={p} className="flex flex-col gap-0.5">
                 <div className="px-3 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-                  {PITCH_LABELS[p]} <span className="text-ink-600">· {list.length}</span>
+                  {p} <span className="text-ink-600">· {list.length}</span>
                 </div>
                 {list.map(renderRow)}
               </div>
@@ -167,6 +165,6 @@ export default function VoicePickerView({ selectedId, onSelect, onClose }: Voice
           </div>
         )}
       </div>
-    </div>
+    </>
   )
 }

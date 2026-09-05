@@ -1,9 +1,9 @@
 export type Gender = 'Female' | 'Male'
 
-// Gemini 3.1 Flash TTS ships 30 prebuilt voices. We group them by delivery
-// vibe so the picker's filter chips are useful for ad work (not by gender —
-// gender is shown separately). Each voice's `description` is Google's canonical
-// one-word character for that voice.
+// Gemini 3.1 Flash TTS ships 30 prebuilt voices. The category is the delivery
+// vibe, shown as the tag beside a voice's name; the picker itself groups and
+// filters by GENDER (see VoicePickerView). Each voice's `description` is
+// Google's canonical one-word character for that voice.
 export type VoiceCategory =
   | 'Energetic'
   | 'Warm'
@@ -18,16 +18,12 @@ export const VOICE_CATEGORIES: VoiceCategory[] = [
 ]
 
 // Google publishes a pitch band for every voice (in AI Studio's voice library).
-// The picker groups AND filters by these, highest → lowest, so members can scan
-// by register.
+// Kept as data on the row — it's true, and it's in the search haystack's reach
+// if it's ever wanted — but the picker no longer groups by it: it grouped and
+// filtered by these four bands until September 2026, which split each gender
+// across four headings (see VoicePickerView for why that went). The
+// PITCH_ORDER / PITCH_LABELS constants went with it.
 export type VoicePitch = 'Higher' | 'Middle' | 'Lower-middle' | 'Lower'
-export const PITCH_ORDER: VoicePitch[] = ['Higher', 'Middle', 'Lower-middle', 'Lower']
-export const PITCH_LABELS: Record<VoicePitch, string> = {
-  Higher: 'Higher pitch',
-  Middle: 'Middle pitch',
-  'Lower-middle': 'Lower or mid pitch',
-  Lower: 'Lower pitch',
-}
 
 export interface VoiceOption {
   // For Gemini the voice IS the name (e.g. "Zephyr") — it's what the API's
