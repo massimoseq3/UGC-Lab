@@ -425,10 +425,19 @@ export default function BrollStudio() {
   const [activeHistoryId, setActiveHistoryId] = useState<string | null>(sessionId || null)
   useEffect(() => { setActiveHistoryId(sessionId || null) }, [sessionId])
 
-  // Canvas-clear state for the right panel, owned here because BOTH the panel's
-  // + and the left column's "New" empty it. It's a view state, not a delete:
-  // the signature is keyed to the storyboard that was cleared, so the next
-  // generation (or a history pick) fills the panel again on its own.
+  // Canvas-clear state for the right panel, owned here because the panel's +
+  // sets it and the paths that refill the canvas live on this side. It's a view
+  // state, not a delete: the signature is keyed to the storyboard that WAS
+  // cleared, so anything landing different content (a fresh generation, an
+  // import — both mint a new session id) drops the clear on its own.
+  //
+  // Opening a history row is the one act that can put the very same storyboard
+  // back — same mode, same session, same scene count, so the same signature —
+  // and a signature that still matches reads as "still cleared". Clearing the
+  // canvas and then clicking the row you just cleared therefore left the panel
+  // on "Awaiting storyboard" with the session loaded behind it, until a refresh
+  // (this flag doesn't survive one) put it back. So handleSelectHistory drops
+  // the flag outright rather than relying on the signature to change.
   const [clearedCanvasSig, setClearedCanvasSig] = useState<string | null>(null)
   const canvasSceneCount = mode === 'continuous'
     ? (continuousResult?.scenes.length ?? 0)
@@ -1166,6 +1175,10 @@ export default function BrollStudio() {
     // nothing to restore, and loading it would empty the workspace. The card
     // isn't clickable either; this is the guard behind it.
     if (item.storyboardStatus) return
+    // Opening a row IS "put this storyboard on the canvas", so it outranks a
+    // previous clear — including a re-open of the session that was cleared,
+    // which the signature alone can't tell apart from never having reloaded.
+    setClearedCanvasSig(null)
     setSessionId(item.id)
     setSelectedProductId(item.productId ?? null)
     setSelectedModelId(item.modelId ?? null)
