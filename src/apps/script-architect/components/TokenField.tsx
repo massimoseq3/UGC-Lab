@@ -63,6 +63,7 @@ export function TokenHighlight({ text }: { text: string }) {
 export default function TokenField({
   value,
   onCommit,
+  onDelete,
   ariaLabel,
   padClass,
   textClass,
@@ -71,6 +72,9 @@ export default function TokenField({
   value: string
   // Omitted → read-only prose with the same wash, no field at all.
   onCommit?: (next: string) => void
+  // Clearing the field REMOVES the block from the take. Omitted → an emptied
+  // field reverts, which is what a block with no well-defined cut has to do.
+  onDelete?: () => void
   ariaLabel: string
   // Padding — applied to BOTH layers, so they wrap identically.
   padClass: string
@@ -105,10 +109,13 @@ export default function TokenField({
       return
     }
     const next = draft.trim()
-    // An emptied block reverts rather than committing: prose that vanishes as
-    // you clear it reads as the block deleting itself, and deleting a scene is
-    // the header's own button.
+    // Clearing a block IS how it gets deleted — the same rule `EditableText`
+    // follows, and it rides the take's undo stack like every other edit.
+    // Clearing the LAST block in a scene takes the scene with it, since a
+    // header with nothing under it renders nothing and would be stranded in
+    // the text.
     if (!next) {
+      if (onDelete) onDelete()
       setDraft(value)
       return
     }

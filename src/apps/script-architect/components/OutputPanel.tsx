@@ -208,6 +208,39 @@ function renumberScenes(text: string): string {
   return text.replace(SCENE_NUMBER, (_m, lead: string, word: string, gap: string) => `${lead}${word}${gap}${++n}`)
 }
 
+// Cut a span out of the take and CLOSE THE SEAM it leaves. Emptying a block is
+// how it gets deleted, so this runs on every one of them — a script line, a
+// spoken line, a scene's direction, a master block.
+//
+// The separator is the WIDER of the two runs of whitespace either side, never
+// their sum: a line inside a paragraph sits between two newlines and has to
+// close back to one, while a paragraph sits between two blank lines and has to
+// keep one. Adding them turns every deleted line into a paragraph break, and
+// dropping them both runs two sentences together.
+function spliceOut(text: string, start: number, end: number): string {
+  const head = text.slice(0, start)
+  const tail = text.slice(end)
+  const headGap = /\s*$/.exec(head)?.[0] ?? ''
+  const tailGap = /^\s*/.exec(tail)?.[0] ?? ''
+  const body = head.slice(0, head.length - headGap.length)
+  const rest = tail.slice(tailGap.length)
+  if (!body) return rest
+  if (!rest) return body
+  const breaks = Math.max(
+    (headGap.match(/\n/g) ?? []).length,
+    (tailGap.match(/\n/g) ?? []).length,
+  )
+  if (breaks) return body + (breaks >= 2 ? '\n\n' : '\n') + rest
+  // An INLINE cut came out of the middle of a sentence, so it can orphan the
+  // punctuation that joined it to what's left — deleting the line out of
+  // `"It just works," [CHARACTER] says, turning it over` leaves the comma with
+  // nothing in front of it. Only a joining mark is taken, and only at the seam:
+  // a full stop or a dash is the prose's own and stays. Nothing tries to repair
+  // the grammar beyond that — what remains is exactly the words that were on
+  // screen, which is the promise every other edit here keeps.
+  return `${body.replace(/[,;:]+$/, '')} ${rest.replace(/^[,;:]+\s*/, '')}`
+}
+
 // The look every scene in a blueprint is shot in — the master style block. The
 // Ad Analyzer writes it in front of its scenes and the scene rewrite is told to
 // lead with the same block, so by contract it sits BEFORE the first header;
@@ -268,7 +301,7 @@ const VOICE_HEADER_GLOBAL = new RegExp(VOICE_HEADER_REGEX.source, 'gi')
 // spans are offsets into `text`, and any cut from the middle would slide every
 // one of them. A leading block therefore isn't removed at all — it's preamble,
 // which `splitScenes` already ignores.
-function splitVoiceProfile(text: string): { body: string; rest: string; bodyStart?: number; bodyEnd?: number } {
+function splitVoiceProfile(text: string): { body: string; rest: string; bodyStart?: number; bodyEnd?: number; blockStart?: number; blockEnd?: number } {
   // The appended block is the one the prompt asks for, so it wins when both
   // shapes are present. Taking the first match unconditionally handed a
   // remixed Ad Analyzer blueprint a "voice profile" containing every scene in
@@ -303,7 +336,17 @@ function splitVoiceProfile(text: string): { body: string; rest: string; bodyStar
     // Only the ends were stripped, so indexOf lands on the true offset — the
     // body can't begin with the `=`/whitespace that was taken off its front.
     const lead = region.indexOf(body)
-    return { body, rest, bodyStart: regionStart + lead, bodyEnd: regionStart + lead + body.length }
+    // The BLOCK span runs from the header line to the end of the region, so
+    // emptying the card removes the label with the paragraph rather than
+    // leaving a "=== VOICE PROFILE ===" heading over nothing.
+    return {
+      body,
+      rest,
+      bodyStart: regionStart + lead,
+      bodyEnd: regionStart + lead + body.length,
+      blockStart: headerStart,
+      blockEnd: regionStart + region.length,
+    }
   }
   return { body: extractIntro(rest), rest }
 }
@@ -317,7 +360,7 @@ function splitVoiceProfile(text: string): { body: string; rest: string; bodyStar
 // Read off the FULL take text, not off `splitVoiceProfile`'s `rest` — a leading
 // block is preamble either way, and the span has to be an offset into `text`
 // for the in-place edit to splice back over the right characters.
-function splitVisualStyle(text: string): { body: string; start: number; end: number } | null {
+function splitVisualStyle(text: string): { body: string; start: number; end: number; blockStart: number; blockEnd: number } | null {
   const match = text.match(STYLE_HEADER_REGEX)
   if (!match || match.index == null) return null
   const headerStart = match.index + match[1].length
@@ -330,7 +373,14 @@ function splitVisualStyle(text: string): { body: string; start: number; end: num
   if (!body) return null
   // Only the ends were stripped, so indexOf lands on the true offset.
   const lead = region.indexOf(body)
-  return { body, start: regionStart + lead, end: regionStart + lead + body.length }
+  // Header included, for the same reason the voice block's is.
+  return {
+    body,
+    start: regionStart + lead,
+    end: regionStart + lead + body.length,
+    blockStart: headerStart,
+    blockEnd: regionStart + region.length,
+  }
 }
 
 // Where the last "--- Scene N ---" header starts, or -1. Used to tell an
@@ -355,9 +405,15 @@ function lastSceneHeaderIndex(text: string): number {
 // `start`/`end` are offsets into the BODY this segment was split out of — the
 // other half of the in-place edit. Add the chunk's own `bodyStart` and you have
 // the exact span of the take text that one rendered block owns.
+//
+// A spoken line carries a SECOND span: `start`/`end` are the words a member
+// types over, `cutStart`/`cutEnd` are what a delete takes — the attribution cue
+// in front of it, its own quote marks, and a trailing attribution behind it.
+// Removing only the words would leave `[CHARACTER] says: ""` sitting in the
+// take, which re-parses as direction with a pair of stray quotes in it.
 type SceneSegment =
   | { kind: 'direction'; text: string; start: number; end: number }
-  | { kind: 'line'; speaker: string | null; text: string; start: number; end: number }
+  | { kind: 'line'; speaker: string | null; text: string; start: number; end: number; cutStart: number; cutEnd: number }
 
 // The verbs that introduce a line. `speaks` is the one a model reaches for
 // most naturally after a [TOKEN] and it was missing, which is most of why one
@@ -476,16 +532,21 @@ function splitSpokenLines(body: string): SceneSegment[] {
     // the survivor is one contiguous run and indexOf finds its true offset —
     // it can't match earlier, since a direction never begins with the
     // whitespace/punctuation that was stripped off its front.
+    // Everything from here to the end of the line's own region is the line's
+    // to remove: the cue, the quote marks, and whatever attribution trails it.
+    let cutStart = cursor
     if (direction) {
       const at = cursor + before.indexOf(direction)
       segments.push({ kind: 'direction', text: direction, start: at, end: at + direction.length })
+      cutStart = at + direction.length
     }
     // The span is the quoted WORDS, inside the quote marks, so an edit can't
     // delete the quotes the parser finds the line by.
     const raw = match[1]
     const lineStart = match.index + 1 + (raw.length - raw.trimStart().length)
-    segments.push({ kind: 'line', speaker, text: raw.trim(), start: lineStart, end: lineStart + raw.trim().length })
-    cursor = quoteEnd + (after ? after[0].length : 0)
+    const cutEnd = quoteEnd + (after ? after[0].length : 0)
+    segments.push({ kind: 'line', speaker, text: raw.trim(), start: lineStart, end: lineStart + raw.trim().length, cutStart, cutEnd })
+    cursor = cutEnd
   }
   const rest = body.slice(cursor)
   const tail = rest.replace(/^[\s,;:]+|[\s,;:]+$/g, '')
@@ -662,7 +723,7 @@ function SendToPlaygroundButton({ text, unit }: { text: string; unit: 'shot' | '
 
 // The spoken line — the thing that gets read aloud. Tinted, set at reading
 // size, and separately copyable, because it's what leaves this app.
-function SpokenLine({ speaker, text, onChange }: { speaker: string | null; text: string; onChange?: (next: string) => void }) {
+function SpokenLine({ speaker, text, onChange, onDelete }: { speaker: string | null; text: string; onChange?: (next: string) => void; onDelete?: () => void }) {
   const [copied, setCopied] = useState(false)
   const addToast = useAppStore((s) => s.addToast)
   const handleCopy = async () => {
@@ -691,6 +752,7 @@ function SpokenLine({ speaker, text, onChange }: { speaker: string | null; text:
         <EditableText
           value={text}
           onCommit={onChange}
+          onDelete={onDelete}
           singleLine
           ariaLabel="Spoken line"
           className="min-w-0 flex-1 text-[15px] font-light leading-snug tracking-tight text-ink-100"
@@ -778,9 +840,9 @@ function VariationCard({
   // Pull the voice-profile block (wherever it sits) out FIRST, then split the
   // remaining text into scenes — otherwise the appended profile gets merged into
   // the last scene's body.
-  const { scenes, voiceProfile, voiceSpan, visualStyle, styleSpan } = useMemo(() => {
-    if (isHooks) return { scenes: null, voiceProfile: '', voiceSpan: null, visualStyle: '', styleSpan: null }
-    const { body, rest, bodyStart, bodyEnd } = splitVoiceProfile(text)
+  const { scenes, voiceProfile, voiceSpan, voiceBlock, visualStyle, styleSpan, styleBlock } = useMemo(() => {
+    if (isHooks) return { scenes: null, voiceProfile: '', voiceSpan: null, voiceBlock: null, visualStyle: '', styleSpan: null, styleBlock: null }
+    const { body, rest, bodyStart, bodyEnd, blockStart, blockEnd } = splitVoiceProfile(text)
     const parsed = splitScenes(rest)
     // Both master blocks belong to a blueprint; a plain spoken take that
     // happens to contain the words has no scenes for them to govern.
@@ -789,8 +851,10 @@ function VariationCard({
       scenes: parsed,
       voiceProfile: parsed ? body : '',
       voiceSpan: bodyStart != null && bodyEnd != null ? { start: bodyStart, end: bodyEnd } : null,
+      voiceBlock: blockStart != null && blockEnd != null ? { start: blockStart, end: blockEnd } : null,
       visualStyle: style?.body ?? '',
       styleSpan: style ? { start: style.start, end: style.end } : null,
+      styleBlock: style ? { start: style.blockStart, end: style.blockEnd } : null,
     }
   }, [text, isHooks])
 
@@ -877,12 +941,19 @@ function VariationCard({
 
   // A hook is edited ON its own row — click the line and type, no Edit mode to
   // enter first. Rewrites that one line and pushes the rebuilt pack through the
-  // same commit path (and the same undo stack) the raw editor uses, so the two
-  // ways in stay interchangeable. The raw editor is still the only way to ADD
-  // or DELETE a line, which is why its button survives here.
+  // same commit path (and the same undo stack) the whole-take editor uses, so
+  // the two ways in stay interchangeable. Clearing a row deletes it; the
+  // whole-take editor is what ADDS one.
   const editHookLine = (index: number, next: string) => {
     if (!hooks) return
     commitText(hooksToText(hooks.map((h, i) => (i === index ? { ...h, text: next } : h))))
+  }
+
+  // Clearing a hook drops it from the pack — the pack is a list, so removing a
+  // line is rebuilding it without that one rather than splicing the text.
+  const deleteHookLine = (index: number) => {
+    if (!hooks) return
+    commitText(hooksToText(hooks.filter((_, i) => i !== index)))
   }
 
   // Push a rewritten take through the same commit path (and the same undo
@@ -905,6 +976,29 @@ function VariationCard({
   const replaceRange = (start: number, end: number, next: string) => {
     if (start < 0 || end > text.length || start > end) return
     commitText(text.slice(0, start) + next + text.slice(end))
+  }
+
+  // The other half of the same primitive: emptying a block cuts its span out of
+  // the take instead of committing an empty string. Same spans, same commit
+  // path, same undo stack — so a deleted line comes back with Undo like any
+  // other edit.
+  const deleteRange = (start: number, end: number) => {
+    if (start < 0 || end > text.length || start >= end) return
+    commitText(spliceOut(text, start, end))
+  }
+
+  // A delete INSIDE a scene. Clearing the last block in a scene body leaves a
+  // header with nothing under it — which renders nothing at all, so there'd be
+  // no way left on screen to remove it — hence the whole scene goes instead,
+  // renumbered like any other scene delete.
+  const deleteInScene = (index: number, start: number, end: number) => {
+    const chunk = scenes?.[index]
+    if (!chunk || start < chunk.bodyStart || end > chunk.bodyEnd || start >= end) return
+    if (!(text.slice(chunk.bodyStart, start) + text.slice(end, chunk.bodyEnd)).trim()) {
+      deleteScene(index)
+      return
+    }
+    deleteRange(start, end)
   }
 
   // Cut one scene out of the take — its header line, its body, and the blank
@@ -1042,18 +1136,20 @@ function VariationCard({
         </div>
         {onEdit && !editing && (
           <div className="absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
-            {/* The raw take, in one box. No longer how you fix a typo — every
-                block on the card below is its own field — nor how you remove a
-                scene, which is the scene header's own button. What's left is
-                ADDING: a new scene, a line, a paragraph. Same for the hooks
-                pack, which has no per-row delete of its own. */}
+            {/* The whole take in one box. No longer how you fix a typo (every
+                block on the card below is its own field), nor how you remove a
+                line or a scene (clear the block, or use the scene's own delete).
+                What's left is ADDING: a new scene, a line, a paragraph. It read
+                "Raw" until September 2026 — accurate about the textarea and
+                meaningless about the job, since what a member wants from it is
+                to edit the take. */}
             <button
               onClick={startEdit}
-              title="Edit the whole take as raw text — for adding scenes and lines"
+              title="Edit the whole take in one box — for adding scenes and lines"
               className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
             >
               <Pencil className="h-3 w-3" />
-              Raw
+              Edit
             </button>
             <button
               onClick={handleUndo}
@@ -1075,7 +1171,7 @@ function VariationCard({
         )}
         {!editing && (
           // Glyph only on a phone (Massimo's call, August 2026). This row also
-          // carries the Raw / Scene Prompts toggle and the scene count, and
+          // carries the Edit / undo / redo controls and the scene count, and
           // "Copy Full Script" is the longest label on it — at 375px the three
           // ran into each other. The copy icon says what the button does
           // without being read; the wording survives as the tooltip and the
@@ -1117,6 +1213,7 @@ function VariationCard({
                 hook={hook}
                 index={i}
                 onChange={onEdit ? (line) => editHookLine(i, line) : undefined}
+                onDelete={onEdit ? () => deleteHookLine(i) : undefined}
               />
             ))}
           </>
@@ -1131,12 +1228,14 @@ function VariationCard({
                 copyToast="Visual style copied to clipboard"
                 copyTitle="Copy the visual style"
                 onChange={onEdit && styleSpan ? (next) => replaceRange(styleSpan.start, styleSpan.end, next) : undefined}
+                onDelete={onEdit && styleBlock ? () => deleteRange(styleBlock.start, styleBlock.end) : undefined}
               />
             )}
             {voiceProfile && (
               <VoiceProfileCard
                 body={voiceProfile}
                 onChange={onEdit && voiceSpan ? (next) => replaceRange(voiceSpan.start, voiceSpan.end, next) : undefined}
+                onDelete={onEdit && voiceBlock ? () => deleteRange(voiceBlock.start, voiceBlock.end) : undefined}
               />
             )}
             {scenes.map((scene, i) => (
@@ -1144,6 +1243,7 @@ function VariationCard({
                 key={i}
                 chunk={scene}
                 onEditRange={onEdit ? replaceRange : undefined}
+                onDeleteRange={onEdit ? (start, end) => deleteInScene(i, start, end) : undefined}
                 onDelete={onEdit ? () => deleteScene(i) : undefined}
                 collapsed={collapsed.has(i)}
                 onToggleCollapsed={() => toggleCollapsed(i)}
@@ -1173,6 +1273,7 @@ function VariationCard({
                 key={i}
                 value={line}
                 onCommit={onEdit ? (next) => replaceRange(start, start + line.length, next) : undefined}
+                onDelete={onEdit ? () => deleteRange(start, start + line.length) : undefined}
                 singleLine
                 ariaLabel={`Line ${i + 1}`}
                 className={`text-sm font-light leading-normal tracking-tight text-ink-100 ${breakBefore ? 'mt-2' : ''}`}
@@ -1295,6 +1396,7 @@ function BlueprintBlockCard({
   copyToast,
   copyTitle,
   onChange,
+  onDelete,
 }: {
   icon: typeof Copy
   label: string
@@ -1303,6 +1405,10 @@ function BlueprintBlockCard({
   copyToast: string
   copyTitle: string
   onChange?: (next: string) => void
+  // Clearing the paragraph removes the whole block — its header line included,
+  // since the label alone governs nothing. Omitted for the remix run's own
+  // voice brief, which belongs to no take and so rides no undo stack.
+  onDelete?: () => void
 }) {
   const [copied, setCopied] = useState(false)
   const addToast = useAppStore((s) => s.addToast)
@@ -1340,6 +1446,7 @@ function BlueprintBlockCard({
       <EditableText
         value={body}
         onCommit={onChange}
+        onDelete={onDelete}
         ariaLabel={ariaLabel}
         className="whitespace-pre-wrap rounded-xl bg-surface-0 p-2.5 text-[13px] font-light leading-relaxed tracking-tight text-ink-100"
         render={(
@@ -1356,7 +1463,7 @@ function BlueprintBlockCard({
 // the card for its own brief, which arrives from its own call rather than out
 // of a take (see `runRemixVoiceProfile`) — hence `label`, since nothing there
 // has scenes and the profile is attached to no variation.
-function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene', onChange }: { body: string; label?: string; onChange?: (next: string) => void }) {
+function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene', onChange, onDelete }: { body: string; label?: string; onChange?: (next: string) => void; onDelete?: () => void }) {
   return (
     <BlueprintBlockCard
       icon={Mic}
@@ -1366,6 +1473,7 @@ function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene'
       copyToast="Voice profile copied to clipboard"
       copyTitle="Copy the voice profile"
       onChange={onChange}
+      onDelete={onDelete}
     />
   )
 }
@@ -1373,10 +1481,10 @@ function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene'
 // The in-place editor every output block uses: a textarea styled as the prose
 // it replaces, with no chrome until you're in it (a hover tint says "editable"
 // without printing a box around every line). There is no edit MODE to enter —
-// you click the words and type, which is the whole point. The header's raw Edit
-// button survives as the escape hatch, because a single box over the take text
-// is still the only way to ADD a scene, a line, or a hook (removing a scene is
-// the scene header's own button).
+// you click the words and type, which is the whole point. CLEARING a block is
+// how it gets deleted, so the two halves of editing a take are both here. The
+// header's Edit button survives as the escape hatch, because a single box over
+// the take text is still the only way to ADD a scene, a line, or a hook.
 //
 // The field is ALWAYS on — every block that takes one is plain text, so a
 // textarea styled as the paragraph looks identical and costs nothing. A
@@ -1389,6 +1497,7 @@ function VoiceProfileCard({ body, label = 'Voice Profile · same in every scene'
 function EditableText({
   value,
   onCommit,
+  onDelete,
   className,
   ariaLabel,
   singleLine = false,
@@ -1397,6 +1506,9 @@ function EditableText({
   value: string
   // Omitted → read-only. A card with no edit handler renders exactly as before.
   onCommit?: (next: string) => void
+  // Clearing the field REMOVES the block. Omitted → an emptied field reverts,
+  // which is what a block with no well-defined cut has to do.
+  onDelete?: () => void
   className: string
   ariaLabel: string
   // Enter commits instead of breaking the text in two, and anything pasted in
@@ -1424,10 +1536,15 @@ function EditableText({
       return
     }
     const next = singleLine ? draft.replace(/\s+/g, ' ').trim() : draft.trim()
-    // An emptied block reverts rather than committing: prose that vanishes as
-    // you clear it reads as the row deleting itself, and deleting is the raw
-    // editor's job.
+    // Clearing a block IS how it gets deleted — select the line, delete it, and
+    // it goes, which is what a member who empties a field is asking for. It used
+    // to put the text back, so the only way to drop a line was the raw editor
+    // and every attempt to do it in place read as the edit failing to save.
+    // Undo covers it like any other edit. A block with no `onDelete` still
+    // reverts: the cut isn't defined there, and prose that silently vanishes is
+    // worse than prose that comes back.
     if (!next) {
+      if (onDelete) onDelete()
       setDraft(value)
       return
     }
@@ -1470,7 +1587,7 @@ function EditableText({
 // no edit mode to enter, which is the whole point — the alternative was
 // swapping the ten rendered rows for one raw box of <FAMILY> tags to fix a
 // typo in line 3.
-function HookLineCard({ hook, index, onChange }: { hook: ParsedHook; index: number; onChange?: (text: string) => void }) {
+function HookLineCard({ hook, index, onChange, onDelete }: { hook: ParsedHook; index: number; onChange?: (text: string) => void; onDelete?: () => void }) {
   const [copied, setCopied] = useState(false)
   // Local draft so a keystroke doesn't re-serialise and re-parse the whole
   // pack; committed on blur. `sync` tells our own commit from an external
@@ -1509,6 +1626,7 @@ function HookLineCard({ hook, index, onChange }: { hook: ParsedHook; index: numb
       <EditableText
         value={hook.text}
         onCommit={onChange}
+        onDelete={onDelete}
         singleLine
         ariaLabel={`Hook ${index + 1}`}
         className="text-sm font-light leading-normal tracking-tight text-ink-100"
@@ -1561,12 +1679,16 @@ function clearSelectionOnChrome(e: React.MouseEvent) {
 function SceneChunkCard({
   chunk,
   onEditRange,
+  onDeleteRange,
   onDelete,
   collapsed = false,
   onToggleCollapsed,
 }: {
   chunk: SceneChunk
   onEditRange?: (start: number, end: number, next: string) => void
+  // Emptying a block inside the scene cuts that span out — and cutting the last
+  // one takes the whole scene, which the caller decides.
+  onDeleteRange?: (start: number, end: number) => void
   // Omitted → no delete button (a card with no edit handler is read-only).
   onDelete?: () => void
   collapsed?: boolean
@@ -1672,6 +1794,7 @@ function SceneChunkCard({
               body={chunk.body}
               audioNote={audioNote?.text ?? null}
               onEditRange={onEditRange ? (start, end, next) => onEditRange(chunk.bodyStart + start, chunk.bodyStart + end, next) : undefined}
+              onDeleteRange={onDeleteRange ? (start, end) => onDeleteRange(chunk.bodyStart + start, chunk.bodyStart + end) : undefined}
             />
           ))}
           {audioNote && (
@@ -1683,6 +1806,7 @@ function SceneChunkCard({
             <TokenField
               value={audioNote.text}
               onCommit={onEditRange ? (next) => onEditRange(chunk.bodyStart + audioNote.start, chunk.bodyStart + audioNote.end, next) : undefined}
+              onDelete={onDeleteRange ? () => onDeleteRange(chunk.bodyStart + audioNote.start, chunk.bodyStart + audioNote.end) : undefined}
               ariaLabel="Scene audio direction"
               className="-mx-1.5 -my-1 w-[calc(100%+0.75rem)] rounded-lg transition-colors hover:bg-ink/[0.04]"
               padClass="px-1.5 py-1"
@@ -1698,6 +1822,7 @@ function SceneChunkCard({
         <TokenField
           value={chunk.body}
           onCommit={onEditRange ? (next) => onEditRange(chunk.bodyStart, chunk.bodyEnd, next) : undefined}
+          onDelete={onDeleteRange ? () => onDeleteRange(chunk.bodyStart, chunk.bodyEnd) : undefined}
           ariaLabel="Scene prompt"
           className="rounded-xl bg-surface-0"
           padClass="p-2.5"
@@ -1724,6 +1849,7 @@ function SceneBeatBlock({
   body,
   audioNote,
   onEditRange,
+  onDeleteRange,
 }: {
   beat: SceneBeat
   // The scene body the beat's spans are offsets into. Copy SLICES the shot's
@@ -1735,6 +1861,10 @@ function SceneBeatBlock({
   audioNote: string | null
   // Spans are BODY-relative; the caller adds the chunk's own offset.
   onEditRange?: (start: number, end: number, next: string) => void
+  // Emptying a block removes it. Body-relative like the edit span, but for a
+  // spoken line it is the WIDER `cut` span — the cue and the quote marks go
+  // with the words.
+  onDeleteRange?: (start: number, end: number) => void
 }) {
   const [copied, setCopied] = useState(false)
   const addToast = useAppStore((s) => s.addToast)
@@ -1745,6 +1875,7 @@ function SceneBeatBlock({
         speaker={segment.speaker}
         text={segment.text}
         onChange={onEditRange ? (next) => onEditRange(segment.start, segment.end, next) : undefined}
+        onDelete={onDeleteRange ? () => onDeleteRange(segment.cutStart, segment.cutEnd) : undefined}
       />
     ) : (
       // Direction is context for the shot, not the script — set a step down in
@@ -1756,6 +1887,7 @@ function SceneBeatBlock({
         key={i}
         value={segment.text}
         onCommit={onEditRange ? (next) => onEditRange(segment.start, segment.end, next) : undefined}
+        onDelete={onDeleteRange ? () => onDeleteRange(segment.start, segment.end) : undefined}
         ariaLabel="Scene direction"
         className="-mx-1.5 -my-1 w-[calc(100%+0.75rem)] rounded-lg transition-colors hover:bg-ink/[0.04]"
         padClass="px-1.5 py-1"
