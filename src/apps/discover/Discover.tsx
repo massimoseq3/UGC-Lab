@@ -745,16 +745,16 @@ export default function Discover() {
             }}
             placeholder={
               isVault
-                ? 'Filter the vault — a topic, a phrase, a creator…'
+                ? 'Filter the vault by topic, phrase or creator…'
                 : isAccounts
                   // Names both shapes it takes, because a handle and a link
                   // are the two things anyone has to hand and neither is
                   // obviously the one being asked for.
-                  ? 'Track an Instagram account — @handle or profile link…'
+                  ? 'Track an Instagram account by @handle or profile link…'
                   : isTikTok
-                    ? 'Search TikTok — a product, a pain point, a hook…'
+                    ? 'Search TikTok for a product, a pain point, a hook…'
                     : isInstagram
-                      ? 'Search Instagram reels — a product, a pain point, a hook…'
+                      ? 'Search Instagram reels for a product, a pain point, a hook…'
                       : 'Search the Meta Ad Library…'
             }
             className="w-full rounded-full border border-ink/10 bg-ink/5 py-2 pl-10 pr-4 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
@@ -809,7 +809,7 @@ export default function Discover() {
           : query !== '' || results.length > 0) && (
           <button
             type="button"
-            title={isVault ? 'Back to the folders — clears the vault filters' : 'New search — clears this tab'}
+            title={isVault ? 'Back to the folders. Clears the vault filters' : 'New search. Clears this tab'}
             onClick={() => {
               if (isVault) {
                 setVaultQuery('')
@@ -1019,7 +1019,7 @@ export default function Discover() {
                     credits chip in the header, which is live. Quoting a guess
                     on a button that spends money is worse than quoting
                     nothing. */}
-                {loadingMore ? 'Loading…' : isInstagram ? 'Load more' : 'Load more — 1 credit'}
+                {loadingMore ? 'Loading…' : isInstagram ? 'Load more' : 'Load more · 1 credit'}
               </button>
             </div>
           )}
@@ -1055,7 +1055,7 @@ function ConnectKeyPanel({ onConnect }: { onConnect: () => void }) {
         <p className="text-sm text-ink-500">Connect ScrapeCreators</p>
         <p className="max-w-[340px] text-xs leading-relaxed text-ink-600">
           Outliers searches TikTok, Instagram and the Meta Ad Library on your
-          own key — from 1 credit a search, and 100 free when you sign up.
+          own key, from 1 credit a search, and 100 free when you sign up.
         </p>
         {/* Reopens the popup rather than linking out, so dismissing the
             onboarding can't strand a member with nowhere to paste a key. */}

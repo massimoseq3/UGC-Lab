@@ -230,7 +230,7 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
                 : <Bookmark className="h-3.5 w-3.5" />}
           </TileActionButton>
           <TileActionButton
-            title="Analyze Ad — opens in Ad Analyzer"
+            title="Analyze Ad · opens in Ad Analyzer"
             onClick={() => onAnalyze(result)}
             disabled={busy === 'analyze' || !hasVideo}
           >
@@ -244,7 +244,7 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
               card — but the title has to say so, since the modal's route now
               charges on its own separate "Get transcript" step. */}
           <TileActionButton
-            title="Remix Transcript — 1 credit, opens in Scripts"
+            title="Remix Transcript · 1 credit, opens in Scripts"
             onClick={() => onRemix(result)}
             disabled={busy === 'remix'}
           >

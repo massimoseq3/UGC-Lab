@@ -213,13 +213,13 @@ export default function ResultDetailModal({
                   className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5"
                 >
                   {isInstagram ? <Sparkles className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
-                  {isInstagram ? 'Transcribe with AI — 10-30s' : 'Get transcript — 1 credit'}
+                  {isInstagram ? 'Transcribe with AI · 10-30s' : 'Get transcript · 1 credit'}
                 </button>
               )}
               {transcript.phase === 'loading' && (
                 <p className="flex items-center gap-2 text-[12px] text-ink-500">
                   <Spinner className="h-3.5 w-3.5" />
-                  {isInstagram ? 'Transcribing the audio — 10-30 seconds…' : 'Pulling the transcript…'}
+                  {isInstagram ? 'Transcribing the audio, 10-30 seconds…' : 'Pulling the transcript…'}
                 </p>
               )}
               {transcript.phase === 'ready' && (
@@ -295,7 +295,7 @@ export default function ResultDetailModal({
                 type="button"
                 onClick={() => onAnalyze(result)}
                 disabled={busy === 'analyze' || !result.videoUrl}
-                title={canTranscribe ? 'Opens in Ad Analyzer' : 'Reads the video itself — the way to get this ad’s script'}
+                title={canTranscribe ? 'Opens in Ad Analyzer' : 'Reads the video itself, the way to get this ad’s script'}
                 className="flex flex-1 items-center justify-center gap-2 rounded-full bg-ink py-2.5 text-[13px] font-medium text-ink-900 transition-colors hover:bg-ink-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {busy === 'analyze' ? <Spinner className="h-4 w-4" /> : <Eye className="h-4 w-4" />}

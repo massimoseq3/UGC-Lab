@@ -89,7 +89,7 @@ export async function resolveAccount(
   const { profile, creditsRemaining } = await fetchInstagramProfile(apiKey, handle)
   if (!profile) {
     throw new FriendlyError(
-      `Instagram has no public profile at @${handle}. Check the spelling — private accounts can't be tracked.`,
+      `Instagram has no public profile at @${handle}. Check the spelling. Private accounts can't be tracked.`,
     )
   }
   return { profile, creditsRemaining }

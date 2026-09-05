@@ -265,7 +265,7 @@ export default function AccountsBrowser({
         <AwaitingBody
           icon={Users}
           title="No accounts tracked"
-          hint="Paste a creator's Instagram profile link or their @handle above. Outliers pulls their reels and scores each one against that account's own median — so you see which of their posts actually popped, not just which ones are big."
+          hint="Paste a creator's Instagram profile link or their @handle above. Outliers pulls their reels and scores each one against that account's own median, so you see which of their posts actually popped, not just which ones are big."
         />
       </GridCanvas>
     )
@@ -308,7 +308,7 @@ export default function AccountsBrowser({
                   : scored.sampleSize > 0
                     // Honest about WHY there is no badge on any card, rather
                     // than leaving a grid of unscored reels unexplained.
-                    ? `${scored.sampleSize} reels — needs ${MIN_BASELINE_SAMPLE} to set a median`
+                    ? `${scored.sampleSize} reels, needs ${MIN_BASELINE_SAMPLE} to set a median`
                     : selected.refreshedAt
                       ? `refreshed ${agoLabel(selected.refreshedAt)}`
                       : 'not loaded yet'}
@@ -323,7 +323,7 @@ export default function AccountsBrowser({
               className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-ink/10 px-3 text-[12px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:opacity-50"
             >
               {loading ? <Spinner className="h-3.5 w-3.5" /> : <RotateCw className="h-3.5 w-3.5" />}
-              Refresh — 1 credit
+              Refresh · 1 credit
             </button>
 
             {/* Three selects on a 375px line, where the vault's row has two —
@@ -390,7 +390,7 @@ export default function AccountsBrowser({
                     // member to refresh would spend a credit on the same grid.
                     ? `All ${hiddenByFilters} reels are filtered out. Widen the score or date filter to see them.`
                     : 'This account has no public reels to rank.'
-                  : "Refresh to pull this account's reels — 1 credit."
+                  : "Refresh to pull this account's reels. 1 credit."
               }
             />
           </GridCanvas>
@@ -426,7 +426,7 @@ export default function AccountsBrowser({
                   className="flex items-center gap-2 rounded-full border border-ink/10 px-5 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:opacity-50"
                 >
                   {loadingMore && <Spinner className="h-3.5 w-3.5" />}
-                  {loadingMore ? 'Loading…' : 'Load more — 1 credit'}
+                  {loadingMore ? 'Loading…' : 'Load more · 1 credit'}
                 </button>
               </div>
             )}
