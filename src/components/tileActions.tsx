@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MoreHorizontal, Star, Trash2, X } from 'lucide-react'
+import { Check, MoreHorizontal, Star, Trash2, X } from 'lucide-react'
 import Spinner from './Spinner'
 
 // The hover action controls that sit on top of a generated media tile —
@@ -199,9 +199,22 @@ const CONFIRM_WINDOW_MS = 3000
 const ICON = { sm: 'h-3.5 w-3.5', md: 'h-4 w-4' } as const
 
 /**
- * Two-click delete: the trash icon arms on the first click and grows into a
- * red "Confirm" pill, reverting after 3s if the second click never comes. An
- * inline step rather than a modal, so deleting a tile stays in one spot.
+ * Two-click delete: the first click arms the button, the second deletes, and
+ * it reverts after 3s if that second click never comes. An inline step rather
+ * than a modal, so deleting a tile stays in one spot.
+ *
+ * Arming does NOT change the button's size. It used to grow into a red pill
+ * labelled "Confirm" at 9px uppercase — the smallest type in the app — filled
+ * with a translucent red over the translucent black scrim, which came out
+ * muddy over warm footage and never read as a solid control. Growing was the
+ * worse half: this sits in a right-aligned column on tiles as narrow as 110px
+ * (a three-across B-Roll storyboard), so a 32px circle jumped to ~74px across
+ * most of the still, instantly, under the pointer heading for it.
+ *
+ * So the circle holds its footprint and swaps what's inside it: solid red
+ * fill, trash → check. That reads at any tile size, carries the state change
+ * on the glyph rather than on a word too small to read, and is opaque enough
+ * to be red over any media. The tooltip already says "Click again to delete".
  *
  * `onArmedChange` lets the parent hold the whole stack visible while armed —
  * otherwise moving the pointer off the tile hides the button mid-confirm.
@@ -266,24 +279,24 @@ export function TileDeleteButton({
         if (timer.current) window.clearTimeout(timer.current)
         timer.current = window.setTimeout(() => { setArmedAndNotify(false); timer.current = null }, CONFIRM_WINDOW_MS)
       }}
-      // Idle is a fixed circle matching its neighbours; only the armed state
-      // grows into a pill to fit its label.
-      className={`${armed || busy || alwaysVisible ? 'opacity-100' : FADE} flex shrink-0 items-center justify-center rounded-full disabled:cursor-wait ${
-        size === 'sm' ? 'h-7' : 'h-8'
+      // One circle at both states — see the note above. Armed is a solid fill
+      // in both variants: the red is the signal, and a translucent one reads
+      // as whatever is behind it.
+      className={`${armed || busy || alwaysVisible ? 'opacity-100' : FADE} flex shrink-0 items-center justify-center rounded-full transition-all disabled:cursor-wait ${
+        size === 'sm' ? 'h-7 w-7' : 'h-8 w-8'
       } ${
         armed
-          ? variant === 'media'
-            ? 'gap-1 border border-red-400/60 bg-red-500/55 px-2 text-red-50'
-            : 'gap-1 bg-red-500/30 px-2 text-red-100 ring-1 ring-red-400/60 light:text-red-900'
+          ? 'bg-red-500 text-white hover:brightness-110 disabled:hover:brightness-100'
           : variant === 'media'
-            ? `border ${size === 'sm' ? 'w-7' : 'w-8'} ${TONE.danger}`
-            : `${size === 'sm' ? 'w-7' : 'w-8'} text-ink-500 hover:bg-red-500/10 hover:text-red-400 light:hover:text-red-600`
+            ? `border ${TONE.danger}`
+            : 'text-ink-500 hover:bg-red-500/10 hover:text-red-400 light:hover:text-red-600'
       }`}
     >
       {busy
         ? <Spinner className={ICON[size]} />
-        : <Trash2 className={ICON[size]} />}
-      {armed && !busy && <span className="text-[9px] font-medium uppercase tracking-wider">Confirm</span>}
+        : armed
+          ? <Check className={ICON[size]} />
+          : <Trash2 className={ICON[size]} />}
     </button>
   )
 }
