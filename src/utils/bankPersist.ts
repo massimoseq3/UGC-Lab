@@ -89,11 +89,21 @@ export async function readBanks(): Promise<unknown | null> {
 // those functions silently, but structured clone throws DataCloneError on them
 // and takes the write down with it. Picking explicitly also stops any stray
 // non-serialisable field ever reaching the store.
-const BANK_DATA_KEYS = [
-  'products', 'models', 'scripts', 'voices', 'brolls', 'styles', 'swipes',
-  'voiceHistory', 'videoHistory', 'imageHistory', 'musicHistory', 'scriptHistory',
-  'brollHistory', 'characterHistory', 'adAnatomyHistory', 'usageDays',
-] as const satisfies readonly (keyof BankData)[]
+//
+// Written as an object literal under `satisfies Record<keyof BankData, true>`
+// rather than as an array of key strings, which is the same guard
+// `orphanCleanup` uses and for the same reason: an array only proved that
+// every key LISTED is a real bank, never that every real bank is listed. A
+// bank added to `BankData` and forgotten here simply stopped being cached —
+// silently, and only on a reload — which is exactly how `trackedAccounts`
+// shipped missing. This shape fails the build instead.
+const BANK_DATA_KEYS = Object.keys({
+  products: true, models: true, scripts: true, voices: true, brolls: true, styles: true,
+  swipes: true, trackedAccounts: true,
+  voiceHistory: true, videoHistory: true, imageHistory: true, musicHistory: true,
+  scriptHistory: true, brollHistory: true, characterHistory: true, adAnatomyHistory: true,
+  usageDays: true,
+} satisfies Record<keyof BankData, true>) as (keyof BankData)[]
 
 /**
  * Structured-clone the banks in rather than a JSON string: it skips a

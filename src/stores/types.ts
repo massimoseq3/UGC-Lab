@@ -175,6 +175,49 @@ export interface SwipeItem {
   createdAt: number
 }
 
+/**
+ * A creator whose reels the member is tracking — the Accounts tab in Outliers.
+ *
+ * What lives here is the CURATION plus a snapshot: who is tracked, and how that
+ * account was performing when it was last refreshed. The reels themselves do
+ * NOT — they carry signed CDN urls that expire within days, they are a credit
+ * to re-fetch, and there can be fifty per account. They are cached in the app's
+ * own local state instead, so this bank stays a short, durable list that is
+ * worth syncing across a member's devices.
+ *
+ * `baseline` is the median play count that snapshot was taken over. It is here
+ * so the rail can say what an account normally does without holding a single
+ * reel, and so a member opening the app on a second device sees their list
+ * fully formed before spending anything.
+ *
+ * The avatar is copied into our own storage for exactly the reason `SwipeItem`
+ * copies a thumbnail: every image url Instagram hands back is signed and rots.
+ */
+export interface TrackedAccount {
+  id: string
+  /** Instagram today. Declared so tracking a TikTok creator needs no migration. */
+  platform: 'instagram'
+  /** Lower-case, no leading @. The identity — one row per account. */
+  handle: string
+  /** Instagram's numeric id. The fast path for every reels call; may be blank. */
+  userId?: string
+  name: string
+  /** Our own copy of the profile picture. */
+  avatarRef?: string
+
+  /** Snapshot, as of `refreshedAt`. All absent until the first refresh lands. */
+  followerCount?: number
+  /** Median plays across the reels last pulled — the score's denominator. */
+  baseline?: number
+  /** How many reels that median was taken over. Under six there is no baseline. */
+  sampleSize?: number
+  /** When the numbers above were last bought. Null until the first refresh. */
+  refreshedAt?: number
+
+  starred?: boolean
+  createdAt: number
+}
+
 export interface BRollVideo {
   url: string
   aspectRatio: string

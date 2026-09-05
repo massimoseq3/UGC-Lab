@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, SwipeItem, VoiceHistoryItem, VideoHistoryItem, ImageHistoryItem, MusicHistoryItem, ScriptHistoryItem, BrollHistoryItem, CharacterHistoryItem, AdAnatomyHistoryItem, AppUsageStat, UsageDay, UsageKind } from './types'
+import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, SwipeItem, TrackedAccount, VoiceHistoryItem, VideoHistoryItem, ImageHistoryItem, MusicHistoryItem, ScriptHistoryItem, BrollHistoryItem, CharacterHistoryItem, AdAnatomyHistoryItem, AppUsageStat, UsageDay, UsageKind } from './types'
 import { isAssetRef, assetIdFromRef, deleteAsset, saveFromDataUrl } from '../utils/assetStore'
 import { useAuthStore } from './authStore'
 import { isCloudEnabled } from '../lib/supabase'
@@ -23,6 +23,7 @@ interface BankState {
   brolls: BRoll[]
   styles: StylePreset[]
   swipes: SwipeItem[]
+  trackedAccounts: TrackedAccount[]
   voiceHistory: VoiceHistoryItem[]
   videoHistory: VideoHistoryItem[]
   imageHistory: ImageHistoryItem[]
@@ -89,6 +90,11 @@ interface BankState {
   deleteSwipe: (id: string) => Promise<BankActionResult>
   getSwipeBySource: (platform: SwipeItem['platform'], sourceId: string) => SwipeItem | undefined
 
+  addTrackedAccount: (account: Omit<TrackedAccount, 'id' | 'createdAt'>) => Promise<string>
+  updateTrackedAccount: (id: string, updates: Partial<TrackedAccount>) => Promise<BankActionResult>
+  deleteTrackedAccount: (id: string) => Promise<BankActionResult>
+  getTrackedAccountByHandle: (platform: TrackedAccount['platform'], handle: string) => TrackedAccount | undefined
+
   // Star toggle — the starrable banks share one action. Starred items
   // surface first in the bank pickers.
   toggleStar: (bank: StarrableBank, id: string) => void
@@ -142,7 +148,7 @@ interface BankState {
 }
 
 // Banks whose items can be starred (pinned) by the user.
-export type StarrableBank = 'products' | 'models' | 'scripts' | 'brolls' | 'styles' | 'swipes'
+export type StarrableBank = 'products' | 'models' | 'scripts' | 'brolls' | 'styles' | 'swipes' | 'trackedAccounts'
 
 export interface UsageEvent {
   kind: UsageKind
@@ -217,7 +223,7 @@ function generateId(): string {
   return crypto.randomUUID()
 }
 
-export type BankData = Pick<BankState, 'products' | 'models' | 'scripts' | 'voices' | 'brolls' | 'styles' | 'swipes' | 'voiceHistory' | 'videoHistory' | 'imageHistory' | 'musicHistory' | 'scriptHistory' | 'brollHistory' | 'characterHistory' | 'adAnatomyHistory' | 'usageDays'>
+export type BankData = Pick<BankState, 'products' | 'models' | 'scripts' | 'voices' | 'brolls' | 'styles' | 'swipes' | 'trackedAccounts' | 'voiceHistory' | 'videoHistory' | 'imageHistory' | 'musicHistory' | 'scriptHistory' | 'brollHistory' | 'characterHistory' | 'adAnatomyHistory' | 'usageDays'>
 
 function migrateVoiceShape<T>(arr: unknown): T[] {
   if (!Array.isArray(arr)) return []
@@ -251,6 +257,7 @@ const EMPTY_BANKS: BankData = {
   brolls: [],
   styles: [],
   swipes: [],
+  trackedAccounts: [],
   voiceHistory: [],
   videoHistory: [],
   imageHistory: [],
@@ -288,6 +295,7 @@ function normalizeBanks(source: unknown): BankData {
         brolls: parsed.brolls ?? [],
         styles: Array.isArray(parsed.styles) ? parsed.styles : [],
         swipes: Array.isArray(parsed.swipes) ? parsed.swipes : [],
+        trackedAccounts: Array.isArray(parsed.trackedAccounts) ? parsed.trackedAccounts : [],
         voiceHistory: migrateVoiceShape<VoiceHistoryItem>(parsed.voiceHistory),
         videoHistory: Array.isArray(parsed.videoHistory) ? parsed.videoHistory : [],
         imageHistory: Array.isArray(parsed.imageHistory) ? parsed.imageHistory : [],
@@ -919,6 +927,66 @@ export const useBankStore = create<BankState>((set, get) => ({
   // stops the same ad being filed twice across two different searches.
   getSwipeBySource: (platform, sourceId) =>
     get().swipes.find((s) => s.platform === platform && s.sourceId === sourceId),
+
+  // ── Tracked accounts ─────────────────────────────────────────────
+  // The Accounts tab's curation: who the member watches, plus a snapshot of
+  // how that account was performing at the last refresh. The reels are NOT
+  // here — they rot and they're re-buyable, so Outliers caches them locally.
+  // Like styles and swipes, the avatar is this bank's own asset, so a delete
+  // purges it outright.
+  addTrackedAccount: async (account) => {
+    const handle = account.handle.replace(/^@/, '').toLowerCase()
+    // One row per account, whichever surface asked. Tracking one you already
+    // track hands back the existing row rather than making a second card that
+    // refreshes to the same numbers.
+    const existing = get().trackedAccounts.find(
+      (a) => a.platform === account.platform && a.handle === handle,
+    )
+    if (existing) return existing.id
+
+    const newAccount: TrackedAccount = { ...account, handle, id: generateId(), createdAt: Date.now() }
+    set((state) => {
+      const next = { trackedAccounts: [newAccount, ...state.trackedAccounts] }
+      saveToStorage({ ...state, ...next })
+      return next
+    })
+    pushRow('trackedAccounts', newAccount)
+    reportSuccess(`Tracking @${handle}`)
+    return newAccount.id
+  },
+
+  // Silent: this is the write a refresh makes, and a refresh already reports
+  // itself by the numbers changing on screen. A toast per account would fire
+  // once per row on "Refresh all".
+  updateTrackedAccount: async (id, updates) => {
+    const old = get().trackedAccounts.find((a) => a.id === id)
+    if (!old) return
+    const updated: TrackedAccount = { ...old, ...updates }
+    set((state) => {
+      const next = { trackedAccounts: state.trackedAccounts.map((a) => (a.id === id ? updated : a)) }
+      saveToStorage({ ...state, ...next })
+      return next
+    })
+    pushRow('trackedAccounts', updated)
+  },
+
+  deleteTrackedAccount: async (id) => {
+    const item = get().trackedAccounts.find((a) => a.id === id)
+    if (!item) return
+    set((state) => {
+      const next = { trackedAccounts: state.trackedAccounts.filter((a) => a.id !== id) }
+      saveToStorage({ ...state, ...next })
+      return next
+    })
+    dropRow('trackedAccounts', id)
+    if (item.avatarRef) void cleanupAssets(item.avatarRef)
+    reportSuccess(`Stopped tracking @${item.handle}`)
+  },
+
+  getTrackedAccountByHandle: (platform, handle) => {
+    const wanted = handle.replace(/^@/, '').toLowerCase()
+    return get().trackedAccounts.find((a) => a.platform === platform && a.handle === wanted)
+  },
 
   // ── Star toggle ──────────────────────────────────────────────────
   // Deliberately silent (no toast): starring is a lightweight pin, not a
