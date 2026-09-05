@@ -274,6 +274,17 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
   // thought. One button, on the media.
   const [muted, setMuted] = useState(true)
 
+  // Ask for playback once the source resolves. `autoPlay` alone is not enough
+  // on Safari, which refuses it far more readily than Chromium does — a per-site
+  // Auto-Play setting is by itself sufficient — and a refused autoplay on an
+  // element with no poster is a black rectangle where the member's ad should
+  // be. A refusal here is fine and expected: the poster below is what the
+  // screen falls back to, so this only ever upgrades a still into a preview.
+  useEffect(() => {
+    if (!sourceUrl) return
+    videoRef.current?.play().catch(() => { /* autoplay refused — the poster stands in */ })
+  }, [sourceUrl])
+
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 px-6 py-8">
       <div className="flex flex-col items-center gap-1 text-center">
@@ -290,7 +301,21 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
           style={{ aspectRatio: '9 / 16' }}
         >
           {sourceUrl ? (
-            <video ref={videoRef} src={sourceUrl} className="h-full w-full object-cover" muted={muted} autoPlay loop playsInline />
+            /* `poster` is the saved first frame: Safari's default `preload` is
+               "metadata", so it reads the clip's header and then paints nothing
+               until playback starts — and if it also declines the autoplay above,
+               nothing ever starts it. Without a poster that is a black box under
+               the scanning sweep for the whole analysis. */
+            <video
+              ref={videoRef}
+              src={sourceUrl}
+              poster={thumbUrl}
+              className="h-full w-full object-cover"
+              muted={muted}
+              autoPlay
+              loop
+              playsInline
+            />
           ) : (
             <img src={thumbUrl!} alt="" className="h-full w-full object-cover" />
           )}

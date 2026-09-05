@@ -37,8 +37,12 @@ interface ResultsViewProps {
   result: AnalysisResult
   // Set when the analysis came from a fresh upload; the asset:// blob URL.
   videoSrc: string | null
-  // Set when the user restored from History; we don't keep the source video,
-  // only the saved first-frame still.
+  // The saved first-frame still. It does two jobs: it stands in for the ad
+  // once the source video is gone (TTL-swept, or opened on another device —
+  // the source is deliberately local-only), and it is the player's `poster`
+  // while the source is still there, so the column shows the ad rather than a
+  // black box in any browser that won't decode a frame it hasn't been asked
+  // to play.
   restoredThumbUrl?: string | null
   fileName: string
   // Legacy rows predate the field; a missing kind is a video, which is what
@@ -899,6 +903,20 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
                 <video
                   {...sourceVideo}
                   src={videoSrc}
+                  // The still we already captured for the History row, standing in
+                  // until the clip is played. Safari's default `preload` is
+                  // "metadata": it reads the header off the blob — the element is
+                  // correctly sized, so the source is fine — and then paints
+                  // NOTHING, so an unplayed <video> is a black rectangle with a
+                  // play button on it. Chrome defaults to "auto" and paints frame
+                  // one, which is why this only ever showed up on Safari. Worse,
+                  // the branch below renders that same still while the video blob
+                  // is still resolving, so the picture appeared and was then
+                  // replaced by the black box a moment later. `preload` asks for
+                  // the data as well, but it is only a hint (Safari downgrades it
+                  // freely) — the poster is what actually guarantees a picture.
+                  poster={restoredThumbUrl ?? undefined}
+                  preload="auto"
                   className="block max-h-full max-w-full rounded-xl border border-ink/10 transition-all hover:-translate-y-px card-soft-shadow"
                   controls
                 />
