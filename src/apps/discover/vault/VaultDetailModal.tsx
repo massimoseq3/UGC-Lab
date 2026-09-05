@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { ArrowUpRight, Download, Eye, PenLine, Star, X } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
+import { downloadLabel, type DownloadProgress } from '../services/handoff'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
@@ -22,6 +23,8 @@ interface VaultDetailModalProps {
   /** Opens the ScrapeCreators popup. Pressed from the note below the footer. */
   onNeedKey: () => void
   busy: VaultAction | null
+  /** How far the in-flight download has got, when one is running. */
+  downloadProgress?: DownloadProgress | null
   onClose: () => void
   onStar: (item: VaultItem) => void
   onAnalyze: (item: VaultItem) => void
@@ -30,7 +33,7 @@ interface VaultDetailModalProps {
 }
 
 export default function VaultDetailModal({
-  item, video, coverUrl, starred, hasKey, busy,
+  item, video, coverUrl, starred, hasKey, busy, downloadProgress,
   onClose, onStar, onAnalyze, onRemix, onDownload, onNeedKey,
 }: VaultDetailModalProps) {
   // Above any early return — hook order has to be stable.
@@ -252,21 +255,28 @@ export default function VaultDetailModal({
                 Open on Instagram
                 <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
               </button>
-              {/* Glyph only: the row's other button carries a sentence, and a
-                  second label would squeeze both past reading. */}
-              <button
-                type="button"
-                onClick={() => onDownload(item)}
-                disabled={busy != null}
-                title={needsKey
-                  ? 'Needs a ScrapeCreators key to fetch the video. Press to connect one'
-                  : video ? 'Download the video' : 'Download the video · 1 credit to fetch it from Instagram'}
-                aria-label="Download the video"
-                className="flex w-11 shrink-0 items-center justify-center rounded-full border border-ink/10 py-2.5 text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {busy === 'download' ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
-              </button>
             </div>
+
+            {/* Its own full-width labelled row, the same shape the result
+                modal's Download takes — it was a 44px glyph beside a
+                sentence-long button, and the width is what makes room for the
+                progress. The credit is named ON the label rather than only in
+                the tooltip, because until the video has been resolved this
+                press spends one. */}
+            <button
+              type="button"
+              onClick={() => onDownload(item)}
+              disabled={busy != null}
+              title={needsKey
+                ? 'Needs a ScrapeCreators key to fetch the video. Press to connect one'
+                : 'Save the video to your computer'}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-full border border-ink/10 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {busy === 'download' ? <Spinner className="h-4 w-4" /> : <Download className="h-4 w-4" />}
+              {busy === 'download'
+                ? downloadLabel(downloadProgress)
+                : video ? 'Download video' : 'Download video · 1 credit'}
+            </button>
 
             {/* Visible before the press, not just in a tooltip after it. Only
                 Analyze and Download are affected — watching the reel above and

@@ -8,7 +8,7 @@ import { useExclusiveVideo } from '../../../hooks/useInlineVideo'
 import { engagementRate, formatCount, formatMultiple, formatRate } from '../services/scoring'
 import type { DiscoverAction, TranscriptState } from '../Discover'
 import type { DiscoverResult } from '../types'
-import type { DownloadProgress } from '../services/handoff'
+import { downloadLabel, type DownloadProgress } from '../services/handoff'
 
 interface ResultDetailModalProps {
   result: DiscoverResult
@@ -379,23 +379,6 @@ export default function ResultDetailModal({
       </div>
     </div>
   )
-}
-
-/**
- * "Downloading… 12.4 MB" / "Downloading… 47%".
- *
- * A percentage only when the server told us the total, which cross-origin it
- * usually hasn't — `Content-Range` and `Content-Length` are not CORS-safelisted
- * on a ranged response. Megabytes are the honest fallback: a number that keeps
- * moving is the whole point, and inventing a percentage off a guessed total
- * would stall at "99%" on every long reel.
- */
-function downloadLabel(progress: DownloadProgress | null | undefined): string {
-  if (!progress || progress.received === 0) return 'Downloading…'
-  if (progress.total && progress.total > 0) {
-    return `Downloading… ${Math.min(99, Math.round((progress.received / progress.total) * 100))}%`
-  }
-  return `Downloading… ${(progress.received / 1_048_576).toFixed(1)} MB`
 }
 
 /**

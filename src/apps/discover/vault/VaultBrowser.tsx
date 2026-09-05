@@ -9,7 +9,7 @@ import VaultFolders from './VaultFolders'
 import { usePersistedState, useProjectScopedKey } from '../../../hooks/usePersistedState'
 import { useAppStore } from '../../../stores/appStore'
 import { humanizeError } from '../../../utils/friendlyError'
-import { downloadVideoFile, saveFileToDisk } from '../services/handoff'
+import { downloadVideoFile, saveFileToDisk, type DownloadProgress } from '../services/handoff'
 import {
   categoryLabel, facetCounts, filterVault, loadVault, patternLabel,
   resolveVaultVideo, thumbUrl, vaultFileName, VaultMessage, type VaultRow,
@@ -92,6 +92,9 @@ export default function VaultBrowser({
   const [openItem, setOpenItem] = useState<VaultItem | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [busyKind, setBusyKind] = useState<VaultAction | null>(null)
+  // A vault reel is the same tens of megabytes a search result is, so the same
+  // rule applies: a spinner with no number for the whole of it reads as stuck.
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null)
 
   // Back to one page whenever what's IN the list changes — a member who
   // filtered to 12 hooks after scrolling 300 deep should not have to press
@@ -166,9 +169,11 @@ export default function VaultBrowser({
   ) => {
     setBusyId(item.id)
     setBusyKind(kind)
+    setDownloadProgress(null)
     const result = await settle(work)
     setBusyId(null)
     setBusyKind(null)
+    setDownloadProgress(null)
     if (!result.ok) {
       // Our own copy goes out as written; anything from a vendor gets
       // translated. See VaultMessage.
@@ -201,7 +206,7 @@ export default function VaultBrowser({
     if (requireKey()) return
     void runFor(item, 'analyze', "Couldn't import that video. Try opening the original instead.", async () => {
       const video = await ensureVideo(item)
-      const file = await downloadVideoFile(video.url, vaultFileName(item))
+      const file = await downloadVideoFile(video.url, vaultFileName(item), setDownloadProgress)
       sendToApp({
         targetApp: 'ad-anatomy',
         targetField: 'adVideo',
@@ -217,7 +222,7 @@ export default function VaultBrowser({
     void runFor(item, 'download', "Couldn't download that video. Try opening the original instead.", async () => {
       const video = await ensureVideo(item)
       const name = vaultFileName(item)
-      saveFileToDisk(await downloadVideoFile(video.url, name), name)
+      saveFileToDisk(await downloadVideoFile(video.url, name, setDownloadProgress), name)
     })
   }
 
@@ -524,6 +529,7 @@ export default function VaultBrowser({
           hasKey={!!apiKey}
           onNeedKey={onNeedKey}
           busy={busyId === openItem.id ? busyKind : null}
+          downloadProgress={downloadProgress}
           onClose={() => setOpenItem(null)}
           onStar={handleStar}
           onAnalyze={handleAnalyze}
