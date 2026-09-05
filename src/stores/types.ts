@@ -142,7 +142,8 @@ export interface StylePreset {
  */
 export interface SwipeItem {
   id: string
-  platform: 'tiktok' | 'meta'
+  /** Mirrors DiscoverPlatform, spelled out so the store depends on no app. */
+  platform: 'tiktok' | 'instagram' | 'meta'
   /** The platform's own id, so re-saving the same ad can be detected. */
   sourceId: string
   /** Permalink to the original — the one link guaranteed not to rot. */

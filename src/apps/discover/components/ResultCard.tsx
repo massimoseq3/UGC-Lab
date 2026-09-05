@@ -32,6 +32,10 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
   const hasVideo = !!result.videoUrl
   const isMeta = result.platform === 'meta'
   const er = result.stats ? engagementRate(result.stats) : null
+  // Whatever this platform published, in the canonical order. Instagram gives
+  // likes and comments and nothing else, so its row is two cells rather than
+  // five zeros — see DiscoverStats.
+  const statCells = result.stats ? presentStats(result.stats) : []
 
   // TikTok's image CDN refuses plenty of its own cover URLs from a browser, so
   // a card that has a coverUrl still can't be trusted to render one — the grid
@@ -42,9 +46,9 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
   /** A clip with nothing to show behind it — it has to be its own thumbnail. */
   const posterless = hasVideo && !showCover
 
-  // Only TikTok publishes a runtime; Meta's payload carries none at all, so a
-  // Meta card would never show one. The browser knows it either way once it
-  // has the file's metadata, which is why every video card preloads that far
+  // TikTok and Instagram publish a runtime; Meta's payload carries none at all,
+  // so a Meta card would never show one. The browser knows it either way once
+  // it has the file's metadata, which is why every video card preloads that far
   // below — a runtime that only appears on hover isn't a thing you can scan.
   const [probedDuration, setProbedDuration] = useState<number | null>(null)
   const duration = result.durationSeconds ?? probedDuration
@@ -264,16 +268,17 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
             <img src={result.author.avatarUrl} alt="" loading="lazy" className="h-5 w-5 shrink-0 rounded-full object-cover" />
           )}
           <span className="min-w-0 flex-1 truncate text-[11px] font-medium text-ink-200">
-            {result.platform === 'tiktok' ? `@${result.author.handle}` : result.author.name}
+            {/* A creator is their handle; an advertiser is its page name. */}
+            {isMeta ? result.author.name : `@${result.author.handle}`}
           </span>
         </div>
         {/* Rendered even when the count is missing, so the caption below starts
             at the same height on every card in the row. Height is per-platform
-            because the two carry different things: on TikTok this is the
-            creator's following — context for the outlier score above it, and
-            dim on purpose — while on Meta it's page likes, the only audience
-            figure the Ad Library gives at all, so it takes a pill. As dim text
-            beside a dim glyph it was the easiest thing on the card to miss. */}
+            because they carry different things: on TikTok and Instagram this is
+            the creator's following — context for the score above it, and dim on
+            purpose — while on Meta it's page likes, the only audience figure the
+            Ad Library gives at all, so it takes a pill. As dim text beside a dim
+            glyph it was the easiest thing on the card to miss. */}
         <span
           className={`-mt-1.5 flex items-center gap-1 pl-[26px] ${
             isMeta ? 'h-[18px]' : 'h-[14px] text-[10px] text-ink-600'
@@ -301,16 +306,22 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
           {result.caption || 'No caption'}
         </p>
 
-        {/* The full engagement row. Five numbers on one line only stay readable
-            because each is glyph-led and they always appear in the same order,
-            so the eye lands on a position rather than reading labels. */}
-        {result.stats && (
-          <div className="flex items-center justify-between gap-1 border-t border-ink/5 pt-2 text-[10px] text-ink-500">
-            <Stat icon={Eye} value={result.stats.views} title="Views" strong />
-            <Stat icon={Heart} value={result.stats.likes} title="Likes" />
-            <Stat icon={MessageCircle} value={result.stats.comments} title="Comments" />
-            <Stat icon={Share2} value={result.stats.shares} title="Shares" />
-            <Stat icon={Bookmark} value={result.stats.saves} title="Saves" />
+        {/* The engagement row. Numbers on one line only stay readable because
+            each is glyph-led and they always appear in the same order, so the
+            eye lands on a position rather than reading labels — which is why
+            the cells a platform doesn't publish are LEFT OUT rather than shown
+            as zeros. A full five spread across the row; a short one closes up
+            to the left, since two figures pinned to opposite edges read as two
+            unrelated things rather than as a pair. */}
+        {statCells.length > 0 && (
+          <div
+            className={`flex items-center border-t border-ink/5 pt-2 text-[10px] text-ink-500 ${
+              statCells.length >= 4 ? 'justify-between gap-1' : 'gap-4'
+            }`}
+          >
+            {statCells.map(({ key, icon, value, title, strong }) => (
+              <Stat key={key} icon={icon} value={value} title={title} strong={strong} />
+            ))}
           </div>
         )}
 
@@ -323,6 +334,23 @@ function ResultCardImpl({ result, onAnalyze, onRemix, onSave, onDownload, onOpen
       </div>
     </div>
   )
+}
+
+/**
+ * The figures this card actually has, in the canonical order.
+ *
+ * Views · Likes · Comments · Shares · Saves is the order the row is scanned in,
+ * and it holds whichever subset a platform gives: all five on TikTok, likes and
+ * comments on Instagram, none on Meta.
+ */
+function presentStats(stats: NonNullable<DiscoverResult['stats']>) {
+  return ([
+    { key: 'views', icon: Eye, value: stats.views, title: 'Views', strong: true },
+    { key: 'likes', icon: Heart, value: stats.likes, title: 'Likes', strong: false },
+    { key: 'comments', icon: MessageCircle, value: stats.comments, title: 'Comments', strong: false },
+    { key: 'shares', icon: Share2, value: stats.shares, title: 'Shares', strong: false },
+    { key: 'saves', icon: Bookmark, value: stats.saves, title: 'Saves', strong: false },
+  ] as const).flatMap((cell) => (cell.value == null ? [] : [{ ...cell, value: cell.value }]))
 }
 
 /** One glyph-led figure in the engagement row. */

@@ -3,10 +3,13 @@
 
 import {
   searchTikTokKeyword,
+  searchInstagramReels,
   searchMetaAds,
   fetchTikTokVideo,
+  fetchInstagramPost,
   fetchMetaAd,
   firstUrl,
+  type InstagramReel,
   type TikTokSearchItem,
   type MetaAdItem,
   type MetaCreative,
@@ -88,6 +91,65 @@ function normaliseTikTok(item: TikTokSearchItem): DiscoverResult | null {
     // Deliberately unscored here — see applyMinViews. Scoring at fetch time
     // baked the min-views threshold into the row, so moving the filter
     // afterwards changed nothing until the member searched again.
+  }
+}
+
+// ── Instagram ───────────────────────────────────────────────────
+
+/** An absolute http(s) url, or nothing. Instagram nulls what it hasn't got. */
+function instagramUrl(value: string | null | undefined): string | undefined {
+  return typeof value === 'string' && /^https?:\/\//.test(value) ? value : undefined
+}
+
+/**
+ * A Google-indexed reel as a card.
+ *
+ * What it deliberately does NOT build is a `stats.views` — the search payload
+ * carries no view or play count, so there is no outlier multiple and no
+ * engagement rate on this tab, exactly as there is none on Meta's. The two
+ * optional play-count fields are read anyway: the sibling user-reels endpoint
+ * publishes one behind a flag, and a row that ever arrives carrying a real
+ * number should score off it rather than be ignored. Nothing is inferred when
+ * they are absent.
+ */
+function normaliseInstagram(reel: InstagramReel): DiscoverResult | null {
+  const id = reel.id ?? reel.shortcode
+  if (!id) return null
+
+  // The permalink is what every action points at — and on this platform it is
+  // also the API's own handle for the reel (transcript and media refresh both
+  // take a url, not an id), so a row without one is unusable.
+  const postUrl = reel.url ?? (reel.shortcode ? `https://www.instagram.com/reel/${reel.shortcode}/` : '')
+  if (!postUrl) return null
+
+  const owner = reel.owner ?? {}
+  const handle = owner.username ?? ''
+  const views = reel.video_play_count ?? reel.video_view_count
+
+  return {
+    id,
+    platform: 'instagram',
+    caption: reel.caption ?? '',
+    postUrl,
+    coverUrl: instagramUrl(reel.thumbnail_src) ?? instagramUrl(reel.display_url),
+    videoUrl: instagramUrl(reel.video_url),
+    // Seconds here, fractional — TikTok's same-named field is milliseconds.
+    durationSeconds: reel.video_duration ? Math.round(reel.video_duration) : undefined,
+    // An ISO timestamp rather than the unix seconds everything else sends.
+    createdAt: reel.taken_at ? Date.parse(reel.taken_at) || 0 : 0,
+    author: {
+      handle,
+      name: owner.full_name || handle,
+      avatarUrl: instagramUrl(owner.profile_pic_url),
+      followerCount: owner.follower_count,
+    },
+    stats: {
+      // Only what Instagram published. Shares and saves are absent on purpose:
+      // a 0 in those cells would read as a reel nobody saved.
+      ...(views != null ? { views } : {}),
+      likes: reel.like_count,
+      comments: reel.comment_count,
+    },
   }
 }
 
@@ -233,6 +295,19 @@ export async function refreshResultMedia(
   platform: DiscoverPlatform,
   ref: { sourceId: string; postUrl?: string },
 ): Promise<RefreshedMedia> {
+  if (platform === 'instagram') {
+    // Instagram's API has no id lookup — the permalink IS the handle. A row
+    // saved without one can't be re-resolved, and saying so beats a request
+    // that spends a credit to fail.
+    if (!ref.postUrl) throw new Error('This swipe has no Instagram link to refresh from.')
+    const { videoUrl, coverUrl, creditsRemaining } = await fetchInstagramPost(apiKey, ref.postUrl)
+    return {
+      videoUrl: videoUrl ?? undefined,
+      coverUrl: coverUrl ?? undefined,
+      creditsRemaining,
+    }
+  }
+
   if (platform === 'meta') {
     const { ad, creditsRemaining } = await fetchMetaAd(apiKey, ref.sourceId)
     const slots = creativeSlots(ad?.snapshot)
@@ -259,20 +334,23 @@ export async function refreshResultMedia(
  * filter re-ranks the grid you're already looking at instead of silently
  * doing nothing until the next search (which costs a credit).
  *
- * Cards with no view count of their own — every Meta ad — pass through
- * untouched: a view threshold can't be applied to a number the platform
- * doesn't publish, and filtering them out would empty that whole tab.
+ * Cards with no view count of their own — every Meta ad, and every Instagram
+ * reel — pass through untouched: a view threshold can't be applied to a number
+ * the platform doesn't publish, and filtering them out would empty those tabs.
+ * The caller passes a floor of 0 on a tab where the control isn't offered, so
+ * a stray view count can't be filtered by a filter nobody can see.
  */
 export function applyMinViews(results: DiscoverResult[], minViews: number): DiscoverResult[] {
   return results.reduce<DiscoverResult[]>((acc, r) => {
-    if (!r.stats) {
+    const views = r.stats?.views
+    if (views == null) {
       acc.push(r)
       return acc
     }
-    if (r.stats.views < minViews) return acc
+    if (views < minViews) return acc
     acc.push({
       ...r,
-      outlier: scoreOutlier(r.stats.views, r.author.followerCount, minViews),
+      outlier: scoreOutlier(views, r.author.followerCount, minViews),
     })
     return acc
   }, [])
@@ -291,6 +369,12 @@ export function sortResults(results: DiscoverResult[], sort: DiscoverSort): Disc
     out.sort((a, b) => b.createdAt - a.createdAt)
   } else if (sort === 'views') {
     out.sort((a, b) => (b.stats?.views ?? 0) - (a.stats?.views ?? 0))
+  } else if (sort === 'likes') {
+    // Instagram's tab leads on this: with no view count there is no multiple
+    // and no engagement rate, so likes are the only performance figure the
+    // platform gives — the same "rank by what is actually published" rule
+    // that makes Meta's default sort longevity.
+    out.sort((a, b) => (b.stats?.likes ?? 0) - (a.stats?.likes ?? 0))
   } else {
     // Outlier: scored cards first by multiple, then everything else by views.
     // Meta cards have neither, so they fall back to days running — which keeps
@@ -367,7 +451,7 @@ function dropUnpreviewable(platform: string, results: DiscoverResult[]): Discove
 
 export async function runSearch(
   apiKey: string,
-  platform: 'tiktok' | 'meta',
+  platform: DiscoverPlatform,
   query: string,
   filters: DiscoverFilters,
   cursor?: string | number,
@@ -388,6 +472,22 @@ export async function runSearch(
       .filter((r): r is DiscoverResult => r !== null)
     warnIfAllDropped('tiktok', page.items.length, normalised.length)
     const results = dropUnpreviewable('tiktok', normalised)
+    return { results, cursor: page.cursor, creditsRemaining: page.creditsRemaining }
+  }
+
+  if (platform === 'instagram') {
+    const page = await searchInstagramReels(apiKey, {
+      query,
+      // 'all-time' is the absence of a window, not a value the vendor takes.
+      datePosted: filters.instagramDatePosted === 'all-time' ? undefined : filters.instagramDatePosted,
+      // The cursor IS the page number on this endpoint — see searchInstagramReels.
+      page: typeof cursor === 'number' ? cursor : 1,
+    })
+    const normalised = page.items
+      .map(normaliseInstagram)
+      .filter((r): r is DiscoverResult => r !== null)
+    warnIfAllDropped('instagram', page.items.length, normalised.length)
+    const results = dropUnpreviewable('instagram', normalised)
     return { results, cursor: page.cursor, creditsRemaining: page.creditsRemaining }
   }
 

@@ -78,14 +78,17 @@ export function bandFor(multiple: number): OutlierBand | undefined {
  * audience. A video can be strong on one and flat on the other.
  */
 export function engagementRate(stats: {
-  views: number
-  likes: number
-  comments: number
-  shares: number
-  saves: number
+  views?: number
+  likes?: number
+  comments?: number
+  shares?: number
+  saves?: number
 }): number | null {
+  // No views, no rate — the figure is a share OF the views, so a platform that
+  // publishes none (Instagram's reel search, every Meta ad) gets null rather
+  // than a percentage of a number nobody reported.
   if (!stats.views || !Number.isFinite(stats.views)) return null
-  const interactions = stats.likes + stats.comments + stats.shares + stats.saves
+  const interactions = (stats.likes ?? 0) + (stats.comments ?? 0) + (stats.shares ?? 0) + (stats.saves ?? 0)
   return (interactions / stats.views) * 100
 }
 

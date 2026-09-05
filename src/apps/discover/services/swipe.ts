@@ -40,15 +40,18 @@ export function swipeToResult(item: SwipeItem, coverUrl?: string): DiscoverResul
       name: item.authorName,
       followerCount: item.followerCount,
     },
-    // Only when the platform gave us numbers at all: Meta publishes none, and
-    // the modal's five-cell grid reading zero across would be an invention.
-    stats: item.views != null
+    // Only the cells the platform actually gave us, and only when it gave at
+    // least one: Meta publishes none, Instagram publishes likes and comments
+    // and no views. Filling the rest with zeros would print "0 saves" on a
+    // reel Instagram simply doesn't report saves for — the same invention the
+    // Meta tab refuses to make with an outlier score.
+    stats: hasStats(item)
       ? {
           views: item.views,
-          likes: item.likes ?? 0,
-          comments: item.comments ?? 0,
-          shares: item.shares ?? 0,
-          saves: item.saves ?? 0,
+          likes: item.likes,
+          comments: item.comments,
+          shares: item.shares,
+          saves: item.saves,
         }
       : undefined,
     outlier: item.outlierMultiple != null && bandFor(item.outlierMultiple)
@@ -60,4 +63,10 @@ export function swipeToResult(item: SwipeItem, coverUrl?: string): DiscoverResul
       ? { isActive: false, daysRunning: item.daysRunning, platforms: [] }
       : undefined,
   }
+}
+
+/** True when the row snapshotted any figure at all. */
+function hasStats(item: SwipeItem): boolean {
+  return item.views != null || item.likes != null || item.comments != null
+    || item.shares != null || item.saves != null
 }

@@ -63,6 +63,15 @@ export default function ResultDetailModal({
   const er = result.stats ? engagementRate(result.stats) : null
   const hasTranscript = transcript.phase === 'ready'
   const isTikTok = result.platform === 'tiktok'
+  const isInstagram = result.platform === 'instagram'
+  const isMeta = result.platform === 'meta'
+  // The two platforms whose words we can buy. Meta's ad-transcript endpoint
+  // reads Facebook's exposed captions, which Ad Library video ads don't carry,
+  // so it came back empty every time — there the route to the script is
+  // Analyze Ad, which reads the video itself.
+  const canTranscribe = isTikTok || isInstagram
+  // Only the figures this platform published — see DiscoverStats.
+  const statCells = result.stats ? presentStats(result.stats) : []
 
   return (
     <div
@@ -108,11 +117,15 @@ export default function ResultDetailModal({
                 <img src={result.author.avatarUrl} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" />
               )}
               <span className="truncate text-[13px] font-medium text-ink-100">
-                {result.platform === 'tiktok' ? `@${result.author.handle}` : result.author.name}
+                {/* A creator is their handle; an advertiser is its page name. */}
+                {isMeta ? result.author.name : `@${result.author.handle}`}
               </span>
               {result.author.followerCount != null && (
                 <span className="shrink-0 text-[11px] text-ink-600">
-                  {formatCount(result.author.followerCount)} {result.platform === 'tiktok' ? 'followers' : 'likes'}
+                  {/* Followers on the creator platforms; on Meta this field
+                      carries page likes, the only audience figure the Ad
+                      Library publishes at all. */}
+                  {formatCount(result.author.followerCount)} {isMeta ? 'likes' : 'followers'}
                 </span>
               )}
             </div>
@@ -150,15 +163,13 @@ export default function ResultDetailModal({
               ))}
             </div>
 
-            {result.stats && (
-              <div className="mt-3 grid grid-cols-5 gap-1.5 text-center">
-                {([
-                  ['Views', result.stats.views],
-                  ['Likes', result.stats.likes],
-                  ['Comments', result.stats.comments],
-                  ['Shares', result.stats.shares],
-                  ['Saves', result.stats.saves],
-                ] as const).map(([label, value]) => (
+            {/* One tile per figure the platform actually published. A cell for
+                a number nobody reported would read as a zero — "0 saves" on a
+                reel Instagram doesn't count saves for — so the grid narrows
+                instead. */}
+            {statCells.length > 0 && (
+              <div className={`mt-3 grid gap-1.5 text-center ${STAT_GRID_COLS[statCells.length] ?? 'grid-cols-5'}`}>
+                {statCells.map(({ label, value }) => (
                   <div key={label} className="rounded-xl bg-ink/[0.03] py-2">
                     <div className="text-[13px] font-medium tabular-nums text-ink-100">{formatCount(value)}</div>
                     <div className="text-[10px] text-ink-600">{label}</div>
@@ -167,19 +178,19 @@ export default function ResultDetailModal({
               </div>
             )}
 
-            <Section label={result.platform === 'meta' ? 'Ad copy' : 'Caption'}>
+            <Section label={isMeta ? 'Ad copy' : 'Caption'}>
               <p className="text-[13px] leading-relaxed whitespace-pre-wrap text-ink-300">
                 {result.caption || 'No caption'}
               </p>
             </Section>
 
-            {/* TikTok only. Meta's ad-transcript endpoint returns nothing for
-                the ads that actually matter here — it reads Facebook's exposed
-                captions, and video ads in the Ad Library don't carry them — so
-                showing an empty Transcript block on every Meta ad was a promise
-                the platform can't keep. On that tab the route to the words is
-                Analyze Ad, which reads the video itself. */}
-            {result.platform === 'tiktok' && (
+            {/* The creator platforms only. Meta's ad-transcript endpoint returns
+                nothing for the ads that actually matter here — it reads
+                Facebook's exposed captions, and video ads in the Ad Library
+                don't carry them — so showing an empty Transcript block on every
+                Meta ad was a promise the platform can't keep. On that tab the
+                route to the words is Analyze Ad, which reads the video itself. */}
+            {canTranscribe && (
             <Section label="Transcript">
               {/* Asked for, never assumed. Opening a card used to fetch this on
                   its own, which billed a ScrapeCreators credit for the act of
@@ -190,16 +201,25 @@ export default function ResultDetailModal({
                 <button
                   type="button"
                   onClick={() => onFetchTranscript(result)}
+                  // Instagram exposes no caption track at all, so its endpoint
+                  // is speech-to-text every time — there is no 1-credit tier to
+                  // offer first, and no flat price published to quote. The
+                  // label names what it does and what it costs in TIME, which
+                  // is the part a member is about to wait through; the credits
+                  // chip in the header carries the rest.
+                  title={isInstagram
+                    ? 'Instagram publishes no captions, so this runs speech-to-text on your ScrapeCreators key. The reel has to be under 2 minutes.'
+                    : undefined}
                   className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5"
                 >
-                  <FileText className="h-3.5 w-3.5" />
-                  Get transcript — 1 credit
+                  {isInstagram ? <Sparkles className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
+                  {isInstagram ? 'Transcribe with AI — 10-30s' : 'Get transcript — 1 credit'}
                 </button>
               )}
               {transcript.phase === 'loading' && (
                 <p className="flex items-center gap-2 text-[12px] text-ink-500">
                   <Spinner className="h-3.5 w-3.5" />
-                  Pulling the transcript…
+                  {isInstagram ? 'Transcribing the audio — 10-30 seconds…' : 'Pulling the transcript…'}
                 </p>
               )}
               {transcript.phase === 'ready' && (
@@ -207,7 +227,15 @@ export default function ResultDetailModal({
                   {transcript.text}
                 </p>
               )}
-              {transcript.phase === 'empty' && (
+              {transcript.phase === 'empty' && (isInstagram ? (
+                // Instagram's answer is already the AI one, so there is no
+                // better attempt to offer behind it — an empty result here
+                // means nobody spoke, or the reel runs past two minutes.
+                <p className="text-[12px] leading-relaxed text-ink-500">
+                  No speech came back for this reel. Reels over two minutes
+                  can’t be transcribed — Analyze Ad reads the video itself.
+                </p>
+              ) : (
                 <div>
                   <p className="text-[12px] leading-relaxed text-ink-500">
                     This video has no captions to pull.
@@ -225,7 +253,7 @@ export default function ResultDetailModal({
                     Transcribe with AI — 10 credits
                   </button>
                 </div>
-              )}
+              ))}
               {transcript.phase === 'error' && (
                 <div>
                   <p className="text-[12px] leading-relaxed text-red-300 light:text-red-700">
@@ -267,14 +295,14 @@ export default function ResultDetailModal({
                 type="button"
                 onClick={() => onAnalyze(result)}
                 disabled={busy === 'analyze' || !result.videoUrl}
-                title={isTikTok ? 'Opens in Ad Analyzer' : 'Reads the video itself — the way to get this ad’s script'}
+                title={canTranscribe ? 'Opens in Ad Analyzer' : 'Reads the video itself — the way to get this ad’s script'}
                 className="flex flex-1 items-center justify-center gap-2 rounded-full bg-ink py-2.5 text-[13px] font-medium text-ink-900 transition-colors hover:bg-ink-200 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {busy === 'analyze' ? <Spinner className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 Analyze Ad
                 <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
               </button>
-              {isTikTok && (
+              {canTranscribe && (
                 <button
                   type="button"
                   onClick={() => void onRemix(result)}
@@ -318,7 +346,7 @@ export default function ResultDetailModal({
                 onClick={() => window.open(result.postUrl, '_blank', 'noopener,noreferrer')}
                 className="flex flex-1 items-center justify-center gap-2 rounded-full border border-ink/10 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5"
               >
-                {isTikTok ? 'Open on TikTok' : 'Open in Meta Ad Library'}
+                {isTikTok ? 'Open on TikTok' : isInstagram ? 'Open on Instagram' : 'Open in Meta Ad Library'}
                 <ArrowUpRight className="h-3.5 w-3.5 opacity-60" strokeWidth={2.5} />
               </button>
               {/* Glyph only: the row's other two buttons carry sentences, and a
@@ -341,6 +369,31 @@ export default function ResultDetailModal({
       </div>
     </div>
   )
+}
+
+/**
+ * The figures this result actually carries, in the canonical order.
+ *
+ * Same rule as the card's engagement row: a platform that doesn't publish a
+ * number gets no tile for it, rather than a tile reading zero.
+ */
+function presentStats(stats: NonNullable<DiscoverResult['stats']>) {
+  return ([
+    { label: 'Views', value: stats.views },
+    { label: 'Likes', value: stats.likes },
+    { label: 'Comments', value: stats.comments },
+    { label: 'Shares', value: stats.shares },
+    { label: 'Saves', value: stats.saves },
+  ] as const).flatMap((cell) => (cell.value == null ? [] : [{ ...cell, value: cell.value }]))
+}
+
+/** Static class strings — Tailwind can't see a template-built column count. */
+const STAT_GRID_COLS: Record<number, string> = {
+  1: 'grid-cols-1',
+  2: 'grid-cols-2',
+  3: 'grid-cols-3',
+  4: 'grid-cols-4',
+  5: 'grid-cols-5',
 }
 
 /**
