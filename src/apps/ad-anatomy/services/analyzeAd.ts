@@ -4,12 +4,15 @@ import {
   createTask,
   pollTask,
   extractChatTaskText,
+  chatTaskHitTokenLimit,
   kieChatCompletions,
   fileToDataUri,
   ensureHostedUrl,
+  TruncatedResponseError,
   CHAT_POLL_ATTEMPTS,
   type ChatMessage,
 } from '../../../utils/kie'
+import { FriendlyError } from '../../../utils/friendlyError'
 import { getChatTarget, CHAT_MODEL_STRONG } from '../../../utils/models'
 import {
   CONTINUOUS_STYLES,
@@ -310,12 +313,57 @@ function normalizeVoiceProfile(raw: unknown): MasterVoiceProfile | undefined {
   }
 }
 
+// Did this JSON document ever close? Walks the text tracking string/escape
+// state and bracket depth: anything still open at the end means the answer
+// stopped mid-write.
+//
+// This is the structural half of the same two-test rule B-Roll's storyboard
+// already runs, and it exists for the same reason: the transport's stop reason
+// is authoritative WHEN IT FIRES and says nothing when it doesn't. A stream
+// that is simply cut — the connection drops, or kie's gateway ends the SSE
+// without a final chunk — carries no `finish_reason: 'length'` at all, so the
+// answer arrives looking clean and lands on JSON.parse. Reported September
+// 2026 as an analysis that failed with `JSON Parse error: Unterminated string`
+// and told the member only "Analysis failed."
+//
+// Deliberately answers the narrow question "does it terminate", not "is it
+// valid": a model that closed its object and then wrote a sentence after it is
+// NOT truncated (depth returns to zero), and that parse failure keeps the
+// developer-detail error it has always had.
+function jsonDocumentIsTruncated(text: string): boolean {
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (const ch of text) {
+    if (escaped) { escaped = false; continue }
+    if (inString) {
+      if (ch === '\\') escaped = true
+      else if (ch === '"') inString = false
+      continue
+    }
+    if (ch === '"') inString = true
+    else if (ch === '{' || ch === '[') depth++
+    else if (ch === '}' || ch === ']') depth--
+  }
+  return inString || depth > 0
+}
+
+// One sentence for both ways an analysis comes back short, so a member never
+// gets B-Roll's wording ("a shorter script or fewer scenes") for an ad. Retry
+// is the right first move either way — a cut stream succeeds on the next pass,
+// a genuine ceiling does not — and the row keeps its `uploadedRef`, so it costs
+// a click rather than another upload.
+const INCOMPLETE_ANALYSIS = new FriendlyError(
+  'The analysis stopped partway and came back incomplete. Retry it — if that keeps happening, the ad is too long to read in one pass, so try a shorter cut.',
+)
+
 function parseAnalysisJson(rawText: string): AnalysisResult {
   const cleaned = rawText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
   let parsed: unknown
   try {
     parsed = JSON.parse(cleaned)
   } catch (e) {
+    if (jsonDocumentIsTruncated(cleaned)) throw INCOMPLETE_ANALYSIS
     const reason = e instanceof Error ? e.message : String(e)
     throw new Error(`Bad JSON from ad analysis model: ${reason} — body: ${cleaned.slice(0, 400)}`)
   }
@@ -392,6 +440,13 @@ export async function pollAnalysisTask(taskId: string): Promise<AnalysisResult> 
   const apiKey = useSettingsStore.getState().getKieApiKey()
   const record = await pollTask(apiKey, taskId, { maxPollAttempts: CHAT_POLL_ATTEMPTS })
 
+  // The stop reason, read off the finished record — the jobs transport's half
+  // of the same test the streaming path gets from TruncatedResponseError.
+  // Checked BEFORE the text is read: a record that hit the ceiling still
+  // carries the partial answer, which would otherwise go to the parser and
+  // fail there with something less true than "it stopped partway".
+  if (chatTaskHitTokenLimit(record)) throw INCOMPLETE_ANALYSIS
+
   // Shared with B-Roll's storyboard call — kie's chat result comes back in
   // several shapes and both surfaces have to read all of them.
   const text = extractChatTaskText(record)
@@ -414,6 +469,12 @@ export async function streamAnalysisFallback(videoFile: File): Promise<AnalysisR
   const responseText = await kieChatCompletions(apiKey, endpoint, messages, {
     timeoutMs: STREAM_TIMEOUT_MS,
     reasoningEffort: REASONING_EFFORT,
+  }).catch((err) => {
+    // A detected ceiling. humanizeError's own rule for this is written for
+    // Scripts and B-Roll and advises "a shorter script or fewer scenes" —
+    // neither of which is a thing a member analysing an ad has.
+    if (err instanceof TruncatedResponseError) throw INCOMPLETE_ANALYSIS
+    throw err
   })
   return parseAnalysisJson(responseText)
 }
