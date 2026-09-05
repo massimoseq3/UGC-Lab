@@ -130,10 +130,10 @@ function VaultCardImpl({
           <TileStarButton
             starred={starred}
             onToggle={() => onStar(item)}
-            title="Star — starred hooks filter to the top of the vault"
+            title="Star · starred hooks filter to the top of the vault"
           />
           <TileActionButton
-            title={video ? 'Download the video' : 'Download the video — 1 credit to fetch it from Instagram'}
+            title={video ? 'Download the video' : 'Download the video · 1 credit to fetch it from Instagram'}
             onClick={() => onDownload(item)}
             // Never disabled for a missing key — the handler opens the popup
             // that fixes it. Only an in-flight action holds these.
@@ -142,7 +142,7 @@ function VaultCardImpl({
             {busy === 'download' ? <Spinner className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
           </TileActionButton>
           <TileActionButton
-            title={video ? 'Analyze Ad — opens in Ad Analyzer' : 'Analyze Ad — 1 credit to fetch the video, then opens in Ad Analyzer'}
+            title={video ? 'Analyze Ad · opens in Ad Analyzer' : 'Analyze Ad · 1 credit to fetch the video, then opens in Ad Analyzer'}
             onClick={() => onAnalyze(item)}
             disabled={busy != null}
           >
@@ -151,7 +151,7 @@ function VaultCardImpl({
           {/* Free, unlike its opposite number on the search grid: the words are
               already in the library, transcribed once when it was built. */}
           <TileActionButton
-            title={hasTranscript ? 'Remix Transcript — free, opens in Scripts' : 'This reel has no spoken words'}
+            title={hasTranscript ? 'Remix Transcript · free, opens in Scripts' : 'This reel has no spoken words'}
             onClick={() => onRemix(item)}
             disabled={!hasTranscript}
           >

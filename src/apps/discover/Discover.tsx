@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
-import { Key, Plus, Radar, Search } from 'lucide-react'
+import { Key, Plus, Radar, Search, UserPlus } from 'lucide-react'
 import Spinner from '../../components/Spinner'
 import GridCanvas, { AwaitingBody } from '../../components/GridCanvas'
 import SegmentedToggle from '../../components/SegmentedToggle'
@@ -7,6 +7,7 @@ import FilterSelect from './components/FilterSelect'
 import ResultCard from './components/ResultCard'
 import ResultDetailModal from './components/ResultDetailModal'
 import ConnectScrapeCreators from './components/ConnectScrapeCreators'
+import AccountsBrowser from './components/AccountsBrowser'
 import VaultBrowser from './vault/VaultBrowser'
 import { vaultFiltersActive } from './vault/service'
 import { DEFAULT_VAULT_FILTERS, type VaultFilters } from './vault/types'
@@ -16,8 +17,9 @@ import { useAppStore } from '../../stores/appStore'
 import { useBankStore } from '../../stores/bankStore'
 import { humanizeError } from '../../utils/friendlyError'
 import { applyMinViews, isPreviewable, mergeResults, runSearch, sortResults } from './services/search'
-import { downloadResultVideo, fetchResultTranscript, saveResultVideoToDisk, saveThumbnail } from './services/handoff'
-import { DEFAULT_FILTERS, type DiscoverFilters, type DiscoverPlatform, type DiscoverResult, type DiscoverSort, type DiscoverView } from './types'
+import { downloadResultVideo, fetchResultTranscript, saveRemoteImage, saveResultVideoToDisk, saveThumbnail } from './services/handoff'
+import { resolveAccount } from './services/accounts'
+import { DEFAULT_ACCOUNT_FILTERS, DEFAULT_FILTERS, type AccountFilters, type DiscoverFilters, type DiscoverPlatform, type DiscoverResult, type DiscoverSort, type DiscoverView } from './types'
 
 // Outliers — search TikTok, Instagram and the Meta Ad Library for ads worth
 // stealing, then hand one straight to the Ad Analyzer or to Scripts.
@@ -235,10 +237,14 @@ export default function Discover() {
   // find something worth tearing down before it could help.
   const [view, setView] = usePersistedState<DiscoverView>(`${baseKey}:view`, 'vault')
   const isVault = view === 'vault'
-  // Only the two search tabs have search state. The vault borrows TikTok's
-  // slot while it is on screen so the per-platform records below stay
-  // two-keyed and nothing has to grow a branch for a tab that never searches.
-  const platform: DiscoverPlatform = isVault ? 'tiktok' : view
+  const isAccounts = view === 'accounts'
+  /** The two tabs with no keyword search of their own. */
+  const isLibrary = isVault || isAccounts
+  // Only the three search tabs have search state. The vault and the accounts
+  // tab borrow TikTok's slot while either is on screen, so the per-platform
+  // records below stay three-keyed and nothing has to grow a branch for a tab
+  // that never searches.
+  const platform: DiscoverPlatform = isLibrary ? 'tiktok' : view
   // Merged over the defaults on every hydrate, not just when the slot is
   // empty. `usePersistedState` hands back a stored blob verbatim, so a filter
   // saved before a field existed carries that field as `undefined` for good —
@@ -258,6 +264,21 @@ export default function Discover() {
     `${baseKey}:vault-filters`,
     DEFAULT_VAULT_FILTERS,
     { sanitize: (f) => ({ ...DEFAULT_VAULT_FILTERS, ...f }) },
+  )
+
+  // The accounts tab's own state. Its "query" is not a search — it is the
+  // handle being tracked — so it deliberately does NOT share the per-platform
+  // search record: there is no page to restore and nothing to re-run.
+  const [accountInput, setAccountInput] = useState('')
+  const [tracking, setTracking] = useState(false)
+  const [selectedAccountId, setSelectedAccountId] = usePersistedState<string | null>(
+    `${baseKey}:account`,
+    null,
+  )
+  const [accountFilters, setAccountFilters] = usePersistedState<AccountFilters>(
+    `${baseKey}:account-filters`,
+    DEFAULT_ACCOUNT_FILTERS,
+    { sanitize: (f) => ({ ...DEFAULT_ACCOUNT_FILTERS, ...f }) },
   )
 
   // One search per platform, kept side by side. Flipping to the other tab used
@@ -331,6 +352,10 @@ export default function Discover() {
   const swipes = useBankStore((s) => s.swipes)
   const savedKeys = new Set(swipes.map((s) => `${s.platform}:${s.sourceId}`))
 
+  // The accounts tab's whole list. Cloud-synced, so it follows a member to
+  // their laptop with the snapshot on each row already filled in.
+  const trackedAccounts = useBankStore((s) => s.trackedAccounts)
+
   // Onboarding pops up the first time Outliers is opened without a key. Seeded
   // from the store at mount and never re-armed, so dismissing it is respected
   // for as long as the app stays open — the empty state behind it keeps a
@@ -390,6 +415,46 @@ export default function Discover() {
       setLoadingMore(false)
     }
   }, [apiKey, platform, filters, addToast, patchSearch])
+
+  /**
+   * Tracks an account off whatever the member pasted. 1 credit.
+   *
+   * The profile is looked up BEFORE the row is written, so nothing lands in
+   * the bank that can't be refreshed — the same verify-before-save contract
+   * `ConnectScrapeCreators` keeps with the key itself. Selecting the new row
+   * is what makes `AccountsBrowser` fetch its first page, so tracking and
+   * seeing the reels are one action from here.
+   */
+  const handleTrack = useCallback(async () => {
+    const input = accountInput.trim()
+    if (!input || !apiKey || tracking) return
+    setTracking(true)
+    try {
+      const { profile, creditsRemaining } = await resolveAccount(apiKey, input)
+      if (creditsRemaining !== null) setCredits(creditsRemaining)
+
+      // Tracking one already tracked selects it rather than making a second
+      // row — `addTrackedAccount` dedupes on the handle and hands the existing
+      // id back, so the avatar below is only bought for a genuinely new row.
+      const existing = useBankStore.getState().getTrackedAccountByHandle('instagram', profile.handle)
+      const id = existing?.id ?? await useBankStore.getState().addTrackedAccount({
+        platform: 'instagram',
+        handle: profile.handle,
+        userId: profile.userId,
+        name: profile.name,
+        avatarRef: await saveRemoteImage(profile.avatarUrl),
+        followerCount: profile.followerCount,
+      })
+      setSelectedAccountId(id)
+      setAccountInput('')
+    } catch (e) {
+      addToast(humanizeError(e, "Couldn't look up that account. Try again in a moment."), 'error')
+    } finally {
+      setTracking(false)
+    }
+    // `setSelectedAccountId` is useState's own setter via usePersistedState —
+    // declared rather than disabled, see patchSearch.
+  }, [accountInput, apiKey, tracking, addToast, setSelectedAccountId])
 
   const handleAnalyze = useCallback(async (result: DiscoverResult) => {
     setBusyId(result.id)
@@ -605,6 +670,19 @@ export default function Discover() {
                 </>
               ),
             },
+            // Sits beside the vault rather than beside Instagram, because
+            // the split that matters on this row is what a tab DOES: the
+            // first two are lists you already have (a library, your own
+            // tracked creators), the last three are searches you pay for.
+            {
+              value: 'accounts',
+              label: (
+                <>
+                  <span className="md:hidden">Accts</span>
+                  <span className="max-md:hidden">Accounts</span>
+                </>
+              ),
+            },
             { value: 'tiktok', label: 'TikTok' },
             {
               value: 'instagram',
@@ -654,20 +732,30 @@ export default function Discover() {
               tab: on TikTok and Meta it BUYS a page of results, in the vault
               it filters 872 rows already sitting on the member's machine. */}
           <input
-            value={isVault ? vaultQuery : query}
+            value={isVault ? vaultQuery : isAccounts ? accountInput : query}
             onChange={(e) => {
               if (isVault) setVaultQuery(e.target.value)
+              else if (isAccounts) setAccountInput(e.target.value)
               else patchSearch(platform, { query: e.target.value })
             }}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !isVault) void search() }}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              if (isAccounts) void handleTrack()
+              else if (!isVault) void search()
+            }}
             placeholder={
               isVault
-                ? 'Filter the vault — a topic, a phrase, a creator…'
-                : isTikTok
-                  ? 'Search TikTok — a product, a pain point, a hook…'
-                  : isInstagram
-                    ? 'Search Instagram reels — a product, a pain point, a hook…'
-                    : 'Search the Meta Ad Library…'
+                ? 'Filter the vault by topic, phrase or creator…'
+                : isAccounts
+                  // Names both shapes it takes, because a handle and a link
+                  // are the two things anyone has to hand and neither is
+                  // obviously the one being asked for.
+                  ? 'Track an Instagram account by @handle or profile link…'
+                  : isTikTok
+                    ? 'Search TikTok for a product, a pain point, a hook…'
+                    : isInstagram
+                      ? 'Search Instagram reels for a product, a pain point, a hook…'
+                      : 'Search the Meta Ad Library…'
             }
             className="w-full rounded-full border border-ink/10 bg-ink/5 py-2 pl-10 pr-4 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
           />
@@ -677,7 +765,17 @@ export default function Discover() {
             nothing to bill, so it carries no button — a Search button that
             spends no credit next to one that does would teach the wrong
             thing about both. */}
-        {!isVault && (
+        {isAccounts ? (
+          <button
+            type="button"
+            onClick={() => void handleTrack()}
+            disabled={!accountInput.trim() || !apiKey || tracking}
+            className="flex shrink-0 items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-ink-900 transition-colors hover:bg-ink-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {tracking ? <Spinner className="h-3.5 w-3.5" /> : <UserPlus className="h-3.5 w-3.5" />}
+            Track
+          </button>
+        ) : !isVault && (
           <button
             type="button"
             onClick={() => void search()}
@@ -702,12 +800,16 @@ export default function Discover() {
             search on TikTok isn't asking to bin the Meta grid too. Nothing here
             is recoverable by re-running for free, so it only appears once there
             is something to clear. */}
-        {(isVault
+        {/* Never on the accounts tab. Everything else this button clears is
+            re-runnable for a credit; a tracked list is curation, and a reset
+            that quietly binned it would be the one destructive + in the app.
+            A half-typed handle isn't worth a control. */}
+        {!isAccounts && (isVault
           ? vaultQuery.trim() !== '' || vaultFiltersActive(vaultFilters)
           : query !== '' || results.length > 0) && (
           <button
             type="button"
-            title={isVault ? 'Back to the folders — clears the vault filters' : 'New search — clears this tab'}
+            title={isVault ? 'Back to the folders. Clears the vault filters' : 'New search. Clears this tab'}
             onClick={() => {
               if (isVault) {
                 setVaultQuery('')
@@ -723,7 +825,7 @@ export default function Discover() {
         )}
       </header>
 
-      {!isVault && apiKey && (
+      {!isLibrary && apiKey && (
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-ink/5 px-4 py-2.5">
           <FilterSelect
             label="Sort"
@@ -823,6 +925,27 @@ export default function Discover() {
         />
       ) : !apiKey ? (
         <ConnectKeyPanel onConnect={() => setConnectOpen(true)} />
+      ) : isAccounts ? (
+        // Renders its own rail, header and filter row — the tab is a two-pane
+        // layout rather than a filter band over a grid, so it owns everything
+        // under the app header.
+        <AccountsBrowser
+          accounts={trackedAccounts}
+          selectedId={selectedAccountId}
+          onSelect={setSelectedAccountId}
+          filters={accountFilters}
+          onFiltersChange={setAccountFilters}
+          apiKey={apiKey}
+          onCredits={setCredits}
+          onAnalyze={handleAnalyze}
+          onRemix={handleRemix}
+          onSave={handleSave}
+          onDownload={handleDownload}
+          onOpen={openCard}
+          savedKeys={savedKeys}
+          busyId={busyId}
+          busyKind={busyKind}
+        />
       ) : searching ? (
         <GridCanvas>
           <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-ink-500">
@@ -896,7 +1019,7 @@ export default function Discover() {
                     credits chip in the header, which is live. Quoting a guess
                     on a button that spends money is worse than quoting
                     nothing. */}
-                {loadingMore ? 'Loading…' : isInstagram ? 'Load more' : 'Load more — 1 credit'}
+                {loadingMore ? 'Loading…' : isInstagram ? 'Load more' : 'Load more · 1 credit'}
               </button>
             </div>
           )}
@@ -932,7 +1055,7 @@ function ConnectKeyPanel({ onConnect }: { onConnect: () => void }) {
         <p className="text-sm text-ink-500">Connect ScrapeCreators</p>
         <p className="max-w-[340px] text-xs leading-relaxed text-ink-600">
           Outliers searches TikTok, Instagram and the Meta Ad Library on your
-          own key — from 1 credit a search, and 100 free when you sign up.
+          own key, from 1 credit a search, and 100 free when you sign up.
         </p>
         {/* Reopens the popup rather than linking out, so dismissing the
             onboarding can't strand a member with nowhere to paste a key. */}

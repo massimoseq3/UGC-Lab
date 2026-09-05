@@ -40,6 +40,11 @@ model and known limitations, see [SECURITY.md](SECURITY.md).
    `0023_lapsed_status.sql` adds the **Lapsed** member status and the
    `redeem_access_code` RPC behind it — skip it and Admin → Members simply
    shows no Lapsed pill and no Lapse button.
+   `0024_tracked_accounts.sql` adds the table behind Outliers' **Accounts**
+   tab, and unlike the two above it must be run **before** the frontend is
+   deployed: the client hydrates every bank table on sign-in, so a missing
+   one makes every member's hydrate report a per-table error (and skips that
+   session's orphan-asset sweep).
 4. Add yourself to the allowlist so you can sign up:
    ```sql
    insert into public.allowlist (email, source) values ('you@example.com', 'manual');

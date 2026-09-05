@@ -499,6 +499,181 @@ export async function searchInstagramReels(
   }
 }
 
+// ── Instagram: profile + a profile's own reels ──────────────────
+//
+// A different pair of endpoints from the keyword search above, and the reason
+// the Accounts tab exists: THESE publish a play count. `/v2/instagram/reels/
+// search` reads Google's index and carries likes and comments only, so nothing
+// on that tab can be scored. `/v1/instagram/user/reels` reads the profile
+// itself and hands back `play_count` per reel, which is the numerator of every
+// figure Outliers computes.
+
+interface InstagramProfileResponse {
+  success?: boolean
+  credits_remaining?: number
+  data?: { user?: InstagramProfileUser | null } | null
+  // The vendor documents `trim` without documenting its shape, and the sibling
+  // post endpoint has been seen flat — read both rather than trusting one.
+  user?: InstagramProfileUser | null
+}
+
+interface InstagramProfileUser {
+  id?: string
+  pk?: string | number
+  username?: string
+  full_name?: string
+  profile_pic_url?: string | null
+  profile_pic_url_hd?: string | null
+  is_verified?: boolean
+  /** The GraphQL shape. A flat `follower_count` has been seen too. */
+  edge_followed_by?: { count?: number }
+  follower_count?: number
+  edge_owner_to_timeline_media?: { count?: number }
+  media_count?: number
+}
+
+/** What the app keeps about a tracked profile. Vendor field names stop here. */
+export interface InstagramProfile {
+  /** Instagram's numeric id — the fast path for every later reels call. */
+  userId: string
+  handle: string
+  name: string
+  avatarUrl?: string
+  followerCount?: number
+  isVerified: boolean
+}
+
+/**
+ * One public profile: its numeric id, its following, its avatar.
+ *
+ * `cacheMaxAge` is the vendor's own cache window (1d/3d/7d/14d/30d) and a
+ * CACHED READ COSTS NOTHING — which is the whole reason a refresh re-reads the
+ * profile at all. Follower counts move slowly and the figure is only context
+ * for the score, so buying a fresh one on every refresh would be spending a
+ * credit on a number that hasn't changed.
+ */
+export async function fetchInstagramProfile(
+  apiKey: string,
+  handle: string,
+  cacheMaxAge?: '1d' | '3d' | '7d' | '14d' | '30d',
+): Promise<{ profile: InstagramProfile | null; creditsRemaining: number | null }> {
+  const body = await scFetch<InstagramProfileResponse>(apiKey, '/v1/instagram/profile', {
+    handle: handle.replace(/^@/, ''),
+    cache_max_age: cacheMaxAge,
+  })
+  const user = body.data?.user ?? body.user ?? null
+  const userId = user?.id ?? (user?.pk != null ? String(user.pk) : '')
+  const username = user?.username ?? ''
+
+  // No id and no handle is not a thin profile, it is a miss — the caller has
+  // nothing to fetch reels with and nothing to name the account after.
+  if (!user || (!userId && !username)) {
+    return { profile: null, creditsRemaining: body.credits_remaining ?? null }
+  }
+
+  return {
+    profile: {
+      userId,
+      handle: username || handle.replace(/^@/, ''),
+      name: user.full_name || username,
+      avatarUrl:
+        instagramHttpUrl(user.profile_pic_url_hd) ?? instagramHttpUrl(user.profile_pic_url),
+      followerCount: user.edge_followed_by?.count ?? user.follower_count,
+      isVerified: user.is_verified === true,
+    },
+    creditsRemaining: body.credits_remaining ?? null,
+  }
+}
+
+interface InstagramUserReelsResponse {
+  success?: boolean
+  credits_remaining?: number
+  items?: InstagramUserReelItem[] | null
+  paging_info?: { max_id?: string | null; more_available?: boolean } | null
+}
+
+/** The envelope Instagram wraps each reel in on this endpoint. */
+interface InstagramUserReelItem {
+  media?: InstagramUserReelMedia | null
+}
+
+/**
+ * One reel off a profile.
+ *
+ * Instagram's own private-API row, passed through — so it shares almost no
+ * field name with the reel the keyword search returns, including the id, the
+ * shortcode and the timestamp. Two of everything is declared where the vendor's
+ * docs and a live response disagree; `pickReelX` below reads whichever landed.
+ */
+export interface InstagramUserReelMedia {
+  id?: string
+  pk?: string | number
+  /** Instagram's own name for the shortcode. The docs say `shortcode`. */
+  code?: string
+  shortcode?: string
+  /** Unix SECONDS. `created_at` is the ISO sibling under `trim`. */
+  taken_at?: number
+  created_at?: string
+  /** The figure this whole tab is built on. `ig_play_count` is IG-only. */
+  play_count?: number
+  ig_play_count?: number
+  view_count?: number
+  like_count?: number
+  comment_count?: number
+  video_duration?: number
+  /** An object on the live shape, a bare string in the docs. */
+  caption?: { text?: string } | string | null
+  video_versions?: Array<{ url?: string; width?: number; height?: number }> | null
+  image_versions2?: { candidates?: Array<{ url?: string; width?: number }> | null } | null
+}
+
+/**
+ * A page of a profile's own reels, newest first.
+ *
+ * Paged by `max_id`, handed back as the `SearchPage` cursor so this sits on the
+ * same contract as the three searches. Pinned reels are excluded by the vendor,
+ * which is a feature here: a pinned reel is usually the account's best ever and
+ * would drag the median it is being scored against.
+ *
+ * Prefers `userId` — the vendor says a handle costs a lookup on their side —
+ * and falls back to the handle for a row saved before the id was captured.
+ */
+export async function fetchInstagramUserReels(
+  apiKey: string,
+  opts: { userId?: string; handle?: string; cursor?: string },
+): Promise<SearchPage<InstagramUserReelMedia>> {
+  if (!opts.userId && !opts.handle) {
+    throw new ScrapeCreatorsError(400, 'No account to fetch reels for.')
+  }
+
+  const body = await scFetch<InstagramUserReelsResponse>(apiKey, '/v1/instagram/user/reels', {
+    user_id: opts.userId,
+    // Only sent when there is no id: passing both has been seen to make the
+    // vendor prefer the slower path.
+    handle: opts.userId ? undefined : opts.handle?.replace(/^@/, ''),
+    max_id: opts.cursor,
+  })
+
+  const items = (body.items ?? [])
+    .map((row) => row?.media ?? null)
+    .filter((m): m is InstagramUserReelMedia => !!m)
+
+  const nextId = body.paging_info?.max_id ?? null
+  return {
+    items,
+    // Both halves matter: `more_available` false ends the walk even when a
+    // stale max_id is still present, and a missing max_id ends it even when
+    // the flag says otherwise.
+    cursor: body.paging_info?.more_available !== false && nextId ? nextId : null,
+    creditsRemaining: body.credits_remaining ?? null,
+  }
+}
+
+/** An absolute http(s) url, or nothing. Instagram nulls what it hasn't got. */
+function instagramHttpUrl(value: string | null | undefined): string | undefined {
+  return typeof value === 'string' && /^https?:\/\//.test(value) ? value : undefined
+}
+
 /**
  * One TikTok video by id, for its CURRENT media urls.
  *

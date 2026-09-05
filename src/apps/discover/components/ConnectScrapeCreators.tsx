@@ -83,7 +83,7 @@ export default function ConnectScrapeCreators({ onClose }: { onClose: () => void
           <p className="mt-1 text-[12px] leading-relaxed text-ink-500">
             {connected
               ? 'Search TikTok and the Meta Ad Library, then send anything you find straight to Ad Analyzer or Scripts.'
-              : 'Outliers runs on your own ScrapeCreators key — 1 credit a search, and 100 free when you sign up.'}
+              : 'Outliers runs on your own ScrapeCreators key. 1 credit a search, and 100 free when you sign up.'}
           </p>
 
           {connected ? (

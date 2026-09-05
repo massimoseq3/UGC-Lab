@@ -6,14 +6,15 @@
 export type DiscoverPlatform = 'tiktok' | 'instagram' | 'meta'
 
 /**
- * Which of Outliers' three tabs is on screen.
+ * Which of Outliers' five tabs is on screen.
  *
- * The vault is not a platform and never becomes one — it is a fixed library
- * that ships with the app, so it has no search state, no cursor and no
- * credits. Keeping it out of `DiscoverPlatform` is what stops every
- * `Record<DiscoverPlatform, …>` in the app growing a key that means nothing.
+ * Two of them are not platforms and never become one. The vault is a fixed
+ * library that ships with the app; accounts is a tracked list the member
+ * curates. Neither has a keyword search, a page cursor or a per-tab query, so
+ * keeping both out of `DiscoverPlatform` is what stops every
+ * `Record<DiscoverPlatform, …>` in the app growing keys that mean nothing.
  */
-export type DiscoverView = 'vault' | DiscoverPlatform
+export type DiscoverView = 'vault' | 'accounts' | DiscoverPlatform
 
 /** Which band a video's view-to-follower multiple falls into. */
 export type OutlierBand = '2x' | '5x' | '10x'
@@ -142,4 +143,33 @@ export const DEFAULT_FILTERS: DiscoverFilters = {
   // Defaults to video: this is a tool for finding UGC ads to take apart, and
   // a static image has no hook, no delivery and no transcript to remix.
   mediaType: 'VIDEO',
+}
+
+// ── The Accounts tab ────────────────────────────────────────────
+
+export type AccountSort = 'score' | 'plays' | 'recent'
+
+/**
+ * The Accounts tab's own filter set, deliberately separate from
+ * `DiscoverFilters`.
+ *
+ * Nothing here is sent to the vendor — this endpoint takes an account and a
+ * page and nothing else — so all three run client-side over reels already
+ * paid for. That is also why the score floor is a MULTIPLE rather than the
+ * search tabs' view floor: on one account the interesting cut is "show me
+ * everything that beat their usual", not "hide the small stuff".
+ */
+export interface AccountFilters {
+  sort: AccountSort
+  /** 0 = any. Matches the badge's own bands so the control and the pill agree. */
+  minMultiple: 0 | 2 | 3 | 5 | 10
+  posted: 'all' | '1m' | '3m' | '6m' | '12m'
+}
+
+export const DEFAULT_ACCOUNT_FILTERS: AccountFilters = {
+  // The tab exists to surface an account's outliers, so it opens on them —
+  // unlike the search tabs, where the newest page is the thing just bought.
+  sort: 'score',
+  minMultiple: 0,
+  posted: 'all',
 }

@@ -124,9 +124,20 @@ function adFileName(result: DiscoverResult): string {
  * the save over a missing picture would be the wrong trade.
  */
 export async function saveThumbnail(result: DiscoverResult): Promise<string | undefined> {
-  if (!result.coverUrl) return undefined
+  return saveRemoteImage(result.coverUrl)
+}
+
+/**
+ * The url-shaped half, for a caller holding a link rather than a card.
+ *
+ * A tracked account's profile picture goes through this for exactly the reason
+ * a swipe's cover does — Instagram signs its avatar urls too, so a rail that
+ * remembered the link would be a row of broken circles inside a week.
+ */
+export async function saveRemoteImage(url: string | undefined): Promise<string | undefined> {
+  if (!url) return undefined
   try {
-    const res = await fetch(result.coverUrl)
+    const res = await fetch(url)
     if (!res.ok) return undefined
     const blob = await res.blob()
     if (!blob.size) return undefined

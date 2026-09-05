@@ -499,7 +499,7 @@ export default function VaultBrowser({
             ))}
           </div>
 
-          {/* Where the search tab says "Load more — 1 credit", this one is
+          {/* Where the search tab says "Load more · 1 credit", this one is
               free: the rows are already on the member's machine and the only
               thing being spent is DOM. */}
           {shown < matches.length && (

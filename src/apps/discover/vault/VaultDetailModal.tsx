@@ -102,7 +102,7 @@ export default function VaultDetailModal({
                 type="button"
                 onClick={() => onStar(item)}
                 aria-pressed={starred}
-                title={starred ? 'Unstar' : 'Star — starred hooks filter to the top of the vault'}
+                title={starred ? 'Unstar' : 'Star · starred hooks filter to the top of the vault'}
                 className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
                   starred ? 'text-amber-400' : 'text-ink-500 hover:text-ink-200'
                 }`}
@@ -212,7 +212,7 @@ export default function VaultDetailModal({
                 // so the button answers its own question.
                 disabled={busy != null}
                 title={needsKey
-                  ? 'Needs a ScrapeCreators key to fetch the video — press to connect one'
+                  ? 'Needs a ScrapeCreators key to fetch the video. Press to connect one'
                   : video ? 'Opens in Ad Analyzer' : 'Fetches the video (1 credit), then opens in Ad Analyzer'}
                 // The app's SEND-TO-ANOTHER-APP shape, not its primary-button
                 // shape: a tinted accent wash rather than a solid fill
@@ -231,7 +231,7 @@ export default function VaultDetailModal({
                 type="button"
                 onClick={() => onRemix(item)}
                 disabled={!hasTranscript}
-                title={hasTranscript ? 'Opens in Scripts — free, the words are already here' : 'This reel has no spoken words'}
+                title={hasTranscript ? 'Opens in Scripts · free, the words are already here' : 'This reel has no spoken words'}
                 // Character-for-character the button Ad Analyzer already uses
                 // to send ITS transcript to Scripts — same destination, same
                 // job, so there was no reason to invent a second look for it.
@@ -259,8 +259,8 @@ export default function VaultDetailModal({
                 onClick={() => onDownload(item)}
                 disabled={busy != null}
                 title={needsKey
-                  ? 'Needs a ScrapeCreators key to fetch the video — press to connect one'
-                  : video ? 'Download the video' : 'Download the video — 1 credit to fetch it from Instagram'}
+                  ? 'Needs a ScrapeCreators key to fetch the video. Press to connect one'
+                  : video ? 'Download the video' : 'Download the video · 1 credit to fetch it from Instagram'}
                 aria-label="Download the video"
                 className="flex w-11 shrink-0 items-center justify-center rounded-full border border-ink/10 py-2.5 text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-50"
               >
