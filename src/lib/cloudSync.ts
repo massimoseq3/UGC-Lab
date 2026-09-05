@@ -59,7 +59,7 @@ const BANK_KEYS: BankKey[] = ['products', 'models', 'scripts', 'voices', 'brolls
 function reportError(context: string, err: unknown) {
   const msg = err instanceof Error ? err.message : (typeof err === 'string' ? err : JSON.stringify(err))
   console.error(`[cloudSync] ${context}:`, err)
-  try { useAppStore.getState().addToast(`Cloud — ${context}: ${msg}`, 'error') } catch { /* store not ready */ }
+  try { useAppStore.getState().addToast(`Cloud · ${context}: ${msg}`, 'error') } catch { /* store not ready */ }
 }
 
 // ── Persistent sync outbox ──────────────────────────────────────────

@@ -334,7 +334,7 @@ const SWIPES = [
     caption: 'not me gatekeeping this for 3 months 😭 #skincare #vitaminc #glowup',
     // Already fetched before it was saved, so it rode along free — the
     // ready-transcript path (Copy transcript, Remix without paying again).
-    transcript: "Okay so I almost returned this serum, and now I'm on my third bottle. My skin was so dull I'd cake on foundation just to look awake. Then I used this for a week and people asked if I'd been on holiday. It's 15% vitamin C, no sticky finish, zero fragrance. They're doing 20% off right now — don't sleep on it.",
+    transcript: "Okay so I almost returned this serum, and now I'm on my third bottle. My skin was so dull I'd cake on foundation just to look awake. Then I used this for a week and people asked if I'd been on holiday. It's 15% vitamin C, no sticky finish, zero fragrance. They're doing 20% off right now, don't sleep on it.",
     views: 2_140_000, likes: 318_000, comments: 4_120, shares: 21_800, saves: 96_400,
     followerCount: 84_300,
     outlierMultiple: 25.4,
@@ -388,13 +388,13 @@ const SWIPES = [
   },
 ]
 
-const SCRIPT_TEXT_1 = `Okay so I almost returned this serum… and now I'm on my third bottle.\n\nMy skin was so dull I'd cake on foundation just to look awake. Nothing worked.\n\nThen I tried this for a week — and people literally asked if I'd been on holiday.\n\nIt's 15% vitamin C, no sticky finish, zero fragrance. I just put it on, glow, done.\n\nThey're doing 20% off right now. Don't sleep on it.`
-const SCRIPT_TEXT_2 = `I thought I was just "bad at sleeping." Turns out I had no idea what was actually happening at night.\n\nThis little ring tracks my sleep, recovery, all of it — seven day battery, no subscription.\n\nFirst week it told me my late coffee was wrecking my deep sleep. Cut it. Now I actually wake up rested.\n\nIf you wake up tired for no reason, this is the move.`
+const SCRIPT_TEXT_1 = `Okay so I almost returned this serum… and now I'm on my third bottle.\n\nMy skin was so dull I'd cake on foundation just to look awake. Nothing worked.\n\nThen I tried this for a week, and people literally asked if I'd been on holiday.\n\nIt's 15% vitamin C, no sticky finish, zero fragrance. I just put it on, glow, done.\n\nThey're doing 20% off right now. Don't sleep on it.`
+const SCRIPT_TEXT_2 = `I thought I was just "bad at sleeping." Turns out I had no idea what was actually happening at night.\n\nThis little ring tracks my sleep, recovery, all of it. Seven day battery, no subscription.\n\nFirst week it told me my late coffee was wrecking my deep sleep. Cut it. Now I actually wake up rested.\n\nIf you wake up tired for no reason, this is the move.`
 // Ad Analyzer's product-agnostic Script Style Prompt, saved to the Script Bank
 // as kind 'style' — the reusable recipe, not a script for one product.
-const STYLE_PROMPT = `STYLE: Skeptic-to-believer UGC testimonial.\n\nOpen on an admission that undercuts the ad ("I almost returned this") so the viewer reads it as a real opinion, not a pitch. Spend the next beat on the problem in concrete, unflattering detail — what it actually looked and felt like day to day. Turn on a specific moment of proof someone else noticed, never a claim about the product itself. Only then state the mechanism in plain specs, flatly, as though it barely matters. Close on a casual, low-pressure CTA with the current offer.\n\nDelivery: talking straight to the front camera, unscripted cadence, no adjectives a real person wouldn't use. Name the product at most twice.`
+const STYLE_PROMPT = `STYLE: Skeptic-to-believer UGC testimonial.\n\nOpen on an admission that undercuts the ad ("I almost returned this") so the viewer reads it as a real opinion, not a pitch. Spend the next beat on the problem in concrete, unflattering detail, what it actually looked and felt like day to day. Turn on a specific moment of proof someone else noticed, never a claim about the product itself. Only then state the mechanism in plain specs, flatly, as though it barely matters. Close on a casual, low-pressure CTA with the current offer.\n\nDelivery: talking straight to the front camera, unscripted cadence, no adjectives a real person wouldn't use. Name the product at most twice.`
 
-const SCENE_PROMPT = `=== MASTER VISUAL STYLE (every scene is shot in this look) ===\nLive-action smartphone capture, photoreal and lightly grainy, with the soft matte finish of a front-facing camera rather than a lit set. Forms stay natural and unretouched, edges a little soft, skin texture left in. Palette runs warm cream, pale oak and bathroom white with one cool green accent, low saturation and gentle contrast, no grade pushed past what the room gives. Light is a single large window from camera left, soft and directional, with an open shadow side and no rim or bloom. Framing is handheld at chest height about an arm's length away, mild wide-lens character, shallow but imperfect focus, faint sensor noise in the shadows and no post treatment.\n\n--- Scene 1: Hook (00:00-00:04) ---\n[CHARACTER] stands at a sunlit bathroom counter, half-turned to the lens mid-sentence, holding [PRODUCT] loosely at chest height. Handheld chest-height framing an arm's length away, window light from the left. She says: "okay so I almost sent this back." Audio: NO background music, NO soundtrack, NO score — dialogue and room tone only.\n\n--- Scene 2: Proof (00:04-00:10) ---\nTight insert on hands turning [PRODUCT] once on the counter, water beading on the marble beside it, the same soft window light. She says, off camera: "a week in and my mum asked if I'd been away." Audio: NO background music, NO soundtrack, NO score — dialogue and room tone only.\n\n--- Scene 3: CTA (00:10-00:15) ---\n[CHARACTER] back at the mirror, applying [PRODUCT] without looking at the lens, then a flat glance up as she finishes. She says: "link's below, they're doing twenty percent off." Audio: NO background music, NO soundtrack, NO score — dialogue and room tone only.\n\n=== VOICE PROFILE (same voice in every scene) ===\nFemale, late 20s, General American with a slight urban lilt. Mid-range and a little dry, unhurried, landing sentences flat rather than selling them. Reads like someone talking over their shoulder while getting ready — light breath between clauses, no announcer lift at the end of a line.`
+const SCENE_PROMPT = `=== MASTER VISUAL STYLE (every scene is shot in this look) ===\nLive-action smartphone capture, photoreal and lightly grainy, with the soft matte finish of a front-facing camera rather than a lit set. Forms stay natural and unretouched, edges a little soft, skin texture left in. Palette runs warm cream, pale oak and bathroom white with one cool green accent, low saturation and gentle contrast, no grade pushed past what the room gives. Light is a single large window from camera left, soft and directional, with an open shadow side and no rim or bloom. Framing is handheld at chest height about an arm's length away, mild wide-lens character, shallow but imperfect focus, faint sensor noise in the shadows and no post treatment.\n\n--- Scene 1: Hook (00:00-00:04) ---\n[CHARACTER] stands at a sunlit bathroom counter, half-turned to the lens mid-sentence, holding [PRODUCT] loosely at chest height. Handheld chest-height framing an arm's length away, window light from the left. She says: "okay so I almost sent this back." Audio: NO background music, NO soundtrack, NO score. Dialogue and room tone only.\n\n--- Scene 2: Proof (00:04-00:10) ---\nTight insert on hands turning [PRODUCT] once on the counter, water beading on the marble beside it, the same soft window light. She says, off camera: "a week in and my mum asked if I'd been away." Audio: NO background music, NO soundtrack, NO score. Dialogue and room tone only.\n\n--- Scene 3: CTA (00:10-00:15) ---\n[CHARACTER] back at the mirror, applying [PRODUCT] without looking at the lens, then a flat glance up as she finishes. She says: "link's below, they're doing twenty percent off." Audio: NO background music, NO soundtrack, NO score. Dialogue and room tone only.\n\n=== VOICE PROFILE (same voice in every scene) ===\nFemale, late 20s, General American with a slight urban lilt. Mid-range and a little dry, unhurried, landing sentences flat rather than selling them. Reads like someone talking over their shoulder while getting ready, with light breath between clauses, no announcer lift at the end of a line.`
 
 const BROLLS = [
   { from: '#f59e0b', to: '#b45309', prompt: 'Close-up of a glass serum bottle on a marble counter, morning light, water droplets, photorealistic.' },
@@ -559,13 +559,13 @@ const AD_ANALYSES = [
           styleId: 'ugc',
           label: 'UGC Realism',
           liveAction: true,
-          brief: 'Handheld phone footage with the flat wide-lens rendering of a front camera: mild sensor noise in the shadows, a slight wobble on every movement, and no grade at all. Skin keeps its real texture, stray hairs and a shine on the forehead; the cream sweater wrinkles where an arm bends. Colour runs warm and slightly uneven — daylight through one window against a cooler bulb further back — with open shadows and a blown highlight on the wall behind. Framing sits casually off-centre, sharp edge to edge with almost no falloff, no vignette and no gloss anywhere.',
+          brief: 'Handheld phone footage with the flat wide-lens rendering of a front camera: mild sensor noise in the shadows, a slight wobble on every movement, and no grade at all. Skin keeps its real texture, stray hairs and a shine on the forehead; the cream sweater wrinkles where an arm bends. Colour runs warm and slightly uneven, daylight through one window against a cooler bulb further back, with open shadows and a blown highlight on the wall behind. Framing sits casually off-centre, sharp edge to edge with almost no falloff, no vignette and no gloss anywhere.',
         },
         masterVoiceProfile: {
           label: 'Bright American Female, Mid-20s',
           traits: ['Female, mid-20s', 'General American', 'Fast, conversational', 'Slight vocal fry'],
           delivery: 'On camera throughout, talking straight into the lens with her mouth in sync; the same voice continues over the product close-up as a voiceover.',
-          profile: 'A mid-pitched female voice in her mid-twenties, General American with no regional colour, running fast and conversational with the pace of someone telling a friend something before they forget it. The texture is warm and slightly breathy at the top of a sentence, dropping into a light vocal fry on the last two or three words of every line. Energy is up but never announced — she sounds amused rather than excited. Sentences trail upward at the end like a question even when they are not, and she half-laughs through the word before her punchline.',
+          profile: 'A mid-pitched female voice in her mid-twenties, General American with no regional colour, running fast and conversational with the pace of someone telling a friend something before they forget it. The texture is warm and slightly breathy at the top of a sentence, dropping into a light vocal fry on the last two or three words of every line. Energy is up but never announced, she sounds amused rather than excited. Sentences trail upward at the end like a question even when they are not, and she half-laughs through the word before her punchline.',
         },
         scenes: [
           // Written in the shape a real analysis comes back in: one `[m:ss–m:ss]`
@@ -573,8 +573,8 @@ const AD_ANALYSES = [
           // attributed, and the on-screen text transcribed — a one-line prompt
           // would render as a shape the app never actually produces.
           {
-            index: 1, startTime: '00:00', endTime: '00:09', durationSeconds: 9, label: 'Hook — Skeptic',
-            prompt: `[0:00–0:04] Medium close-up at eye level, an arm's length away, square on: a woman in her mid-20s with shoulder-length wavy auburn hair parted in the middle, light freckled skin and bare lips, wearing an oversized cream cable-knit sweater, sits on the end of an unmade bed in a sunlit apartment. She holds the phone herself, so the frame drifts a little with her breathing, and she raises both eyebrows as she starts. She says: "Okay so I almost returned this serum… and now I'm on my third bottle." Window light from camera-left, soft and warm, with an open shadow down the right side of her face. White text with a black outline sits across the lower third: "I ALMOST RETURNED IT". [0:04–0:09] Cut to a slightly tighter handheld shot from the same side, her chin dropped and her hand flat against her cheek. She says: "My skin was so dull I'd cake on foundation just to look awake." Same window light, a white radiator and a half-open sash window behind her, no music yet — just room tone.`,
+            index: 1, startTime: '00:00', endTime: '00:09', durationSeconds: 9, label: 'Hook · Skeptic',
+            prompt: `[0:00–0:04] Medium close-up at eye level, an arm's length away, square on: a woman in her mid-20s with shoulder-length wavy auburn hair parted in the middle, light freckled skin and bare lips, wearing an oversized cream cable-knit sweater, sits on the end of an unmade bed in a sunlit apartment. She holds the phone herself, so the frame drifts a little with her breathing, and she raises both eyebrows as she starts. She says: "Okay so I almost returned this serum… and now I'm on my third bottle." Window light from camera-left, soft and warm, with an open shadow down the right side of her face. White text with a black outline sits across the lower third: "I ALMOST RETURNED IT". [0:04–0:09] Cut to a slightly tighter handheld shot from the same side, her chin dropped and her hand flat against her cheek. She says: "My skin was so dull I'd cake on foundation just to look awake." Same window light, a white radiator and a half-open sash window behind her, no music yet, just room tone.`,
           },
           {
             index: 2, startTime: '00:09', endTime: '00:15', durationSeconds: 6, label: 'Mechanism',
@@ -604,7 +604,7 @@ const AD_ANALYSES = [
           { label: 'CTA Strength', score: 7 },
           { label: 'Production Quality', score: 9 },
         ],
-        analystNote: 'Clean, premium static that communicates the value prop instantly. Loses points on emotional pull — it’s feature-forward rather than story-forward. The headline does the heavy lifting; a benefit-led variant could test well.',
+        analystNote: 'Clean, premium static that communicates the value prop instantly. Loses points on emotional pull, it’s feature-forward rather than story-forward. The headline does the heavy lifting; a benefit-led variant could test well.',
       },
       transcript: [
         { timestamp: '00:00', text: 'Headline: "Know why you wake up tired."' },
@@ -619,7 +619,7 @@ const AD_ANALYSES = [
           styleId: 'other',
           label: 'Premium product still',
           liveAction: true,
-          brief: 'Studio product photography finished like a brand campaign: one hero object, critically sharp, on a seamless dark surface with a soft reflection under it. Forms read as machined and exact — polished titanium against matte charcoal, every edge clean, no clutter in frame. The palette is near-monochrome navy and graphite with a single cool cyan accent glowing from a screen just off the subject. Light is a large soft source from high camera-left plus a hard rim along the far edge, shadows deep and controlled with no fill spill. Shallow depth of field, gentle falloff into black, faint bloom on the accent, no grain.',
+          brief: 'Studio product photography finished like a brand campaign: one hero object, critically sharp, on a seamless dark surface with a soft reflection under it. Forms read as machined and exact: polished titanium against matte charcoal, every edge clean, no clutter in frame. The palette is near-monochrome navy and graphite with a single cool cyan accent glowing from a screen just off the subject. Light is a large soft source from high camera-left plus a hard rim along the far edge, shadows deep and controlled with no fill spill. Shallow depth of field, gentle falloff into black, faint bloom on the accent, no grain.',
         },
         scenes: [
           // A still has no timeline, so this one stays a single untimed beat —
@@ -725,7 +725,7 @@ export async function seedMockData(): Promise<void> {
       const portrait = await makeImageAsset({ w: 768, h: 1365, from: m.from, to: m.to, label: m.name, sub: 'CHARACTER' })
       const isSheet = i === INFLUENCERS.length - 1
       const sheet = isSheet
-        ? await makeImageAsset({ w: 1365, h: 768, from: m.from, to: m.to, label: `${m.name} — Sheet`, sub: 'turnaround · expressions · full body' })
+        ? await makeImageAsset({ w: 1365, h: 768, from: m.from, to: m.to, label: `${m.name} · Sheet`, sub: 'turnaround · expressions · full body' })
         : undefined
       await store.addModel({
         name: m.name,
@@ -738,9 +738,9 @@ export async function seedMockData(): Promise<void> {
     }
 
     // Scripts bank
-    await store.addScript({ title: 'Glow Serum — Almost Returned It', scriptText: SCRIPT_TEXT_1, linkedProductId: '', source: 'script-architect', kind: 'remix' })
-    await store.addScript({ title: 'Sleep Tracker — Bad At Sleeping', scriptText: SCRIPT_TEXT_2, linkedProductId: '', source: 'script-architect', kind: 'remix' })
-    await store.addScript({ title: 'Serum Ad — Scene Blueprint', scriptText: SCENE_PROMPT, linkedProductId: '', source: 'script-architect', kind: 'reverse-engineer' })
+    await store.addScript({ title: 'Glow Serum · Almost Returned It', scriptText: SCRIPT_TEXT_1, linkedProductId: '', source: 'script-architect', kind: 'remix' })
+    await store.addScript({ title: 'Sleep Tracker · Bad At Sleeping', scriptText: SCRIPT_TEXT_2, linkedProductId: '', source: 'script-architect', kind: 'remix' })
+    await store.addScript({ title: 'Serum Ad · Scene Blueprint', scriptText: SCENE_PROMPT, linkedProductId: '', source: 'script-architect', kind: 'reverse-engineer' })
     // A saved Script Style Prompt — what Ad Analyzer writes into the Script Bank
     // (kind 'style'): product-agnostic, so it can be pointed at anything.
     await store.addScript({ title: 'Skeptic-to-Believer UGC', scriptText: STYLE_PROMPT, linkedProductId: '', source: 'script-architect', kind: 'style' })
@@ -808,7 +808,7 @@ export async function seedMockData(): Promise<void> {
       await store.addCharacterHistory(item)
     }
     const sheetSubject = INFLUENCERS[2]
-    const sheetImg = await makeImageAsset({ w: 1365, h: 768, from: sheetSubject.from, to: sheetSubject.to, label: `${sheetSubject.name} — Sheet`, sub: 'reference sheet' })
+    const sheetImg = await makeImageAsset({ w: 1365, h: 768, from: sheetSubject.from, to: sheetSubject.to, label: `${sheetSubject.name} · Sheet`, sub: 'reference sheet' })
     await store.addCharacterHistory({
       id: 'demo-char-sheet',
       imageRef: sheetImg,
@@ -826,7 +826,7 @@ export async function seedMockData(): Promise<void> {
         id: 'demo-script-hist-0',
         mode: 'write',
         variations: [SCRIPT_TEXT_1, SCRIPT_TEXT_1.replace('third bottle', 'second bottle'), SCRIPT_TEXT_1.replace('20% off', 'a bundle deal')],
-        inputSummary: 'Glow Lab Vitamin C Serum — Problem/Agitate/Solution',
+        inputSummary: 'Glow Lab Vitamin C Serum · Problem/Agitate/Solution',
         productName: 'Glow Lab Vitamin C Serum',
         brief: 'Skincare serum, target women 24-40, emphasize the visible glow',
         writeStyle: 'Problem–Agitate–Solution',
@@ -838,7 +838,7 @@ export async function seedMockData(): Promise<void> {
         id: 'demo-script-hist-1',
         mode: 'remix',
         variations: [SCRIPT_TEXT_2, SCRIPT_TEXT_2.replace('seven day battery', 'a week of battery'), SCRIPT_TEXT_2.replace('late coffee', 'evening screen time')],
-        inputSummary: 'FocusBand Sleep Tracker — testimonial remix',
+        inputSummary: 'FocusBand Sleep Tracker · testimonial remix',
         productName: 'FocusBand Sleep Tracker',
         winningTranscript: SCRIPT_TEXT_2,
         createdAt: ago(4),
@@ -847,7 +847,7 @@ export async function seedMockData(): Promise<void> {
         id: 'demo-script-hist-2',
         mode: 'reverse-engineer',
         variations: [SCENE_PROMPT],
-        inputSummary: 'Serum ad — scene blueprint',
+        inputSummary: 'Serum ad · scene blueprint',
         reversePrompt: SCENE_PROMPT,
         createdAt: ago(6),
       },
@@ -1048,7 +1048,7 @@ export async function seedMockData(): Promise<void> {
     await store.upsertBrollHistory({
       id: BROLL_SESSION_ID,
       createdAt: ago(0),
-      inputSummary: 'Glow Lab Vitamin C Serum — almost returned it, now on my third bottle',
+      inputSummary: 'Glow Lab Vitamin C Serum · almost returned it, now on my third bottle',
       productId: sessionProductId,
       modelId: sessionModelId,
       scriptText: SCRIPT_TEXT_1,
@@ -1174,7 +1174,7 @@ export async function seedMockData(): Promise<void> {
     await store.upsertBrollHistory({
       id: BROLL_CONTINUOUS_SESSION_ID,
       createdAt: ago(3),
-      inputSummary: 'Glow Lab Vitamin C Serum — continuous keyframe chain',
+      inputSummary: 'Glow Lab Vitamin C Serum · continuous keyframe chain',
       productId: sessionProductId,
       modelId: sessionModelId,
       scriptText: CONTINUOUS_SCENES.map((s) => s.scriptLine).join('\n'),

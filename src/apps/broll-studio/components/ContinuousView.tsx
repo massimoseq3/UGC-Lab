@@ -69,7 +69,7 @@ import { useBackdropClose } from '../../../hooks/useBackdropClose'
 
 // Every clip is silent narration-wise — the voiceover and music land in the
 // edit. Appended to the motion prompt at fire time so hand-edits can't drop it.
-const CLIP_AUDIO_RULE = 'No dialogue, no narration, no music — only the named sound effect and natural ambience.'
+const CLIP_AUDIO_RULE = 'No dialogue, no narration, no music. Only the named sound effect and natural ambience.'
 
 function frameKey(frameIndex: number, conceptId: string): string {
   return `${frameIndex}:${conceptId}`
@@ -272,7 +272,7 @@ export default function ContinuousView({
 
   const guardDemo = (): boolean => {
     if (result?.demo) {
-      useAppStore.getState().addToast('This is a sample storyboard — add your kie.ai key in Settings to generate', 'info')
+      useAppStore.getState().addToast('This is a sample storyboard. Add your kie.ai key in Settings to generate', 'info')
       return true
     }
     return false
@@ -391,7 +391,7 @@ export default function ContinuousView({
     // visible once the image lands.
     if (card.chainLink && frameIndex > 1 && !chainRefUrl) {
       useAppStore.getState().addToast(
-        `No keyframe picked for Frame ${frameIndex - 1} yet — generating Frame ${frameIndex} without the continuity reference.`,
+        `No keyframe picked for Frame ${frameIndex - 1} yet. Generating Frame ${frameIndex} without the continuity reference.`,
         'info',
       )
     }
@@ -583,7 +583,7 @@ export default function ContinuousView({
         setChainAt({ step: ++step, of: ordered.length })
         const ok = await runOneFrameOfBatch(frameIndex, override, includeExisting)
         if (!ok) {
-          useAppStore.getState().addToast(`Stopped at Frame ${frameIndex} — fix it and run again.`, 'error')
+          useAppStore.getState().addToast(`Stopped at Frame ${frameIndex}. Fix it and run again.`, 'error')
           break
         }
         // Let the ref effect observe the new selection before the next frame
@@ -751,7 +751,7 @@ export default function ContinuousView({
         ? 'reference-to-video'
         : null
     if (!animateMode) {
-      useAppStore.getState().addToast(`${model.displayName} can't animate a single still — pick a model that takes a start frame or reference images.`, 'error')
+      useAppStore.getState().addToast(`${model.displayName} can't animate a single still. Pick a model that takes a start frame or reference images.`, 'error')
       return
     }
     const frameDataUri = await toDataUri(startImageRef)
@@ -1019,7 +1019,7 @@ export default function ContinuousView({
       <div className="flex h-full flex-col items-center justify-center gap-3 p-8">
         <Box className="h-10 w-10 text-ink-800" strokeWidth={1.5} />
         <p className="text-sm text-ink-700">Storyboard the script as one continuous shot</p>
-        <p className="text-xs text-ink-800">Keyframes chain into each other — every clip ends on the next clip's first frame</p>
+        <p className="text-xs text-ink-800">Keyframes chain into each other: every clip ends on the next clip's first frame</p>
         {error && (
           <div className="mt-2 flex max-w-sm items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400 light:text-red-600" />
@@ -1089,7 +1089,7 @@ export default function ContinuousView({
   const requestClips = (sceneIndices: number[], scope: string) => {
     const targets = sceneIndices.filter((i) => clipStates[clipKey(i)])
     if (targets.length === 0) {
-      useAppStore.getState().addToast('No clips are ready — pick keyframes first.', 'error')
+      useAppStore.getState().addToast('No clips are ready. Pick keyframes first.', 'error')
       return
     }
     setConfirmGen({ kind: 'clips', sceneIndices: targets, scope })
@@ -1426,7 +1426,7 @@ export default function ContinuousView({
 
                 {balance !== null && overBudget && (
                   <p className="mt-3 text-[11px] text-red-400 light:text-red-600">
-                    Not enough credits — your balance is {balance.toLocaleString()}.
+                    Not enough credits. Your balance is {balance.toLocaleString()}.
                   </p>
                 )}
               </>
@@ -1499,7 +1499,7 @@ export default function ContinuousView({
 
                 {balance !== null && framesOverBudget && (
                   <p className="mt-3 text-[11px] text-red-400 light:text-red-600">
-                    Not enough credits — your balance is {balance.toLocaleString()}.
+                    Not enough credits. Your balance is {balance.toLocaleString()}.
                   </p>
                 )}
               </>
@@ -1651,7 +1651,7 @@ export default function ContinuousView({
         <ClipDownloadModal
           entries={allClipEntries}
           zipBasename="continuous-clips"
-          subtitle="Every card&rsquo;s cover clip is picked — tick the extra takes you also want."
+          subtitle="Every card&rsquo;s cover clip is picked. Tick the extra takes you also want."
           onClose={() => setDownloadOpen(false)}
         />
       )}
@@ -1726,7 +1726,7 @@ function SceneEditModal({
             ? <>Split here → <span className="text-ink-300">&ldquo;{head}&rdquo;</span> then <span className="text-ink-300">&ldquo;{tail}&rdquo;</span>, with a blank keyframe between them to write or regenerate.</>
             : dirty
               ? 'Save the line before splitting it.'
-              : 'One scene shows one idea. Put the cursor where the line turns — usually at a “but”, “until” or “then” — to split it in two.'}
+              : 'One scene shows one idea. Put the cursor where the line turns, usually at a “but”, “until” or “then”, to split it in two.'}
         </p>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -1742,7 +1742,7 @@ function SceneEditModal({
           <button
             type="button"
             disabled={!hasNext || dirty}
-            title={hasNext ? 'Fold the next scene into this one — the keyframe between them is removed' : 'No scene after this one'}
+            title={hasNext ? 'Fold the next scene into this one. The keyframe between them is removed' : 'No scene after this one'}
             onClick={() => { onApply({ kind: 'merge', sceneIndex: scene.index }); onClose() }}
             className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -1800,7 +1800,7 @@ function ChainToggle({ frameIndex, chainOn, onToggle }: { frameIndex: number; ch
       title={
         chainOn
           ? `Chained to Frame ${frameIndex - 1}: every concept here inherits its look. Turn off for genuinely different shots.`
-          : `Unchained: concepts here generate from the character, product and style only — more variety, looser continuity.`
+          : `Unchained: concepts here generate from the character, product and style only. More variety, looser continuity.`
       }
       className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-colors ${
         chainOn
@@ -1875,7 +1875,7 @@ function SceneRow({
             <button
               type="button"
               onClick={onEditScene}
-              title="Edit this scene — retype, split, merge or delete"
+              title="Edit this scene: retype, split, merge or delete"
               className="group/line flex min-w-0 items-center gap-2 text-left"
             >
               <span
@@ -1895,7 +1895,7 @@ function SceneRow({
             onClick={onGenerateFrame}
             disabled={chainRunning}
             title={framePicked
-              ? 'Render this scene\'s concepts again — the keyframe moves onto the fresh image'
+              ? 'Render this scene\'s concepts again. The keyframe moves onto the fresh image'
               : 'Render every concept for this scene'}
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -2008,7 +2008,7 @@ function FinalFrameRow({
             onClick={onGenerateFrame}
             disabled={chainRunning}
             title={framePicked
-              ? 'Render the final frame\'s concepts again — the keyframe moves onto the fresh image'
+              ? 'Render the final frame\'s concepts again. The keyframe moves onto the fresh image'
               : 'Render every concept for the final frame'}
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -2483,7 +2483,7 @@ function AddConceptCard({ onAdd }: { onAdd: () => void }) {
     <button
       type="button"
       onClick={onAdd}
-      title="Add a blank concept — open it to write or generate a prompt"
+      title="Add a blank concept. Open it to write or generate a prompt"
       className="group/add flex aspect-[9/16] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink/20 bg-ink/[0.03] transition-colors hover:border-broll-400/60 hover:bg-broll-500/10"
     >
       <Plus className="h-4 w-4 shrink-0 text-ink-400 transition-colors group-hover/add:text-broll-300" />

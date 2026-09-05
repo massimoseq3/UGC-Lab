@@ -175,7 +175,7 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
           {hasStaged ? 'Add another ad, or ' : 'Drag & drop one or more ads, or '}
           <span className="text-ink-200 underline underline-offset-2">browse</span>
         </span>
-        <span className="text-[11px] text-ink-600">MP4, MOV, WebM — max {MAX_SIZE_MB}MB each</span>
+        <span className="text-[11px] text-ink-600">MP4, MOV, WebM · max {MAX_SIZE_MB}MB each</span>
       </button>
       <input
         ref={inputRef}
@@ -200,7 +200,7 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
               <span className="min-w-0 flex-1 truncate text-xs text-ink-300">{s.file.name}</span>
               {needsCompressing(s.file) && (
                 <span
-                  title={`This ad is over the ${Math.round(VIDEO_UPLOAD_BUDGET_BYTES / (1024 * 1024))}MB the analyser can upload, so it gets compressed first — that takes about as long as the ad runs.`}
+                  title={`This ad is over the ${Math.round(VIDEO_UPLOAD_BUDGET_BYTES / (1024 * 1024))}MB the analyser can upload, so it gets compressed first, which takes about as long as the ad runs.`}
                   className="flex shrink-0 items-center gap-1 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium text-ink-400"
                 >
                   <Minimize2 className="h-2.5 w-2.5" strokeWidth={2.25} />
@@ -235,7 +235,7 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
             )}
             {totalCredits !== null && (
               <span
-                title="Estimated credits to analyse — rough and rounded up. The real charge is metered per token on your key."
+                title="Estimated credits to analyse: rough and rounded up. The real charge is metered per token on your key."
                 className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight"
               >
                 <Coins className="h-3 w-3" strokeWidth={2} />
@@ -248,7 +248,7 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
               whole-video read is one long call with no progress to stream, so
               the wait has to be stated or it reads as a hung page. */}
           <p className="text-center text-[11px] text-ink-600">
-            Please wait after starting — this can take a couple of minutes
+            Please wait after starting. This can take a couple of minutes
             {staged.length > 1 ? ' per ad' : ''}.
             {staged.some((s) => needsCompressing(s.file)) &&
               ' Oversized ads are compressed first, which adds roughly their own runtime.'}
@@ -261,7 +261,7 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
           <p className="text-[11px] font-medium uppercase tracking-widest text-[#FF5257]/80">Skipped</p>
           {rejected.map((r) => (
             <p key={r.name} className="truncate text-xs text-[#FF5257]/90">
-              <span className="text-ink-400">{r.name}</span> — {r.reason}
+              <span className="text-ink-400">{r.name}</span>: {r.reason}
             </p>
           ))}
         </div>
@@ -276,7 +276,7 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
             <p className="text-xl font-semibold tracking-tight text-ink-100">
               Drop your ads here to analyse
             </p>
-            <p className="text-sm text-ink-400">MP4, MOV, WebM — max {MAX_SIZE_MB}MB each</p>
+            <p className="text-sm text-ink-400">MP4, MOV, WebM · max {MAX_SIZE_MB}MB each</p>
           </div>
         </div>
       )}

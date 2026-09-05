@@ -71,7 +71,7 @@ export default function StyleForm({ item, onSave, onCancel }: StyleFormProps) {
             value={brief}
             onChange={(e) => setBrief(e.target.value)}
             rows={16}
-            placeholder="How everything rendered in this style looks — medium, forms, palette, light, camera and finish. Describe the look only; never the subjects it came from."
+            placeholder="How everything rendered in this style looks: medium, forms, palette, light, camera and finish. Describe the look only; never the subjects it came from."
             className="min-h-[320px] resize-y rounded-3xl border border-ink/10 bg-ink/[0.02] px-5 py-4 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
           />
           <span className="px-1 text-[11px] leading-relaxed text-ink-600">
@@ -111,7 +111,7 @@ export default function StyleForm({ item, onSave, onCancel }: StyleFormProps) {
           {!item && (
             <p className="flex items-start gap-2 rounded-2xl border border-ink/5 bg-ink/[0.03] px-3.5 py-3 text-[11px] leading-relaxed text-ink-500">
               <Palette className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-600" strokeWidth={1.5} />
-              <span>Tip: B-Roll can write this for you — upload a few frames of an ad whose look you want and save the result here.</span>
+              <span>Tip: B-Roll can write this for you. Upload a few frames of an ad whose look you want and save the result here.</span>
             </p>
           )}
 

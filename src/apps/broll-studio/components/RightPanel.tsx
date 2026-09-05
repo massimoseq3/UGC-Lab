@@ -207,7 +207,7 @@ export default function RightPanel(props: RightPanelProps) {
           <AwaitingBody
             icon={Film}
             title="Awaiting storyboard"
-            hint="Your next storyboard lands here. Nothing was deleted — this session is saved in History."
+            hint="Your next storyboard lands here. Nothing was deleted. This session is saved in History."
           />
         ) : isContinuous ? (
           <ContinuousView

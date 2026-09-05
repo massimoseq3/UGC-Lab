@@ -218,7 +218,7 @@ function PresetStamp({
       <button
         type="button"
         onClick={onOpen}
-        title={`Preset: ${label} — click to load a different one`}
+        title={`Preset: ${label} · click to load a different one`}
         className="flex min-w-0 items-center gap-1 transition-colors hover:text-voice-200"
       >
         <Bookmark className="h-3 w-3 shrink-0" />
@@ -227,7 +227,7 @@ function PresetStamp({
       <button
         type="button"
         onClick={onClear}
-        title="Detach preset — the settings it loaded stay as they are"
+        title="Detach preset · the settings it loaded stay as they are"
         aria-label="Detach preset"
         className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-voice-300/70 transition-colors hover:bg-ink/10 hover:text-red-400 light:hover:text-red-600"
       >

@@ -55,7 +55,7 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
     // they already have.
     test: (m) => m.includes('scrapecreators') && (m.includes('402') || m.includes('credit')),
     message:
-      "ScrapeCreators turned that search down — either the key is wrong or you're out of credits. Check the key in Settings, then top up at scrapecreators.com if it's correct.",
+      "ScrapeCreators turned that search down. Either the key is wrong or you're out of credits. Check the key in Settings, then top up at scrapecreators.com if it's correct.",
   },
   {
     test: (m) => m.includes('scrapecreators') && m.includes('429'),
@@ -77,7 +77,7 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
   {
     test: (m) => m.includes('unable to generate audio') || (m.includes('google model') && m.includes('audio')),
     message:
-      "Veo couldn't generate audio for this prompt — this is a Google model limitation, not a problem with your account. Try rephrasing the prompt (simplify or change any dialogue) and generate again, or switch to a different video model.",
+      "Veo couldn't generate audio for this prompt. This is a Google model limitation, not a problem with your account. Try rephrasing the prompt (simplify or change any dialogue) and generate again, or switch to a different video model.",
   },
 
   // ── Content moderation / safety filters ──
@@ -111,7 +111,7 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
       m.includes('risk not passed') ||
       m.includes('risk control'),
     message:
-      "The model's content filter turned this down. It's the wording of the prompt or a reference image, not your account — rewrite the line and try again.",
+      "The model's content filter turned this down. It's the wording of the prompt or a reference image, not your account. Rewrite the line and try again.",
   },
 
   // ── Auth / billing on the kie.ai key ──
@@ -152,12 +152,12 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
   {
     test: (m) => m.includes('455') || m.includes('maintenance') || m.includes('maintain'),
     message:
-      'kie.ai is under maintenance right now — this is on their end, not yours. Try again in a few minutes.',
+      'kie.ai is under maintenance right now. This is on their end, not yours. Try again in a few minutes.',
   },
   {
     test: (m) => /\b5\d\d\b/.test(m) || m.includes('server error'),
     message:
-      'kie.ai had a server error — this is on their end, not yours. Try again in a moment.',
+      'kie.ai had a server error. This is on their end, not yours. Try again in a moment.',
   },
 
   // ── Network / timeouts (our own messages) ──
@@ -185,7 +185,7 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
     // themselves were failing, so the model was never the problem.
     test: (m) => m.includes('connection to kie.ai kept failing'),
     message:
-      'Lost the connection to kie.ai while waiting. Check your internet — the generation may have finished anyway, so check kie.ai before running it again.',
+      'Lost the connection to kie.ai while waiting. Check your internet. The generation may have finished anyway, so check kie.ai before running it again.',
   },
   {
     // fetchWithRetry's AbortController fired: we stopped listening before kie
@@ -203,7 +203,7 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
     // it, so this is the one a Seedance 2.5 clip lands on.
     test: (m) => m.includes('timed out downloading'),
     message:
-      "Your result finished, but downloading it timed out. Retry — it picks up the finished file rather than generating it again, so it costs no extra credits.",
+      "Your result finished, but downloading it timed out. Retry picks up the finished file rather than generating it again, so it costs no extra credits.",
   },
   {
     // The clip arrived and the BROWSER couldn't open it: the metadata probe in
@@ -215,14 +215,14 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
     // free (it re-fetches the finished file), which is the whole message here.
     test: (m) => m.includes('metadata probe timed out') || m.includes('rejected the downloaded video'),
     message:
-      "The clip downloaded but this browser couldn't open it. Retry — it picks the finished file up again and costs no extra credits.",
+      "The clip downloaded but this browser couldn't open it. Retry picks the finished file up again and costs no extra credits.",
   },
   {
     // PollTimeoutError on a healthy connection — the task is very likely still
     // rendering on kie.ai, and regenerating pays for it twice.
     test: (m) => m.includes('timed out') || m.includes('timeout'),
     message:
-      "This is taking longer than we wait for, so we stopped watching — it's likely still running on kie.ai. Check there before generating it again.",
+      "This is taking longer than we wait for, so we stopped watching. It's likely still running on kie.ai. Check there before generating it again.",
   },
 
   // ── Truncated model responses (TruncatedResponseError) ──
@@ -292,7 +292,7 @@ const RULES: Array<{ test: (m: string) => boolean; message: string }> = [
 ]
 
 const GENERIC_FALLBACK =
-  'Something went wrong while generating. Please try again in a moment — if it keeps failing, the model may be temporarily down on kie.ai.'
+  'Something went wrong while generating. Please try again in a moment. If it keeps failing, the model may be temporarily down on kie.ai.'
 
 /**
  * Turn any thrown value into one friendly, plain-English sentence for end users.

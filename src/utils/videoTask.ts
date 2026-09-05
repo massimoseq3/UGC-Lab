@@ -46,7 +46,7 @@ export async function finishVideoAssetTask(
   const blob = await res.blob()
   if (blob.size === 0) {
     throw new Error(
-      `kie.ai returned an empty video (0 bytes). url=${urls[0]} — likely filtered by content policy or the result expired.`,
+      `kie.ai returned an empty video (0 bytes). url=${urls[0]}. Likely filtered by content policy or the result expired.`,
     )
   }
   const effectiveType = contentType || blob.type

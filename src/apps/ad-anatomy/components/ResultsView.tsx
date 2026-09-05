@@ -228,7 +228,7 @@ function TranscriptSection({ result, fileName }: { result: AnalysisResult; fileN
 
   const withoutTimestamps = result.transcript.map((l) => l.text).join('\n')
   const adTitle = result.adTitle?.trim() || deriveFallbackTitle(fileName)
-  const scriptTitle = `${adTitle} — Transcript`
+  const scriptTitle = `${adTitle} · Transcript`
 
   const handleSaveToBank = () => {
     addScript({
@@ -310,7 +310,7 @@ function joinScenes(scenes: Scene[]): string {
 // they exist so the LOOK and the VOICE can't drift between clips, which is what
 // makes a set of separately-generated clips read as one ad.
 function styleText(style: MasterVisualStyle): string {
-  return `${style.label} — ${style.liveAction ? 'live action' : 'animated / rendered'}\n${style.brief}`
+  return `${style.label} · ${style.liveAction ? 'live action' : 'animated / rendered'}\n${style.brief}`
 }
 
 function voiceText(voice: MasterVoiceProfile): string {
@@ -408,7 +408,7 @@ function VisualStyleBlock({ style, adTitle }: { style: MasterVisualStyle; adTitl
 
   const handleSave = () => {
     // addStyle toasts on success; a second click would just write a duplicate row.
-    void addStyle({ name: `${adTitle} — Visual Style`, brief: style.brief })
+    void addStyle({ name: `${adTitle} · Visual Style`, brief: style.brief })
     setSavedBrief(style.brief)
   }
 
@@ -583,7 +583,7 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
   const addScript = useBankStore((s) => s.addScript)
 
   const adTitle = result.adTitle?.trim() || deriveFallbackTitle(fileName)
-  const scriptTitle = `${adTitle} — Prompt`
+  const scriptTitle = `${adTitle} · Prompt`
 
   const handleSaveToBank = () => {
     addScript({
@@ -780,7 +780,7 @@ function FrameGrabButton({
     const ok = await grabFrameToDisk(video, fileName)
     setBusy(false)
     if (!ok) {
-      addToast('Could not grab that frame — let the ad finish loading, then try again.', 'error')
+      addToast('Could not grab that frame. Let the ad finish loading, then try again.', 'error')
       return
     }
     setDone(true)
@@ -792,7 +792,7 @@ function FrameGrabButton({
       type="button"
       onClick={handleGrab}
       disabled={busy}
-      title="Download the frame showing now — scrub the player to pick your moment"
+      title="Download the frame showing now · scrub the player to pick your moment"
       className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-[#FF5257]/20 bg-[#FF5257]/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-[#FF5257] transition-colors hover:bg-[#FF5257]/20 disabled:cursor-not-allowed disabled:opacity-60"
     >
       {busy ? (
@@ -938,7 +938,7 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
                 saved still — not a broken or missing video. */}
             {!videoSrc && restoredThumbUrl && (
               <p className="-mt-2 shrink-0 text-center text-[11px] italic text-ink-500">
-                Still frame — source ad not retained
+                Still frame · source ad not retained
               </p>
             )}
           </div>

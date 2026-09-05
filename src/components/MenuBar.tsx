@@ -86,7 +86,7 @@ function ThemeItem() {
   return (
     <button
       onClick={() => setPref(next)}
-      title={`Theme: ${label} — click for ${next === 'dark' ? 'Dark' : 'Light'}`}
+      title={`Theme: ${label} · click for ${next === 'dark' ? 'Dark' : 'Light'}`}
       aria-label={`Switch to ${next} mode`}
       className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-ink-300 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
     >
@@ -110,7 +110,7 @@ function StreakItem() {
   return (
     <button
       onClick={() => openApp('dashboard')}
-      title={`${streak}-day generation streak — open Dashboard`}
+      title={`${streak}-day generation streak · open Dashboard`}
       className="flex h-6 shrink-0 items-center gap-1 rounded-md px-2 text-[12px] text-ink-300 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
     >
       <Flame className="h-3.5 w-3.5 text-dashboard-400" strokeWidth={1.75} />
@@ -164,7 +164,7 @@ function CreditsItem() {
       <>
         <button
           onClick={() => setGuideOpen(true)}
-          title="No kie.ai API key yet — click for setup instructions"
+          title="No kie.ai API key yet · click for setup instructions"
           className="flex h-6 shrink-0 items-center gap-2 rounded-md px-2 text-[12px] text-red-300 transition-colors hover:bg-ink/[0.06] light:text-red-700"
         >
           <span className="relative flex h-2 w-2">
@@ -197,7 +197,7 @@ function CreditsItem() {
     <button
       onClick={handleRefresh}
       disabled={refreshing}
-      title="kie.ai credits remaining — click to refresh"
+      title="kie.ai credits remaining · click to refresh"
       aria-label="Refresh credits balance"
       className="group flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 text-[12px] text-ink-300 transition-colors hover:bg-ink/[0.06] hover:text-ink-100 disabled:opacity-60"
     >

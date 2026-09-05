@@ -195,7 +195,7 @@ export default function VaultDetailModal({
                 </p>
               ) : (
                 <p className="text-[12px] leading-relaxed text-ink-500">
-                  This reel has no spoken words — it ran on music and on-screen text.
+                  This reel has no spoken words. It ran on music and on-screen text.
                 </p>
               )}
             </Section>

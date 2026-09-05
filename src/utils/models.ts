@@ -481,7 +481,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     chatRating: {
       intelligence: 4,
       blurb:
-        'A safe middle rung — better than the cheap rows, well under the top.',
+        'A safe middle rung, better than the cheap rows and well under the top.',
     },
   },
 

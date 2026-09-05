@@ -25,7 +25,7 @@ export interface DeleteMemberResult {
 
 async function purgeR2(userId: string): Promise<string | null> {
   const token = await ensureFreshSession()
-  if (!token) return 'Not signed in — R2 objects were left in place.'
+  if (!token) return 'Not signed in. R2 objects were left in place.'
 
   let totalFailed = 0
   let lastError: string | null = null
@@ -55,7 +55,7 @@ async function purgeR2(userId: string): Promise<string | null> {
     }
   }
 
-  return 'Storage purge did not finish — some objects may remain in R2.'
+  return 'Storage purge did not finish. Some objects may remain in R2.'
 }
 
 export async function deleteMember(
@@ -73,7 +73,7 @@ export async function deleteMember(
     // A missing function is the one failure worth translating — it means the
     // migration hasn't been run against this project yet.
     if (/admin_delete_member/.test(error.message) && /(does not exist|not find)/i.test(error.message)) {
-      throw new Error('Deletion is not set up on this project yet — run migration 0018_admin_delete_member.sql.')
+      throw new Error('Deletion is not set up on this project yet. Run migration 0018_admin_delete_member.sql.')
     }
     throw new Error(error.message)
   }

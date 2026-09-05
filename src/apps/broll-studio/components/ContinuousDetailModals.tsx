@@ -383,17 +383,17 @@ export function ContinuousFrameModal({
                     onChange={(e) => { setDraft(e.target.value); onUpdate(() => ({ editablePrompt: e.target.value })) }}
                     onBlur={commitDraft}
                     rows={10}
-                    placeholder="Describe this keyframe as one paragraph — what's in frame, the light, the framing…"
+                    placeholder="Describe this keyframe as one paragraph: what's in frame, the light, the framing…"
                     className="relative min-h-[200px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                   />
                   <PromptToolbar
                     accent="broll"
                     onEnhance={() => void runPromptTool(onEnhancePrompt, 'Enhance')}
-                    enhanceTitle="Enhance — same staging, richer detail"
+                    enhanceTitle="Enhance · same staging, richer detail"
                     enhanceDisabled={!draft.trim()}
                     busy={promptWorking}
                     onRegenerate={() => void runPromptTool(onRegeneratePrompt, 'Regenerate')}
-                    regenerateTitle="Regenerate — a fresh staging for this keyframe"
+                    regenerateTitle="Regenerate · a fresh staging for this keyframe"
                     onUndo={handleUndo}
                     canUndo={canUndo}
                     onRedo={handleRedo}
@@ -437,7 +437,7 @@ export function ContinuousFrameModal({
                         value={cardState.animateMotion}
                         onChange={(e) => onUpdate(() => ({ animateMotion: e.target.value }))}
                         rows={6}
-                        placeholder="How the shot moves — the camera move, the character's motion, what changes across the clip."
+                        placeholder="How the shot moves: the camera move, the character's motion, what changes across the clip."
                         className="relative min-h-[140px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                       />
                     </div>
@@ -446,7 +446,7 @@ export function ContinuousFrameModal({
                         ? 'The still is used as the start frame.'
                         : animateModel?.modes?.includes('reference-to-video')
                           ? 'The still is used as a reference image (this model has no start-frame mode).'
-                          : "This model can't animate a still — pick another below."}
+                          : "This model can't animate a still. Pick another below."}
                     </p>
                   </div>
                 </>
@@ -553,7 +553,7 @@ export function ContinuousFrameModal({
                     task="video"
                     allowedModelIds={CONTINUOUS_MODEL_IDS}
                     requireAnyModes={['image-to-video', 'reference-to-video']}
-                    requireModeNote="Greyed-out models can't animate a single still — they take neither a start frame nor reference images."
+                    requireModeNote="Greyed-out models can't animate a single still. They take neither a start frame nor reference images."
                     value={animateModelId}
                     onChange={(id) => useSettingsStore.getState().setAppModel('broll-studio:continuous:animate', id)}
                     isOpen={animateModelPanelOpen}
@@ -616,7 +616,7 @@ export function ContinuousFrameModal({
                   // Not gated on a render in flight — animations queue in
                   // parallel like every other B-Roll generation.
                   disabled={!startImageUrl || !animateCapable}
-                  title={!startImageUrl ? 'Generate an image first, then animate it' : !animateCapable ? 'This model can’t animate a single still — pick another' : undefined}
+                  title={!startImageUrl ? 'Generate an image first, then animate it' : !animateCapable ? 'This model can’t animate a single still. Pick another' : undefined}
                   className="flex w-full items-center justify-center gap-2.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-broll-500 px-7 py-4 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <Film className="h-4 w-4" />
@@ -657,7 +657,7 @@ export function ContinuousFrameModal({
                   {conceptShot && (
                     <span
                       className="inline-flex w-fit shrink-0 rounded-full border border-broll-500/20 bg-broll-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wider text-broll-400"
-                      title="This concept's shot class — Enhance and Regenerate keep it"
+                      title="This concept's shot class · Enhance and Regenerate keep it"
                     >
                       {conceptShot}
                     </span>
@@ -668,7 +668,7 @@ export function ContinuousFrameModal({
                   style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
                   title={scriptLine || undefined}
                 >
-                  {scriptLine ? `“${scriptLine}”` : 'Final frame — the end state the last clip lands on'}
+                  {scriptLine ? `“${scriptLine}”` : 'Final frame · the end state the last clip lands on'}
                 </span>
               </div>
             </div>
@@ -680,7 +680,7 @@ export function ContinuousFrameModal({
               cardState.images.length === 0 && cardState.inFlightImages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                   <ImageIcon className="h-9 w-9 text-ink-800" strokeWidth={1.5} />
-                  <p className="text-xs text-ink-600">No images yet — hit Generate, then click one to make it the keyframe.</p>
+                  <p className="text-xs text-ink-600">No images yet. Hit Generate, then click one to make it the keyframe.</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
@@ -721,7 +721,7 @@ export function ContinuousFrameModal({
               cardState.videos.length === 0 && cardState.inFlightVideos.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                   <VideoIcon className="h-9 w-9 text-ink-800" strokeWidth={1.5} />
-                  <p className="text-xs text-ink-600">No animations yet — pick a still on the Image tab, then hit Animate.</p>
+                  <p className="text-xs text-ink-600">No animations yet. Pick a still on the Image tab, then hit Animate.</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
@@ -761,7 +761,7 @@ export function ContinuousFrameModal({
         onClose={() => setPromptExpanded(false)}
         value={draft}
         onChange={(v) => { setDraft(v); onUpdate(() => ({ editablePrompt: v })) }}
-        title={`${frameLabel} — Keyframe prompt`}
+        title={`${frameLabel} · Keyframe prompt`}
         placeholder="Describe this keyframe…"
         accent="broll"
       />
@@ -1022,7 +1022,7 @@ export function ContinuousClipModal({
                 </div>
                 {!framesReady && (
                   <p className="text-[11px] leading-relaxed text-amber-300 light:text-amber-700">
-                    Pick a keyframe for both ends of this clip first — click an image on each frame card.
+                    Pick a keyframe for both ends of this clip first. Click an image on each frame card.
                   </p>
                 )}
               </SectionCard>
@@ -1038,13 +1038,13 @@ export function ContinuousClipModal({
                     onChange={(e) => { setDraft(e.target.value); onUpdate(() => ({ editablePrompt: e.target.value, motionEdited: true })) }}
                     onBlur={commitDraft}
                     rows={8}
-                    placeholder="Describe the animation — what moves, how the camera moves, how it comes to rest, and one sound…"
+                    placeholder="Describe the animation: what moves, how the camera moves, how it comes to rest, and one sound…"
                     className="relative min-h-[160px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                   />
                   <PromptToolbar
                     accent="broll"
                     onEnhance={() => void runPromptTool(onEnhanceMotion, 'Enhance')}
-                    enhanceTitle="Enhance — same motion, richer detail"
+                    enhanceTitle="Enhance · same motion, richer detail"
                     enhanceDisabled={!draft.trim()}
                     busy={promptWorking}
                     onRegenerate={() => void runPromptTool(onRegenerateMotion, 'Regenerate')}
@@ -1212,7 +1212,7 @@ export function ContinuousClipModal({
             {cardState.videos.length === 0 && cardState.inFlightVideos.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                 <VideoIcon className="h-9 w-9 text-ink-800" strokeWidth={1.5} />
-                <p className="text-xs text-ink-600">No videos yet — hit Generate to animate between the keyframes.</p>
+                <p className="text-xs text-ink-600">No videos yet. Hit Generate to animate between the keyframes.</p>
               </div>
             ) : (
               <div className="flex flex-col gap-3">
@@ -1257,8 +1257,8 @@ export function ContinuousClipModal({
         onClose={() => setPromptExpanded(false)}
         value={draft}
         onChange={(v) => { setDraft(v); onUpdate(() => ({ editablePrompt: v, motionEdited: true })) }}
-        title={`${clipLabel} — Motion prompt`}
-        placeholder="Describe how the start frame moves — never the end frame…"
+        title={`${clipLabel} · Motion prompt`}
+        placeholder="Describe how the start frame moves, never the end frame…"
         accent="broll"
       />
     </ModalShell>

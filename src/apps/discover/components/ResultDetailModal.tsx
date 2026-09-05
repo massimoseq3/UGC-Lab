@@ -233,7 +233,7 @@ export default function ResultDetailModal({
                 // means nobody spoke, or the reel runs past two minutes.
                 <p className="text-[12px] leading-relaxed text-ink-500">
                   No speech came back for this reel. Reels over two minutes
-                  can’t be transcribed — Analyze Ad reads the video itself.
+                  can’t be transcribed. Analyze Ad reads the video itself.
                 </p>
               ) : (
                 <div>
@@ -250,7 +250,7 @@ export default function ResultDetailModal({
                     className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5"
                   >
                     <Sparkles className="h-3.5 w-3.5" />
-                    Transcribe with AI — 10 credits
+                    Transcribe with AI · 10 credits
                   </button>
                 </div>
               ))}

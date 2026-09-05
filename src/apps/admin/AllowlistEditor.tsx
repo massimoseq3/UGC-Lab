@@ -443,8 +443,8 @@ export default function AllowlistEditor() {
             <div className="text-[13px] font-medium text-ink-100">Allowlist enforcement</div>
             <p className="mt-0.5 text-[12px] text-ink-500">
               {enforced === false
-                ? 'OFF — anyone with the link can create an account.'
-                : 'ON — only emails on the list below can sign up.'}
+                ? 'OFF. Anyone with the link can create an account.'
+                : 'ON. Only emails on the list below can sign up.'}
             </p>
           </div>
           <button
@@ -471,7 +471,7 @@ export default function AllowlistEditor() {
           </div>
         )}
         {enforced === null && (
-          <p className="mt-2 text-[11px] text-ink-600">Couldn't load enforcement state — run migration 0013, then refresh.</p>
+          <p className="mt-2 text-[11px] text-ink-600">Couldn't load enforcement state. Run migration 0013, then refresh.</p>
         )}
       </div>
 
@@ -481,10 +481,10 @@ export default function AllowlistEditor() {
         <div className="text-[13px] font-medium text-ink-100">Signup access code</div>
         <p className="mt-0.5 text-[12px] text-ink-500">
           {!codeSupported
-            ? "Not available — run migration 0021, then refresh."
+            ? "Not available. Run migration 0021, then refresh."
             : savedCode
               ? 'New accounts must enter this code. Post it in the Skool community.'
-              : 'No code set — the Create account form will accept any code.'}
+              : 'No code set. The Create account form will accept any code.'}
         </p>
         {codeSupported && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -507,12 +507,12 @@ export default function AllowlistEditor() {
           </div>
         )}
         <p className="mt-2 text-[11px] text-ink-600">
-          Only affects new signups — members who already have an account sign in as usual.
+          Only affects new signups. Members who already have an account sign in as usual.
         </p>
       </div>
 
       <p className="text-[12px] text-ink-500">
-        Emails on this list can sign up. Until your Zapier zap is wired, you can bulk-import a Skool members CSV — and re-upload it later with sync mode enabled to also remove members who left. Removing an email also signs out and disables the matching account.
+        Emails on this list can sign up. Until your Zapier zap is wired, you can bulk-import a Skool members CSV, and re-upload it later with sync mode enabled to also remove members who left. Removing an email also signs out and disables the matching account.
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -574,7 +574,7 @@ export default function AllowlistEditor() {
         <div className="divide-y divide-ink/5 overflow-hidden rounded-lg border border-ink/10 md:hidden">
           {rows.length === 0 && (
             <p className="px-3 py-6 text-center text-[12px] text-ink-500">
-              Empty — Zapier zap not yet wired, or no members yet.
+              Empty. Zapier zap not yet wired, or no members yet.
             </p>
           )}
           {rows.map((r) => {
@@ -615,7 +615,7 @@ export default function AllowlistEditor() {
             </thead>
             <tbody className="divide-y divide-ink/5">
               {rows.length === 0 && (
-                <tr><td colSpan={5} className="px-3 py-6 text-center text-ink-500">Empty — Zapier zap not yet wired, or no members yet.</td></tr>
+                <tr><td colSpan={5} className="px-3 py-6 text-center text-ink-500">Empty. Zapier zap not yet wired, or no members yet.</td></tr>
               )}
               {rows.map((r) => {
                 const fullName = [r.first_name, r.last_name].filter(Boolean).join(' ')
@@ -699,7 +699,7 @@ function ImportPreviewModal({
         <div className="mt-4 space-y-2">
           <Stat color="emerald" label="New emails to add" value={preview.newEntries.length} />
           {preview.nameUpdates.length > 0 && (
-            <Stat color="sky" label="Existing — name update" value={preview.nameUpdates.length} />
+            <Stat color="sky" label="Existing · name update" value={preview.nameUpdates.length} />
           )}
           <Stat color="zinc" label="Already on allowlist" value={preview.duplicates.length} />
           {preview.invalid.length > 0 && (
@@ -749,7 +749,7 @@ function ImportPreviewModal({
               />
               <div className="flex-1">
                 <div className="text-[12px] font-medium text-red-200 light:text-red-800">
-                  Sync mode — also remove {preview.removable.length} {preview.removable.length === 1 ? 'email' : 'emails'} not in this CSV
+                  Sync mode · also remove {preview.removable.length} {preview.removable.length === 1 ? 'email' : 'emails'} not in this CSV
                 </div>
                 <div className="mt-0.5 text-[11px] text-red-300/70 light:text-red-700/70">
                   Removed members are signed out and disabled. Admin-seeded entries are protected.

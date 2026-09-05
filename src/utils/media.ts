@@ -24,7 +24,7 @@ export function readMediaDuration(src: string, kind: 'audio' | 'video'): Promise
       if (settled) return
       settled = true
       cleanup()
-      reject(new Error('Could not read media metadata — the file took too long to load.'))
+      reject(new Error('Could not read media metadata. The file took too long to load.'))
     }, METADATA_TIMEOUT_MS)
     const finish = (fn: () => void) => {
       if (settled) return
@@ -42,7 +42,7 @@ export function readMediaDuration(src: string, kind: 'audio' | 'video'): Promise
         // metadata parsed to nothing — neither can be range-checked, so say so
         // rather than hand a caller a number it will silently compare against.
         if (!Number.isFinite(duration)) {
-          reject(new Error('Could not read media metadata — this file reports no fixed duration.'))
+          reject(new Error('Could not read media metadata. This file reports no fixed duration.'))
           return
         }
         resolve(duration)

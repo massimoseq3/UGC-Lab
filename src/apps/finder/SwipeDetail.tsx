@@ -207,7 +207,7 @@ export default function SwipeDetail({ item, onClose }: SwipeDetailProps) {
             className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {refreshing ? <Spinner className="h-3.5 w-3.5" /> : <RotateCw className="h-3.5 w-3.5" />}
-            Restore video — 1 credit
+            Restore video · 1 credit
           </button>
         </div>
       ) : undefined}

@@ -188,7 +188,7 @@ export async function saveAsset(blob: Blob, mimeType?: string, opts: SaveAssetOp
       // happens: cloudSync's reconcileAssets re-uploads any bank-referenced blob
       // R2 doesn't have yet, on the next load. The old wording read as data loss.
       useAppStore.getState().addToast(
-        `Cloud sync failed: ${msg}. Saved on this device — it'll upload on your next reload.`,
+        `Cloud sync failed: ${msg}. Saved on this device, and it'll upload on your next reload.`,
         'error',
       )
     })

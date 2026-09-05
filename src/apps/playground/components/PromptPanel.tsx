@@ -598,7 +598,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
     if (durationSeconds) {
       const total = existing.reduce((s, v) => s + (v.durationSeconds ?? 0), 0) + durationSeconds
       if (total > refClipSeconds) {
-        addToast(`Combined ${slot} length can't exceed ${refClipSeconds}s — this clip would make it ${Math.ceil(total)}s.`, 'error')
+        addToast(`Combined ${slot} length can't exceed ${refClipSeconds}s. This clip would make it ${Math.ceil(total)}s.`, 'error')
         return
       }
     }
@@ -1005,10 +1005,10 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                         state.mode === 'image'
                           ? 'Describe the image you want… (type @ to reference banks)'
                           : isMotionControl
-                          ? 'Optional — refine the motion or leave blank…'
+                          ? 'Optional. Refine the motion or leave blank…'
                           : state.mode === 'video'
                           ? 'Describe the video… (type @ to reference banks)'
-                          : 'Describe the music — genre, mood, instruments…'
+                          : 'Describe the music: genre, mood, instruments…'
                       }
                     />
                     <PromptToolbar
@@ -1075,7 +1075,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             open={presetOpen}
             onClose={() => setPresetOpen(false)}
             title="UGC Prompt Presets & Visual Styles"
-            subtitle="Add a look, a format, or both — each one appends to your prompt"
+            subtitle="Add a look, a format, or both. Each one appends to your prompt"
             // 460px — a step under the old 560px so more of the list is on screen
             // at once, but wider than the Characters picker's 380px: these tiles
             // are the only thing that says what a format looks like, and at 380
@@ -1146,7 +1146,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 ? 'Describe the image you want…'
                 : state.mode === 'video'
                 ? 'Describe the video…'
-                : 'Describe the music — genre, mood, instruments…'
+                : 'Describe the music: genre, mood, instruments…'
             }
           />
         </div>

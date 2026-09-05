@@ -48,7 +48,7 @@ export default function TermsOfService() {
         termination without refund.
       </P>
 
-      <H2>5. AI Outputs — No Warranty</H2>
+      <H2>5. AI Outputs: No Warranty</H2>
       <P>
         AI-generated content can be inaccurate, biased, offensive, or infringing. Outputs are
         provided "as is". You are solely responsible for reviewing, editing, and verifying any

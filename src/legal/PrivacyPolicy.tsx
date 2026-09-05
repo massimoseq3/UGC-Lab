@@ -12,9 +12,9 @@ export default function PrivacyPolicy() {
       <H2>1. What we collect</H2>
       <H3>Information you provide</H3>
       <UL>
-        <li><strong>Account data</strong> — email address, password (stored hashed by Supabase Auth), display name.</li>
+        <li><strong>Account data</strong>: email address, password (stored hashed by Supabase Auth), display name.</li>
         <li>
-          <strong>API keys</strong> — your kie.ai Bearer key. Stored{' '}
+          <strong>API keys</strong>: your kie.ai Bearer key. Stored{' '}
           <strong>only in your browser's local storage</strong> on each device where you use the
           Service. We do not transmit your kie.ai key to our servers, store it in our database,
           or back it up. The key is read from local storage at request time and sent over TLS
@@ -22,8 +22,8 @@ export default function PrivacyPolicy() {
           new browser or device you sign in from. To remove the key, clear it in Settings or
           clear your browser storage.
         </li>
-        <li><strong>Inputs</strong> — prompts, scripts, products, character profiles, reference images, audio.</li>
-        <li><strong>Outputs</strong> — generated images, videos, voiceovers, and music produced by the Service on your behalf.</li>
+        <li><strong>Inputs</strong>: prompts, scripts, products, character profiles, reference images, audio.</li>
+        <li><strong>Outputs</strong>: generated images, videos, voiceovers, and music produced by the Service on your behalf.</li>
       </UL>
 
       <H3>Information collected automatically</H3>
@@ -48,28 +48,28 @@ export default function PrivacyPolicy() {
         solely to operate the Service:
       </P>
       <UL>
-        <li><strong>Supabase</strong> — authentication and Postgres database (account, profile, banks, history rows).</li>
-        <li><strong>Cloudflare R2</strong> — object storage for generated images, videos, audio.</li>
-        <li><strong>Vercel</strong> — application hosting and edge functions (presigned-URL signing).</li>
-        <li><strong>kie.ai</strong> — unified API gateway for AI model calls. Your prompts, reference images, and any other input data you submit for generation are sent from your browser to kie.ai.</li>
+        <li><strong>Supabase</strong>: authentication and Postgres database (account, profile, banks, history rows).</li>
+        <li><strong>Cloudflare R2</strong>: object storage for generated images, videos, audio.</li>
+        <li><strong>Vercel</strong>: application hosting and edge functions (presigned-URL signing).</li>
+        <li><strong>kie.ai</strong>: unified API gateway for AI model calls. Your prompts, reference images, and any other input data you submit for generation are sent from your browser to kie.ai.</li>
         <li>
-          <strong>Downstream AI providers via kie.ai</strong> — including OpenAI, Google
+          <strong>Downstream AI providers via kie.ai</strong>: including OpenAI, Google
           (Gemini, Veo), ElevenLabs, Suno, and others. Your inputs may be processed by these
           providers to produce outputs. Each provider has its own privacy practices; refer to
           theirs for details.
         </li>
         <li>
-          <strong>Skool / Zapier</strong> — community membership status is synced to our
+          <strong>Skool / Zapier</strong>: community membership status is synced to our
           allowlist via Zapier. Email is shared for the purpose of access control.
         </li>
       </UL>
 
       <H2>4. Retention</H2>
       <UL>
-        <li>Account and profile data — retained while your account is active and for a reasonable period after deletion to comply with legal obligations.</li>
-        <li>Generated assets — retained in Cloudflare R2 until you delete them or your account is closed.</li>
-        <li>Video / image / music history rows — retained per the in-app retention windows (e.g., video history is auto-pruned after 14 days).</li>
-        <li>Server logs — retained for a limited period as determined by our hosting providers.</li>
+        <li>Account and profile data: retained while your account is active and for a reasonable period after deletion to comply with legal obligations.</li>
+        <li>Generated assets: retained in Cloudflare R2 until you delete them or your account is closed.</li>
+        <li>Video / image / music history rows: retained per the in-app retention windows (e.g., video history is auto-pruned after 14 days).</li>
+        <li>Server logs: retained for a limited period as determined by our hosting providers.</li>
       </UL>
 
       <H2>5. Your rights</H2>
@@ -97,7 +97,7 @@ export default function PrivacyPolicy() {
       <P>
         Your kie.ai API key is intentionally kept out of our database; it lives only in your
         browser's local storage and is sent directly to kie.ai over TLS at request time. This
-        means we — and any compromise of our database — cannot read it.
+        means we, and any compromise of our database, cannot read it.
       </P>
 
       <H2>8. International transfers</H2>

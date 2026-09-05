@@ -1107,7 +1107,7 @@ export default function ScenesView({
 
             {balance !== null && batchOverBudget && (
               <p className="mt-3 text-[11px] text-red-400 light:text-red-600">
-                Not enough credits — your balance is {balance.toLocaleString()}.
+                Not enough credits. Your balance is {balance.toLocaleString()}.
               </p>
             )}
             <div className="mt-4 flex items-center justify-end gap-2">
@@ -1205,7 +1205,7 @@ export default function ScenesView({
                 task="video"
                 costParams={{ durationSeconds: representativeSeconds, resolution: effectiveVideoRes }}
                 requireAnyModes={videoAnimateCount > 0 ? STILL_CAPABLE_MODES : undefined}
-                requireModeNote="Greyed-out models can't animate a still — they take neither a start frame nor reference images."
+                requireModeNote="Greyed-out models can't animate a still. They take neither a start frame nor reference images."
               />
               {(batchVideoResOptions.length > 0 || batchVideoDurationOptions.length > 0) && (
                 <div className="flex flex-wrap items-center gap-2">
@@ -1259,12 +1259,12 @@ export default function ScenesView({
                 the button. */}
             {balance !== null && videoOverBudget && (
               <p className="mt-3 text-[11px] text-red-400 light:text-red-600">
-                Not enough credits — your balance is {balance.toLocaleString()}.
+                Not enough credits. Your balance is {balance.toLocaleString()}.
               </p>
             )}
             {videoModelCantAnimate && (
               <p className="mt-1.5 text-[11px] text-red-300 light:text-red-700">
-                {getModel(batchVideoModelId ?? '')?.displayName ?? 'This model'} can&rsquo;t animate a still — every card with an image would fail. Pick a model that takes a start frame or reference images.
+                {getModel(batchVideoModelId ?? '')?.displayName ?? 'This model'} can&rsquo;t animate a still. Every card with an image would fail. Pick a model that takes a start frame or reference images.
               </p>
             )}
             <div className="mt-4 flex items-center justify-end gap-2">
@@ -1306,7 +1306,7 @@ export default function ScenesView({
         <ClipDownloadModal
           entries={allClipEntries}
           zipBasename="broll-clips"
-          subtitle="Every card&rsquo;s cover clip is picked — tick the extra takes you also want."
+          subtitle="Every card&rsquo;s cover clip is picked. Tick the extra takes you also want."
           onClose={() => setDownloadOpen(false)}
         />
       )}

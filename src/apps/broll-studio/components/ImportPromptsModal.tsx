@@ -18,7 +18,7 @@ const MODE_LABEL: Record<BrollMode, string> = {
 // way, and the brief the modal hands out is built from the live delivery.
 const MODE_WHAT: Record<BrollMode, string> = {
   line: 'three shot prompts per script line',
-  continuous: 'a keyframe chain — scenes, keyframe concepts and their motion',
+  continuous: 'a keyframe chain: scenes, keyframe concepts and their motion',
 }
 
 const BRIEF_FILENAME: Record<BrollMode, string> = {
@@ -143,7 +143,7 @@ export default function ImportPromptsModal({
             </p>
             <p className="mt-1 text-[12px] leading-relaxed text-ink-500">
               It carries this session's script, product and character context plus the exact output format B-Roll
-              parses — {MODE_WHAT[mode]}. Attach your product and character photos in that chat for context, then
+              parses, {MODE_WHAT[mode]}. Attach your product and character photos in that chat for context, then
               paste the reply back here.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -166,7 +166,7 @@ export default function ImportPromptsModal({
               {!ctx.scriptText.trim() && (
                 <span className="flex items-center gap-1.5 text-[11px] text-amber-300 light:text-amber-700">
                   <AlertTriangle className="h-3 w-3 shrink-0" />
-                  No script in the panel — the brief won't include one.
+                  No script in the panel. The brief won't include one.
                 </span>
               )}
             </div>
@@ -260,8 +260,8 @@ export default function ImportPromptsModal({
           <p className="mt-3 flex items-start gap-2 text-[11px] leading-relaxed text-ink-600">
             <Info className="mt-0.5 h-3 w-3 shrink-0" />
             <span>
-              Importing replaces the {MODE_LABEL[mode]} storyboard on screen and starts a new history row — the old one
-              stays in History. Visual style stays as it is ({styleLabel}) and is applied at render time — change it on the
+              Importing replaces the {MODE_LABEL[mode]} storyboard on screen and starts a new history row. The old one
+              stays in History. Visual style stays as it is ({styleLabel}) and is applied at render time, so change it on the
               storyboard's own pill afterwards.
             </span>
           </p>

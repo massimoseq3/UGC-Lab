@@ -196,7 +196,7 @@ export function ModalGallery({
         <ImageIcon className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
         <p className="text-sm text-ink-500">No generations yet</p>
         <p className="max-w-[220px] text-xs leading-relaxed text-ink-600">
-          Pick a model and hit Generate. Outputs land here — click any to set
+          Pick a model and hit Generate. Outputs land here. Click any to set
           it as the cover.
         </p>
       </div>
@@ -678,7 +678,7 @@ export function ModalVideoPlayer({
 // Shared with the Continuous frame/clip modals (InFlightFailureRow below) —
 // the same entry can fail in either place and must read the same.
 
-const RESUMABLE_PROMISE = 'Retry is free — kie.ai already made this one.'
+const RESUMABLE_PROMISE = 'Retry is free. kie.ai already made this one.'
 
 // Retry + Dismiss, with the two-click arming a resumable entry needs. Reverts
 // after 3s, exactly like TileDeleteButton — the app's one destructive idiom.
@@ -708,7 +708,7 @@ function FailureActions({
     onDismiss()
   }
   const dismissTitle = resumable
-    ? (armed ? 'Discard the clip kie.ai is holding' : 'Discard — kie.ai is holding this one for 3 days')
+    ? (armed ? 'Discard the clip kie.ai is holding' : 'Discard · kie.ai is holding this one for 3 days')
     : 'Dismiss'
 
   if (compact) {
@@ -716,7 +716,7 @@ function FailureActions({
       <>
         <button
           type="button"
-          title={resumable ? 'Retry — free, picks up the finished file' : 'Retry'}
+          title={resumable ? 'Retry · free, picks up the finished file' : 'Retry'}
           onClick={onRetry}
           className="shrink-0 rounded-full p-1 text-ink-400 transition-colors hover:bg-ink/10 hover:text-ink-200"
         >
@@ -742,7 +742,7 @@ function FailureActions({
     <div className="flex items-center gap-1.5">
       <button
         type="button"
-        title={resumable ? 'Picks up the file kie.ai already made — no new generation' : undefined}
+        title={resumable ? 'Picks up the file kie.ai already made, no new generation' : undefined}
         onClick={onRetry}
         className="flex items-center gap-1 rounded-full border border-white/15 bg-broll-500 px-2.5 py-1 text-[10px] font-medium text-white transition-colors hover:bg-broll-400"
       >
@@ -928,7 +928,7 @@ export function ReferenceSlotCard({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onToggleActive() }}
-          title={active ? 'Active — click to disable' : 'Inactive — click to enable'}
+          title={active ? 'Active · click to disable' : 'Inactive · click to enable'}
           className={`absolute right-3 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full border transition-colors ${
             active
               ? accent.toggle

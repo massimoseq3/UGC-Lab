@@ -134,7 +134,7 @@ function ProductCard({ item, onEdit, onDelete, inFlight }: { item: Product; onEd
         </span>
       ) : state !== 'legacy' ? (
         <span
-          title={state === 'draft' ? 'Unconfirmed draft — open and save to confirm' : 'Confirmed'}
+          title={state === 'draft' ? 'Unconfirmed draft · open and save to confirm' : 'Confirmed'}
           className={`absolute left-2 top-2 z-10 h-2 w-2 rounded-full ring-2 ${
             state === 'draft'
               ? 'bg-orange-400 ring-orange-400/20 shadow-[0_0_8px_rgba(251,146,60,0.5)]'
@@ -310,7 +310,7 @@ function ScriptCard({ item, onEdit, onDelete, showDate = true }: { item: Script;
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); toggleStar('scripts', item.id) }}
-          title={item.starred ? 'Unstar' : 'Star — starred items show first when picking from banks'}
+          title={item.starred ? 'Unstar' : 'Star · starred items show first when picking from banks'}
           aria-pressed={item.starred}
           className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-ink/5 ${
             item.starred ? 'text-amber-400' : 'text-ink-700 hover:text-amber-400'
@@ -795,7 +795,7 @@ export default function BankList({ bankType, onEdit, onAdd, sort, query, modelFi
           <Bookmark className="h-8 w-8 text-ink-700" strokeWidth={1.5} />
           <p className="text-sm text-ink-500">No saved ads yet</p>
           <p className="max-w-[300px] text-xs leading-relaxed text-ink-600">
-            Save an ad from Outliers and it lands here — thumbnail, numbers and
+            Save an ad from Outliers and it lands here: thumbnail, numbers and
             transcript kept, so it's still readable long after the links expire.
           </p>
         </div>

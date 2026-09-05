@@ -150,7 +150,7 @@ export function ExpandVideoButton({
   ...lightbox
 }: VideoLightboxProps & { chrome?: 'stack' | 'plain' }) {
   const [open, setOpen] = useState(false)
-  const label = 'Expand — full view with first/last frame'
+  const label = 'Expand · full view with first/last frame'
   return (
     <>
       {chrome === 'stack' ? (

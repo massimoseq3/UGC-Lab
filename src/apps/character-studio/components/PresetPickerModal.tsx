@@ -117,7 +117,7 @@ function PresetCard({ entry, savedId, onClick }: {
       <button
         type="button"
         onClick={onClick}
-        title={[entry.title, entry.note].filter(Boolean).join(' — ') || entry.name}
+        title={[entry.title, entry.note].filter(Boolean).join(' · ') || entry.name}
         className="absolute inset-0 block h-full w-full"
       >
         {url ? (
@@ -182,8 +182,8 @@ function StarterSaveAction({ row, savedId }: { row: StarterRow; savedId?: string
       <TileActionButton
         title={
           saved
-            ? 'Already in your Characters — pick it in Playground, B-Roll or any character picker'
-            : 'Save to Characters — then use this face in Playground, B-Roll or any character picker'
+            ? 'Already in your Characters. Pick it in Playground, B-Roll or any character picker'
+            : 'Save to Characters, then use this face in Playground, B-Roll or any character picker'
         }
         tone={saved ? 'saved' : 'default'}
         disabled={saving}

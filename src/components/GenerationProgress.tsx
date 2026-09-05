@@ -84,7 +84,7 @@ export default function GenerationProgress({
       {phase && (
         <p className={`mt-2 text-[11px] font-medium uppercase tracking-widest ${accentTextClass(color)}`}>
           {phase.noun ?? 'Step'} {phase.step} of {phase.of}
-          {phase.label ? ` — ${phase.label}` : ''}
+          {phase.label ? ` · ${phase.label}` : ''}
         </p>
       )}
       <div className={`${phase ? 'mt-1' : showHelper ? 'mt-2' : 'mt-1.5'} space-y-0.5`}>

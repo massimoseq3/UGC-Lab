@@ -119,7 +119,7 @@ export class PollTimeoutError extends Error {
     const elapsed = `${minutes} minute${minutes === 1 ? '' : 's'}`
     super(
       unreachable
-        ? `${label} timed out after ${elapsed} — the connection to kie.ai kept failing.`
+        ? `${label} timed out after ${elapsed}. The connection to kie.ai kept failing.`
         : `${label} timed out after ${elapsed}.`,
     )
     this.name = 'PollTimeoutError'
@@ -186,7 +186,7 @@ function armBodyTimeout(res: Response, controller: AbortController, timeoutMs: n
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => {
             controller.abort()
-            reject(new Error('Request timed out — kie.ai started responding but never finished. Try again.'))
+            reject(new Error('Request timed out. kie.ai started responding but never finished. Try again.'))
           }, timeoutMs)
         }),
       ])
@@ -278,7 +278,7 @@ async function fetchWithRetry(
 
       if (err instanceof DOMException && err.name === 'AbortError') {
         if (signal?.aborted) throw err
-        throw new Error('Request timed out — kie.ai took too long to respond. Try again.')
+        throw new Error('Request timed out. kie.ai took too long to respond. Try again.')
       }
 
       if (err instanceof Error && !(err instanceof TypeError)) throw err
@@ -759,7 +759,7 @@ function chatEnvelopeError(body: unknown, endpoint: string): Error | null {
       typeof e.code === 'string' ? e.code : '',
       typeof e.type === 'string' ? e.type : '',
     ].filter(Boolean)
-    const msg = parts.join(' — ') || JSON.stringify(err).slice(0, 300)
+    const msg = parts.join(' · ') || JSON.stringify(err).slice(0, 300)
     return status === undefined
       ? new Error(`kie.ai error at ${tag}: ${msg}`)
       : new KieHttpError(status, friendlyHttpError(status, msg, tag))
@@ -1456,7 +1456,7 @@ export async function ensureHostedUrl(apiKey: string, source: string): Promise<s
     hostedUrlCache.set(key, { url: pending, at: Date.now() })
     return pending
   }
-  throw new Error(`Cannot host image source — unsupported format: ${source.slice(0, 64)}`)
+  throw new Error(`Cannot host image source. Unsupported format: ${source.slice(0, 64)}`)
 }
 
 // ── File helpers ────────────────────────────────────────────────

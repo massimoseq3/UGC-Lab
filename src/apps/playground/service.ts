@@ -45,11 +45,11 @@ import type { PlaygroundMode } from './types'
 // Prompt" affordance but generic (no scene/variation framework). Returns the
 // rewritten prompt text only — the caller owns undo/redo history.
 
-const ENHANCE_SYSTEM = `You are a senior prompt engineer for AI image, video and music models. You rewrite a user's rough prompt into a single, vivid, production-ready prompt that the model can render well. You KEEP the user's intent and subject — you never invent a different concept. You make it concrete and specific, not longer for its own sake.`
+const ENHANCE_SYSTEM = `You are a senior prompt engineer for AI image, video and music models. You rewrite a user's rough prompt into a single, vivid, production-ready prompt that the model can render well. You KEEP the user's intent and subject. You never invent a different concept. You make it concrete and specific, not longer for its own sake.`
 
 // Per-modality guidance — what "good" looks like for each generator.
 const ENHANCE_MODE_GUIDE: Record<PlaygroundMode, string> = {
-  image: 'Target: a text-to-image model. Add concrete visual specifics — subject, composition/shot size, lighting, lens/mood, setting, materials, color. Photoreal and grounded unless the draft asks otherwise. One flowing paragraph, no lists, no "Style:" headers.',
+  image: 'Target: a text-to-image model. Add concrete visual specifics: subject, composition/shot size, lighting, lens/mood, setting, materials, color. Photoreal and grounded unless the draft asks otherwise. One flowing paragraph, no lists, no "Style:" headers.',
   video: 'Target: a text-to-video model. Describe the subject, the action/motion over the shot, camera movement and shot size, setting, lighting and mood as one flowing paragraph. Keep it to a single coherent shot unless the draft implies cuts. No lists, no timestamps.',
   music: 'Target: a music model. Specify genre, mood, tempo feel, key instruments, and energy arc in one tight sentence or two. No lyrics unless the draft asks for them.',
 }
@@ -160,7 +160,7 @@ const PLAYGROUND_SOURCE = 'playground' as const
 export async function ensureOmniCharacterId(bankModelId: string): Promise<string> {
   const bank = useBankStore.getState()
   const model = bank.models.find((m) => m.id === bankModelId)
-  if (!model) throw new Error('Character not found in bank — it may have been deleted.')
+  if (!model) throw new Error('Character not found in bank. It may have been deleted.')
   if (model.omniCharacterId) return model.omniCharacterId
 
   const apiKey = useSettingsStore.getState().getKieApiKey()
@@ -168,7 +168,7 @@ export async function ensureOmniCharacterId(bankModelId: string): Promise<string
   let source = model.characterImage
   if (isAssetRef(source)) {
     const asset = await getAsBase64(source)
-    if (!asset) throw new Error(`Couldn't load the image for "${model.name}" — its asset is missing.`)
+    if (!asset) throw new Error(`Couldn't load the image for "${model.name}". Its asset is missing.`)
     source = `data:${asset.mimeType};base64,${asset.base64}`
   }
   const imageUrl = await ensureHostedUrl(apiKey, source)

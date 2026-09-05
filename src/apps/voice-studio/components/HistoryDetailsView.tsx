@@ -122,7 +122,7 @@ export default function HistoryDetailsView({ item, onClose, onRestoreText, onRes
           />
           <div className="min-w-0 flex-1">
             <div className="truncate text-base font-semibold text-ink-100">
-              {voice ? `${voice.name} — ${voice.description}` : item.voiceName}
+              {voice ? `${voice.name} · ${voice.description}` : item.voiceName}
             </div>
             <div className="text-xs text-ink-500">{formatRelative(item.createdAt)}</div>
           </div>

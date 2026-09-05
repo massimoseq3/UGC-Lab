@@ -338,7 +338,7 @@ export default function Playground() {
       }
       if (Date.now() - gen.startedAt > STALE_TASK_MS) {
         setInFlight((prev) => prev.filter((g) => g.id !== gen.id))
-        addToast(`${gen.mode} generation expired — it ran too long to recover`, 'error')
+        addToast(`${gen.mode} generation expired. It ran too long to recover`, 'error')
         continue
       }
       resuming.current.add(gen.id)
@@ -462,7 +462,7 @@ export default function Playground() {
         // member never picked and can't see.
         const pickedLabel = getModel(state.modelId)?.displayName ?? state.modelId
         addToast(
-          `${pickedLabel} generates from the prompt only — it takes no images. Remove the attached images, or pick a model that accepts them.`,
+          `${pickedLabel} generates from the prompt only. It takes no images. Remove the attached images, or pick a model that accepts them.`,
           'error',
         )
         return
@@ -485,7 +485,7 @@ export default function Playground() {
     if (mode === 'video' && !isMotionControl && hasPlainRefs && hasFrames && mixedPolicy === 'reference') {
       const label = getModel(modelId)?.displayName ?? modelId
       addToast(
-        `${label} can't hold a start frame and reference images apart — everything attached is sent as a reference, so the frame guides this clip rather than opening it.`,
+        `${label} can't hold a start frame and reference images apart. Everything attached is sent as a reference, so the frame guides this clip rather than opening it.`,
         'info',
       )
     }
@@ -499,7 +499,7 @@ export default function Playground() {
       && inferredVideoMode !== 'reference-to-video') {
       const label = getModel(modelId)?.displayName ?? modelId
       addToast(
-        `${label} takes either frames or reference images, not both. Rendering from the frames — clear the start frame to use your references instead.`,
+        `${label} takes either frames or reference images, not both. Rendering from the frames. Clear the start frame to use your references instead.`,
         'info',
       )
     }
@@ -514,7 +514,7 @@ export default function Playground() {
       if (dropped.length > 0) {
         const label = getModel(modelId)?.displayName ?? modelId
         addToast(
-          `${label} takes only a start frame here — ${dropped.join(' and ')} won't be sent with this clip.`,
+          `${label} takes only a start frame here, so ${dropped.join(' and ')} won't be sent with this clip.`,
           'info',
         )
       }
@@ -696,7 +696,7 @@ export default function Playground() {
         // Deleting it here was the "video succeeds on kie but never shows up"
         // bug — it's now evicted only once it crosses STALE_TASK_MS.
         const noun = mode === 'image' ? 'Image' : mode === 'music' ? 'Track' : 'Video'
-        addToast(`${noun} is still rendering on kie — refresh in a bit and it'll appear here once it's ready.`, 'info')
+        addToast(`${noun} is still rendering on kie. Refresh in a bit and it'll appear here once it's ready.`, 'info')
       } else {
         addToast(humanizeError(err, 'Generation failed.'), 'error')
         setInFlight((prev) => prev.filter((g) => g.id !== id))

@@ -934,7 +934,7 @@ function AwaitingFrame() {
           <UserRound className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
           <p className="text-sm text-ink-500">Awaiting generation</p>
           <p className="max-w-[280px] text-center text-xs leading-relaxed text-ink-600">
-            The next character lands here. Nothing was deleted — switch to List
+            The next character lands here. Nothing was deleted. Switch to List
             or Grid for the full history.
           </p>
         </div>
@@ -1054,7 +1054,7 @@ function SingleCard({
           <ActionPill
             icon={a.savingToBank ? Spinner : a.savedAsModel ? Check : Bookmark}
             label={a.savedAsModel ? 'Saved' : 'Save to Bank'}
-            title={a.savedAsModel ? 'Saved — click to remove from Bank' : 'Save to Bank'}
+            title={a.savedAsModel ? 'Saved · click to remove from Bank' : 'Save to Bank'}
             tone={a.savedAsModel ? 'saved' : 'default'}
             spin={a.savingToBank}
             onClick={a.toggleSave}
@@ -1283,7 +1283,7 @@ function HistoryTile({
             <Download className="h-4 w-4" />
           </TileActionButton>
           <TileActionButton
-            title={a.savedAsModel ? 'Saved — click to remove from Bank' : a.savingToBank ? 'Saving…' : 'Save to Bank'}
+            title={a.savedAsModel ? 'Saved · click to remove from Bank' : a.savingToBank ? 'Saving…' : 'Save to Bank'}
             tone={a.savedAsModel ? 'saved' : 'default'}
             onClick={() => a.toggleSave()}
           >
@@ -1292,7 +1292,7 @@ function HistoryTile({
           <TileActionButton title="Copy prompt" onClick={() => onCopyPrompt()}>
             <Copy className="h-4 w-4" />
           </TileActionButton>
-          <TileActionButton title="Reuse — load these parameters back into the form" onClick={() => onReuse()}>
+          <TileActionButton title="Reuse · load these parameters back into the form" onClick={() => onReuse()}>
             <ArrowLeft className="h-4 w-4" />
           </TileActionButton>
           <TileActionButton title="Show this one in Single view" onClick={() => onShowInSingle()}>
@@ -1477,7 +1477,7 @@ function HistoryListRow({
               <Download className="h-3.5 w-3.5" />
             </ListRowButton>
             <ListRowButton
-              title={a.savedAsModel ? 'Saved — click to remove from Bank' : a.savingToBank ? 'Saving…' : 'Save to Bank'}
+              title={a.savedAsModel ? 'Saved · click to remove from Bank' : a.savingToBank ? 'Saving…' : 'Save to Bank'}
               tone={a.savedAsModel ? 'saved' : 'default'}
               onClick={a.toggleSave}
             >
@@ -1486,7 +1486,7 @@ function HistoryListRow({
             <ListRowButton title="Copy prompt" onClick={onCopyPrompt}>
               <Copy className="h-3.5 w-3.5" />
             </ListRowButton>
-            <ListRowButton title="Reuse — load these parameters back into the form" onClick={onReuse}>
+            <ListRowButton title="Reuse · load these parameters back into the form" onClick={onReuse}>
               <ArrowLeft className="h-3.5 w-3.5" />
             </ListRowButton>
             <ListRowButton title="Show this one in Single view" onClick={onShowInSingle}>

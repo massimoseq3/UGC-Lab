@@ -63,7 +63,7 @@ const STYLE_PRESETS: StyleDef[] = [
   {
     id: 'mirror-selfie',
     title: 'Mirror Selfie',
-    prompt: `Vertical mirror-selfie shot: the camera is a phone held up to a mirror, visible in one raised hand, capturing the subject's waist-up reflection as they [what the subject is doing — e.g. talking to camera, showing a product]. Casual handheld framing with a slight natural sway, shot at eye level, self-filmed everyday energy. ${UGC_STYLE_TRAILER}`,
+    prompt: `Vertical mirror-selfie shot: the camera is a phone held up to a mirror, visible in one raised hand, capturing the subject's waist-up reflection as they [what the subject is doing, e.g. talking to camera, showing a product]. Casual handheld framing with a slight natural sway, shot at eye level, self-filmed everyday energy. ${UGC_STYLE_TRAILER}`,
     thumbnailUrl: mirrorSelfieThumb,
     duration: 6,
   },
@@ -84,7 +84,7 @@ const STYLE_PRESETS: StyleDef[] = [
   {
     id: 'day-in-a-life',
     title: 'Day In A Life',
-    prompt: `Vertical "make it with me" lifestyle shot, camera locked off on a tripod at counter height with hands working in frame [the task being demonstrated — e.g. making a drink, applying a product]. Static, stable framing at a slight high angle, observational vlog energy. ${UGC_STYLE_TRAILER}`,
+    prompt: `Vertical "make it with me" lifestyle shot, camera locked off on a tripod at counter height with hands working in frame [the task being demonstrated, e.g. making a drink, applying a product]. Static, stable framing at a slight high angle, observational vlog energy. ${UGC_STYLE_TRAILER}`,
     thumbnailUrl: dayInLifeThumb,
     duration: 8,
   },
@@ -98,7 +98,7 @@ const STYLE_PRESETS: StyleDef[] = [
   {
     id: 'green-screen',
     title: 'Green-Screen',
-    prompt: `Vertical green-screen reaction shot: the subject sits small in a lower corner, gesturing toward [what they're reacting to — e.g. an article, screenshot, or graphic] that fills the rest of the frame behind them. Flat, even lighting on the presenter, talking-head commentary energy, static framing. ${UGC_STYLE_TRAILER}`,
+    prompt: `Vertical green-screen reaction shot: the subject sits small in a lower corner, gesturing toward [what they're reacting to, e.g. an article, screenshot, or graphic] that fills the rest of the frame behind them. Flat, even lighting on the presenter, talking-head commentary energy, static framing. ${UGC_STYLE_TRAILER}`,
     thumbnailUrl: greenScreenThumb,
     duration: 8,
   },

@@ -454,7 +454,7 @@ export default function InputPanel({
               <div className="flex min-w-0 flex-1 flex-col">
                 <span className="text-[13px] font-medium text-ink-300">Product</span>
                 <span className="text-[11px] text-ink-600">
-                  {productRequired ? 'Choose from your Product Bank' : 'Optional — choose from your Product Bank'}
+                  {productRequired ? 'Choose from your Product Bank' : 'Optional. Choose from your Product Bank'}
                 </span>
               </div>
               <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
@@ -596,7 +596,7 @@ export default function InputPanel({
                         {/* "family", not "category" — the picker itself calls
                             them families, and one control shouldn't use two
                             names for the same thing. */}
-                        <div className="text-[11px] text-ink-600">Auto picks the best mix — or lock one family</div>
+                        <div className="text-[11px] text-ink-600">Auto picks the best mix, or lock one family</div>
                       </>
                     )}
                   </div>
@@ -716,7 +716,7 @@ export default function InputPanel({
                     value={brief}
                     onChange={(e) => handleBriefType(e.target.value)}
                     onBlur={commitBriefDraft}
-                    placeholder={"Leave blank and I'll come up with the angle — or steer it: e.g. A girl in her 20s talking about this serum like she's telling her best friend, focus on how fast it cleared her skin. Casual, a little funny, end with the discount code."}
+                    placeholder={"Leave blank and I'll come up with the angle, or steer it: e.g. A girl in her 20s talking about this serum like she's telling her best friend, focus on how fast it cleared her skin. Casual, a little funny, end with the discount code."}
                     className="w-full min-h-0 flex-1 resize-none border-0 bg-transparent px-4 pb-3 pt-1.5 text-sm leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                   />
                   <PromptToolbar
@@ -778,7 +778,7 @@ export default function InputPanel({
                     value={source}
                     onChange={(e) => { onSourceChange(e.target.value); setSourceScript(null) }}
                     rows={6}
-                    placeholder={'…or paste a proven ad transcript, or a scene blueprint from Ad Analyzer — the format is detected automatically.'}
+                    placeholder={'…or paste a proven ad transcript, or a scene blueprint from Ad Analyzer. The format is detected automatically.'}
                     className={`w-full min-h-0 grow resize-none overflow-y-auto border-0 bg-transparent px-4 py-3 leading-relaxed text-ink-200 outline-none ${
                       isBlueprint ? 'font-mono text-xs placeholder-ink-700' : 'text-sm placeholder-ink-600'
                     }`}
@@ -793,7 +793,7 @@ export default function InputPanel({
                   <div className="flex shrink-0 items-center justify-between gap-2 border-t border-ink/10 px-4 py-2">
                     <span className={`flex min-w-0 items-center gap-1.5 truncate text-[11px] font-medium ${blueprintActive ? 'text-fuchsia-300 light:text-fuchsia-700' : 'text-ink-500'}`}>
                       {blueprintActive ? <Clapperboard className="h-3 w-3 shrink-0" /> : <FileText className="h-3 w-3 shrink-0" />}
-                      {blueprintActive ? 'Scene blueprint detected — scenes will be rewritten' : `Remixing as a plain script — ${variationCount} variations`}
+                      {blueprintActive ? 'Scene blueprint detected. Scenes will be rewritten' : `Remixing as a plain script · ${variationCount} variations`}
                     </span>
                     <button
                       type="button"
@@ -1037,7 +1037,7 @@ export default function InputPanel({
           open={styleSlideOpen}
           onClose={() => setStyleSlideOpen(false)}
           title="Choose a style"
-          subtitle="What kind of content the ad looks like — and how it's built"
+          subtitle="What kind of content the ad looks like, and how it's built"
           size="wide"
         >
           {/* Two sections: Structures (how the argument is built) on top, then

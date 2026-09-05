@@ -187,7 +187,7 @@ export default function Insights() {
     <div className="space-y-5">
       {profilesError && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-[12px] text-red-300 light:text-red-700">
-          Refresh failed — showing the last loaded numbers. {profilesError}
+          Refresh failed. Showing the last loaded numbers. {profilesError}
         </div>
       )}
       {appUsageWarning && (
@@ -227,7 +227,7 @@ export default function Insights() {
           <p className="pt-2.5 text-[10px] text-ink-600">
             {usageCoverage.seconds > 0
               ? `${formatDuration(usageCoverage.seconds)} across ${usageCoverage.tracked} member${usageCoverage.tracked === 1 ? '' : 's'}. Time is only counted while the tab is open and someone is interacting.`
-              : 'Nothing recorded yet. Usage is measured from the moment app tracking shipped — earlier sessions left no trace.'}
+              : 'Nothing recorded yet. Usage is measured from the moment app tracking shipped. Earlier sessions left no trace.'}
           </p>
         </Panel>
         <Panel title="Top tool per member" hint="where each member spends most of their time">
@@ -423,7 +423,7 @@ function AppUsageBars({ items }: { items: Array<{ appId: string; seconds: number
           <div
             key={it.appId}
             className="flex items-center gap-2"
-            title={`${appName(it.appId)} — ${it.members} member${it.members === 1 ? '' : 's'}`}
+            title={`${appName(it.appId)} · ${it.members} member${it.members === 1 ? '' : 's'}`}
           >
             <div className="flex w-20 shrink-0 items-center gap-1.5 text-[11px] text-ink-400 sm:w-24">
               <AppGlyph appId={it.appId} className="h-3 w-3 shrink-0" />

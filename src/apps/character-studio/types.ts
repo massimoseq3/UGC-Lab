@@ -193,14 +193,14 @@ export const TABS: TabConfig[] = [
             key: 'skinTexture',
             label: 'Skin & Realism',
             chips: [
-              'Subtle realism — smooth, healthy skin with fine visible pores, faint peach fuzz and an even tone, a soft natural matte finish with no plastic smoothing',
-              'Natural realism — realistic skin with visible pores, light freckles scattered across the nose and cheeks, subtle shine on the T-zone, realistic subsurface scattering and slight natural asymmetry',
-              'Gritty realism — heavily textured skin with pronounced pores, freckles and a few small blemishes, faint acne scarring, mild redness around the nose, visible under-eye texture, fine lines and a small beauty mark',
+              'Subtle realism: smooth, healthy skin with fine visible pores, faint peach fuzz and an even tone, a soft natural matte finish with no plastic smoothing',
+              'Natural realism: realistic skin with visible pores, light freckles scattered across the nose and cheeks, subtle shine on the T-zone, realistic subsurface scattering and slight natural asymmetry',
+              'Gritty realism: heavily textured skin with pronounced pores, freckles and a few small blemishes, faint acne scarring, mild redness around the nose, visible under-eye texture, fine lines and a small beauty mark',
               // The same graded tiers carried into older faces. Without these,
               // an older preset had to hand-write its skin as free text, which
               // never matched a dropdown row and so never showed as picked.
-              'Mature realism — softly lined skin with visible pores, gentle crow\'s feet and smile lines, faint age spots, natural under-eye texture and warm subsurface scattering',
-              'Weathered realism — sun-aged skin with deep laugh lines, coarse visible pores, uneven pigmentation, age spots and a calm, lived-in texture',
+              'Mature realism: softly lined skin with visible pores, gentle crow\'s feet and smile lines, faint age spots, natural under-eye texture and warm subsurface scattering',
+              'Weathered realism: sun-aged skin with deep laugh lines, coarse visible pores, uneven pigmentation, age spots and a calm, lived-in texture',
               'Glass skin finish with ultra-detailed texture, including visible skin pores, fine peach fuzz, and a scattering of light freckles across the bridge of her nose',
               'Glass skin',
               'Natural pores',
@@ -211,7 +211,7 @@ export const TABS: TabConfig[] = [
               'Mature lines',
               'Textured',
             ],
-            placeholder: 'e.g. "Natural realism — visible pores, light freckles"',
+            placeholder: 'e.g. "Natural realism: visible pores, light freckles"',
             // Half-width so it pairs with Skin Tone on one row; the realism
             // presets are long sentences, so its dropdown widens and wraps
             // (wideMenu) to stay readable despite the narrow input.
@@ -233,7 +233,7 @@ export const TABS: TabConfig[] = [
             chips: [
               'No makeup', 'Natural/minimal', 'Skin-like natural makeup with visible skin texture', 'Dewy "no-makeup" makeup', 'Light glam', 'Full glam', 'Dewy skin', 'Bold lip', 'E-girl makeup', 'Soft glam',
               'E-girl makeup with graphic liner, soft blush and glossy lips',
-              'Minimal everyday makeup — tinted balm, groomed brows, no foundation',
+              'Minimal everyday makeup: tinted balm, groomed brows, no foundation',
             ],
           },
           {

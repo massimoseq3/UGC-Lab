@@ -31,7 +31,7 @@ export default function LoadPresetDropdown({ onLoadProfile }: LoadPresetDropdown
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title="Load every field from a saved preset — physical, scene and pose"
+        title="Load every field from a saved preset: physical, scene and pose"
         className="flex w-full items-center gap-2.5 rounded-full border border-dashed border-ink/10 bg-ink/[0.02] px-3 py-2 text-left transition-colors hover:bg-ink/[0.05]"
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-influencers-500/10 text-influencers-400">

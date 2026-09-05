@@ -144,7 +144,7 @@ export default function OmniVoiceDesigner({ open, onClose, onCreated }: OmniVoic
 
           <div>
             <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-ink-500">
-              Base voice <span className="normal-case text-ink-700">— tap ▸ to hear a sample</span>
+              Base voice <span className="normal-case text-ink-700">· tap ▸ to hear a sample</span>
             </label>
             <div className="relative">
               <button
@@ -201,7 +201,7 @@ export default function OmniVoiceDesigner({ open, onClose, onCreated }: OmniVoic
 
           <div>
             <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-ink-500">
-              Voice description <span className="normal-case text-ink-700">— optional</span>
+              Voice description <span className="normal-case text-ink-700">· optional</span>
             </label>
             <textarea
               value={description}
@@ -214,7 +214,7 @@ export default function OmniVoiceDesigner({ open, onClose, onCreated }: OmniVoic
 
           <div>
             <label className="mb-1.5 block text-[10px] font-medium uppercase tracking-wider text-ink-500">
-              Example line <span className="normal-case text-ink-700">— optional, max 120 chars</span>
+              Example line <span className="normal-case text-ink-700">· optional, max 120 chars</span>
             </label>
             <input
               value={exampleDialogue}

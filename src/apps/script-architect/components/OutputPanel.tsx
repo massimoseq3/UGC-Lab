@@ -1145,7 +1145,7 @@ function VariationCard({
                 to edit the take. */}
             <button
               onClick={startEdit}
-              title="Edit the whole take in one box — for adding scenes and lines"
+              title="Edit the whole take in one box · for adding scenes and lines"
               className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink/5 hover:text-ink-300"
             >
               <Pencil className="h-3 w-3" />
@@ -2151,11 +2151,11 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
                   ? `Variation ${i + 1}`
                   : 'Scene prompts'
           const defaultSaveTitle = isHooks
-            ? (productName ? `${productName} — Hooks (${hookCategoryLabel ?? 'Best Mix'})` : `Hooks — ${hookCategoryLabel ?? 'Best Mix'}`)
+            ? (productName ? `${productName} · Hooks (${hookCategoryLabel ?? 'Best Mix'})` : `Hooks · ${hookCategoryLabel ?? 'Best Mix'}`)
             : isWrite && productName
-              ? `${productName} — ${writeStyleLabel ?? 'New'} Take ${i + 1}`
+              ? `${productName} · ${writeStyleLabel ?? 'New'} Take ${i + 1}`
               : isRemix && productName
-                ? `${productName} — ${angleLabel ?? `Variation ${i + 1}`} Script`
+                ? `${productName} · ${angleLabel ?? `Variation ${i + 1}`} Script`
                 : deriveTitleFromContent(
                       text,
                       mode === 'reverse-engineer' ? 'Reverse-engineered prompts' : 'Untitled script',
