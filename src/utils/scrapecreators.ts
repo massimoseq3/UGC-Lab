@@ -230,6 +230,62 @@ interface InstagramPostResponse {
   xdt_shortcode_media?: InstagramMedia | null
 }
 
+// The Instagram reels search endpoint (v2). Instagram's own GraphQL row shape,
+// passed through — which is why nothing here shares a field name with TikTok's
+// payload above.
+//
+// Two absences are the important part, and both are why this platform gets no
+// outlier score and no engagement rate: **there is no view or play count on a
+// row**, and there are no share or save counts either. `video_play_count` is
+// declared anyway because the sibling user-reels endpoint publishes one behind
+// an `include_play_count` flag — if search ever starts carrying it, a row with
+// a real number scores on its own. Nothing is ever synthesised from the fields
+// that are here.
+interface InstagramReelOwner {
+  id?: string
+  username?: string
+  full_name?: string
+  profile_pic_url?: string | null
+  follower_count?: number
+  is_verified?: boolean
+}
+
+export interface InstagramReel {
+  id?: string
+  shortcode?: string
+  url?: string
+  caption?: string
+  thumbnail_src?: string | null
+  display_url?: string | null
+  video_url?: string | null
+  is_video?: boolean
+  /** Seconds, fractional (75.7). TikTok's same-named field is milliseconds. */
+  video_duration?: number
+  /** ISO 8601 — not the unix seconds every other endpoint here hands back. */
+  taken_at?: string
+  is_ad?: boolean
+  like_count?: number
+  comment_count?: number
+  /** Not published by search today. See the note above. */
+  video_play_count?: number
+  video_view_count?: number
+  owner?: InstagramReelOwner
+}
+
+interface InstagramReelsSearchResponse {
+  success?: boolean
+  credits_remaining?: number
+  reels?: InstagramReel[]
+}
+
+// The AI transcript endpoint. A carousel post yields one entry per video
+// slide, hence the array — a reel is the single-entry case.
+interface InstagramTranscriptResponse {
+  success?: boolean
+  credits_remaining?: number
+  transcripts?: Array<{ id?: string; shortcode?: string; text?: string | null }> | null
+}
+
 interface TranscriptResponse {
   success?: boolean
   credits_remaining?: number
@@ -390,6 +446,60 @@ export async function searchMetaAds(
 }
 
 /**
+ * Instagram's date windows, which are its own and deliberately not TikTok's.
+ *
+ * The endpoint searches GOOGLE'S INDEX of Instagram rather than Instagram
+ * itself, and the vendor is explicit that finer windows (an hour, a day) are
+ * not offered because Google does not index reels reliably enough inside them.
+ * Mapping our TikTok vocabulary onto these three would quietly search a year
+ * for a member who picked "3 months", so the filter keeps its own field.
+ */
+export type InstagramDatePosted = 'last-week' | 'last-month' | 'last-year'
+
+/** The vendor rejects page 12 and above with a 400, so paging stops here. */
+export const INSTAGRAM_MAX_PAGE = 11
+
+/**
+ * Google-indexed Instagram reels for a keyword.
+ *
+ * Paged by PAGE NUMBER, not by a cursor — pages 1 to 11, and 12 answers 400.
+ * The `cursor` handed back is therefore the next page number, which keeps this
+ * on the same `SearchPage` contract as the other two searches and lets the
+ * grid's Load more stay one control.
+ *
+ * Results are best-effort by the vendor's own description: this is a Google
+ * index, not Instagram's own search, so a page can be short or empty for a
+ * phrase that plainly has reels behind it.
+ */
+export async function searchInstagramReels(
+  apiKey: string,
+  opts: {
+    query: string
+    datePosted?: InstagramDatePosted
+    page?: number
+  },
+): Promise<SearchPage<InstagramReel>> {
+  const page = Math.min(Math.max(opts.page ?? 1, 1), INSTAGRAM_MAX_PAGE)
+  const body = await scFetch<InstagramReelsSearchResponse>(apiKey, '/v2/instagram/reels/search', {
+    query: opts.query,
+    date_posted: opts.datePosted,
+    page,
+  })
+
+  const items = body.reels ?? []
+
+  return {
+    items,
+    // An empty page and the last allowed page both end the walk. There is no
+    // page size to compare against — the vendor publishes none and a short
+    // page is normal for a Google-indexed search — so a page that came back
+    // with rows is always allowed one more.
+    cursor: items.length > 0 && page < INSTAGRAM_MAX_PAGE ? page + 1 : null,
+    creditsRemaining: body.credits_remaining ?? null,
+  }
+}
+
+/**
  * One TikTok video by id, for its CURRENT media urls.
  *
  * Every url a search hands back is signed and expires within hours, which is
@@ -518,6 +628,36 @@ export async function fetchMetaAdTranscript(
     transcript: body.data?.transcript ?? '',
     creditsRemaining: body.credits_remaining ?? null,
   }
+}
+
+/**
+ * The words spoken in an Instagram reel.
+ *
+ * Unlike TikTok's, this endpoint has no captions track to read: Instagram
+ * exposes none, so the vendor runs the video through speech-to-text every
+ * time. Three consequences the UI has to carry rather than hide — it is
+ * **always** the AI path (there is no cheap tier to offer first), it takes
+ * 10-30 seconds, and it refuses a video over two minutes.
+ *
+ * A carousel post answers with one transcript per video slide; they are joined
+ * in order, since a caller asked for "the words in this post". A reel is the
+ * single-entry case, and no speech at all comes back as an empty string —
+ * a normal outcome, not a failure.
+ */
+export async function fetchInstagramTranscript(
+  apiKey: string,
+  url: string,
+): Promise<{ transcript: string; creditsRemaining: number | null }> {
+  const body = await scFetch<InstagramTranscriptResponse>(apiKey, '/v2/instagram/media/transcript', {
+    url,
+  }, 90_000)
+
+  const transcript = (body.transcripts ?? [])
+    .map((t) => (typeof t?.text === 'string' ? t.text.trim() : ''))
+    .filter(Boolean)
+    .join('\n\n')
+
+  return { transcript, creditsRemaining: body.credits_remaining ?? null }
 }
 
 /**

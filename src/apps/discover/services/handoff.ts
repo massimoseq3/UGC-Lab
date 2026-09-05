@@ -4,7 +4,7 @@
 // browser tab: find a winner, then tear it down or remix it without saving
 // files or switching apps.
 
-import { fetchMetaAdTranscript, fetchTikTokTranscript, vttToPlainText } from '../../../utils/scrapecreators'
+import { fetchInstagramTranscript, fetchMetaAdTranscript, fetchTikTokTranscript, vttToPlainText } from '../../../utils/scrapecreators'
 import { ensureFreshSession } from '../../../lib/supabase'
 import { saveAsset } from '../../../utils/assetStore'
 import type { DiscoverResult } from '../types'
@@ -148,12 +148,23 @@ export async function saveThumbnail(result: DiscoverResult): Promise<string | un
  * `useAiFallback` (TikTok only) costs 10 EXTRA credits, so it is never passed
  * automatically — the UI offers it as an explicit retry after a miss. Plenty of
  * videos have no caption track, which is a normal outcome, not an error.
+ *
+ * Instagram has no caption track to read at all, so its endpoint is speech-to-
+ * text every time: slower (10-30s), refused over two minutes, and with no
+ * cheap tier to try first — which is why `useAiFallback` means nothing there
+ * and the UI offers no second attempt behind it.
  */
 export async function fetchResultTranscript(
   apiKey: string,
   result: DiscoverResult,
   useAiFallback = false,
 ): Promise<{ text: string; creditsRemaining: number | null }> {
+  if (result.platform === 'instagram') {
+    // The permalink is the API's own handle for a reel — there is no id route.
+    const { transcript, creditsRemaining } = await fetchInstagramTranscript(apiKey, result.postUrl)
+    return { text: transcript, creditsRemaining }
+  }
+
   if (result.platform === 'meta') {
     const { transcript, creditsRemaining } = await fetchMetaAdTranscript(apiKey, result.id)
     // Meta hands back plain prose, not WEBVTT — but run it through the same

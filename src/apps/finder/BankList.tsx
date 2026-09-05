@@ -548,8 +548,13 @@ function SwipeCard({ item, onDelete }: { item: SwipeItem; onDelete: () => void }
   }
 
   // Only rendered when the platform gave us numbers — Meta publishes none, so
-  // a Meta swipe shows its runtime badge and nothing else.
-  const hasStats = item.views != null
+  // a Meta swipe shows its runtime badge and nothing else. Instagram publishes
+  // likes and comments but no view count, so the row keys off ANY figure being
+  // present rather than off views, and the cells it hasn't got stay empty
+  // rather than reading zero.
+  const statCount = [item.views, item.likes, item.comments, item.shares, item.saves]
+    .filter((v) => v != null).length
+  const hasStats = statCount > 0
 
   return (
     <>
@@ -593,7 +598,8 @@ function SwipeCard({ item, onDelete }: { item: SwipeItem; onDelete: () => void }
 
       <div className="flex flex-col gap-2 p-2.5">
         <span className="truncate text-[13px] font-semibold tracking-tight text-ink-200">
-          {item.platform === 'tiktok' ? `@${item.authorHandle}` : item.authorName}
+          {/* A creator is their handle; an advertiser is its page name. */}
+          {item.platform === 'meta' ? item.authorName : `@${item.authorHandle}`}
         </span>
         {/* Rendered even when the count is missing, so the caption below starts
             at the same height on every card in the row. */}
@@ -601,7 +607,7 @@ function SwipeCard({ item, onDelete }: { item: SwipeItem; onDelete: () => void }
           {item.followerCount != null && (
             <>
               {item.platform === 'meta' && <Heart className="h-2.5 w-2.5 shrink-0" />}
-              {formatCount(item.followerCount)} {item.platform === 'tiktok' ? 'followers' : 'likes'}
+              {formatCount(item.followerCount)} {item.platform === 'meta' ? 'likes' : 'followers'}
             </>
           )}
         </span>
@@ -612,8 +618,16 @@ function SwipeCard({ item, onDelete }: { item: SwipeItem; onDelete: () => void }
           {item.caption || 'No caption'}
         </p>
 
+        {/* A full five spread across the row; a short one closes up to the
+            left, since two figures pinned to opposite edges read as two
+            unrelated things rather than as a pair. Same shape as the Outliers
+            card this row was saved from. */}
         {hasStats && (
-          <div className="flex items-center justify-between gap-1 border-t border-ink/5 pt-2 text-[10px] text-ink-500">
+          <div
+            className={`flex items-center border-t border-ink/5 pt-2 text-[10px] text-ink-500 ${
+              statCount >= 4 ? 'justify-between gap-1' : 'gap-4'
+            }`}
+          >
             <SwipeStat icon={Eye} value={item.views} title="Views" strong />
             <SwipeStat icon={Heart} value={item.likes} title="Likes" />
             <SwipeStat icon={MessageCircle} value={item.comments} title="Comments" />
@@ -640,6 +654,9 @@ function SwipeStat({
   title: string
   strong?: boolean
 }) {
+  // A figure the platform never published is left out, not printed as a zero:
+  // "0 saves" on an Instagram swipe would be a number Instagram didn't report.
+  if (value == null) return null
   return (
     <span className={`flex items-center gap-0.5 ${strong ? 'text-ink-200' : ''}`} title={title}>
       <Icon className="h-3 w-3 shrink-0" />

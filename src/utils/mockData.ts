@@ -318,8 +318,10 @@ const STYLES = [
 // live feed), and `mediaUrl` is left off — a demo row can't carry a signed CDN
 // link, and a swipe with no media link is the normal state of one a week old,
 // which is exactly the state the detail view's "Restore video" is written for.
-// One of each platform, because the two render differently: Meta publishes no
-// engagement numbers, so a Meta row shows its runtime badge and nothing else.
+// One of each platform, because all three render differently: Meta publishes no
+// engagement numbers, so a Meta row shows its runtime badge and nothing else,
+// and Instagram publishes likes and comments but no view count, so its row
+// carries a two-cell stats strip and no outlier badge.
 const SWIPES = [
   {
     platform: 'tiktok' as const,
@@ -352,6 +354,22 @@ const SWIPES = [
     views: 486_000, likes: 41_200, comments: 1_930, shares: 3_640, saves: 12_700,
     followerCount: 22_100,
     outlierMultiple: 4.6,
+  },
+  {
+    platform: 'instagram' as const,
+    sourceId: '3744043036998479424',
+    postUrl: 'https://www.instagram.com/reel/DP1g04sEa5A/',
+    from: '#c084fc', to: '#4c1d95',
+    label: 'Three weeks of this, honestly',
+    authorHandle: 'priya.lifts',
+    authorName: 'Priya',
+    caption: 'nobody told me the warm-up was the whole thing 🫠 #hybridtraining #running',
+    // Likes and comments and nothing else: Instagram's reel search publishes
+    // no view count, so views, shares and saves are ABSENT rather than zero —
+    // a seeded zero would print a number the real app never produces, the same
+    // rule the Meta row above follows.
+    likes: 47_900, comments: 612,
+    followerCount: 31_400,
   },
   {
     platform: 'meta' as const,
@@ -768,7 +786,7 @@ export async function seedMockData(): Promise<void> {
       const { from, to, label, ...row } = s
       const thumbRef = await makeImageAsset({
         w: 768, h: 1365, from, to, label,
-        sub: s.platform === 'tiktok' ? `@${s.authorHandle}` : `${s.authorName} · Meta`,
+        sub: s.platform === 'meta' ? `${s.authorName} · Meta` : `@${s.authorHandle}`,
       })
       await store.addSwipe({ ...row, thumbRef })
     }

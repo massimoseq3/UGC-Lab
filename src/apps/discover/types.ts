@@ -1,9 +1,9 @@
-// Outliers — one normalised card type for both platforms.
+// Outliers — one normalised card type for every platform.
 //
 // The app id is 'discover' (stable, keys the persisted state); the display
 // name is "Outliers". Folder, ids and types keep the discover naming.
 
-export type DiscoverPlatform = 'tiktok' | 'meta'
+export type DiscoverPlatform = 'tiktok' | 'instagram' | 'meta'
 
 /**
  * Which of Outliers' three tabs is on screen.
@@ -31,12 +31,24 @@ export interface DiscoverAuthor {
   followerCount?: number
 }
 
+/**
+ * Whatever numbers the platform actually published — every field optional,
+ * and an absent one is never filled with a zero.
+ *
+ * TikTok publishes all five. Instagram's reel search publishes likes and
+ * comments and nothing else: no view count (so no outlier multiple and no
+ * engagement rate, both of which divide BY views), and no shares or saves. A
+ * zero in those cells would read as "this reel got no saves" rather than as
+ * "Instagram doesn't say", which is the same lie the Meta tab refuses to tell
+ * with a made-up outlier score. Every surface renders the cells it was given
+ * and leaves out the rest.
+ */
 export interface DiscoverStats {
-  views: number
-  likes: number
-  comments: number
-  shares: number
-  saves: number
+  views?: number
+  likes?: number
+  comments?: number
+  shares?: number
+  saves?: number
 }
 
 export interface DiscoverAdMeta {
@@ -57,6 +69,8 @@ export interface DiscoverAdMeta {
  * ad has run. Meta returns `spend` and `reach_estimate` as null for every
  * commercial ad, so there is no honest outlier score to compute there — the
  * card renders whichever block it was given and never invents the other.
+ * Instagram sits between the two: real likes and comments, no views, so it
+ * carries `stats` with three of its five cells empty and no `outlier`.
  */
 export interface DiscoverResult {
   /** aweme_id (TikTok) or ad_archive_id (Meta). Unique within a platform. */
@@ -82,13 +96,20 @@ export interface DiscoverResult {
 
 // ── Search inputs ───────────────────────────────────────────────
 
-export type DiscoverSort = 'outlier' | 'views' | 'recent'
+export type DiscoverSort = 'outlier' | 'views' | 'likes' | 'recent'
 
 export interface DiscoverFilters {
   /** Videos below this view count never score, however good the ratio. */
   minViews: number
   datePosted: 'yesterday' | 'this-week' | 'this-month' | 'last-3-months' | 'last-6-months' | 'all-time'
   sort: DiscoverSort
+  /**
+   * Instagram only. Its search reads GOOGLE'S INDEX of Instagram, which offers
+   * three windows and nothing finer — so it keeps its own field rather than
+   * borrowing `datePosted`. Mapping "3 months" onto the nearest of the three
+   * would search a year and say otherwise.
+   */
+  instagramDatePosted: 'last-week' | 'last-month' | 'last-year' | 'all-time'
   /** Meta only — 2-letter code. */
   country: string
   /** Meta only. */
@@ -112,6 +133,9 @@ export const DEFAULT_FILTERS: DiscoverFilters = {
   minViews: 10_000,
   datePosted: 'last-3-months',
   sort: 'outlier',
+  // The widest window Instagram offers, since its index is patchy enough that
+  // a narrow one on a niche phrase returns nothing at all.
+  instagramDatePosted: 'last-year',
   country: 'US',
   activeOnly: true,
   exactPhrase: false,

@@ -19,18 +19,34 @@ import { applyMinViews, isPreviewable, mergeResults, runSearch, sortResults } fr
 import { downloadResultVideo, fetchResultTranscript, saveResultVideoToDisk, saveThumbnail } from './services/handoff'
 import { DEFAULT_FILTERS, type DiscoverFilters, type DiscoverPlatform, type DiscoverResult, type DiscoverSort, type DiscoverView } from './types'
 
-// Outliers — search TikTok and the Meta Ad Library for ads worth stealing,
-// then hand one straight to the Ad Analyzer or to Scripts.
+// Outliers — search TikTok, Instagram and the Meta Ad Library for ads worth
+// stealing, then hand one straight to the Ad Analyzer or to Scripts.
 //
 // Unlike every generation surface in the app, nothing here costs kie credits:
-// the searches run on the member's own ScrapeCreators key (1 credit a page)
-// and the transcript path never touches a model at all.
+// the searches run on the member's own ScrapeCreators key (a credit a page on
+// TikTok and Meta; Instagram's rate isn't published, which is why that tab
+// quotes no number) and the transcript path never touches a model at all.
+
+/** Every tab that actually searches. The vault is a library, not a platform. */
+const PLATFORMS: DiscoverPlatform[] = ['tiktok', 'instagram', 'meta']
 
 const DATE_OPTIONS: Array<{ value: DiscoverFilters['datePosted']; label: string }> = [
   { value: 'this-week', label: 'This week' },
   { value: 'this-month', label: 'This month' },
   { value: 'last-3-months', label: '3 months' },
   { value: 'last-6-months', label: '6 months' },
+  { value: 'all-time', label: 'All time' },
+]
+
+// Instagram's own three windows and nothing finer — its search reads Google's
+// index rather than Instagram, and the vendor doesn't offer an hour or a day
+// because Google doesn't index reels reliably inside one. Labelled as the
+// windows they are rather than borrowed from the list above, which would offer
+// "3 months" and quietly search a year.
+const IG_DATE_OPTIONS: Array<{ value: DiscoverFilters['instagramDatePosted']; label: string }> = [
+  { value: 'last-week', label: 'Last week' },
+  { value: 'last-month', label: 'Last month' },
+  { value: 'last-year', label: 'Last year' },
   { value: 'all-time', label: 'All time' },
 ]
 
@@ -44,6 +60,16 @@ const SORT_OPTIONS: Record<DiscoverPlatform, Array<{ value: DiscoverSort; label:
   tiktok: [
     { value: 'outlier', label: 'Outlier score' },
     { value: 'views', label: 'Most viewed' },
+    { value: 'recent', label: 'Newest' },
+  ],
+  // Instagram's reel search publishes no view count, so there is no multiple
+  // to rank by and no 'outlier' option to offer — likes are the only
+  // performance figure it gives, and they lead. Ranking likes ÷ followers
+  // under the outlier badge was considered and rejected: the badge means one
+  // thing (views against a creator's own audience) and a second ratio wearing
+  // it would make the number unreadable across tabs.
+  instagram: [
+    { value: 'likes', label: 'Most liked' },
     { value: 'recent', label: 'Newest' },
   ],
   meta: [
@@ -78,10 +104,15 @@ interface PlatformSearch {
 }
 
 const BLANK_SEARCH: PlatformSearch = { query: '', results: [], cursor: null, searched: false, fetchedAt: null }
-const EMPTY_SEARCHES: Record<DiscoverPlatform, PlatformSearch> = {
-  tiktok: BLANK_SEARCH,
-  meta: BLANK_SEARCH,
+
+/** One entry per platform, built from the list — adding a tab needs no edit here. */
+function bySearchTab(
+  build: (platform: DiscoverPlatform) => PlatformSearch,
+): Record<DiscoverPlatform, PlatformSearch> {
+  return Object.fromEntries(PLATFORMS.map((p) => [p, build(p)])) as Record<DiscoverPlatform, PlatformSearch>
 }
+
+const EMPTY_SEARCHES: Record<DiscoverPlatform, PlatformSearch> = bySearchTab(() => BLANK_SEARCH)
 
 /**
  * How long a restored grid is trusted.
@@ -138,7 +169,7 @@ function restoreSearches(stored: Record<DiscoverPlatform, PlatformSearch> | null
       fetchedAt: s.fetchedAt,
     }
   }
-  return { tiktok: restore(stored?.tiktok), meta: restore(stored?.meta) }
+  return bySearchTab((p) => restore(stored?.[p]))
 }
 
 /** Caps what reaches localStorage. The in-memory grid is untouched. */
@@ -151,7 +182,9 @@ function pruneSearches(all: Record<DiscoverPlatform, PlatformSearch>): Record<Di
     // in the middle that nothing on screen explains.
     return { ...s, results: s.results.slice(0, PERSIST_RESULT_CAP), cursor: null }
   }
-  return { tiktok: trim(all.tiktok), meta: trim(all.meta) }
+  // Falls back per tab: prune runs on state, which restoreSearches has always
+  // filled — but a key added after a blob was written must not throw here.
+  return bySearchTab((p) => trim(all[p] ?? BLANK_SEARCH))
 }
 
 /**
@@ -517,16 +550,23 @@ export default function Discover() {
   }, [])
 
   const isTikTok = platform === 'tiktok'
+  const isInstagram = platform === 'instagram'
   // A member who picked "Most viewed" on TikTok and switched to Meta has a
-  // persisted sort with no option on this tab — coerce rather than render an
-  // empty select.
+  // persisted sort with no option on this tab — coerce to the tab's own first
+  // option rather than render an empty select. It can't be a literal
+  // 'outlier': Instagram doesn't offer that one either.
   const sortOptions = SORT_OPTIONS[platform]
   const activeSort: DiscoverSort = sortOptions.some((o) => o.value === filters.sort)
     ? filters.sort
-    : 'outlier'
+    : sortOptions[0].value
   // Both derived on every render: moving Min views or Sort re-ranks what's on
   // screen without spending another credit.
-  const visible = applyMinViews(results, filters.minViews)
+  //
+  // The floor only applies where the control is shown. Meta and Instagram
+  // publish no view count so it does nothing there anyway — but an Instagram
+  // row CAN arrive carrying one (see normaliseInstagram), and a stray card
+  // vanishing to a filter that tab doesn't render would be unexplainable.
+  const visible = applyMinViews(results, isTikTok ? filters.minViews : 0)
   const sorted = sortResults(visible, activeSort)
   // A page is 30 rows, and the Min views floor (10K by default) removes every
   // card under it CLIENT-SIDE — so a niche keyword can pay for 30 results and
@@ -550,11 +590,12 @@ export default function Discover() {
         <SegmentedToggle
           options={[
             // The segments share the width equally, so the longest label sets
-            // what all three can show — and on a phone this row also carries
+            // what all four can show — and on a phone this row also carries
             // the credits chip and the +, which left "Outlier Vault" reading
-            // "Outlie…" and "Meta Ads" as "Meta …". Both shorten there: the
-            // app is already called Outliers and the other two are platform
-            // names either way. Two spans, no JS media query.
+            // "Outlie…" and "Meta Ads" as "Meta …". Three shorten there: the
+            // app is already called Outliers, and Instagram and Meta Ads are
+            // recognisable at "IG" and "Meta" on a row this tight. Spans, no
+            // JS media query.
             {
               value: 'vault',
               label: (
@@ -565,6 +606,15 @@ export default function Discover() {
               ),
             },
             { value: 'tiktok', label: 'TikTok' },
+            {
+              value: 'instagram',
+              label: (
+                <>
+                  <span className="md:hidden">IG</span>
+                  <span className="max-md:hidden">Instagram</span>
+                </>
+              ),
+            },
             {
               value: 'meta',
               label: (
@@ -615,7 +665,9 @@ export default function Discover() {
                 ? 'Filter the vault — a topic, a phrase, a creator…'
                 : isTikTok
                   ? 'Search TikTok — a product, a pain point, a hook…'
-                  : 'Search the Meta Ad Library…'
+                  : isInstagram
+                    ? 'Search Instagram reels — a product, a pain point, a hook…'
+                    : 'Search the Meta Ad Library…'
             }
             className="w-full rounded-full border border-ink/10 bg-ink/5 py-2 pl-10 pr-4 text-sm text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.07]"
           />
@@ -697,6 +749,16 @@ export default function Discover() {
                 onChange={(v) => setFilters((f) => ({ ...f, minViews: Number(v) }))}
               />
             </>
+          ) : isInstagram ? (
+            // One filter, because one is all this endpoint takes: a Google
+            // date window. No Min views (the payload carries no view count),
+            // and no media filter (a reel is a video by definition).
+            <FilterSelect
+              label="Posted"
+              value={filters.instagramDatePosted}
+              options={IG_DATE_OPTIONS}
+              onChange={(instagramDatePosted) => setFilters((f) => ({ ...f, instagramDatePosted }))}
+            />
           ) : (
             <>
               <FilterSelect
@@ -765,7 +827,7 @@ export default function Discover() {
         <GridCanvas>
           <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-ink-500">
             <Spinner className="h-4 w-4" />
-            Searching {isTikTok ? 'TikTok' : 'the Meta Ad Library'}…
+            Searching {isTikTok ? 'TikTok' : isInstagram ? 'Instagram' : 'the Meta Ad Library'}…
           </div>
         </GridCanvas>
       ) : sorted.length === 0 ? (
@@ -783,7 +845,14 @@ export default function Discover() {
                   : 'Nothing came back for that phrase. Try a broader keyword, or widen the date range.'
                 : isTikTok
                   ? 'Search a phrase and Outliers ranks what comes back by views against each creator’s own following.'
-                  : 'Search a phrase to see the ads running against it, ranked by how long they’ve been live.'
+                  : isInstagram
+                    // Says what this tab is up front: it reads Google's index
+                    // of Instagram, so a thin page is the index being thin
+                    // rather than the phrase being wrong — and a member who
+                    // knows that tries a broader phrase instead of assuming
+                    // the search is broken.
+                    ? 'Search a phrase to see the reels Google has indexed for it, ranked by likes. Instagram publishes no view count, so there is no outlier score on this tab.'
+                    : 'Search a phrase to see the ads running against it, ranked by how long they’ve been live.'
             }
           />
         </GridCanvas>
@@ -820,7 +889,14 @@ export default function Discover() {
                 className="flex items-center gap-2 rounded-full border border-ink/10 px-5 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5 disabled:opacity-50"
               >
                 {loadingMore && <Spinner className="h-3.5 w-3.5" />}
-                {loadingMore ? 'Loading…' : 'Load more — 1 credit'}
+                {/* The price is named where it is known. ScrapeCreators
+                    publishes a flat credit a page for the TikTok and Meta
+                    searches and nothing at all for the Instagram one, so that
+                    tab says what the button does and leaves the number to the
+                    credits chip in the header, which is live. Quoting a guess
+                    on a button that spends money is worse than quoting
+                    nothing. */}
+                {loadingMore ? 'Loading…' : isInstagram ? 'Load more' : 'Load more — 1 credit'}
               </button>
             </div>
           )}
@@ -855,8 +931,8 @@ function ConnectKeyPanel({ onConnect }: { onConnect: () => void }) {
         <Key className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
         <p className="text-sm text-ink-500">Connect ScrapeCreators</p>
         <p className="max-w-[340px] text-xs leading-relaxed text-ink-600">
-          Outliers searches TikTok and the Meta Ad Library on your own key —
-          1 credit a search, and 100 free when you sign up.
+          Outliers searches TikTok, Instagram and the Meta Ad Library on your
+          own key — from 1 credit a search, and 100 free when you sign up.
         </p>
         {/* Reopens the popup rather than linking out, so dismissing the
             onboarding can't strand a member with nowhere to paste a key. */}
