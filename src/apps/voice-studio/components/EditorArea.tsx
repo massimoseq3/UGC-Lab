@@ -1,19 +1,8 @@
-import type { ReactNode } from 'react'
-import { FileText, Mic, AlertCircle, RefreshCw, X, ChevronRight, Coins, Sparkles } from 'lucide-react'
+import { FileText, RefreshCw, X, ChevronRight, Sparkles } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import type { Script } from '../../../stores/types'
-import GenerationProgress from '../../../components/GenerationProgress'
 import ClearAllButton from '../../../components/ClearAllButton'
-import BatchCountStepper from '../../../components/BatchCountStepper'
-import { clampBatchCount } from '../../../utils/batchCount'
-import { estimateCredits, formatCredits, getDefaultModel, TTS_MODEL_PRO, TTS_MODEL_SLOT } from '../../../utils/models'
-import { useSettingsStore } from '../../../stores/settingsStore'
-
-const MAX_CHARACTERS = 5000
-
-// Three reads is a choice; more is an audition. TTS is the cheapest thing in
-// the app, so the ceiling here is about what's useful, not what it costs.
-export const VOICE_BATCH_MAX = 3
+import { MAX_CHARACTERS } from './GenerateBar'
 
 interface EditorAreaProps {
   scriptText: string
@@ -24,26 +13,20 @@ interface EditorAreaProps {
   // Resets the editor to a blank slate — the picked script and the pasted
   // text. Every generated voiceover stays in History.
   onClearInputs: () => void
-  onGenerate: () => void
-  // How many reads of the same script one press fires. Capped at 3 (see
-  // VOICE_BATCH_MAX): same voice, same params, same words — the delivery still
-  // lands differently each time, and picking between three is the job.
-  batchCount: number
-  onBatchCountChange: (value: number) => void
-  isGenerating: boolean
   canGenerate: boolean
   onEnhance: () => void
   isEnhancing: boolean
   highlightField?: string | null
-  error?: string | null
-  // The playback bar for the latest voiceover, rendered INSIDE the generate
-  // row rather than as a band under it — the button leaves most of that row
-  // empty on a desktop, and a second full-width strip for a control that fits
-  // beside it is a strip the script box could have had. Absent until a
-  // generation lands.
-  player?: ReactNode
 }
 
+/**
+ * The script pane, and nothing else.
+ *
+ * It used to end in the generate footer — the batch stepper, the button and
+ * the player. Generate moved to the foot of the settings column in September
+ * 2026 (see `GenerateBar`), and the player became this column's own footer one
+ * level up, so it spans History as well as the script.
+ */
 export default function EditorArea({
   scriptText,
   onScriptChange,
@@ -51,42 +34,17 @@ export default function EditorArea({
   selectedScript,
   onClearScript,
   onClearInputs,
-  onGenerate,
-  batchCount,
-  onBatchCountChange,
-  isGenerating,
   canGenerate,
   onEnhance,
   isEnhancing,
   highlightField,
-  error,
-  player,
 }: EditorAreaProps) {
   const charCount = scriptText.length
   const overLimit = charCount > MAX_CHARACTERS
-  // The model the left panel's picker is on — read THROUGH the selector, never
-  // by calling a getter pulled out of the store (see the React Compiler note in
-  // CLAUDE.md), so the price follows a swap. Falls back the same way
-  // resolveTtsModel does, so the button quotes what the run will actually cost.
-  const pickedModel = useSettingsStore((s) => s.getAppModel(TTS_MODEL_SLOT))
-  const modelId = pickedModel ?? getDefaultModel('voice-studio', 'tts')?.id ?? TTS_MODEL_PRO
-  // Gemini TTS bills by tokens; we estimate from the script's char count (see
-  // geminiTtsCredits in models.ts). Show the estimate on the Generate button so
-  // cost is visible before spending.
-  const count = clampBatchCount(batchCount, VOICE_BATCH_MAX)
-  // TTS is billed per call, so a run of N is N times one read.
-  const creditsFor = (n: number) => {
-    const one = estimateCredits(modelId, { charCount })
-    return one === null ? null : one * n
-  }
-  const creditsLabel = charCount > 0 ? formatCredits(creditsFor(count)) : null
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {/* Body — no header band here on purpose: the panel-level "New" reset
-          rides in the action row above the textarea (beside Enhance) instead,
-          so the editor column has no near-empty strip across its top. */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pt-5 md:px-8 md:pt-6">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 pb-5 pt-5 md:px-8 md:pb-6 md:pt-6">
         {/* Pull from Script bank — dashed "click to select" when empty; a
             filled pill with a hover refresh icon / X-clear once a bank script
             is loaded. Editing the textarea below reverts it to the empty state. */}
@@ -190,93 +148,6 @@ export default function EditorArea({
             highlightField === 'script' ? 'animate-field-flash' : ''
           }`}
         />
-
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="mx-5 mb-3 mt-4 flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400 light:text-red-600" />
-          <p className="text-xs leading-relaxed text-red-300 light:text-red-700">{error}</p>
-        </div>
-      )}
-
-      {/* Progress bar — only takes space while generating so it sits snug
-          just above the footer separator (no empty gap when idle). The
-          "keep this tab open" helper is hidden here to keep it tight. */}
-      {isGenerating && (
-        <div className="px-5 pb-2 pt-2">
-          <GenerationProgress
-            isActive
-            color="bg-voice-500"
-            messages={['Preparing audio...', 'Sending request...', 'Generating speech...', 'Encoding audio...']}
-            showHelper={false}
-          />
-        </div>
-      )}
-
-      {/* Footer row — how many voiceovers one press makes, then the button
-          that makes them, and NOTHING else. A count reads as a setting on the
-          way to Generate, so it sits on the approach to it rather than
-          trailing behind; the row is `items-stretch` and the stepper takes
-          `size='fill'`, so it is exactly the button's height by construction
-          rather than by a matching magic number. It's a property of THIS
-          press, like the button's own cost pill, not a saved setting.
-
-          The character count used to ride this row's right edge and now sits
-          above the script box it counts: three things on a 375px line meant
-          the button's own label was what gave way ("Generat…"). The pane owns
-          its own height (the phone shows one pane at a time), so this is an
-          ordinary last row in the column — it used to be `fixed`, which is
-          what laid that count across the button in the first place.
-
-          The PLAYER is the row's third item and takes whatever the button
-          leaves (`flex-1` on its side, `md:flex-none` on the button). It's
-          `flex-wrap` so that on a phone — where the two existing items already
-          fill the line — the player drops to its own line underneath instead
-          of squeezing them, which is where it used to live full-time. */}
-      <div className={`flex shrink-0 flex-wrap items-stretch gap-2 border-t border-ink/5 px-5 py-3 ${isGenerating ? 'md:mt-0' : 'md:mt-4'}`}>
-        <BatchCountStepper
-          size="fill"
-          stacked
-          accent="voice"
-          noun="voiceover"
-          label="Voiceovers"
-          // The word is desktop-only: the button beside it already says
-          // "Generate 2 Voiceovers", and carrying it twice on a phone left the
-          // button ~170px to say it in — which is what clipped it to "Generat…".
-          labelClassName="max-md:hidden"
-          max={VOICE_BATCH_MAX}
-          value={count}
-          onChange={onBatchCountChange}
-          creditsFor={charCount > 0 ? creditsFor : undefined}
-        />
-        <button
-          onClick={onGenerate}
-          // Stays live while a voiceover renders — a second click queues
-          // another one alongside it. The progress bar above is the feedback.
-          disabled={!canGenerate || overLimit}
-          className="flex min-w-0 flex-1 items-center justify-center gap-2.5 glass-fill glass-fill-soft rounded-full border border-white/15 bg-voice-500 px-4 py-4 md:flex-none md:px-10 text-sm font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] btn-soft-shadow transition-all hover:brightness-110 disabled:hover:brightness-100 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <Mic className="h-4 w-4" strokeWidth={2.5} />
-          {/* The noun is desktop-only. A 375px row leaves this button ~150px
-              for its label, and "Generate 3 Voiceovers" plus the credits pill
-              wants twice that — so what goes is the word three other things on
-              screen already say (the app, the pane tab, the stepper's own
-              label above md). The NUMBER stays: it's what this press spends,
-              and it rides the button beside the price like everywhere else. */}
-          <span className="truncate">
-            Generate{count > 1 ? ` ${count}` : ''}
-            <span className="hidden md:inline">{count === 1 ? ' Voiceover' : ' Voiceovers'}</span>
-          </span>
-          {creditsLabel && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight">
-              <Coins className="h-3 w-3" strokeWidth={2} />
-              {creditsLabel}
-            </span>
-          )}
-        </button>
-        {player}
       </div>
     </div>
   )

@@ -182,22 +182,16 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
   const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0
 
   return (
-    // The player rides the generate row, in the space the Generate button
-    // leaves on its right — it used to be a full-width band UNDER that row,
-    // which spent a whole strip of the editor column on a control the row was
-    // already wide enough to hold. `flex-1` claims exactly the leftover, and
-    // `items-stretch` on the row gives it the button's own height, so the pair
-    // reads as one bar rather than two.
+    // The player is the output column's own FOOTER (September 2026), so it
+    // spans the Script tab and the History tab alike: it's the transport for
+    // whatever is playing, whichever list is on screen. It rode inside the
+    // generate row until Generate moved to the settings column, and it takes
+    // that row's whole width now rather than the leftover beside a button.
     //
-    // Below `md` the row wraps and this takes its own line (`basis-full`),
-    // ABOVE the stepper + Generate (`order-first`) — the thing you just made is
-    // what you reach for first on a phone, and it shouldn't sit under the
-    // button that would replace it. What it drops there is everything that
-    // can't earn 335px: the ±10s
-    // skips (the scrubber does that job) and the details button (History's own
-    // card opens the same view). The elapsed / total pair and the scrubber are
-    // what's left, because a player you can't seek isn't one.
-    <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.02] px-3 py-2 max-md:order-first max-md:basis-full">
+    // On a phone it drops the details button (History's own card opens the
+    // same view); the elapsed / total pair and the scrubber always stay,
+    // because a player you can't seek isn't one.
+    <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.02] px-3 py-2">
       {/* Play — filled with the voice's own seed colour, the same trick the
           History cards use: the button says WHO is speaking, which is what the
           avatar + name block beside it used to say and no longer has room to. */}
@@ -208,19 +202,21 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
         title={isPlaying ? `Pause ${item.voiceName}` : `Play ${item.voiceName}`}
         aria-label={isPlaying ? 'Pause' : 'Play'}
       >
-        {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 translate-x-px" />}
+        {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 translate-x-px fill-current" />}
       </button>
 
       {/* The ±10s pair is the first thing to go when the bar is narrow, and
           it goes by VIEWPORT width because that is an exact proxy here: the
-          side panel is a fixed 400px, so the editor pane — and therefore this
-          bar — is the viewport minus a constant. Below `2xl` the two buttons
-          and their gaps are ~80px out of the ~160px the scrubber has to live
-          on, and a scrubber you can click is worth more on a 6-second read
-          than a jump longer than the clip. */}
+          settings column is a fixed 460px, so this bar is the viewport minus a
+          constant. The threshold is `lg` rather than the old `2xl` because the
+          bar no longer shares its row with a Generate button — at 1024px it
+          has ~544px to itself, where before it had ~160px for the scrubber
+          once the button had taken its share. Below that, the two buttons and
+          their gaps cost more than a clickable scrubber is worth on a
+          six-second read. */}
       <button
         onClick={() => skip(-10)}
-        className="relative hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/5 hover:text-ink-100 2xl:flex"
+        className="relative hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/5 hover:text-ink-100 lg:flex"
         title="Back 10 seconds"
       >
         <RotateCcw className="h-4 w-4" />
@@ -228,7 +224,7 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
       </button>
       <button
         onClick={() => skip(10)}
-        className="relative hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/5 hover:text-ink-100 2xl:flex"
+        className="relative hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/5 hover:text-ink-100 lg:flex"
         title="Forward 10 seconds"
       >
         <RotateCw className="h-4 w-4" />

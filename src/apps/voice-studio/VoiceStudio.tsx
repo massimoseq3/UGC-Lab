@@ -12,7 +12,11 @@ import { createDefaultSettings, sanitizeVoiceSettings } from './types'
 import { startVoiceTask, finishVoiceTask } from './services/generateVoice'
 import { enhanceScriptWithTags } from './services/enhanceScript'
 import { humanizeError } from '../../utils/friendlyError'
-import EditorArea, { VOICE_BATCH_MAX } from './components/EditorArea'
+import EditorArea from './components/EditorArea'
+import { VOICE_BATCH_MAX } from './components/GenerateBar'
+import HistoryView from './components/HistoryView'
+import HistoryDetailsView from './components/HistoryDetailsView'
+import SegmentedToggle from '../../components/SegmentedToggle'
 import { clampBatchCount } from '../../utils/batchCount'
 import SidePanel from './components/SidePanel'
 import BottomPlayer from './components/BottomPlayer'
@@ -99,6 +103,10 @@ export default function VoiceStudio() {
   const [detailsItem, setDetailsItem] = useState<VoiceHistoryItem | null>(null)
   // Phone-only: which of the two panes is on screen (ignored from md up).
   const [pane, setPane] = useState<'editor' | 'settings'>('editor')
+  // The output pane's own toggle: the script you're reading, or the reads
+  // you've made of it. History moved here from the settings column in
+  // September 2026 — it's an output, and it belongs beside the other one.
+  const [rightTab, setRightTab] = useState<'script' | 'history'>('script')
 
   const history = useBankStore((s) => s.voiceHistory)
   const activePlayerItem = useMemo<VoiceHistoryItem | null>(
@@ -220,6 +228,13 @@ export default function VoiceStudio() {
     if (!scriptText.trim()) return
     const count = clampBatchCount(batchCount, VOICE_BATCH_MAX)
     for (let i = 0; i < count; i++) void runOneVoice()
+    // Show the reads. Generate now sits in the settings pane, which on a
+    // phone is the ONLY pane on screen, so without the pane flip a press looks
+    // like nothing happened at all; History is where the queue reports itself
+    // (the in-progress rows), which is the app-wide "Generate flips to the
+    // output pane" rule. The script is untouched and one click back.
+    setPane('editor')
+    setRightTab('history')
   }
 
   // Mount-time resume: poll every persisted in-flight TTS taskId that survived
@@ -259,6 +274,18 @@ export default function VoiceStudio() {
     [inFlightVoices],
   )
 
+  // Opening a details view (from a History card, or from the player) has to
+  // put the pane that holds it on screen. Done during render as a prop-change
+  // sync rather than in an effect, the same shape the side panel used when it
+  // owned this view.
+  const [prevDetails, setPrevDetails] = useState(detailsItem)
+  if (detailsItem !== prevDetails) {
+    setPrevDetails(detailsItem)
+    if (detailsItem) { setRightTab('history'); setPane('editor') }
+  }
+
+  const historyCount = history.length + pendingVoices.length
+
   const handleDeleteHistoryItem = (id: string) => {
     deleteVoiceHistory(id)
     if (activePlayerItem?.id === id) setActivePlayerItem(null)
@@ -292,62 +319,101 @@ export default function VoiceStudio() {
         accent="voice"
       />
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        {/* Left — settings / voice picker / history. First in the DOM so the
-            desktop reading order matches the visual one (and so this app has the
-            same source shape as Scripts / B-Roll); the editor takes `order-first`
-            below to keep the mobile stack unchanged — settings are long, and
-            they'd push the script box off the first screen. */}
-        <div className={paneClass(pane === 'settings', 'md:w-[400px] md:shrink-0 md:border-r md:border-ink/5')}>
+        {/* Left — the settings, and Generate at their foot. First in the DOM so
+            the desktop reading order matches the visual one (and so this app
+            has the same source shape as Scripts / B-Roll); the editor takes
+            `order-first` below to keep the mobile stack unchanged — settings
+            are long, and they'd push the script box off the first screen.
+
+            460px, up from 400: History leaving freed the column, and the
+            settings cards plus a generate row read better with the extra
+            width. The last 20px are load-bearing rather than taste — the
+            model row shares its line with the batch stepper, and at 440 the
+            name it exists to show clipped to "Gemini 2.5 Pro T…" at every
+            desktop width, since this column is a constant. Anything else
+            reading that constant — the player's ±10s gating does — has to
+            move with it. */}
+        <div className={paneClass(pane === 'settings', 'md:w-[460px] md:shrink-0 md:border-r md:border-ink/5')}>
           <SidePanel
             settings={settings}
             onSettingsChange={setSettings}
-            history={history}
-            pending={pendingVoices}
-            activeHistoryId={activePlayerItem?.id ?? null}
-            detailsItem={detailsItem}
-            onSelectHistory={setActivePlayerItem}
-            onDeleteHistory={handleDeleteHistoryItem}
-            onShowDetails={setDetailsItem}
-            onCloseDetails={() => setDetailsItem(null)}
-            onRestoreText={handleRestoreText}
-            onRestoreSettings={handleRestoreSettings}
+            scriptText={scriptText}
+            onGenerate={handleGenerate}
+            batchCount={batchCount}
+            onBatchCountChange={setBatchCount}
+            isGenerating={isGenerating}
+            error={error}
           />
         </div>
 
-        {/* Right — editor, with the player riding the generate row inside it.
-            The player belongs to this column, not to the window: stretched
-            across the bottom it cut the side panel off short and left dead
-            space under History. It's a child of the generate row now rather
-            than a band beneath it — see EditorArea's footer note. */}
+        {/* Right — the output column: the script you're reading, or the reads
+            you've made of it, behind one toggle. The player is its FOOTER
+            rather than a passenger in the generate row, so it spans both tabs:
+            it's the transport for whatever is playing, whichever list you're
+            looking at. */}
         <div className={paneClass(pane === 'editor', 'md:flex-1 md:overflow-hidden')}>
           <div className="flex min-h-0 flex-1 flex-col">
-            <EditorArea
-              scriptText={scriptText}
-              onScriptChange={(v) => { setScriptText(v); setSelectedScript(null) }}
-              onSelectScript={() => setScriptPickerOpen(true)}
-              selectedScript={selectedScript}
-              onClearScript={() => setSelectedScript(null)}
-              onClearInputs={() => { setSelectedScript(null); setScriptText('') }}
-              onGenerate={handleGenerate}
-              batchCount={batchCount}
-              onBatchCountChange={setBatchCount}
-              isGenerating={isGenerating}
-              canGenerate={scriptText.trim().length > 0}
-              onEnhance={handleEnhance}
-              isEnhancing={isEnhancing}
-              highlightField={highlightField}
-              error={error}
-              // Appears in the generate row once a generation lands.
-              player={
-                activePlayerItem && (
-                  <BottomPlayer
-                    item={activePlayerItem}
-                    onClose={() => setActivePlayerItem(null)}
-                    onShowDetails={setDetailsItem}
+            <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
+              <SegmentedToggle<'script' | 'history'>
+                className="h-10 !p-1"
+                value={rightTab}
+                onChange={setRightTab}
+                options={[
+                  { value: 'script', label: 'Script' },
+                  { value: 'history', label: 'History', badge: historyCount > 0 ? historyCount : undefined },
+                ]}
+              />
+            </div>
+
+            {/* Body — the base layer switches instantly between the two; the
+                details view rides on top of it, opaque, the same shape the
+                settings column used when it owned History. */}
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              {rightTab === 'script' ? (
+                <EditorArea
+                  scriptText={scriptText}
+                  onScriptChange={(v) => { setScriptText(v); setSelectedScript(null) }}
+                  onSelectScript={() => setScriptPickerOpen(true)}
+                  selectedScript={selectedScript}
+                  onClearScript={() => setSelectedScript(null)}
+                  onClearInputs={() => { setSelectedScript(null); setScriptText('') }}
+                  canGenerate={scriptText.trim().length > 0}
+                  onEnhance={handleEnhance}
+                  isEnhancing={isEnhancing}
+                  highlightField={highlightField}
+                />
+              ) : (
+                <HistoryView
+                  items={history}
+                  pending={pendingVoices}
+                  activeId={activePlayerItem?.id ?? null}
+                  onSelect={setActivePlayerItem}
+                  onDelete={handleDeleteHistoryItem}
+                  onShowDetails={setDetailsItem}
+                />
+              )}
+
+              {detailsItem && (
+                <div className="absolute inset-0 bg-surface-1">
+                  <HistoryDetailsView
+                    item={detailsItem}
+                    onClose={() => setDetailsItem(null)}
+                    onRestoreText={handleRestoreText}
+                    onRestoreSettings={handleRestoreSettings}
                   />
-                )
-              }
-            />
+                </div>
+              )}
+            </div>
+
+            {activePlayerItem && (
+              <div className="flex shrink-0 items-center border-t border-ink/5 px-5 py-3">
+                <BottomPlayer
+                  item={activePlayerItem}
+                  onClose={() => setActivePlayerItem(null)}
+                  onShowDetails={setDetailsItem}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>

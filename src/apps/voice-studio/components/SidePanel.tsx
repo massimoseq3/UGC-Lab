@@ -1,61 +1,50 @@
 import { useState } from 'react'
 import type { VoiceSettings } from '../types'
 import { settingsFromPreset } from '../types'
-import type { VoiceHistoryItem, VoicePreset } from '../../../stores/types'
+import type { VoicePreset } from '../../../stores/types'
 import SettingsView from './SettingsView'
 import VoicePickerView from './VoicePickerView'
 import PresetPickerView from './PresetPickerView'
-import HistoryView, { type PendingVoice } from './HistoryView'
-import HistoryDetailsView from './HistoryDetailsView'
-import SegmentedToggle from '../../../components/SegmentedToggle'
-
-type Tab = 'settings' | 'history'
+import PickerModal from './PickerModal'
+import GenerateBar from './GenerateBar'
 
 interface SidePanelProps {
   settings: VoiceSettings
   onSettingsChange: (next: VoiceSettings) => void
-  history: VoiceHistoryItem[]
-  // Voiceovers still rendering — shown as pending rows at the top of History so
-  // a queued batch is visible while it works.
-  pending: PendingVoice[]
-  activeHistoryId: string | null
-  detailsItem: VoiceHistoryItem | null
-  onSelectHistory: (item: VoiceHistoryItem) => void
-  onDeleteHistory: (id: string) => void
-  onShowDetails: (item: VoiceHistoryItem) => void
-  onCloseDetails: () => void
-  onRestoreText: (text: string) => void
-  onRestoreSettings: (settings: Partial<VoiceSettings>) => void
+  // Generate lives at the foot of this column now — see GenerateBar. The
+  // script itself is edited in the other pane; only its length matters here.
+  scriptText: string
+  onGenerate: () => void
+  batchCount: number
+  onBatchCountChange: (value: number) => void
+  isGenerating: boolean
+  error?: string | null
 }
 
+/**
+ * The settings column, and only settings.
+ *
+ * It carried a Settings / History `SegmentedToggle` across its top until
+ * September 2026 (Massimo's call). History moved to the other pane, where it
+ * shares a toggle with the Script — an output belongs beside the other output
+ * surface, not stacked behind the controls that produce it — and this column
+ * gained the room for Generate at its foot.
+ *
+ * Both pickers are centred modals now rather than views that take over this
+ * column: a takeover would cover the Generate button that lives here.
+ */
 export default function SidePanel({
   settings,
   onSettingsChange,
-  history,
-  pending,
-  activeHistoryId,
-  detailsItem,
-  onSelectHistory,
-  onDeleteHistory,
-  onShowDetails,
-  onCloseDetails,
-  onRestoreText,
-  onRestoreSettings,
+  scriptText,
+  onGenerate,
+  batchCount,
+  onBatchCountChange,
+  isGenerating,
+  error,
 }: SidePanelProps) {
-  const [tab, setTab] = useState<Tab>('settings')
   const [voicePickerOpen, setVoicePickerOpen] = useState(false)
   const [presetPickerOpen, setPresetPickerOpen] = useState(false)
-
-  const openPicker = () => setVoicePickerOpen(true)
-  const closePicker = () => setVoicePickerOpen(false)
-
-  // When details opens (e.g. from BottomPlayer), make sure we're on the History
-  // tab. Done during render (prop-change sync), not in an effect.
-  const [prevDetails, setPrevDetails] = useState(detailsItem)
-  if (detailsItem !== prevDetails) {
-    setPrevDetails(detailsItem)
-    if (detailsItem) setTab('history')
-  }
 
   const handleSelectVoice = (voice: { id: string; name: string; gender?: 'Female' | 'Male' }) => {
     onSettingsChange({
@@ -68,7 +57,7 @@ export default function SidePanel({
       presetId: undefined,
       presetLabel: undefined,
     })
-    closePicker()
+    setVoicePickerOpen(false)
   }
 
   const handleSelectPreset = (preset: VoicePreset) => {
@@ -76,83 +65,50 @@ export default function SidePanel({
     setPresetPickerOpen(false)
   }
 
-  const handleShowDetails = (item: VoiceHistoryItem) => {
-    onShowDetails(item)
-  }
-
-  const handleCloseDetails = () => {
-    onCloseDetails()
-  }
-
-  // Tabs are hidden when a slide-over view (picker, details) owns the chrome.
-  const showTabs = !voicePickerOpen && !presetPickerOpen && !detailsItem
-
   return (
     <div className="flex h-full flex-col">
-      {showTabs && (
-        <div className="flex h-[57px] items-center border-b border-ink/5 px-5">
-          <SegmentedToggle<Tab>
-            className="h-10 !p-1"
-            value={tab}
-            onChange={setTab}
-            options={[
-              { value: 'settings', label: 'Settings' },
-              { value: 'history', label: 'History', badge: history.length + pending.length > 0 ? history.length + pending.length : undefined },
-            ]}
-          />
-        </div>
-      )}
-
-      {/* Body — base layer switches between Settings and History instantly.
-          Slide-in overlays (picker, details) ride on top via AnimatePresence. */}
-      <div className="relative min-h-0 flex-1 overflow-hidden">
-        {tab === 'settings' ? (
-          <SettingsView
-            settings={settings}
-            onSettingsChange={onSettingsChange}
-            onOpenVoicePicker={openPicker}
-            onOpenPresetPicker={() => setPresetPickerOpen(true)}
-          />
-        ) : (
-          <HistoryView
-            items={history}
-            pending={pending}
-            activeId={activeHistoryId}
-            onSelect={onSelectHistory}
-            onDelete={onDeleteHistory}
-            onShowDetails={handleShowDetails}
-          />
-        )}
-
-        {voicePickerOpen && (
-          <div className="absolute inset-0 bg-surface-1">
-            <VoicePickerView
-              selectedId={settings.voiceId}
-              onSelect={handleSelectVoice}
-              onClose={closePicker}
-            />
-          </div>
-        )}
-        {presetPickerOpen && (
-          <div className="absolute inset-0 bg-surface-1">
-            <PresetPickerView
-              selectedId={settings.presetId}
-              onSelect={handleSelectPreset}
-              onClose={() => setPresetPickerOpen(false)}
-            />
-          </div>
-        )}
-        {detailsItem && (
-          <div className="absolute inset-0 bg-surface-1">
-            <HistoryDetailsView
-              item={detailsItem}
-              onClose={handleCloseDetails}
-              onRestoreText={onRestoreText}
-              onRestoreSettings={onRestoreSettings}
-            />
-          </div>
-        )}
+      {/* No header band, deliberately (September 2026, Massimo's call). Both
+          panes of a two-pane app normally carry a 57px header so the hairlines
+          align — this app is the exception, because once History moved across
+          there was nothing left for this one to hold but the word "Voice", and
+          a bar spending 57px to say what the dock tile, the pane tab and every
+          control under it already say is worse than an unmatched hairline.
+          The settings start at the top of the column instead. */}
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <SettingsView
+          settings={settings}
+          onSettingsChange={onSettingsChange}
+          onOpenVoicePicker={() => setVoicePickerOpen(true)}
+          onOpenPresetPicker={() => setPresetPickerOpen(true)}
+        />
       </div>
+
+      <GenerateBar
+        scriptText={scriptText}
+        onGenerate={onGenerate}
+        batchCount={batchCount}
+        onBatchCountChange={onBatchCountChange}
+        isGenerating={isGenerating}
+        error={error}
+      />
+
+      <PickerModal
+        open={voicePickerOpen}
+        title="Select a voice"
+        subtitle="Click a voice to hear a sample"
+        onClose={() => setVoicePickerOpen(false)}
+      >
+        <VoicePickerView selectedId={settings.voiceId} onSelect={handleSelectVoice} />
+      </PickerModal>
+
+      <PickerModal
+        open={presetPickerOpen}
+        title="Select a preset"
+        subtitle="Loads the voice, delivery, scene and tone"
+        onClose={() => setPresetPickerOpen(false)}
+      >
+        <PresetPickerView selectedId={settings.presetId} onSelect={handleSelectPreset} />
+      </PickerModal>
     </div>
   )
 }
