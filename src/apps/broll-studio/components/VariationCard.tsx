@@ -573,7 +573,7 @@ export default function VariationCard(props: VariationCardProps) {
       }
       if (effectiveMode === 'reference-to-video' && referenceDataUris?.length) {
         useAppStore.getState().addToast(
-          `${model.displayName} doesn't support reference images — generating text-to-video only.`,
+          `${model.displayName} doesn't support reference images. Generating text-to-video only.`,
           'error',
         )
       }
@@ -589,7 +589,7 @@ export default function VariationCard(props: VariationCardProps) {
         // reaches it as a reference instead). The picker greys the ones that
         // can't, which is a list that stays true as models come and go.
         useAppStore.getState().addToast(
-          `${model.displayName} can't animate a still. Open the model picker — the ones that can't take a still are greyed out.`,
+          `${model.displayName} can't animate a still. Open the model picker. The ones that can't take a still are greyed out.`,
           'error',
         )
         return
@@ -782,7 +782,7 @@ export default function VariationCard(props: VariationCardProps) {
     } else if (modes.includes('reference-to-video')) {
       await runVideoTask('reference-to-video', undefined, [dataUri], videoModelId, startFrameRef, batchSettings, animatePrompt)
     } else {
-      useAppStore.getState().addToast("This model can't animate a still — pick one that takes a start frame or reference images.", 'error')
+      useAppStore.getState().addToast("This model can't animate a still. Pick one that takes a start frame or reference images.", 'error')
     }
   }
 

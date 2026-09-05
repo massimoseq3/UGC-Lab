@@ -415,7 +415,7 @@ const CLOUD_SYNC_TIMEOUT_MS = 20_000
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${ms / 1000}s — saved on this device; will retry syncing automatically`))
+      reject(new Error(`${label} timed out after ${ms / 1000}s. Saved on this device; will retry syncing automatically`))
     }, ms)
     promise.then(
       (v) => { clearTimeout(timer); resolve(v) },

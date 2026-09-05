@@ -509,7 +509,7 @@ export default function VaultBrowser({
                 onClick={() => setShown((n) => n + PAGE)}
                 className="rounded-full border border-ink/10 px-5 py-2.5 text-[13px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5"
               >
-                Show more — {matches.length - shown} left
+                Show more · {matches.length - shown} left
               </button>
             </div>
           )}

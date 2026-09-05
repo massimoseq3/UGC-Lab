@@ -614,7 +614,7 @@ export default function InputPanel({
         accent="broll"
         placeholder={hasScript
           ? 'Optional notes for this generation (mood, style preferences, specific angles...)'
-          : "What's this ad about? Optional — the product's own details already drive the script (angle, audience, what to avoid...)"}
+          : "What's this ad about? Optional, the product's own details already drive the script (angle, audience, what to avoid...)"}
       />
 
     </div>

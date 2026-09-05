@@ -129,7 +129,7 @@ function newSessionId(): string {
 
 // Capped at 80 chars so the history row shows the gist without wrapping.
 function buildInputSummary(productName: string | undefined, scriptText: string): string {
-  const prefix = productName ? `${productName} — ` : ''
+  const prefix = productName ? `${productName} · ` : ''
   const body = scriptText.trim().replace(/\s+/g, ' ').slice(0, 80 - prefix.length)
   return `${prefix}${body}`.trim() || 'Untitled session'
 }
@@ -817,7 +817,7 @@ export default function BrollStudio() {
       setContinuousSelections({})
       setContinuousResult((row.continuousResult as ContinuousResult | undefined) ?? null)
       useAppStore.getState().addToast(
-        warning ?? 'Storyboard ready — pick a keyframe per frame, then animate',
+        warning ?? 'Storyboard ready. Pick a keyframe per frame, then animate',
         warning ? 'error' : 'success',
       )
       return
@@ -890,7 +890,7 @@ export default function BrollStudio() {
       setContinuousClipStates({})
       setContinuousSelections({})
       setContinuousResult(buildDemoContinuousResult(continuousModelId, resolvedStyleId))
-      useAppStore.getState().addToast('Showing a sample storyboard — add your kie.ai key to storyboard your own script', 'info')
+      useAppStore.getState().addToast('Showing a sample storyboard. Add your kie.ai key to storyboard your own script', 'info')
       return
     }
     setError(null)
@@ -987,7 +987,7 @@ export default function BrollStudio() {
       styleName: trimmedBrief ? name?.trim() || undefined : undefined,
     } : prev))
     setContinuousResult((prev) => (prev ? { ...prev, style, realism, styleId } : prev))
-    useAppStore.getState().addToast('Style updated — regenerate any card to render it in the new look', 'success')
+    useAppStore.getState().addToast('Style updated. Regenerate any card to render it in the new look', 'success')
   }
 
   // A preset and a custom brief are mutually exclusive — picking either clears

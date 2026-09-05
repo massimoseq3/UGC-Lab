@@ -345,8 +345,8 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
     if (valid.length > room) {
       addToast(
         room === 0
-          ? `More Angles is full — ${MAX_EXTRA_IMAGES} is the limit.`
-          : `Only ${MAX_EXTRA_IMAGES} extra angles fit — kept the first ${room}.`,
+          ? `More Angles is full. ${MAX_EXTRA_IMAGES} is the limit.`
+          : `Only ${MAX_EXTRA_IMAGES} extra angles fit. Kept the first ${room}.`,
         'info',
       )
     }
@@ -653,7 +653,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
           <button
             type="button"
             onClick={handleClose}
-            title="Close — everything is already saved"
+            title="Close · everything is already saved"
             className="text-ink-500 transition-colors hover:text-ink-300"
           >
             <X className="h-4 w-4" />

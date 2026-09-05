@@ -83,7 +83,7 @@ export async function prepareAnnouncementImage(file: File): Promise<string> {
     const dataUrl = canvas.toDataURL('image/jpeg', quality)
     if (dataUrl.length <= MAX_IMAGE_DATA_CHARS) return dataUrl
   }
-  throw new Error('That image is too large even after compression — try a smaller crop.')
+  throw new Error('That image is too large even after compression. Try a smaller crop.')
 }
 
 async function loadBitmap(file: File): Promise<ImageBitmap | HTMLImageElement> {

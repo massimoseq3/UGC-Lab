@@ -247,7 +247,7 @@ async function putAssetBinary(assetId: string, blob: Blob): Promise<string> {
     // it keeps the marker word the retry loop matches on. Only a run that has
     // exhausted its attempts ever shows this, by which point a misconfigured
     // bucket really is the likelier of the two.
-    throw new Error(`R2 PUT to ${host} failed (${reason}). Likely a CORS misconfiguration — verify the bucket CORS policy allows ${origin} with method PUT.`)
+    throw new Error(`R2 PUT to ${host} failed (${reason}). Likely a CORS misconfiguration. Verify the bucket CORS policy allows ${origin} with method PUT.`)
   }
   if (!putRes.ok) {
     const text = await putRes.text().catch(() => '')

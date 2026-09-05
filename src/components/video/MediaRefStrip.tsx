@@ -56,7 +56,7 @@ export default function MediaRefStrip({
     if (maxTotalSeconds && durationSeconds) {
       const total = values.reduce((s, v) => s + (v.durationSeconds ?? 0), 0) + durationSeconds
       if (total > maxTotalSeconds) {
-        onLimitError?.(`Combined ${kind} length can't exceed ${maxTotalSeconds}s — this clip would make it ${Math.ceil(total)}s.`)
+        onLimitError?.(`Combined ${kind} length can't exceed ${maxTotalSeconds}s. This clip would make it ${Math.ceil(total)}s.`)
         return
       }
     }

@@ -59,7 +59,7 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
         if (characterRefs.length + additions.length >= MAX_CHARACTERS) break
         if (characterRefs.some((r) => r.bankModelId === item.id)) continue
         if (quotaUsed + additions.length >= OMNI_SLOT_QUOTA) {
-          addToast('Omni input quota reached (7 slots) — remove an image or the clip first.', 'error')
+          addToast('Omni input quota reached (7 slots). Remove an image or the clip first.', 'error')
           break
         }
         // Convert the bank image to a renderable data URI for the chip.
@@ -85,7 +85,7 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
       return
     }
     if (quotaUsed >= OMNI_SLOT_QUOTA) {
-      addToast('Omni input quota reached (7 slots) — remove an image or the clip first.', 'error')
+      addToast('Omni input quota reached (7 slots). Remove an image or the clip first.', 'error')
       return
     }
     setUploadingCharacter(true)
@@ -113,7 +113,7 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
   async function handleClipFile(file: File | null) {
     if (!file) return
     if (quotaUsed + 2 > OMNI_SLOT_QUOTA) {
-      addToast('The source clip needs 2 free slots — remove images or characters first.', 'error')
+      addToast('The source clip needs 2 free slots. Remove images or characters first.', 'error')
       return
     }
     const dataUri = await fileToDataUri(file)
@@ -122,7 +122,7 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
       duration = await readMediaDuration(dataUri, 'video')
     } catch { /* let kie validate */ }
     if (duration && duration > 30) {
-      addToast(`Source clips can't exceed 30s — this one is ${Math.ceil(duration)}s.`, 'error')
+      addToast(`Source clips can't exceed 30s. This one is ${Math.ceil(duration)}s.`, 'error')
       return
     }
     const ends = Math.min(MAX_CLIP_WINDOW_S, duration ?? MAX_CLIP_WINDOW_S)

@@ -90,7 +90,7 @@ function CopyPromptCircle({ text }: { text: string }) {
       type="button"
       onClick={handleCopy}
       disabled={!text.trim()}
-      title="Copy the full prompt — every field on both tabs"
+      title="Copy the full prompt · every field on both tabs"
       aria-label="Copy the full prompt"
       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-ink/[0.03]"
     >

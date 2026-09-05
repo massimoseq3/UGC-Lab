@@ -418,7 +418,7 @@ export default function InfluencerEditModal({
     // Style goes LAST so it reads as the final directive, and stands alone as
     // the whole instruction when nothing was typed.
     const instruction = styleDirective
-      ? [typed && `${typed}\n`, `Re-render this character in the following visual style, keeping the same person — same face, hair, and build:\n\n${styleDirective}`]
+      ? [typed && `${typed}\n`, `Re-render this character in the following visual style, keeping the same person: same face, hair, and build:\n\n${styleDirective}`]
           .filter(Boolean).join('\n')
       : typed
     onLaunchGen({
@@ -721,7 +721,7 @@ export default function InfluencerEditModal({
                         onChange={(e) => setPrompt(e.target.value)}
                         onBlur={commitPromptDraft}
                         rows={4}
-                        placeholder="Describe the change — e.g. 'change the top to a red hoodie', 'add round glasses', 'softer warm lighting'…"
+                        placeholder="Describe the change, e.g. 'change the top to a red hoodie', 'add round glasses', 'softer warm lighting'…"
                         className="relative min-h-[120px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-[1.5] text-ink-200 placeholder-ink-600 outline-none"
                       />
                       <PromptToolbar
@@ -952,7 +952,7 @@ export default function InfluencerEditModal({
         value={prompt}
         onChange={setPrompt}
         title="Edit instruction"
-        placeholder="Describe the change — e.g. 'change the top to a red hoodie', 'add round glasses', 'softer warm lighting'…"
+        placeholder="Describe the change, e.g. 'change the top to a red hoodie', 'add round glasses', 'softer warm lighting'…"
         accent="ink"
       />
       <StyleModal
@@ -1080,7 +1080,7 @@ function OutputTile({
             <Download className="h-4 w-4" />
           </TileActionButton>
           <TileActionButton
-            title={saved ? 'Saved — click to remove from Bank' : saving ? 'Saving…' : 'Save to Bank'}
+            title={saved ? 'Saved · click to remove from Bank' : saving ? 'Saving…' : 'Save to Bank'}
             tone={saved ? 'saved' : 'default'}
             onClick={handleSaveClick}
           >

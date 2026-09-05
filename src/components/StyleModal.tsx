@@ -231,7 +231,7 @@ export default function StyleModal({
       title={view === 'create' ? 'New style from references' : 'Visual style'}
       subtitle={
         view === 'create'
-          ? 'The look is read from these frames — never their subjects'
+          ? 'The look is read from these frames, never their subjects'
           : `The look every ${subjectLabel} is rendered in`
       }
       // The standard 380px panel, matching the Characters preset picker: the

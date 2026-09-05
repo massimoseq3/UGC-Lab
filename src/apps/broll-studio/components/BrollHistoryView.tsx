@@ -266,7 +266,7 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
       ].map((s) => s?.trim()).filter(Boolean)
       map.set(it.id, parts.length > 0
         ? parts.join(' · ')
-        : (it.inputSummary?.split(' — ')[0]?.trim() || 'B-Roll session'))
+        : (it.inputSummary?.split(/ [—·] /)[0]?.trim() || 'B-Roll session'))
     }
     return map
   }, [items, products, models, scripts])

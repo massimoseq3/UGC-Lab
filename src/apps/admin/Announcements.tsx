@@ -435,7 +435,7 @@ function Editor({
           />
         </Field>
 
-        <Field label="Video link" hint="A YouTube link renders its thumbnail on the card — no image needed.">
+        <Field label="Video link" hint="A YouTube link renders its thumbnail on the card, no image needed.">
           <input
             className={FIELD}
             value={draft.videoUrl}

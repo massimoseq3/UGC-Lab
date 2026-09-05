@@ -72,7 +72,7 @@ export default function ActivityHeatmap({ days }: { days: UsageDay[] }) {
           id,
           count,
           future: ts > now,
-          label: `${cell.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} — ${count === 0 ? 'no generations' : `${count} generation${count === 1 ? '' : 's'}`}`,
+          label: `${cell.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${count === 0 ? 'no generations' : `${count} generation${count === 1 ? '' : 's'}`}`,
         }
       }),
     )

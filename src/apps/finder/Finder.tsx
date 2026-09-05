@@ -328,7 +328,7 @@ export default function Finder() {
     // it sends a member off re-cropping a photo when their key was the problem.
     const single = results.length === 1 ? results[0].reason : null
     addToast(
-      single ?? `${succeeded} of ${results.length} extracted, ${failed} failed — review drafts`,
+      single ?? `${succeeded} of ${results.length} extracted, ${failed} failed. Review drafts`,
       single ? 'error' : 'info',
     )
   }, [addToast, trackInFlight])

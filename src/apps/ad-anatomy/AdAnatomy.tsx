@@ -59,7 +59,7 @@ export default function AdAnatomy() {
         // 50MB clip is the part that actually hurts. ErrorPane offers Retry.
         void updateAdAnatomyHistory(item.id, {
           status: 'error',
-          errorMessage: 'Analysis was interrupted by a page refresh. Your ad is still here — retry to run it again.',
+          errorMessage: 'Analysis was interrupted by a page refresh. Your ad is still here. Retry to run it again.',
         })
       }
     }
@@ -230,7 +230,7 @@ function CompletePane({ item, onReset }: { item: AdAnatomyHistoryItem; onReset: 
   if (!result) {
     return (
       <ErrorPane
-        item={{ ...item, status: 'error', errorMessage: 'Result missing — please re-analyse.' }}
+        item={{ ...item, status: 'error', errorMessage: 'Result missing. Please re-analyse.' }}
         onRetry={onReset}
       />
     )
@@ -357,15 +357,15 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
             another minute on a screen that already asks for patience. */}
         <p className="text-xs text-ink-400">
           {item.compressing
-            ? 'This ad is too big to send as-is, so it’s being compressed first — about as long as the ad runs.'
-            : 'Please wait — this can take a couple of minutes.'}
+            ? 'This ad is too big to send as-is, so it’s being compressed first, which takes about as long as the ad runs.'
+            : 'Please wait. This can take a couple of minutes.'}
         </p>
         {/* Deliberately not "survives a refresh": it usually does, but a reload
             in the window before kie accepts the job can't be resumed, and a
             promise the app breaks once is worse than one it never made. */}
         {/* True of the compress pass too: its frame clock runs on a worker, so
             a hidden tab no longer throttles it (see utils/compressVideo.ts). */}
-        <p className="text-[11px] text-ink-600">No need to reload — it keeps running if you switch tools.</p>
+        <p className="text-[11px] text-ink-600">No need to reload. It keeps running if you switch tools.</p>
       </div>
 
       <style>{`
@@ -392,7 +392,7 @@ function ErrorPane({ item, onRetry }: { item: AdAnatomyHistoryItem; onRetry: () 
     retryAnalysis(item)
       .then((ok) => {
         if (!ok) {
-          addToast('That ad is no longer stored — upload it again to retry.', 'error')
+          addToast('That ad is no longer stored. Upload it again to retry.', 'error')
           setRetrying(false)
         }
         // On success the row flips to 'analyzing' and this pane unmounts.

@@ -177,7 +177,7 @@ export function TileStarButton({
   onToggle: () => void
   title?: string
 }) {
-  const label = starred ? 'Unstar' : title ?? 'Star — starred items show first when picking from banks'
+  const label = starred ? 'Unstar' : title ?? 'Star · starred items show first when picking from banks'
   return (
     <button
       type="button"

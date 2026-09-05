@@ -192,7 +192,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
         ok: true,
         message: result.credits === null
           ? 'Connected.'
-          : `Connected — ${result.credits.toLocaleString()} credits remaining.`,
+          : `Connected · ${result.credits.toLocaleString()} credits remaining.`,
       })
     } else {
       setScTestResult({ ok: false, message: result.error })
@@ -219,7 +219,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
     setTestResult(null)
     const result = await kieTestConnection(kieDraft.trim())
     if (result.ok) {
-      setTestResult({ ok: true, message: `Connected — ${result.credits} credits remaining.` })
+      setTestResult({ ok: true, message: `Connected · ${result.credits} credits remaining.` })
     } else {
       setTestResult({ ok: false, message: result.error })
     }
@@ -569,7 +569,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                 <Card>
                   <ToggleRow
                     label="Outliers"
-                    hint="Ad research — the Outlier Vault, plus TikTok and Meta Ad Library search. Off hides the Bank's Swipe File tab too. Nothing is deleted."
+                    hint="Ad research: the Outlier Vault, plus TikTok and Meta Ad Library search. Off hides the Bank's Swipe File tab too. Nothing is deleted."
                     checked={outliersOn}
                     onChange={(next) => setOptionalEnabled('discover', next)}
                   />
@@ -577,7 +577,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                 <Card>
                   <ToggleRow
                     label="Continuous B-Roll"
-                    hint="B-Roll's second mode — one keyframe chain instead of a shot per line. Off holds B-Roll in Line-by-Line and hides Continuous sessions in its History. Nothing is deleted."
+                    hint="B-Roll's second mode: one keyframe chain instead of a shot per line. Off holds B-Roll in Line-by-Line and hides Continuous sessions in its History. Nothing is deleted."
                     checked={continuousOn}
                     onChange={(next) => setOptionalEnabled('broll-continuous', next)}
                   />
@@ -693,7 +693,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                 <Card>
                   <span className="text-[12px] font-medium text-ink-300">Clean up unused files</span>
                   <p className="mt-1 text-[11px] leading-relaxed text-ink-500">
-                    Removes cloud files no item in your banks references. Runs automatically on sign-in — this is the on-demand sweep.
+                    Removes cloud files no item in your banks references. Runs automatically on sign-in. This is the on-demand sweep.
                   </p>
 
                   {storage.phase === 'idle' && (
@@ -716,7 +716,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                             This permanently deletes every file in your cloud storage that no item in your banks or history references. Anything you generated but never saved (or whose history entry you've since cleared) will be removed and cannot be recovered.
                           </p>
                           <p className="text-amber-200 light:text-amber-800/90">
-                            Before continuing, make sure anything you want to keep — Playground generations, B-Roll variations, characters, voiceovers, music — has been saved to its bank.
+                            Before continuing, make sure anything you want to keep, from Playground generations, B-Roll variations, characters, voiceovers and music, has been saved to its bank.
                           </p>
                         </div>
                       </div>
@@ -757,7 +757,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                         {storage.orphans.length === 0 ? (
                           <span className="flex items-center gap-1.5 text-emerald-400 light:text-emerald-600">
                             <Check className="h-3 w-3" />
-                            Clean — no orphans found.
+                            Clean. No orphans found.
                           </span>
                         ) : (
                           <>
@@ -834,7 +834,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                   {storage.phase === 'done' && (
                     <div className="mt-3 space-y-1.5">
                       <Banner tone="ok">
-                        Cleaned {storage.cleaned} — freed {formatBytes(storage.bytes)}.{storage.failed > 0 ? ` ${storage.failed} failed.` : ''}
+                        Cleaned {storage.cleaned} · freed {formatBytes(storage.bytes)}.{storage.failed > 0 ? ` ${storage.failed} failed.` : ''}
                       </Banner>
                       <button
                         type="button"
@@ -889,7 +889,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                   <Card>
                     <ToggleRow
                       label="Generation info"
-                      hint="Name the model on generated media — Playground's list rows and preview, and B-Roll's cards. On for everyone; this switch is yours alone and only affects this browser."
+                      hint="Name the model on generated media: Playground's list rows and preview, and B-Roll's cards. On for everyone; this switch is yours alone and only affects this browser."
                       checked={showGenerationInfo}
                       onChange={setShowGenerationInfo}
                     />

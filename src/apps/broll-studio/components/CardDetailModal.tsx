@@ -266,7 +266,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   // Omni all take reference images — so it named two models out of eight and
   // read as the complete list. The picker greys the ones that can't, and that
   // list is derived from the registry, so it can't go stale.
-  const refsUnsupportedHint = `${videoModelName} doesn't accept reference images. Open the model picker — the ones that can't take them are greyed out.`
+  const refsUnsupportedHint = `${videoModelName} doesn't accept reference images. Open the model picker. The ones that can't take them are greyed out.`
 
   // Is at least one reference image currently armed? When so, the video model
   // picker greys out models that can't take refs so the user can't pick one
@@ -666,7 +666,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                     )}
                     {hasActiveRef && refsUnsupportedForVideo && (
                       <p className="text-[11px] leading-relaxed text-gold-400/80 light:text-gold-600/80">
-                        {videoModelName} doesn't accept reference images, so this clip will render from the prompt alone — without your character or product. Pick a model that takes them in the picker above.
+                        {videoModelName} doesn't accept reference images, so this clip will render from the prompt alone, without your character or product. Pick a model that takes them in the picker above.
                       </p>
                     )}
                   </SectionCard>
@@ -692,7 +692,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                         value={cardState.animateMotion}
                         onChange={(e) => onUpdateState({ animateMotion: e.target.value })}
                         rows={5}
-                        placeholder="How this still moves — the action finishing. One or two sentences."
+                        placeholder="How this still moves, the action finishing. One or two sentences."
                         className="relative min-h-[140px] w-full grow resize-none border-0 bg-transparent px-3.5 pb-3 pt-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none"
                       />
                     </div>
@@ -723,7 +723,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                       enhanceDisabled={!draft.trim()}
                       busy={cardState.isPromptWorking}
                       onRegenerate={handleRegeneratePrompt}
-                      regenerateTitle={`Regenerate prompt — produces a fresh ${tagLabel(variation.tag)} prompt`}
+                      regenerateTitle={`Regenerate prompt · produces a fresh ${tagLabel(variation.tag)} prompt`}
                       onUndo={handleUndo}
                       canUndo={canUndo}
                       onRedo={handleRedo}
@@ -776,7 +776,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                       onChange={(e) => setVoiceDraft(e.target.value)}
                       onBlur={() => onUpdateVoiceProfile(voiceDraft)}
                       rows={3}
-                      placeholder="How the character sounds — age, accent, pitch, pace, texture, energy. Written once, applied to every talking clip."
+                      placeholder="How the character sounds: age, accent, pitch, pace, texture, energy. Written once, applied to every talking clip."
                       className="w-full resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-[12px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
                     />
                   </SectionCard>
@@ -829,7 +829,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                       requireMode={tab === 'animate' ? undefined : (hasActiveRef ? 'reference-to-video' : undefined)}
                       requireAnyModes={tab === 'animate' ? ['image-to-video', 'reference-to-video'] : undefined}
                       requireModeNote={tab === 'animate'
-                        ? "Greyed-out models can't animate a still — they take neither a start frame nor reference images."
+                        ? "Greyed-out models can't animate a still. They take neither a start frame nor reference images."
                         : "Greyed-out models don't accept reference images. To use one anyway, generate stills in the Image tab and animate them there instead."}
                       costParams={{
                         durationSeconds: effectiveVideoDuration,
@@ -1123,7 +1123,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
         onClose={() => { setPromptExpanded(false); handleCommitDraft(draft) }}
         value={draft}
         onChange={setDraft}
-        title={`Scene ${sceneNumber} — Prompt`}
+        title={`Scene ${sceneNumber} · Prompt`}
         placeholder="Write your custom B-roll prompt here..."
         accent="broll"
       />

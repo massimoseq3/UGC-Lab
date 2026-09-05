@@ -65,7 +65,7 @@ export default function MotionControlSection({
       // Unreadable metadata — let kie validate length server-side.
     }
     if (durationSeconds && durationSeconds > MAX_DRIVING_SECONDS) {
-      onError(`The driving video can't exceed ${MAX_DRIVING_SECONDS}s — this one is ${Math.ceil(durationSeconds)}s.`)
+      onError(`The driving video can't exceed ${MAX_DRIVING_SECONDS}s. This one is ${Math.ceil(durationSeconds)}s.`)
       return
     }
     onChangeRefs([

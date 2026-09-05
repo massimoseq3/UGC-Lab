@@ -271,7 +271,7 @@ export default function MembersTable() {
     <div className="space-y-3">
       {profilesError && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-[12px] text-red-300 light:text-red-700">
-          Refresh failed — showing the last loaded list. {profilesError}
+          Refresh failed. Showing the last loaded list. {profilesError}
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -592,7 +592,7 @@ function DeleteMembersModal({
               Delete {members.length} {members.length === 1 ? 'member' : 'members'}?
             </h3>
             <p className="mt-0.5 text-[11px] text-ink-500">
-              Their account and everything in it — banks, history, {formatBytes(totalBytes)} of storage. Not reversible.
+              Their account and everything in it: banks, history, {formatBytes(totalBytes)} of storage. Not reversible.
             </p>
           </div>
           <button
@@ -626,13 +626,13 @@ function DeleteMembersModal({
           />
           <span>
             Also remove from the allowlist{' '}
-            <span className="text-ink-600">— otherwise they can sign up again</span>
+            <span className="text-ink-600">otherwise they can sign up again</span>
           </span>
         </label>
 
         {failures.length > 0 && (
           <div className="mt-3 max-h-32 space-y-1 overflow-y-auto rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-[11px] text-red-300 light:text-red-700">
-            {failures.map((f) => <div key={f.email}><span className="font-medium">{f.email}</span> — {f.message}</div>)}
+            {failures.map((f) => <div key={f.email}><span className="font-medium">{f.email}</span>: {f.message}</div>)}
           </div>
         )}
         {warnings.length > 0 && (
@@ -790,7 +790,7 @@ function StatusActions({
           <button
             onClick={() => onSetStatus(row, 'disabled')}
             disabled={locked}
-            title="Lock the account — only you can reopen it"
+            title="Lock the account · only you can reopen it"
             className={btnClass}
           >
             Disable

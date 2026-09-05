@@ -48,7 +48,7 @@ export default function ClearAllButton({ onClear, className = '', label = 'Creat
       type="button"
       onClick={handleClick}
       onMouseLeave={armed ? disarm : undefined}
-      title={armed ? 'Click again to clear inputs — your outputs stay in history' : iconOnly ? label : undefined}
+      title={armed ? 'Click again to clear inputs. Your outputs stay in history' : iconOnly ? label : undefined}
       aria-label={iconOnly ? (armed ? 'Click again to clear inputs' : label) : undefined}
       className={`flex items-center transition-colors ${
         iconOnly
