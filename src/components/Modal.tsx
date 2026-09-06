@@ -153,17 +153,27 @@ export default function Modal({
               <X className="h-4 w-4" />
             </button>
           </div>
+          {/* `scrollbar-gutter: stable` on the body, not just `overflow-y-auto`.
+              The app keeps its native scrollbars invisible but reserves their
+              11px track so layout stays stable (index.css) — and that only
+              holds while the element actually overflows. A body that FILTERS
+              ITSELF crosses that line both ways: narrowing Choose a Voice to
+              Female stops the list scrolling, the track goes away, and the 11px
+              lands back in the content box, which moved every centred section
+              pill and the toggle 6px sideways (Massimo's report, September
+              2026). Reserving it in both states costs nothing on a phone, where
+              the track is 0px wide to begin with. */}
           {rail ? (
             <div className="flex min-h-0 flex-1">
               <div className="hidden w-[204px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-ink/5 px-3 py-4 lg:flex">
                 {rail}
               </div>
-              <div ref={bodyRef} onScroll={onBodyScroll} className="min-h-0 flex-1 overflow-y-auto">
+              <div ref={bodyRef} onScroll={onBodyScroll} className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
                 {children}
               </div>
             </div>
           ) : (
-            <div ref={bodyRef} onScroll={onBodyScroll} className="min-h-0 flex-1 overflow-y-auto">
+            <div ref={bodyRef} onScroll={onBodyScroll} className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
               {children}
             </div>
           )}

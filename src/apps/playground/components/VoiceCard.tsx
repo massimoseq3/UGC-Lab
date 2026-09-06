@@ -241,12 +241,15 @@ function VoicePresetPicker({
       <div className="p-4">
         {/* Centred, like the section pills under it — the toggle is three short
             words on a 900px body, and left-aligned it read as the start of a
-            toolbar that has nothing else in it. */}
+            toolbar that has nothing else in it. `dense` because it is a filter
+            over a list, not a mode switch: at full size a 48px slab of three
+            short words stood taller than the section pills it narrows. */}
         <div className="flex justify-center">
           <SegmentedToggle
             value={gender}
             onChange={setGender}
             accent="playground"
+            dense
             fitContent
             options={GENDERS.map((g) => ({
               value: g,
