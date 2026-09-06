@@ -2,7 +2,7 @@ import { PanelRightClose, PanelRightOpen } from 'lucide-react'
 
 // The one control that opens and shuts a history rail.
 //
-// It is a 36px circle in the app's own icon-button material, and WHERE it sits
+// It is a 38px circle in the app's own icon-button material, and WHERE it sits
 // is the caller's business:
 // open, it leads the rail's own 57px band, immediately left of that rail's New
 // button; shut, the caller keeps a narrow column in the rail's place holding
@@ -51,13 +51,18 @@ export default function HistoryRailToggle({
       title={title}
       aria-label={title}
       aria-expanded={open}
-      // The app's own icon-button material — the `+` circle every output panel
-      // heads its bar with (`ClearAllButton iconOnly`): a 36px ring in a faint
-      // wash. It was a bare glyph on the panel's background, which put the one
-      // control in that band with no surface of its own beside a solid CTA.
-      // Carrying a label it is the same ring stretched to a pill.
-      className={`flex h-9 shrink-0 items-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100 ${
-        showLabel ? 'justify-center gap-2 px-2.5' : 'w-9 justify-center'
+      // The app's own icon-button material — the ring and faint wash the `+`
+      // every output panel heads its bar with (`ClearAllButton iconOnly`). It
+      // was a bare glyph on the panel's background, which put the one control
+      // in that band with no surface of its own beside a solid CTA. Carrying a
+      // label it is the same ring stretched to a pill.
+      //
+      // `38px`, not that button's own 36: the height is stated on
+      // `RailNewButton` so the rail's band reads level with B-Roll's storyboard
+      // bar across the seam, and this sits in that same row. The material is
+      // what was borrowed, not the size.
+      className={`flex h-[38px] shrink-0 items-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100 ${
+        showLabel ? 'justify-center gap-2 px-2.5' : 'w-[38px] justify-center'
       }`}
     >
       <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
