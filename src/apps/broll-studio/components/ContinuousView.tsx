@@ -1200,7 +1200,13 @@ export default function ContinuousView({
           the scroll port, not a `sticky` child inside it: see the note on the
           Line-by-Line strip for why (a glass sticky bar lagged its own
           scroller on the way back up and read as coming loose). It never
-          scrolled away, so nothing is lost but the blur-under. */}
+          scrolled away, so nothing is lost but the blur-under.
+
+          It wears the same glass as its Line-by-Line twin (September 2026) — a
+          faint `bg-ink/[0.04]` under `.glass-fill .glass-fill-soft` — so the
+          two tabs of one panel don't dress the same band two ways. The blur
+          samples nothing here either; see the note on that strip for why it
+          stays anyway and where it must not go. */}
       {/* The strip is the BATCH BUTTONS and nothing else, centred. The meta
           pills used to share the line and lost the squeeze to buttons that
           can't shrink, painting over the first of them on a narrow window; they
@@ -1215,7 +1221,7 @@ export default function ContinuousView({
           This strip was left as it was because its actions are a different set;
           bringing it across is the obvious follow-up, and until then the two
           tabs of one panel do dress the same job two ways. */}
-      <div className="relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 px-5 py-3.5">
+      <div className="glass-fill glass-fill-soft relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 bg-ink/[0.04] px-5 py-3.5 backdrop-blur-xl backdrop-saturate-150">
         {/* One CENTRED line that scrolls when the pills outrun the panel. The
             `w-max min-w-full` shape is what allows both: at `min-w-full` the row
             is exactly the port when it fits (so centring does the work) and
@@ -1273,7 +1279,12 @@ export default function ContinuousView({
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
             >
               <Download className="h-3.5 w-3.5" />
-              {`Download Clips (${allClipEntries.length})`}
+              {/* Count in its own pill, matching the Line-by-Line strip's
+                  button — see the note there. */}
+              <span>Download Clips</span>
+              <span className="rounded-full bg-ink/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-ink-200">
+                {allClipEntries.length}
+              </span>
             </button>
           )}
         </div>
