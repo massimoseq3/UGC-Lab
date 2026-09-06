@@ -510,7 +510,7 @@ function HistoryListRow({
     // doesn't say.
     if (entry.data.durationSeconds) meta.push(`${Math.round(entry.data.durationSeconds)}s`)
     else if (musicPlayer.duration > 0) meta.push(`${Math.round(musicPlayer.duration)}s`)
-    if (!entry.data.instrumental) meta.push('With lyrics')
+    if (!entry.data.instrumental) meta.push('Lyrics')
   }
 
   return (

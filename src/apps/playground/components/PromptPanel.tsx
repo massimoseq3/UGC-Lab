@@ -921,41 +921,6 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 </SectionCard>
               )}
 
-              {/* Music's two controls sit ABOVE the prompt box, not down in the
-                  footer with the other modes' output settings — model, then
-                  delivery, then the box you write in, reading top to bottom.
-                  Image and Video keep theirs in the footer because they're
-                  genuinely output settings (resolution, aspect, duration) picked
-                  on the way to Generate; Music has no output settings at all, so
-                  its footer was a lone hand-rolled toggle standing in for a row of
-                  chips, sized `h-10` to match chips that aren't there in this
-                  mode. The toggle is a real `SegmentedToggle` at `h-12` now — the
-                  same control at the same height as B-Roll's Dialogue Clips /
-                  B-Roll Clips pair, which is the same question asked of a
-                  generation. */}
-              {state.mode === 'music' && (
-                <div className="flex shrink-0 flex-col gap-2">
-                  <ModelPicker
-                    row
-                    appId="playground"
-                    task="music"
-                    mode={pickerMode}
-                    value={state.modelId}
-                    onChange={(modelId) => onChange({ ...state, modelId })}
-                  />
-                  <SegmentedToggle<'instrumental' | 'lyrics'>
-                    className="h-12 !p-1"
-                    accent="playground"
-                    value={state.instrumental ? 'instrumental' : 'lyrics'}
-                    onChange={(v) => onChange({ ...state, instrumental: v === 'instrumental' })}
-                    options={[
-                      { value: 'instrumental', label: 'Instrumental' },
-                      { value: 'lyrics', label: 'With lyrics' },
-                    ]}
-                  />
-                </div>
-              )}
-
               {/* Prompt — takes the column's leftover height, and never more.
                   `grow` fills the gap that would otherwise sit between the box and
                   the pinned footer; every wrapper below is `min-h-0` so the box can
@@ -1189,9 +1154,15 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             up, where the column has the height to spare. */}
         <div className="shrink-0 px-5 pb-3 pt-2">
           {/* Model — video uses the full picker modal (matching B-Roll); image
-              keeps the inline dropdown (which auto-opens upward here). Music's
-              picker is not here at all: it moved above the prompt box, where its
-              delivery toggle is (see the note up there). */}
+              and music keep the inline dropdown (which auto-opens upward here).
+              Music's pair sat ABOVE the prompt box for a stint (August 2026) on
+              the reasoning that neither is an output setting; they came back
+              down here in September 2026 (Massimo's call) because what a member
+              reads top to bottom in this panel is the mode tabs, then the thing
+              they type, and standing two full-width controls between the two put
+              the panel's whole subject 110px down the column. Every mode now
+              settles what it is making in the same band, directly over the
+              button that makes it. */}
           {/* The model row is a TWO-UP: the picker, and the how-many stepper
               beside it at the same 58px picker-row height. The count used to
               ride in the settings row below, where a video model that declares
@@ -1202,7 +1173,6 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               resolution, aspect, duration and audio all describe the clip, and
               this describes the run. It belongs beside the model, which is the
               other thing the run is. */}
-          {state.mode !== 'music' && (
           <div className="mb-2 flex items-center gap-2">
             <div className="min-w-0 flex-1">
             {state.mode === 'video' ? (
@@ -1265,26 +1235,44 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 58px a number and its word side by side float mid-pill, and the
                 word is what makes a bare stepper on a model row read as a
                 count rather than as a nudge on the model itself. */}
-            <BatchCountStepper
-              stacked
-              size="xl"
-              accent="playground"
-              noun={state.mode === 'video' ? 'clip' : 'image'}
-              label={state.mode === 'video' ? 'clips' : 'images'}
-              value={batchCount}
-              onChange={(n) => onChange({ ...state, batchCount: n })}
-              creditsFor={creditsForRun}
-            />
+            {/* Not on Music: Suno returns a pair of tracks per call, so a
+                count here would multiply an already-doubled run. */}
+            {state.mode !== 'music' && (
+              <BatchCountStepper
+                stacked
+                size="xl"
+                accent="playground"
+                noun={state.mode === 'video' ? 'clip' : 'image'}
+                label={state.mode === 'video' ? 'clips' : 'images'}
+                value={batchCount}
+                onChange={(n) => onChange({ ...state, batchCount: n })}
+                creditsFor={creditsForRun}
+              />
+            )}
           </div>
+          {/* Music's delivery toggle — the one thing that is settled about the
+              track before it is written, so it takes the slot the other modes'
+              output settings take: under the model, over Generate. `h-12` is
+              the `size='lg'` chip height those settings run at, so the band is
+              the same three rows in every mode. */}
+          {state.mode === 'music' && (
+            <SegmentedToggle<'instrumental' | 'lyrics'>
+              className="mb-2 h-12 !p-1"
+              accent="playground"
+              value={state.instrumental ? 'instrumental' : 'lyrics'}
+              onChange={(v) => onChange({ ...state, instrumental: v === 'instrumental' })}
+              options={[
+                { value: 'instrumental', label: 'Instrumental' },
+                { value: 'lyrics', label: 'Lyrics' },
+              ]}
+            />
           )}
           {/* Output settings — resolution / aspect / duration / audio, all of
-              them properties of the thing being made. Music has none (its
-              delivery toggle lives above the prompt box) and so does a model
-              that declares no constraints, and the row is skipped in both
-              cases rather than rendered empty with its own margin under it —
-              which it now can be, since the batch stepper moved up to the model
-              row and no longer holds the line open on its own. Sits just above
-              Generate; dropdowns open upward. */}
+              them properties of the thing being made. A model that declares no
+              constraints has none, and the row is skipped rather than rendered
+              empty with its own margin under it — which it now can be, since the
+              batch stepper moved up to the model row and no longer holds the line
+              open on its own. Sits just above Generate; dropdowns open upward. */}
           {hasOutputSettings && (
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
           {state.mode === 'video' && model?.videoConstraints && (
