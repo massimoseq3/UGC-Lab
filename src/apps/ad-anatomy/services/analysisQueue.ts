@@ -59,15 +59,21 @@ async function fitForUpload(historyId: string, file: File): Promise<File> {
   // what reads as a hung page.
   await updateAdAnatomyHistory(historyId, { compressing: true })
   console.log(`[ad-anatomy] ${file.name} is ${mb(file.size)} — compressing to fit ${mb(VIDEO_UPLOAD_BUDGET_BYTES)}`)
-  const result = await compressVideoForAnalysis(file, VIDEO_UPLOAD_BUDGET_BYTES)
+  // Each pass is another realtime encode, so a second one doubles a wait the
+  // analysing screen has already told the member to expect. It says which pass
+  // it is on rather than letting the promised runtime quietly come and go.
+  const result = await compressVideoForAnalysis(file, VIDEO_UPLOAD_BUDGET_BYTES, (pass) => {
+    if (pass > 1 && rowExists(historyId)) void updateAdAnatomyHistory(historyId, { compressPass: pass })
+  })
     .finally(() => {
-      if (rowExists(historyId)) void updateAdAnatomyHistory(historyId, { compressing: undefined })
+      if (rowExists(historyId)) void updateAdAnatomyHistory(historyId, { compressing: undefined, compressPass: undefined })
     })
-  console.log(`[ad-anatomy] compressed ${mb(result.originalBytes)} → ${mb(result.compressedBytes)}`)
+  console.log(`[ad-anatomy] compressed ${mb(result.originalBytes)} → ${mb(result.compressedBytes)} in ${result.passes} pass(es)`)
 
-  // An encoder that missed the budget has produced a body that will be rejected
-  // anyway. Say so here, where we still know the numbers, rather than letting
-  // kie say it in its own words after another upload.
+  // The compressor re-aims and retries an overshoot itself, so reaching here
+  // means it ran out of passes or hit its bitrate floor — the file simply will
+  // not fit at this length. Say so where we still know the numbers, rather than
+  // letting kie say it in its own words after another upload.
   if (result.compressedBytes > VIDEO_UPLOAD_BUDGET_BYTES) {
     throw new FriendlyError(
       `This ad is still ${mb(result.compressedBytes)} after compressing, over the ${mb(VIDEO_UPLOAD_BUDGET_BYTES)} the analyser can send. Trim it shorter or export it at a lower resolution and try again.`,
@@ -117,6 +123,7 @@ async function applyFailure(historyId: string, err: unknown) {
     errorMessage,
     taskId: undefined,
     compressing: undefined,
+    compressPass: undefined,
     perception: undefined,
   })
 }
@@ -192,6 +199,7 @@ export async function retryAnalysis(item: AdAnatomyHistoryItem): Promise<boolean
     errorMessage: undefined,
     taskId: undefined,
     compressing: undefined,
+    compressPass: undefined,
   })
   enqueueAnalysis(item.id, file)
   return true

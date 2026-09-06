@@ -1,14 +1,11 @@
-// Re-encodes an oversized ad in the browser so it still fits inside one chat
-// request.
+// Re-encodes an oversized ad in the browser so it still fits inside the
+// analyser's upload budget.
 //
-// WHY THIS EXISTS. The analysis sends the whole clip INLINE as a base64 data
-// URI (see the note in `services/analyzeAd.ts` — the hosted-URL route was tried
-// and reverted). Base64 is 4/3 of the bytes it encodes, so the request body is
-// ~1.34x the file on disk, and the model's inline-request ceiling is what a real
-// ad walks past: a 20MB MP4 is a ~27MB body and comes back 400 before a single
-// frame is read. That is the "video is too large" rejection members were
-// hitting, and it fired on files the app had already accepted — the upload cap
-// was 50MB while the transport could only carry ~14MB.
+// WHY THIS EXISTS. The clip is uploaded to kie's file host and the POST that
+// carries it is base64, which is 4/3 of the bytes it encodes — so a real ad
+// walks past the budget the analyser can send and comes back rejected before a
+// single frame is read. That is the "video is too large" rejection members were
+// hitting, and it fired on files the app had already accepted.
 //
 // REALTIME, ON PURPOSE. MediaRecorder encodes at playback speed, so a 40s ad
 // costs ~40s. That is real, but small next to the analysis it makes possible,
@@ -16,6 +13,15 @@
 // dependency and a second decoder to debug for a path that only runs on the
 // files that would otherwise fail outright. Anything already under budget is
 // sent untouched.
+//
+// IT AIMS, MEASURES, AND AIMS AGAIN. `videoBitsPerSecond` is a REQUEST, not a
+// contract: the encoder is free to miss it, and on a high-motion ad it misses
+// high — a single pass came back 13.3MB against a 12MB budget, which the
+// caller could then only report as a failure to a member who had already
+// waited out the whole re-encode. So an overshoot is re-aimed from the size the
+// encoder ACTUALLY produced rather than from the number it ignored, and run
+// again. Each extra pass costs another realtime run, which is why the caller
+// tells the member a second one is happening.
 //
 // AUDIO IS NOT OPTIONAL HERE. The analysis returns a transcript, so a silent
 // re-encode would not fail — it would come back confidently reporting an ad
@@ -39,6 +45,20 @@ const TARGET_FPS = 24
 // Leave room inside the budget for VBR overshoot: the bitrate we ask for is an
 // average and the encoder is free to miss it.
 const BUDGET_HEADROOM = 0.8
+// How many realtime passes we are willing to spend landing under the budget.
+// Two is almost always enough — the first pass measures the encoder's real
+// overshoot on THIS clip and the second corrects for it — and three is the
+// ceiling because every pass is another wait as long as the ad.
+const MAX_PASSES = 3
+// A re-aim targets a little under the budget rather than exactly at it: the
+// correction is computed from one sample of a variable-bitrate encoder, so
+// landing at 99% of the limit would be a coin flip on a wait we've already
+// paid for twice.
+const RETRY_HEADROOM = 0.9
+// A pass that shaved less than this off the last one has stopped responding to
+// the bitrate we ask for (the floor, the container, or an encoder ignoring us),
+// so another identical wait would buy nothing.
+const MIN_PASS_IMPROVEMENT = 0.05
 // Past this, a realtime pass is a wait nobody would sit through and the bitrate
 // needed to hit the budget is below anything readable. Trimming is the answer.
 const MAX_DURATION_SEC = 180
@@ -52,6 +72,8 @@ export interface CompressedVideo {
   file: File
   originalBytes: number
   compressedBytes: number
+  /** Realtime passes it took to land under the budget. 1 unless the encoder overshot. */
+  passes: number
 }
 
 // Ordered best-first. MP4 leads because it is the container the rest of the app
@@ -154,22 +176,36 @@ function loadMetadata(video: HTMLVideoElement): Promise<void> {
   })
 }
 
-/**
- * Shrink `file` to fit `targetBytes`, preserving its full duration and audio.
- * Throws with a member-readable sentence when it can't — the caller surfaces it
- * as the analysis error, so every message here has to name what to do next.
- */
-export async function compressVideoForAnalysis(
-  file: File,
-  targetBytes: number,
-): Promise<CompressedVideo> {
-  const mimeType = pickContainer()
-  if (!mimeType || !canCompressVideo()) {
-    throw new FriendlyError(
-      'This browser cannot compress video, so this ad is too large to analyse here. Try Chrome, or export a smaller version of the clip.',
-    )
+// Duration alone, read before any encoding starts: it is what the first
+// bitrate is derived from, and what the too-long guard answers on. A metadata
+// read is cheap next to the realtime pass it gates.
+async function readDuration(file: File): Promise<number> {
+  const objectUrl = URL.createObjectURL(file)
+  const video = document.createElement('video')
+  video.preload = 'metadata'
+  video.src = objectUrl
+  try {
+    await loadMetadata(video)
+    return video.duration
+  } finally {
+    video.src = ''
+    URL.revokeObjectURL(objectUrl)
   }
+}
 
+interface PassResult {
+  blob: Blob
+  mimeType: string
+  /** True when the graph recorded silence out of a file whose decoder reported audio. */
+  silentDespiteAudio: boolean
+}
+
+/**
+ * One realtime re-encode at the requested bitrate. Throws (with member-readable
+ * copy) on anything that makes the run unusable; an oversized result is NOT a
+ * failure here — that is the caller's to re-aim.
+ */
+async function encodePass(file: File, mimeType: string, videoBitrate: number, pass: number): Promise<PassResult> {
   const objectUrl = URL.createObjectURL(file)
   const video = document.createElement('video')
   video.src = objectUrl
@@ -212,24 +248,7 @@ export async function compressVideoForAnalysis(
     throw err
   }
 
-  const duration = video.duration
-  if (!Number.isFinite(duration) || duration <= 0) {
-    return fail('Could not read how long this ad is, so it cannot be compressed. Re-export it and try again.')
-  }
-  if (duration > MAX_DURATION_SEC) {
-    return fail(
-      `This ad is ${Math.round(duration)} seconds long and too large to send as-is. Trim it to under ${MAX_DURATION_SEC / 60} minutes and analyse it again.`,
-    )
-  }
-
-  // Derive the bitrate from the budget rather than picking one and hoping: the
-  // budget is fixed by the transport, so duration is the only variable.
-  const bitsAvailable = targetBytes * BUDGET_HEADROOM * 8
-  const videoBitrate = Math.round(
-    Math.min(MAX_VIDEO_BITRATE, Math.max(MIN_VIDEO_BITRATE, bitsAvailable / duration - AUDIO_BITRATE)),
-  )
   const longEdge = videoBitrate < LOW_BITRATE_THRESHOLD ? LOW_BITRATE_LONG_EDGE : MAX_LONG_EDGE
-
   const srcW = video.videoWidth || longEdge
   const srcH = video.videoHeight || longEdge
   const scale = Math.min(1, longEdge / Math.max(srcW, srcH))
@@ -312,7 +331,7 @@ export async function compressVideoForAnalysis(
     })
     const watchdog = window.setTimeout(
       () => stop(new FriendlyError('Compressing this ad timed out. Re-export it as a smaller file and try again.')),
-      duration * 1000 + STALL_GRACE_MS,
+      (video.duration || MAX_DURATION_SEC) * 1000 + STALL_GRACE_MS,
     )
     let settled = false
     const stop = (err?: Error) => {
@@ -339,7 +358,7 @@ export async function compressVideoForAnalysis(
     video.onended = () => stop()
     video.onerror = () => stop(new FriendlyError('Playback of the ad failed while compressing it. Re-export it and try again.'))
 
-    console.log(`[ad-anatomy] re-encoding ${width}x${height} @ ${Math.round(videoBitrate / 1000)}kbps as ${mimeType}`)
+    console.log(`[ad-anatomy] pass ${pass}: re-encoding ${width}x${height} @ ${Math.round(videoBitrate / 1000)}kbps as ${mimeType}`)
     recorder.start(1000)
     video.play().catch(() => stop(new FriendlyError('Could not play the ad to compress it. Re-export it and try again.')))
   })
@@ -351,28 +370,100 @@ export async function compressVideoForAnalysis(
     release()
     throw err
   }
+  // Read the decoder's counter BEFORE teardown — a released element reports
+  // nothing, and this is the evidence that separates a capture failure from an
+  // ad that is genuinely silent.
+  const hadAudio = decodedAudioBytes(video) > 0
   release()
 
   if (blob.size === 0) {
     throw new FriendlyError('Compressing this ad produced an empty file. Re-export it as a smaller file and try again.')
   }
 
-  // Silent recording of an ad that DOES have sound — the graph came up but
-  // carried nothing (a refused audible autoplay, a suspended context, a
-  // decoder that never fed the source node). Shipping it would cost the member
-  // the transcript and every spoken line in the scene prompts, and they would
-  // read as an ad nobody talks in rather than as a failure. `decodedAudioBytes`
-  // is what separates that from an ad that is genuinely silent: it counts what
-  // the DECODER handled, upstream of anything the capture path can drop.
-  if (peak === 0 && decodedAudioBytes(video) > 0) {
+  return { blob, mimeType, silentDespiteAudio: peak === 0 && hadAudio }
+}
+
+/**
+ * Shrink `file` to fit `targetBytes`, preserving its full duration and audio.
+ * Runs up to `MAX_PASSES` realtime encodes, re-aiming after any that overshoots
+ * — `onPass` is called with the 1-based number of each one so the caller can
+ * say what the extra wait is for.
+ *
+ * Throws with a member-readable sentence when it can't — the caller surfaces it
+ * as the analysis error, so every message here has to name what to do next.
+ */
+export async function compressVideoForAnalysis(
+  file: File,
+  targetBytes: number,
+  onPass?: (pass: number) => void,
+): Promise<CompressedVideo> {
+  const mimeType = pickContainer()
+  if (!mimeType || !canCompressVideo()) {
     throw new FriendlyError(
-      'The ad’s audio could not be captured while compressing it, so the transcript would come back empty. Click anywhere on the page and retry the analysis.',
+      'This browser cannot compress video, so this ad is too large to analyse here. Try Chrome, or export a smaller version of the clip.',
     )
   }
 
+  const duration = await readDuration(file)
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new FriendlyError('Could not read how long this ad is, so it cannot be compressed. Re-export it and try again.')
+  }
+  if (duration > MAX_DURATION_SEC) {
+    throw new FriendlyError(
+      `This ad is ${Math.round(duration)} seconds long and too large to send as-is. Trim it to under ${MAX_DURATION_SEC / 60} minutes and analyse it again.`,
+    )
+  }
+
+  // Derive the bitrate from the budget rather than picking one and hoping: the
+  // budget is fixed by the transport, so duration is the only variable. `aim`
+  // is the size we ASK for; what comes back is what we re-aim from.
+  let aim = targetBytes * BUDGET_HEADROOM
+  let best: PassResult | null = null
+  let passes = 0
+
+  for (let pass = 1; pass <= MAX_PASSES; pass++) {
+    const videoBitrate = Math.round(
+      Math.min(MAX_VIDEO_BITRATE, Math.max(MIN_VIDEO_BITRATE, (aim * 8) / duration - AUDIO_BITRATE)),
+    )
+    onPass?.(pass)
+    const result = await encodePass(file, mimeType, videoBitrate, pass)
+    passes = pass
+    // A silent capture is final however small the file is — see encodePass.
+    if (result.silentDespiteAudio) {
+      throw new FriendlyError(
+        'The ad’s audio could not be captured while compressing it, so the transcript would come back empty. Click anywhere on the page and retry the analysis.',
+      )
+    }
+
+    const previousBest = best?.blob.size ?? Infinity
+    if (result.blob.size < previousBest) best = result
+    if (result.blob.size <= targetBytes) break
+
+    console.log(
+      `[ad-anatomy] pass ${pass} came back ${(result.blob.size / (1024 * 1024)).toFixed(1)}MB against a ${(aim / (1024 * 1024)).toFixed(1)}MB aim`,
+    )
+    // Nothing left to give: the bitrate is already on the floor, or the encoder
+    // stopped responding to it. Another pass is the same wait for the same file.
+    if (videoBitrate <= MIN_VIDEO_BITRATE) break
+    if (result.blob.size > previousBest * (1 - MIN_PASS_IMPROVEMENT)) break
+
+    // Re-aim from what the encoder ACTUALLY produced, against the size the
+    // bitrate we actually asked for should have produced — NOT against `aim`,
+    // which the MAX_VIDEO_BITRATE clamp can put well above it. Correcting the
+    // uncapped number would hand the next pass the same capped bitrate and
+    // spend a whole realtime run re-recording the identical file.
+    const askedFor = ((videoBitrate + AUDIO_BITRATE) * duration) / 8
+    aim = askedFor * ((targetBytes * RETRY_HEADROOM) / result.blob.size)
+  }
+
+  if (!best) {
+    throw new FriendlyError('Compressing this ad produced nothing. Re-export it as a smaller file and try again.')
+  }
+
   return {
-    file: new File([blob], renameForContainer(file.name, mimeType), { type: mimeType }),
+    file: new File([best.blob], renameForContainer(file.name, best.mimeType), { type: best.mimeType }),
     originalBytes: file.size,
-    compressedBytes: blob.size,
+    compressedBytes: best.blob.size,
+    passes,
   }
 }

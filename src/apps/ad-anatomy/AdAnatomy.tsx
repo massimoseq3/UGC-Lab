@@ -289,7 +289,7 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
     <div className="flex h-full flex-col items-center justify-center gap-6 px-6 py-8">
       <div className="flex flex-col items-center gap-1 text-center">
         <h2 className="text-xl font-semibold tracking-tight text-ink-100">
-          {item.compressing ? 'Shrinking the ad to fit' : 'Analyzing the ad'}
+          {item.compressing ? 'Compressing the ad’s file size' : 'Analyzing the ad'}
         </h2>
       </div>
 
@@ -354,10 +354,15 @@ function AnalyzingPane({ item }: { item: AdAnatomyHistoryItem }) {
         {/* The compress pass runs in realtime, so it takes about as long as the
             ad itself — a wait BEFORE the analysis starts. Naming it is the
             whole point: unexplained, it is just the sweep sitting there for
-            another minute on a screen that already asks for patience. */}
+            another minute on a screen that already asks for patience. The
+            encoder can overshoot the bitrate it was given, in which case the
+            compressor re-aims and runs again — the runtime this line just
+            quoted comes and goes, so the second pass has to say so itself. */}
         <p className="text-xs text-ink-400">
           {item.compressing
-            ? 'This ad is too big to send as-is, so it’s being compressed first, which takes about as long as the ad runs.'
+            ? item.compressPass && item.compressPass > 1
+              ? 'It came back over the limit, so it’s being re-encoded smaller. This pass takes about as long as the ad runs too.'
+              : 'This ad is too big to send as-is, so it’s being compressed first, which takes about as long as the ad runs.'
             : 'Please wait. This can take a couple of minutes.'}
         </p>
         {/* Deliberately not "survives a refresh": it usually does, but a reload
