@@ -7,9 +7,10 @@
 
 import { estimateCredits, CHAT_MODEL_STRONG } from '../../../utils/models'
 
-// The analysis runs on Gemini 3.6 Flash (see analyzeAd.ts CHAT_MODEL_ID) — it
-// must track that constant, or the button quotes one model's rate for another
-// model's call.
+// The analysis runs on whatever CHAT_MODEL_STRONG points at (see analyzeAd.ts
+// CHAT_MODEL_ID) — it must track that constant and NOT name a model, or the
+// button quotes one model's rate for another model's call the next time the
+// tier moves.
 const CHAT_MODEL_ID = CHAT_MODEL_STRONG
 
 // Per second of video: Gemini samples the inline clip at ~1 fps (each frame
