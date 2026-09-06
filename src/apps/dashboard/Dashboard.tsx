@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { Clock, PiggyBank, Flame, CalendarCheck, GraduationCap, ArrowUpRight } from 'lucide-react'
+import { Clock, PiggyBank, CalendarCheck, GraduationCap, ArrowUpRight } from 'lucide-react'
 import { useAuthStore } from '../../stores/authStore'
 import { useSettingsStore } from '../../stores/settingsStore'
 import { useBankStore, backfillUsageLedger } from '../../stores/bankStore'
@@ -9,9 +9,8 @@ import { computeUsageMetrics, dailyMinutesSaved, usageDayStart } from '../../uti
 import { AI_UGC_ACADEMY_URL } from '../../utils/constants'
 import AppLogo from '../../components/AppLogo'
 import ActivityHeatmap from './ActivityHeatmap'
-import AnnouncementsTile from './AnnouncementsTile'
+import WhatsNewTile from './WhatsNewTile'
 import ConnectKeyCard from './ConnectKeyCard'
-import StreakRing from './StreakRing'
 import Widget, { WidgetLabel, WidgetFigure, WidgetDelta } from './Widget'
 import { WIDGET_SHELL, WIDGET_INTERACTIVE, DISPLAY_FONT, riseStyle } from './widgetStyles'
 
@@ -93,17 +92,6 @@ export default function Dashboard() {
   const hasSpark = spark.some((minutes) => minutes > 0)
   const hasSpend = metrics.officialUsd > 0
 
-  // One line under the ring, carrying the record the arc is measured against —
-  // and saying so outright on the day you match it, which is the whole point of
-  // drawing the streak as a closing ring.
-  const streakNote = metrics.currentStreak > 0
-    ? metrics.currentStreak >= metrics.longestStreak
-      ? `day${metrics.currentStreak === 1 ? '' : 's'} in a row · your best yet`
-      : `days in a row · best ${metrics.longestStreak}`
-    : metrics.longestStreak > 0
-      ? `Start one today · best ${metrics.longestStreak}`
-      : 'Start one today'
-
   // Widgets rise in reading order; the banner (when shown) takes slot 0.
   const slot = (n: number) => (needsKey ? n + 1 : n)
 
@@ -161,49 +149,36 @@ export default function Dashboard() {
 
           {/* The widget wall — two rows on a desktop, and deliberately no
               more: the whole desktop has to sit inside one screen with the
-              dock, so nothing here is allowed to push the heatmap
-              below the fold. Row 1 is the three figures (time, money,
-              streak), row 2 is the activity grid with the Academy card
-              beside it. Best streak and active days used to be tiles of their
-              own — three streak-shaped numbers in a row — and now ride as
-              sub-lines on the widgets they actually belong to.
+              dock, so nothing here is allowed to push the heatmap below the
+              fold.
+
+              **Three columns, rearranged September 2026 (Massimo's call).**
+              The two figures stack down the LEFT (Time saved over Money
+              saved, the pair that read as one comparison), Activity heads the
+              MIDDLE with the Academy link under it, and What's New takes the
+              whole RIGHT column at two rows tall. The Streak ring went with
+              that rearrangement — the menu bar's flame chip still carries the
+              number, and the ledger still feeds it.
+
+              What the tall column bought is the point of it: a full-width
+              16:9 hero is 196px, which does not fit in a 233px tile with a
+              label, a title and a button. See WhatsNewTile.
 
               **Below `lg` it is a bento, two tiles across** (August 2026).
-              Every widget was `col-span-12` there, so a phone got six
-              full-width slabs stacked one under another and the Dashboard
-              became a page you scroll rather than a desktop you look at.
-              Three rows of two, in DOM order: the two figures, then Streak
-              and Activity, then the Announcements/Academy pair unstacked to
-              sit side by side. Activity earns a half tile by dropping to
-              `PHONE_WEEKS` columns of smaller cells (see ActivityHeatmap) —
-              a quarter of the history at a size you can read, rather than
-              half a year squeezed into 128px. */}
-          <div className="grid grid-cols-12 gap-3.5 sm:auto-rows-fr">
-            {/* Activity */}
-            <Widget index={slot(0)} className="col-span-6 items-center text-center lg:col-span-4">
-              <WidgetLabel icon={CalendarCheck} label="Activity" />
-              <div className="mt-auto flex w-full items-end pt-3">
-                <ActivityHeatmap days={usageDays} />
-              </div>
-              {/* The tally reads UNDER the grid it counts, the way Streak's
-                  record reads under its ring — it sat beside the label in the
-                  header until the wall went to six equal centred tiles, where
-                  a note in that row is what knocks the label off centre. Still
-                  gone below `sm`, where the bento can't spare the line.
-                  There is nothing here before there is activity: "Every
-                  generation lights up a day" held the slot on the reasoning
-                  that 26 weeks of blank cells read as a broken widget rather
-                  than a waiting one, and came out because the label already
-                  says Activity and the empty grid says there hasn't been
-                  any. */}
-              {hasActivity && (
-                <p className="mt-2 hidden max-w-full truncate text-[11px] text-ink-500 sm:block">
-                  {`${metrics.totalGenerations.toLocaleString()} generations · ${metrics.activeDays.toLocaleString()} active days${sinceLabel ? ` since ${sinceLabel}` : ''}`}
-                </p>
-              )}
-            </Widget>
+              Every widget was `col-span-12` there, so a phone got a stack of
+              full-width slabs and the Dashboard became a page you scroll
+              rather than a desktop you look at. What's New is the one
+              exception — it keeps the full width, because its hero IS a
+              full-width picture — and it takes `order-last` so the phone
+              still ends on it rather than splitting the four figures around
+              it. `auto-rows-fr` is `lg:` only for the same reason: equal rows
+              are what make the desktop read as a wall, and below it they
+              would squeeze the hero into a figure tile's height. Activity
+              earns a half tile by dropping to `PHONE_WEEKS` columns of
+              smaller cells (see ActivityHeatmap). */}
+          <div className="grid grid-cols-12 gap-3.5 lg:auto-rows-fr">
             {/* Time saved */}
-            <Widget index={slot(1)} className="col-span-6 items-center text-center lg:col-span-4">
+            <Widget index={slot(0)} className="col-span-6 items-center text-center lg:col-span-4">
               <WidgetLabel icon={Clock} label="Time Saved" />
               {/* NOT `mt-auto`: bottom-aligning this block lands the figure
                   at a different height in each tile, because Money saved's
@@ -242,6 +217,31 @@ export default function Dashboard() {
               </div>
             </Widget>
 
+            {/* Activity */}
+            <Widget index={slot(1)} className="col-span-6 items-center text-center lg:col-span-4">
+              <WidgetLabel icon={CalendarCheck} label="Activity" />
+              <div className="mt-auto flex w-full items-end pt-3">
+                <ActivityHeatmap days={usageDays} />
+              </div>
+              {/* The tally reads UNDER the grid it counts, the way Streak's
+                  record reads under its ring — it sat beside the label in the
+                  header until the wall went to six equal centred tiles, where
+                  a note in that row is what knocks the label off centre. Still
+                  gone below `sm`, where the bento can't spare the line.
+                  There is nothing here before there is activity: "Every
+                  generation lights up a day" held the slot on the reasoning
+                  that 26 weeks of blank cells read as a broken widget rather
+                  than a waiting one, and came out because the label already
+                  says Activity and the empty grid says there hasn't been
+                  any. */}
+              {hasActivity && (
+                <p className="mt-2 hidden max-w-full truncate text-[11px] text-ink-500 sm:block">
+                  {`${metrics.totalGenerations.toLocaleString()} generations · ${metrics.activeDays.toLocaleString()} active days${sinceLabel ? ` since ${sinceLabel}` : ''}`}
+                </p>
+              )}
+            </Widget>
+            {/* The right-hand column, two rows tall — see the note above. */}
+            <WhatsNewTile index={slot(3)} className="order-last col-span-12 lg:order-none lg:col-span-4 lg:row-span-2" />
             {/* Money saved */}
             <Widget index={slot(2)} className="col-span-6 items-center text-center lg:col-span-4">
               <WidgetLabel icon={PiggyBank} label="Money Saved" />
@@ -261,48 +261,13 @@ export default function Dashboard() {
               </div>
             </Widget>
 
-            {/* Streak — the ring is the desktop's signature widget. The record
-                it's measured against reads under it rather than in a tile of
-                its own; the ring already draws the comparison. */}
-            <Widget index={slot(3)} className="col-span-6 items-center text-center lg:col-span-4">
-              <div className="w-full">
-                <WidgetLabel icon={Flame} label="Streak" />
-              </div>
-              <div className="mt-auto pt-2">
-                <StreakRing current={metrics.currentStreak} best={metrics.longestStreak} />
-              </div>
-              <p className="mt-auto pt-2 text-[11px] leading-snug text-ink-500">{streakNote}</p>
-            </Widget>
-
-
-            {/* The row ends in two shortcuts, each with a column of its own
-                and each SIZED TO THE WIDGET ABOVE IT (August 2026, Massimo's
-                call): Announcements takes Money saved's four columns and
-                Academy takes Streak's three, so the desktop's two rows share
-                one set of gridlines instead of two unrelated splits. They were
-                stacked in a single three-column slot until then, because the
-                heatmap drew at a fixed 361px and Activity couldn't give up the
-                width to fund them. Making the grid FILL its tile (see
-                ActivityHeatmap) is what removed that constraint — there is no
-                longer a width Activity has to have. See SHORTCUT_TILE in
-                Widget.tsx for the card shape.
-
-                Below `lg` both are `col-span-6`, which is the same two-across
-                bento row they have always been — they don't need a wrapper to
-                get it, and without one they can differ from each other above
-                `lg`. */}
-
             {/* Academy — the wall's one pure LINK, and the one tile with
                 nothing of the member's own in it, so it keeps the centred
                 disc-over-title card rather than taking a WidgetLabel header
-                like the five that report something. Announcements wore this
+                like the figures that report something. What's New wore this
                 same shape until it became a log; the shape lived in
                 Widget.tsx as a shared constant for exactly as long as two
-                cards wore it.
-
-                It comes BEFORE Announcements in the row (August 2026,
-                Massimo's call), so the wall ends on the log — the one tile
-                that changes because someone else did something. */}
+                cards wore it. It sits under Activity in the middle column. */}
             <a
               href={AI_UGC_ACADEMY_URL}
               target="_blank"
@@ -338,8 +303,6 @@ export default function Dashboard() {
                 strokeWidth={2}
               />
             </a>
-
-            <AnnouncementsTile index={slot(5)} className="col-span-6 lg:col-span-4" />
           </div>
         </div>
       </div>
