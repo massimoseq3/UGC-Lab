@@ -76,58 +76,63 @@ export default function ReferenceLibraryModal({
       // box — below that the panel is a drop zone over a handful of rows, and a
       // fixed 86vh would stand it in an empty box.
       fill={items.length > SEARCH_THRESHOLD}
-    >
-      <div className="border-b border-ink/5 p-4">
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
-          onClick={() => inputRef.current?.click()}
-          className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-6 text-center transition-colors ${
-            dragOver
-              ? 'border-influencers-400/40 bg-influencers-400/[0.07]'
-              : 'border-ink/10 bg-ink/[0.02] hover:border-ink/20 hover:bg-ink/[0.05]'
-          }`}
-        >
-          <span className={`flex h-9 w-9 items-center justify-center rounded-full ${dragOver ? 'bg-influencers-500/15 text-influencers-300' : 'bg-ink/5 text-ink-400'}`}>
-            <Upload className="h-4 w-4" strokeWidth={1.5} />
-          </span>
-          <span className="text-[13px] font-medium text-ink-300">Drop photos, or click to browse</span>
-        </div>
-
-        {error && (
-          <p className="mt-2 flex items-start gap-1.5 text-[11px] text-red-400 light:text-red-600">
-            <AlertCircle className="mt-px h-3 w-3 shrink-0" />
-            <span>{error}</span>
-          </p>
-        )}
-
-        {items.length > SEARCH_THRESHOLD && (
-          <div className="relative mt-3">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search references..."
-              className="w-full rounded-full border border-ink/10 bg-transparent py-1.5 pl-9 pr-3 text-[12px] text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-influencers-500/40"
-            />
+      // The drop zone and its search stay pinned under the title bar while
+      // the reference list scrolls beneath them: this is the panel's one
+      // action, and scrolling a long library away from it meant scrolling
+      // back to add a photo.
+      toolbar={
+        <div className="border-b border-ink/5 p-4">
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => inputRef.current?.click()}
+            className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-6 text-center transition-colors ${
+              dragOver
+                ? 'border-influencers-400/40 bg-influencers-400/[0.07]'
+                : 'border-ink/10 bg-ink/[0.02] hover:border-ink/20 hover:bg-ink/[0.05]'
+            }`}
+          >
+            <span className={`flex h-9 w-9 items-center justify-center rounded-full ${dragOver ? 'bg-influencers-500/15 text-influencers-300' : 'bg-ink/5 text-ink-400'}`}>
+              <Upload className="h-4 w-4" strokeWidth={1.5} />
+            </span>
+            <span className="text-[13px] font-medium text-ink-300">Drop photos, or click to browse</span>
           </div>
-        )}
 
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-          onChange={(e) => {
-            const files = Array.from(e.target.files ?? [])
-            if (files.length > 0) onAdd(files)
-            e.target.value = ''
-          }}
-          className="hidden"
-        />
-      </div>
+          {error && (
+            <p className="mt-2 flex items-start gap-1.5 text-[11px] text-red-400 light:text-red-600">
+              <AlertCircle className="mt-px h-3 w-3 shrink-0" />
+              <span>{error}</span>
+            </p>
+          )}
 
+          {items.length > SEARCH_THRESHOLD && (
+            <div className="relative mt-3">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search references..."
+                className="w-full rounded-full border border-ink/10 bg-transparent py-1.5 pl-9 pr-3 text-[12px] text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-influencers-500/40"
+              />
+            </div>
+          )}
+
+          <input
+            ref={inputRef}
+            type="file"
+            multiple
+            accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? [])
+              if (files.length > 0) onAdd(files)
+              e.target.value = ''
+            }}
+            className="hidden"
+          />
+        </div>
+      }
+    >
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
           <ScanFace className="h-8 w-8 text-ink-800" strokeWidth={1.5} />

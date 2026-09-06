@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useState, useEffect } from 'react'
-import { Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil, Frame, History, ArrowLeft } from 'lucide-react'
+import { Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil, Frame, History, CornerDownLeft } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState, useAssetThumb } from '../../../hooks/useAssetUrl'
@@ -1078,7 +1078,7 @@ function SingleCard({
               clipboard, reuse puts them back in the form on the left. The arrow
               points at where they land. */}
           <ActionPill
-            icon={ArrowLeft}
+            icon={CornerDownLeft}
             label="Reuse prompt"
             title="Load this character's parameters back into the form"
             onClick={onReuse}
@@ -1323,7 +1323,7 @@ function HistoryTile({
             count={a.isSheet ? 3 : 4}
           >
             <TileMenuItem icon={Copy} label="Copy Prompt" onClick={onCopyPrompt} onClose={closeMenu} />
-            <TileMenuItem icon={ArrowLeft} label="Reuse Prompt" onClick={onReuse} onClose={closeMenu} />
+            <TileMenuItem icon={CornerDownLeft} label="Reuse Prompt" onClick={onReuse} onClose={closeMenu} />
             <TileMenuItem icon={Frame} label="Show in Single View" onClick={onShowInSingle} onClose={closeMenu} />
             {!a.isSheet && (
               <TileMenuItem icon={LayoutGrid} label="Make Character Sheet" onClick={onMakeSheet} onClose={closeMenu} />
@@ -1524,7 +1524,7 @@ function HistoryListRow({
                   and the row's own picture already opens the editor. */}
               <TileMenuItem icon={Pencil} label="Edit Image" onClick={onClick} onClose={closeMenu} />
               <TileMenuItem icon={Copy} label="Copy Prompt" onClick={onCopyPrompt} onClose={closeMenu} />
-              <TileMenuItem icon={ArrowLeft} label="Reuse Prompt" onClick={onReuse} onClose={closeMenu} />
+              <TileMenuItem icon={CornerDownLeft} label="Reuse Prompt" onClick={onReuse} onClose={closeMenu} />
               <TileMenuItem icon={Frame} label="Show in Single View" onClick={onShowInSingle} onClose={closeMenu} />
               {!a.isSheet && (
                 <TileMenuItem icon={LayoutGrid} label="Make Character Sheet" onClick={onMakeSheet} onClose={closeMenu} />

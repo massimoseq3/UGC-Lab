@@ -3,6 +3,13 @@ import { Plus } from 'lucide-react'
 // The primary button a history rail leads with — the Ad Analyzer's "New
 // Analysis" shape, in the host app's accent.
 //
+// `h-[38px]` is STATED rather than left to fall out of `text-[13px]`'s line
+// box, because a second surface now matches it: B-Roll's storyboard bar sits
+// directly across the seam from this button and its pills are pinned to the
+// same number, so the two bands read level (Massimo's call, September 2026).
+// Left to the font metric it measured 37.5px here — half a pixel, and a
+// different fallback face would have moved it without anything else changing.
+//
 // SINGLE click, no arm. Every caller clears an OUTPUT canvas whose contents are
 // a row in the list directly underneath, so there is nothing to confirm: what
 // it clears is on screen the moment it happens. Voiceovers' was the exception
@@ -29,7 +36,7 @@ export default function RailNewButton({
       type="button"
       onClick={onClick}
       title={title}
-      className={`flex min-w-0 items-center justify-center gap-2 rounded-full border border-white/15 px-4 py-2 text-[13px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all glass-fill glass-fill-soft btn-soft-shadow hover:brightness-110 ${accentClass} ${className}`}
+      className={`flex h-[38px] min-w-0 items-center justify-center gap-2 rounded-full border border-white/15 px-4 text-[13px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all glass-fill glass-fill-soft btn-soft-shadow hover:brightness-110 ${accentClass} ${className}`}
     >
       <Plus className="h-4 w-4 shrink-0" strokeWidth={2.5} />
       <span className="truncate">{label}</span>

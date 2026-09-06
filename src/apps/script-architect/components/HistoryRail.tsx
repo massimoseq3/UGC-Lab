@@ -8,6 +8,7 @@ import DayPill from '../../../components/DayPill'
 import RailNewButton from '../../../components/RailNewButton'
 import HistoryRailToggle from '../../../components/HistoryRailToggle'
 import { GeneratingChip } from '../../../components/GeneratingChip'
+import { WARM_METALS, COOL_METALS, metalPlate, METAL_PLATE_INK, METAL_PLATE_RIM, type MetalRamp } from '../../../utils/metal'
 
 const isHooksItem = (item: ScriptHistoryItem) => item.mode === 'write' && item.writeFormat === 'hooks'
 
@@ -16,35 +17,52 @@ const isHooksItem = (item: ScriptHistoryItem) => item.mode === 'write' && item.w
 // in their title, moved onto the row's own label so the title can be the
 // product.
 //
-// SOLID fills, not the translucent tints the cards used (Massimo's call,
-// September 2026): a 9px label over a 15%-alpha wash takes its colour from
-// whatever is behind it, so the same badge read differently on a hovered row,
-// a selected one and a plain one — and the set never read as one set. White on
-// a solid accent is the same badge everywhere, in both themes. The tracking
-// came down with it: `tracking-widest` on a 9px uppercase label is most of the
-// pill's width spent on air between letters.
-function historyBadge(item: ScriptHistoryItem): { label: string; className: string } {
+// The pills are METAL (September 2026, Massimo's call), the same material
+// Voiceovers' voice discs are cut from — a light-to-mid ramp under a diffuse
+// bloom, a lit rim, and the label engraved into it in dark ink. They were
+// solid fuchsia / blue / amber / emerald / sky, which is four saturated
+// rectangles down a column of grey chrome: the loudest thing in the rail was
+// a category label nobody is looking for.
+//
+// The fill is still OPAQUE, which is the half of the previous pass worth
+// keeping: the pills before that were 15%-alpha washes, and a 9px label over
+// one takes its colour from whatever is behind it, so the same badge read
+// differently on a hovered row, a selected one and a plain one. Metal is a
+// fixed material in both themes, so its ink is a literal too.
+//
+// One metal per kind, fixed rather than seeded — the pill has to say the same
+// thing every time it appears. They stay distinguishable at a glance (gold /
+// copper / steel / silver) without a saturated hue between them.
+const BADGE_METALS = {
+  hooks: WARM_METALS[3],     // antique gold
+  remix: WARM_METALS[1],     // copper
+  scenes: COOL_METALS[1],    // steel
+  cinematic: WARM_METALS[2], // champagne
+  script: COOL_METALS[0],    // silver
+} as const
+
+function historyBadge(item: ScriptHistoryItem): { label: string; metal: MetalRamp } {
   if (isHooksItem(item)) {
     const family = isHookCategoryChoice(item.hookCategory) && item.hookCategory !== 'auto'
       ? `${HOOK_CATEGORY_META[item.hookCategory].label} Hooks`
       : 'Hooks'
-    return { label: family, className: 'bg-amber-600 text-white' }
+    return { label: family, metal: BADGE_METALS.hooks }
   }
   if (item.mode === 'remix') {
-    return { label: 'Remix', className: 'bg-scripts-500 text-white' }
+    return { label: 'Remix', metal: BADGE_METALS.remix }
   }
   if (item.mode === 'reverse-engineer' || (item.mode === 'write' && item.writeFormat === 'scenes')) {
-    return { label: 'Scenes', className: 'bg-fuchsia-600 text-white' }
+    return { label: 'Scenes', metal: BADGE_METALS.scenes }
   }
   // Rows from the retired Cinematic format keep their own badge — the run
   // really was a cinematic concept, and the label shouldn't lie about it.
   if (item.mode === 'write' && item.writeFormat === 'prompt') {
-    return { label: 'Cinematic', className: 'bg-sky-600 text-white' }
+    return { label: 'Cinematic', metal: BADGE_METALS.cinematic }
   }
   const style = item.writeStyle && item.writeStyle in WRITE_STYLE_META
     ? WRITE_STYLE_META[item.writeStyle as keyof typeof WRITE_STYLE_META].label
     : 'Script'
-  return { label: style, className: 'bg-emerald-600 text-white' }
+  return { label: style, metal: BADGE_METALS.script }
 }
 
 // The row's preview text — the opening of the first take. Hooks strip their
@@ -266,7 +284,8 @@ function HistoryRow({
       )}
 
       <span
-        className={`block w-fit max-w-full truncate rounded-full px-2 py-[3px] text-[9.5px] font-bold uppercase leading-none tracking-[0.04em] ${badge.className}`}
+        className={`block w-fit max-w-full truncate rounded-full px-2 py-[3px] text-[9.5px] font-bold uppercase leading-none tracking-[0.04em] ${METAL_PLATE_RIM}`}
+        style={{ background: metalPlate(badge.metal), color: METAL_PLATE_INK }}
       >
         {badge.label}
       </span>

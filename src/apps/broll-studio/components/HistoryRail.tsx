@@ -217,10 +217,15 @@ function itemMode(it: BrollHistoryItem): Exclude<ModeFilter, 'all'> {
 // Sort options. `newest`/`oldest` key off the stable creation time (rows never
 // move when reopened); `recent` keys off last-touched activity.
 type SortId = 'newest' | 'oldest' | 'recent'
+// One word each, because this trigger shares a 280px row with the search field
+// (September 2026): "Recently updated" alone is ~105px of text and either
+// truncated in the trigger — whose one job is naming what's picked — or ate the
+// field beside it. In a three-option sort control the qualifier was carrying
+// nothing the word didn't.
 const SORTS: { id: SortId; label: string }[] = [
-  { id: 'newest', label: 'Newest first' },
-  { id: 'oldest', label: 'Oldest first' },
-  { id: 'recent', label: 'Recently updated' },
+  { id: 'newest', label: 'Newest' },
+  { id: 'oldest', label: 'Oldest' },
+  { id: 'recent', label: 'Recent' },
 ]
 function sortTs(it: BrollHistoryItem, sort: SortId): number {
   if (sort === 'recent') return it.updatedAt ?? it.createdAt
@@ -322,33 +327,55 @@ export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew
         />
       </div>
 
-      {/* Search on its own row, then the mode pills and the sort centred under
-          it. They shared ONE wrapping row until September 2026, which is right
-          in a wide panel and wrong in a 280px rail: the field sat at its
-          `min-w-[200px]` floor with dead space beside it, and the sort wrapped
-          underneath left-aligned against the field's edge. Two stacked rows
-          cost ~40px of a column that is otherwise all list, and buy a field
-          that fills its own width and a control that is centred rather than
-          hanging off one side.
+      {/* The sort leads the search row, then the mode pills sit centred under
+          it (September 2026, Massimo's call). The sort was centred on a row of
+          its own, which is where it looked orphaned — a lone pill floating in
+          the middle of a column with nothing to be centred against, and 40px
+          of a rail that is otherwise all list. It is a filter, and it belongs
+          on the line with the other one. Left of the field rather than right,
+          because it is `shrink-0` and the field takes the leftover: at 280px
+          the two measure 95px and 152px and the placeholder still fits.
+
+          The second row now renders only when it HAS something — the mode pills
+          or a live queue chip — so a rail with one delivery in it spends nothing
+          on an empty band.
 
           It stays put on a phone: this bar wore a CollapsingBar for a week and
           lost it (August 2026) — a filter row that rolls away on a scroll and
           unrolls on the way back up moves the list under the thumb reading it. */}
       <div className="flex shrink-0 flex-col gap-2 border-b border-ink/5 px-3 py-2.5">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search history..."
-            className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-[12.5px] text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-broll-500/40"
+        <div className="flex items-center gap-2">
+          {/* A PORTALED dropdown (`Dropdown` → `AnchoredPopover`), not a
+              locally-positioned menu. This rail is a 280px `overflow-y-auto`
+              column, so an `absolute` menu is clipped by it — reported with the
+              options cut off down their left edge. `Dropdown` is the app's only
+              select for exactly this reason. `fitContent` keeps the trigger to
+              its own word while flooring the MENU at 168px, so the options stay
+              readable under a 95px control. */}
+          <Dropdown
+            value={sort}
+            options={SORTS.map((o) => ({ value: o.id, label: o.label }))}
+            onChange={(v) => setSort(v as SortId)}
+            accent="broll"
+            fitContent
+            dense
+            className="shrink-0"
           />
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search history..."
+              className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-[12.5px] text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-broll-500/40"
+            />
+          </div>
         </div>
 
-        {/* Mode filter pills, then the sort. Sort is always shown; the mode
-            pills only when more than one mode is present. A live "N sessions
-            rendering" chip leads them whenever anything is in flight, so the
-            queue is visible without scanning every row. */}
+        {/* Mode filter pills, only when more than one mode is present. A live
+            "N sessions rendering" chip leads them whenever anything is in
+            flight, so the queue is visible without scanning every row. */}
+        {(generatingRows > 0 || showModeFilters) && (
         <div className="flex flex-wrap items-center justify-center gap-1.5">
           {generatingRows > 0 && (
             <span className="flex items-center rounded-full border border-broll-500/30 bg-broll-500/10 px-2.5 py-1 text-[11px]">
@@ -375,20 +402,8 @@ export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew
                 </button>
               )
             })}
-          {/* A PORTALED dropdown (`Dropdown` → `AnchoredPopover`), not a
-              locally-positioned menu. This rail is a 280px `overflow-y-auto`
-              column, so an `absolute` menu is clipped by it — reported with the
-              options cut off down their left edge. `Dropdown` is the app's only
-              select for exactly this reason. */}
-          <Dropdown
-            value={sort}
-            options={SORTS.map((o) => ({ value: o.id, label: o.label }))}
-            onChange={(v) => setSort(v as SortId)}
-            accent="broll"
-            fitContent
-            dense
-          />
         </div>
+        )}
       </div>
 
       {/* A CONTAINER query, not a viewport one: this list is 280px wide as a
