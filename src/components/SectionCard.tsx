@@ -22,6 +22,8 @@ export default function SectionCard({
   children,
   className = '',
   contentClassName = 'flex flex-col gap-2',
+  onHeaderClick,
+  divider = true,
 }: {
   icon?: ElementType
   title: string
@@ -37,6 +39,15 @@ export default function SectionCard({
   children: ReactNode
   className?: string
   contentClassName?: string
+  // Makes the whole header row the control that folds the card, for a section
+  // whose body can be put away (the Voice card). The fold chevron still goes in
+  // `left` as a real button — it keeps the `aria-expanded` and the keyboard
+  // focus — and stops its own click, so a click on it doesn't fold twice.
+  onHeaderClick?: () => void
+  // The rule separates the header from a body. A folded card has none, so it
+  // draws no rule — otherwise the card reads as a heading with its content
+  // clipped off rather than as something put away.
+  divider?: boolean
 }) {
   return (
     <div className={`rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 card-soft-shadow ${className}`}>
@@ -45,7 +56,10 @@ export default function SectionCard({
           narrow for all three squeezes them instead of letting a pill land on
           top of the title (which is what the absolute version did in B-Roll's
           25%-wide column). */}
-      <div className="mb-2.5 grid min-h-[22px] grid-cols-[1fr_auto_1fr] items-center gap-1.5">
+      <div
+        onClick={onHeaderClick}
+        className={`mb-2.5 grid min-h-[22px] grid-cols-[1fr_auto_1fr] items-center gap-1.5 ${onHeaderClick ? 'group cursor-pointer' : ''}`}
+      >
         <div className="flex min-w-0 justify-start">{left}</div>
         <div className="flex min-w-0 items-center justify-center gap-1.5">
           {titleNode ?? (
@@ -57,7 +71,7 @@ export default function SectionCard({
         </div>
         <div className="flex min-w-0 justify-end">{right}</div>
       </div>
-      <div className="mb-2.5 border-t border-ink/10" />
+      {divider && <div className="mb-2.5 border-t border-ink/10" />}
       <div className={contentClassName}>{children}</div>
     </div>
   )

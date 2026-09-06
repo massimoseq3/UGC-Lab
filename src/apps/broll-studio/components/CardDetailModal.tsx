@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ImageIcon, Video as VideoIcon, Film, AlertCircle, Volume2, VolumeX, User, Package, Coins, ChevronRight, Link2, Layers } from 'lucide-react'
 import SectionCard, { SectionLabel } from '../../../components/SectionCard'
+import VoiceCard from '../../../components/VoiceCard'
 import ModelPicker from '../../../components/ModelPicker'
 import ModelPickerModal from '../../../components/ModelPickerModal'
 import ProviderLogo from '../../../components/ProviderLogo'
@@ -200,6 +201,10 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   // shared value on blur so keystrokes don't churn the whole result.
   const [voiceDraft, setVoiceDraft] = useState(voiceProfile ?? '')
   useEffect(() => { setVoiceDraft(voiceProfile ?? '') }, [voiceProfile])
+  // Fold state for the Voice card. Local and open by default, unlike
+  // Playground's, which rides in the persisted draft: this modal is opened per
+  // card and closed again, so there is no draft here for it to live in.
+  const [voiceOpen, setVoiceOpen] = useState(true)
   const isDialogue = variation.tag === 'DIALOGUE'
   // Expand-the-prompt-into-a-modal toggle (parity with Playground / Scripts).
   const [promptExpanded, setPromptExpanded] = useState(false)
@@ -732,39 +737,28 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                     prompt. Only on the Video / Animate tabs of a DIALOGUE card;
                     edits update the value shared by all dialogue clips. */}
                 {isDialogue && onUpdateVoiceProfile && tab !== 'image' && (
-                  /* A real SectionCard rather than a look-alike: this was a
-                     hand-rolled tinted block with a left-aligned heading, which
-                     made it a fourth heading register in one column. Same shape
-                     as Voiceovers' own Voice card now. */
-                  <SectionCard
-                    icon={Volume2}
-                    title="Voice"
-                    // Nothing is gated on this: a talking clip renders without a
-                    // profile, the model just picks its own voice and the ad
-                    // ends up sounding like a different person every scene. The
-                    // card sat in a column of things that DO gate the run, which
-                    // read as another box to fill in before generating. Same
-                    // pill the input panel puts on Additional Instructions.
-                    left={(
-                      <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
-                        optional
-                      </span>
-                    )}
-                    right={(
-                      <span className="rounded-full bg-ink/[0.03] px-2 py-0.5 text-[10px] text-ink-500">
-                        every clip
-                      </span>
-                    )}
-                  >
-                    <textarea
-                      value={voiceDraft}
-                      onChange={(e) => setVoiceDraft(e.target.value)}
-                      onBlur={() => onUpdateVoiceProfile(voiceDraft)}
-                      rows={3}
-                      placeholder="How the character sounds: age, accent, pitch, pace, texture, energy. Written once, applied to every talking clip."
-                      className="w-full resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-[12px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20"
-                    />
-                  </SectionCard>
+                  /* The app-wide Voice card, shared with Playground's video tab
+                     (September 2026, Massimo's call). This modal already had the
+                     shape both settled on — a real `SectionCard`, centred
+                     heading over a hairline — and Playground had the two things
+                     it was missing: the fold, and the preset picker behind the
+                     heading. The `optional` / `every clip` pills came off with
+                     the merge; what the second one said is in the placeholder,
+                     in a sentence, inside the box it describes.
+
+                     Nothing is gated on this — a talking clip renders without a
+                     profile, the model just picks its own voice and the ad ends
+                     up sounding like a different person every scene. */
+                  <VoiceCard
+                    value={voiceDraft}
+                    open={voiceOpen}
+                    onToggleOpen={() => setVoiceOpen((v) => !v)}
+                    onChange={setVoiceDraft}
+                    // Committed on blur rather than per keystroke: this profile
+                    // is written onto EVERY dialogue clip of the ad.
+                    onCommit={onUpdateVoiceProfile}
+                    placeholder="How the character sounds: age, accent, pitch, pace, texture, energy. Written once, applied to every talking clip."
+                  />
                 )}
               </div>
             </div>

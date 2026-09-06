@@ -48,7 +48,7 @@ import { GALLERY_GRID, useSectionSpy } from '../../../components/sectionSpy'
 import ExpandTextModal, { BracketHighlightArea } from '../../../components/ExpandableText'
 import SectionCard from '../../../components/SectionCard'
 import PromptToolbar from '../../../components/PromptToolbar'
-import VoiceCard from './VoiceCard'
+import VoiceCard from '../../../components/VoiceCard'
 import MentionPopover from './MentionPopover'
 import type { PlaygroundMode, BankReference } from '../types'
 import { VIDEO_PRESETS, IMAGE_PRESETS, type Preset } from '../presets'
@@ -816,14 +816,14 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                       {supportsFrames && (
                         <div className="grid grid-cols-2 gap-2">
                           <FrameSlot
-                            label="Start frame"
+                            label="Start Frame"
                             value={startFrameValue()}
                             onChange={(v) => setSlot('start', v)}
                             bankType="brolls"
                             tabs={PLAYGROUND_FRAME_TABS}
                           />
                           <FrameSlot
-                            label="End frame"
+                            label="End Frame"
                             value={supportsEndFrame ? endFrameValue() : null}
                             onChange={(v) => supportsEndFrame && setSlot('end', v)}
                             bankType="brolls"
@@ -1046,6 +1046,13 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   open={state.voiceOpen ?? true}
                   onChange={(voiceProfile) => onChange({ ...state, voiceProfile })}
                   onToggleOpen={() => onChange({ ...state, voiceOpen: !(state.voiceOpen ?? true) })}
+                  // This column's own shape, not B-Roll's card-modal one: no
+                  // hairline and its own tighter padding. The shared `section`
+                  // shell was tried here and put back on sight (Massimo's call)
+                  // — this card is the last thing in a cramped column directly
+                  // under the prompt box, where a rule is one more horizontal
+                  // line in a stack that already has too many.
+                  variant="plain"
                 />
               )}
 
