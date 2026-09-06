@@ -35,6 +35,12 @@ interface ModalProps {
   // simply doesn't render and the sections are reached by scrolling — the same
   // rule BankPicker follows.
   rail?: ReactNode
+  // A band pinned under the title bar, above the scrolling body — a toolbar, a
+  // search row, a drop zone. It is a static `shrink-0` sibling of the scroll
+  // port rather than `sticky top-0` inside it (the app-wide rule): this chrome
+  // never scrolls away, so sticky would buy nothing but the chance to come
+  // loose from the edge. The caller owns its padding and its own hairline.
+  toolbar?: ReactNode
   bodyRef?: RefObject<HTMLDivElement | null>
   onBodyScroll?: UIEventHandler<HTMLDivElement>
   // Optional back arrow left of the title, for a panel with a second view
@@ -71,6 +77,7 @@ export default function Modal({
   layer = 'default',
   fill = false,
   rail,
+  toolbar,
   bodyRef,
   onBodyScroll,
 }: ModalProps) {
@@ -153,6 +160,7 @@ export default function Modal({
               <X className="h-4 w-4" />
             </button>
           </div>
+          {toolbar && <div className="shrink-0">{toolbar}</div>}
           {/* `scrollbar-gutter: stable` on the body, not just `overflow-y-auto`.
               The app keeps its native scrollbars invisible but reserves their
               11px track so layout stays stable (index.css) — and that only
