@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useState, useEffect } from 'react'
-import { Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil, Frame, History, ArrowLeft } from 'lucide-react'
+import { Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil, Frame, History, CornerDownLeft } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAssetUrlState, useAssetThumb } from '../../../hooks/useAssetUrl'
@@ -1078,7 +1078,7 @@ function SingleCard({
               clipboard, reuse puts them back in the form on the left. The arrow
               points at where they land. */}
           <ActionPill
-            icon={ArrowLeft}
+            icon={CornerDownLeft}
             label="Reuse prompt"
             title="Load this character's parameters back into the form"
             onClick={onReuse}
@@ -1307,7 +1307,7 @@ function HistoryTile({
             <Copy className="h-4 w-4" />
           </TileActionButton>
           <TileActionButton title="Reuse · load these parameters back into the form" onClick={() => onReuse()}>
-            <ArrowLeft className="h-4 w-4" />
+            <CornerDownLeft className="h-4 w-4" />
           </TileActionButton>
           <TileActionButton title="Show this one in Single view" onClick={() => onShowInSingle()}>
             <Frame className="h-4 w-4" />
@@ -1501,7 +1501,7 @@ function HistoryListRow({
               <Copy className="h-3.5 w-3.5" />
             </ListRowButton>
             <ListRowButton title="Reuse · load these parameters back into the form" onClick={onReuse}>
-              <ArrowLeft className="h-3.5 w-3.5" />
+              <CornerDownLeft className="h-3.5 w-3.5" />
             </ListRowButton>
             <ListRowButton title="Show this one in Single view" onClick={onShowInSingle}>
               <Frame className="h-3.5 w-3.5" />
