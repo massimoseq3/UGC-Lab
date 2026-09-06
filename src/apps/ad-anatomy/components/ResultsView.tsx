@@ -924,14 +924,14 @@ export default function ResultsView({ result, videoSrc, restoredThumbUrl, fileNa
                   // freely) — the poster is what actually guarantees a picture.
                   poster={restoredThumbUrl ?? undefined}
                   preload="auto"
-                  className="block max-h-full max-w-full rounded-xl border border-ink/10 transition-all hover:-translate-y-px card-soft-shadow"
+                  className="block max-h-full max-w-full rounded-xl border border-ink/10 transition-all card-soft-shadow"
                   controls
                 />
               ) : videoSrc || restoredThumbUrl ? (
                 <img
                   src={videoSrc ?? restoredThumbUrl ?? ''}
                   alt={videoSrc ? 'The analyzed ad' : 'First frame of the analyzed ad'}
-                  className="block max-h-full max-w-full rounded-xl border border-ink/10 transition-all hover:-translate-y-px card-soft-shadow"
+                  className="block max-h-full max-w-full rounded-xl border border-ink/10 transition-all card-soft-shadow"
                 />
               ) : null}
             </div>

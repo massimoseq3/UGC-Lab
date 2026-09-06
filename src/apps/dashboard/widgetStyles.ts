@@ -22,8 +22,8 @@ export const WIDGET_SHELL =
 
 /** Hover treatment for widgets that are also controls (links, launchers). */
 export const WIDGET_INTERACTIVE =
-  'transition-[transform,background-color,border-color,box-shadow] duration-200 ' +
-  'hover:-translate-y-0.5 hover:bg-ink/[0.075] hover:border-ink/15 light:hover:bg-white/90'
+  'transition-[background-color,border-color,box-shadow] duration-200 ' +
+  'hover:bg-ink/[0.075] hover:border-ink/15 light:hover:bg-white/90'
 
 /** Display face for every figure on the desktop — the app's Instrument Serif. */
 export const DISPLAY_FONT = { fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }

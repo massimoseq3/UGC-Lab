@@ -738,7 +738,7 @@ function ImageTile({
       <div
         ref={tileRef}
         onClick={onClick}
-        className="group relative cursor-pointer overflow-hidden rounded-lg border border-ink/10 light:border-ink/5 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 light:hover:border-ink/10 hover:-translate-y-px card-soft-shadow"
+        className="group relative cursor-pointer overflow-hidden rounded-lg border border-ink/10 light:border-ink/5 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 light:hover:border-ink/10 card-soft-shadow"
       >
         {status === 'ready' && url ? (
           <img src={url} alt="" loading="lazy" decoding="async" className="block h-auto w-full" />
@@ -854,7 +854,7 @@ function VideoTile({
         {...inline.hoverProps}
         onClick={selecting ? onToggleSelect : onClick}
         title={selecting ? (selected ? 'Leave out of the zip' : 'Add to the zip') : undefined}
-        className={`group relative cursor-pointer overflow-hidden rounded-lg border transition-all hover:-translate-y-px card-soft-shadow bg-black light:bg-zinc-200 ${
+        className={`group relative cursor-pointer overflow-hidden rounded-lg border transition-all card-soft-shadow bg-black light:bg-zinc-200 ${
           selecting && selected
             ? 'border-playground-500/70 ring-2 ring-playground-500/40'
             : 'border-ink/10 light:border-ink/5 hover:border-ink/20 light:hover:border-ink/10'

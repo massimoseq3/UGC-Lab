@@ -562,7 +562,7 @@ function HistoryCard({
       } ${
         isActive
           ? 'border-broll-500/50 bg-broll-500/[0.08] ring-1 ring-broll-500/40'
-          : 'border-ink/5 bg-ink/[0.03] hover:-translate-y-px hover:border-ink/15 hover:bg-ink/[0.05]'
+          : 'border-ink/5 bg-ink/[0.03] hover:border-ink/15 hover:bg-ink/[0.05]'
       }`}
     >
       <div className="relative aspect-[16/10] overflow-hidden">

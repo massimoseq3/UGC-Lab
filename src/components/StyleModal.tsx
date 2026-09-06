@@ -89,7 +89,7 @@ export function StyleTile({
       type="button"
       onClick={onClick}
       title={name}
-      className={`group relative block aspect-[9/16] w-full overflow-hidden rounded-xl border transition-all hover:-translate-y-px ${
+      className={`group relative block aspect-[9/16] w-full overflow-hidden rounded-xl border transition-all ${
         active ? accent.card : 'border-ink/5 bg-ink/[0.03] hover:border-ink/15'
       }`}
     >

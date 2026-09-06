@@ -30,7 +30,7 @@ export default function PresetCard({ preset, onClick }: PresetCardProps) {
         const v = videoRef.current
         if (v) { v.pause(); v.currentTime = 0 }
       }}
-      className="group relative block aspect-[9/16] w-full overflow-hidden rounded-xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:-translate-y-px"
+      className="group relative block aspect-[9/16] w-full overflow-hidden rounded-xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15"
     >
       {hasVideo && (
         <video

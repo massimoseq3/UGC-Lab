@@ -1045,7 +1045,7 @@ function OutputTile({
     <div
       onClick={onSelect}
       className={`group relative cursor-pointer overflow-hidden rounded-lg bg-black light:bg-zinc-200 transition-all card-soft-shadow ${
-        selected ? 'ring-2 ring-influencers-500/60' : 'hover:-translate-y-px'
+        selected ? 'ring-2 ring-influencers-500/60' : ''
       }`}
     >
       {url

@@ -1275,7 +1275,7 @@ function HistoryTile({
       onClick={onClick}
       style={frameStyle}
       className={`group relative cursor-pointer overflow-hidden border border-ink/10 bg-black light:bg-zinc-200 transition-all hover:border-ink/20 card-soft-shadow ${
-        fitted ? 'rounded-xl' : 'rounded-lg hover:-translate-y-px'
+        fitted ? 'rounded-xl' : 'rounded-lg'
       }`}
     >
       {a.status === 'ready' && a.url ? (
