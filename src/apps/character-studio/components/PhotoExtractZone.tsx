@@ -3,7 +3,7 @@ import { Dna, Check, X, ChevronRight } from 'lucide-react'
 import GenerationProgress from '../../../components/GenerationProgress'
 
 interface PhotoExtractZoneProps {
-  // How many reference photos are being analysed right now (any source).
+  // How many reference photos are being analyzed right now (any source).
   analyzingCount: number
   extractError: string | null
   // True while a reference's DNA is sitting in the form. Kept separate from
@@ -61,7 +61,7 @@ export default function PhotoExtractZone({
   //
   // stopPropagation is load-bearing: CharacterStudio's root div carries a
   // full-area drop handler that also calls addFiles, so a drop landing here
-  // bubbled up and analysed the same photo TWICE — two library rows, two vision
+  // bubbled up and analyzed the same photo TWICE — two library rows, two vision
   // calls, two charges on the member's key, and the form auto-filled twice.
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -94,7 +94,7 @@ export default function PhotoExtractZone({
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-400" />
               </span>
-              Analysing {analyzingCount} photos…
+              Analyzing {analyzingCount} photos…
             </span>
           ) : (
             <GenerationProgress

@@ -60,6 +60,46 @@ const MIGRATIONS_KEY = 'ai-ugc-lab-settings-migrations'
 // its name is recorded under MIGRATIONS_KEY so it never runs again.
 const MODEL_MIGRATIONS: Array<{ name: string; apply: (m: Record<string, string>) => void }> = [
   {
+    // Three models removed at once (Massimo's call): Gemini 3 Flash, Gemini
+    // Omni 1.0 and Wan 2.7. Each was superseded rather than merely dropped —
+    // CHAT_MODEL_DEFAULT moved to Gemini 3.8 Flash, Omni Flash 1.1 takes
+    // everything 1.0 did plus real frame fields, and Wan 3.0 beats 2.7 on
+    // every axis.
+    //
+    // Most of this is belt-and-braces — getAppModel already drops an id that
+    // no longer resolves, and Playground's draft `state` blob validates its own
+    // modelId on hydrate now (see its sanitize). ONE part is not: B-Roll's two
+    // Continuous slots, 'broll-studio:continuous:video' and
+    // ':continuous:animate', are read STRAIGHT off perAppModel rather than
+    // through getAppModel, so a stored id there survives its model's removal
+    // and reaches generate as "Unknown video model: wan/2-7". Both read sites
+    // are guarded now too, but the guard only makes the slot fall back — this
+    // clears it, so the member's stored pick is a real pick again.
+    name: '2026-09-remove-gemini-3-flash-omni-1-wan-2-7',
+    apply: (m) => {
+      const GONE = ['gemini-3-flash', 'gemini-omni-video', 'wan/2-7']
+      for (const k of Object.keys(m)) {
+        if (GONE.includes(m[k])) delete m[k]
+      }
+    },
+  },
+  {
+    // Grok 4.5 removed from the chat registry — it sat one row under Grok 4.6
+    // on the identical rate card, so the only real choice between the two was
+    // the worse one. Unlike the Veo and Suno removals this needs no draft
+    // repair: a chat pick lives only in perAppModel, which getAppModel already
+    // drops when the id no longer resolves, and Playground's `state` blob
+    // snapshots image/video/music models but never a chat one. Clearing the
+    // slot outright is belt-and-braces, and lands the two pickers back on
+    // their `defaultFor`.
+    name: '2026-09-remove-grok-4-5',
+    apply: (m) => {
+      for (const k of Object.keys(m)) {
+        if (m[k] === 'grok-4-5') delete m[k]
+      }
+    },
+  },
+  {
     // ...and back again: Characters' image default returns to GPT Image 2.
     // Exactly the migration below, mirrored — same by-value targeting, same
     // accepted trade-off. A member sitting on the Nano Banana 2 default moves;
@@ -293,8 +333,14 @@ const MODEL_MIGRATIONS: Array<{ name: string; apply: (m: Record<string, string>)
           const raw = localStorage.getItem(key)
           if (!raw) continue
           const parsed = JSON.parse(raw)
+          // Repointed from 'gemini-omni-video' when that entry was removed in
+          // September 2026. A migration normally freezes the literal it wrote
+          // on its own date, but this one hasn't finished running: it still
+          // fires on any browser that has never loaded the app since July, and
+          // writing a dead id there would be writing a bug. Flash 1.1 is the
+          // same family and the closest thing to what this migration meant.
           if (parsed && parsed.modelId === 'bytedance/seedance-2') {
-            parsed.modelId = 'gemini-omni-video'
+            parsed.modelId = 'google/gemini-omni-flash-1-1'
             localStorage.setItem(key, JSON.stringify(parsed))
           }
         }

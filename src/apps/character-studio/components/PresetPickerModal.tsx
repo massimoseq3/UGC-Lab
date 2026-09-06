@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ElementType } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Search, Sparkles, Star, UserRound, Images, Bookmark, Check } from 'lucide-react'
+import { X, Search, Sparkle, Star, UserRound, Images, Bookmark, Check } from 'lucide-react'
 import type { CharacterProfile } from '../types'
 import type { Model } from '../../../stores/types'
 import { useBankStore } from '../../../stores/bankStore'
@@ -130,7 +130,7 @@ function PresetCard({ entry, savedId, onClick }: {
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-ink/[0.04]">
-            <Sparkles className="h-5 w-5 text-ink-700" strokeWidth={1.5} />
+            <Sparkle className="h-5 w-5 text-ink-700" strokeWidth={1.5} />
           </div>
         )}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2 pt-6">

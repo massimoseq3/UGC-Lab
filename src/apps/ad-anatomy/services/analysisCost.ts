@@ -34,7 +34,7 @@ const REASONING_TOKENS = 8_000
 // Fallback when a clip's duration can't be read from its metadata.
 const DEFAULT_DURATION_SEC = 30
 
-// Estimated credits to analyse one ad of the given duration. Null only when the
+// Estimated credits to analyze one ad of the given duration. Null only when the
 // chat model has no pricing entry (never in practice).
 export function estimateAnalysisCredits(durationSeconds: number): number | null {
   const secs =

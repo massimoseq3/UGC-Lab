@@ -48,7 +48,7 @@ export default function Slider({
           // subheading in this panel reads at. Small-caps since the settings
           // moved inside titled cards: a 13px sentence-case label under a 13px
           // card title reads as two competing headings.
-          className="relative cursor-help text-[11px] font-medium uppercase tracking-widest text-ink-300"
+          className="relative cursor-help text-[11px] font-medium uppercase tracking-wider text-ink-300"
           onMouseEnter={() => setLabelHover(true)}
           onMouseLeave={() => setLabelHover(false)}
           onFocus={() => setLabelHover(true)}

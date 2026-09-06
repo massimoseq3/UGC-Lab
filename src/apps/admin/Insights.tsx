@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { RefreshCw, Users, UserCheck, Clock, Ban, HardDrive, Sparkles, TrendingUp, TrendingDown, UserPlus, AlertTriangle } from 'lucide-react'
+import { RefreshCw, Users, UserCheck, Clock, Ban, HardDrive, Sparkle, TrendingUp, TrendingDown, UserPlus, AlertTriangle } from 'lucide-react'
 import Spinner from '../../components/Spinner'
 import { APP_REGISTRY } from '../../utils/constants'
 import { formatDuration } from '../../utils/usage'
@@ -209,7 +209,7 @@ export default function Insights() {
         <StatCard icon={Clock} label={'Inactive 30d+'} value={String(stats.inactive)} accent="text-amber-400 light:text-amber-600" />
         <StatCard icon={Ban} label="Disabled" value={String(stats.disabled)} accent="text-red-400 light:text-red-600" />
         <StatCard icon={HardDrive} label="Storage" value={formatBytes(stats.bytes)} />
-        <StatCard icon={Sparkles} label="Gens / 7d" value={String(stats.gens7d)} />
+        <StatCard icon={Sparkle} label="Gens / 7d" value={String(stats.gens7d)} />
       </div>
 
       <GrowthStrip growth={growth} />

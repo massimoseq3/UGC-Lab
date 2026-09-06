@@ -1,4 +1,4 @@
-import { Sparkles, RefreshCw, Eraser, Undo2, Redo2, Camera } from 'lucide-react'
+import { Sparkle, RefreshCw, Eraser, Undo2, Redo2, Camera } from 'lucide-react'
 import Spinner from './Spinner'
 import { ExpandButton } from './ExpandableText'
 
@@ -107,7 +107,7 @@ export default function PromptToolbar({
           disabled={busy || enhanceDisabled}
           className={`${PILL} ${ACCENT_HOVER[accent]}`}
         >
-          {busy ? <Spinner className="h-3 w-3 shrink-0" /> : <Sparkles className="h-3 w-3 shrink-0" />}
+          {busy ? <Spinner className="h-3 w-3 shrink-0" /> : <Sparkle className="h-3 w-3 shrink-0" />}
           Enhance
         </button>
         {onRegenerate && (

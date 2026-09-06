@@ -43,10 +43,8 @@ export const CONTINUOUS_MODEL_IDS = [
   'grok-imagine-video-1-5-preview',
   'wan/3-0-video',
   'wan/3-0-video-prime',
-  'wan/2-7',
   'kling/v3-turbo-image-to-video',
   'google/gemini-omni-flash-1-1',
-  'gemini-omni-video',
 ]
 
 export const CONTINUOUS_DEFAULT_MODEL_ID = 'bytedance/seedance-1.5-pro'
@@ -66,7 +64,7 @@ export function sceneDuration(scriptLine: string, modelId: string): number {
 }
 
 // ── Visual styles ──────────────────────────────────────────────
-// The style registry, the reference-frame analyser, and brief resolution now
+// The style registry, the reference-frame analyzer, and brief resolution now
 // live in utils/visualStyle.ts — Characters consumes them too, and apps don't
 // import from each other. Re-exported here so B-Roll's own call sites (and any
 // persisted imports) keep working unchanged.

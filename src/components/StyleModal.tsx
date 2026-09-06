@@ -1,5 +1,5 @@
 import { useState, useRef, useLayoutEffect } from 'react'
-import { X, Palette, Sparkles, Check, ImagePlus, Package, Bookmark, Trash2 } from 'lucide-react'
+import { X, Palette, Sparkle, Check, ImagePlus, Package, Bookmark, Trash2 } from 'lucide-react'
 import Spinner from './Spinner'
 import type { StylePreset } from '../stores/types'
 import { useBankStore } from '../stores/bankStore'
@@ -22,7 +22,7 @@ const MAX_REFS = 4
 export interface StyleSelection {
   brief: string
   // Display name — set when the style came from (or was just saved to) the
-  // bank. A one-off analysed brief has none and reads as "Custom style".
+  // bank. A one-off analyzed brief has none and reads as "Custom style".
   name: string | null
   bankId: string | null
 }
@@ -136,7 +136,7 @@ export default function StyleModal({
 
   // 'browse' picks an existing look; 'create' reads a new one off references.
   const [view, setView] = useState<'browse' | 'create'>('browse')
-  // The analysed paragraph, editable before it's used or saved. Empty until the
+  // The analyzed paragraph, editable before it's used or saved. Empty until the
   // vision pass returns.
   const [draftBrief, setDraftBrief] = useState('')
   const [draftName, setDraftName] = useState('')
@@ -270,7 +270,7 @@ export default function StyleModal({
     >
       {view === 'browse' ? (
         <div className="px-5 py-4">
-          {/* A one-off analysed brief isn't in the bank, so no card can carry
+          {/* A one-off analyzed brief isn't in the bank, so no card can carry
               its selected state — surface it here with a way back out. */}
           {usingCustom && !styleBankId && (
             <div className={`mb-4 rounded-2xl border px-4 py-3 ${accent.banner}`}>
@@ -322,7 +322,7 @@ export default function StyleModal({
               className="flex aspect-[9/16] w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-ink/10 bg-ink/[0.02] p-2 text-center transition-colors hover:border-ink/25 hover:bg-ink/[0.05]"
             >
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/5 text-ink-500">
-                <Sparkles className="h-4 w-4" strokeWidth={1.75} />
+                <Sparkle className="h-4 w-4" strokeWidth={1.75} />
               </span>
               <span className="text-[11px] font-semibold leading-tight tracking-tight text-ink-200">New from images</span>
             </button>
@@ -464,7 +464,7 @@ export default function StyleModal({
                     disabled={isAnalyzing}
                     className={`flex w-full items-center justify-center gap-2 rounded-full px-4 py-2.5 text-[12px] font-semibold tracking-tight text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${accent.button}`}
                   >
-                    {isAnalyzing ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    {isAnalyzing ? <Spinner className="h-3.5 w-3.5" /> : <Sparkle className="h-3.5 w-3.5" />}
                     {isAnalyzing ? 'Reading the style…' : draftBrief ? 'Re-read the style' : `Read the style from ${styleRefs.length} image${styleRefs.length === 1 ? '' : 's'}`}
                   </button>
                 </div>

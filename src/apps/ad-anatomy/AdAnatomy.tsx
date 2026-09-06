@@ -230,7 +230,7 @@ function CompletePane({ item, onReset }: { item: AdAnatomyHistoryItem; onReset: 
   if (!result) {
     return (
       <ErrorPane
-        item={{ ...item, status: 'error', errorMessage: 'Result missing. Please re-analyse.' }}
+        item={{ ...item, status: 'error', errorMessage: 'Result missing. Please re-analyze.' }}
         onRetry={onReset}
       />
     )

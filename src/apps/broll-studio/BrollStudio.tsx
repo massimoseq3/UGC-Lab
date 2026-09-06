@@ -247,10 +247,10 @@ export default function BrollStudio() {
   // without its picker would have meant a persisted format quietly staging
   // every shot with nothing on screen to see or change it.
   //
-  // Staging now has exactly one source: an analysed ad handed over by the Ad
+  // Staging now has exactly one source: an analyzed ad handed over by the Ad
   // Analyzer. `sceneStagingFor` and `BrollInput.sceneStaging` are untouched, so
   // restoring the picker is re-adding a row, not rebuilding the seam.
-  // A storyboard staged on an analysed ad, handed over from the Ad Analyzer
+  // A storyboard staged on an analyzed ad, handed over from the Ad Analyzer
   // ("Clone this with my product"). It answers the same question the Ad Format
   // row answers — how is this shot — so it OCCUPIES that row rather than adding
   // a competing one, and it supplies the staging in the format's place. The
@@ -262,7 +262,7 @@ export default function BrollStudio() {
     { sanitize: (raw) => (isAdBlueprint(raw) ? raw : null) },
   )
 
-  // Undefined unless an analysed ad is driving this session. Shared by both
+  // Undefined unless an analyzed ad is driving this session. Shared by both
   // storyboard calls.
   const sceneStaging = adBlueprint?.staging
 
@@ -315,8 +315,17 @@ export default function BrollStudio() {
       },
     },
   )
+  // Read raw and checked against the registry rather than through
+  // getAppModel, which can't be called here: it's a getter, and the compiler
+  // memoizes a plain call on a stable function into a value read once per
+  // mount (see the React Compiler note in CLAUDE.md). The check is what
+  // getAppModel would have done — a retired model falls back to the default
+  // instead of reaching generate as "Unknown video model", which is exactly
+  // what a stored 'wan/2-7' did when that entry was removed.
+  const continuousModelPick = useSettingsStore((s) => s.perAppModel['broll-studio:continuous:video'])
   const continuousModelId =
-    useSettingsStore((s) => s.perAppModel['broll-studio:continuous:video']) ?? CONTINUOUS_DEFAULT_MODEL_ID
+    (continuousModelPick && getModel(continuousModelPick) ? continuousModelPick : null) ??
+    CONTINUOUS_DEFAULT_MODEL_ID
 
   // The storyboard this workspace is waiting on. Persisted, because the run
   // outlives the page: the call goes through kie's task transport where the
@@ -473,7 +482,7 @@ export default function BrollStudio() {
     }
 
     // Ad Analyzer → "Clone this with my product". The ad's transcript becomes
-    // the script and its staging drives the shots; the analysed prompts stay
+    // the script and its staging drives the shots; the analyzed prompts stay
     // behind on purpose (see ad-anatomy/services/adBlueprint.ts).
     if (targetField === 'adBlueprint' && isAdBlueprint(data)) {
       setAdBlueprint(data)
@@ -1157,6 +1166,12 @@ export default function BrollStudio() {
   // per-app picks, so a change outlives the session being opened — announce it
   // instead of letting a history click quietly redefine their default.
   const restoreAppModel = (key: string, modelId: string) => {
+    // A history row outlives the registry: a session recorded on a model that
+    // has since been retired would otherwise write that dead id straight back
+    // into the member's persistent pick, undoing the removal migration for
+    // anyone who opens an old session. Leave the slot as it is — the workspace
+    // still restores, it just animates on whatever is picked now.
+    if (!getModel(modelId)) return
     const settings = useSettingsStore.getState()
     if (settings.perAppModel[key] === modelId) return
     settings.setAppModel(key, modelId)
@@ -1382,7 +1397,7 @@ export default function BrollStudio() {
       />
 
       {/* Visual style modal — presets, the user's saved styles, and the
-          analyse-from-references flow, all in one place. */}
+          analyze-from-references flow, all in one place. */}
       <StyleModal
         open={styleModalOpen}
         onClose={() => setStyleModalOpen(false)}

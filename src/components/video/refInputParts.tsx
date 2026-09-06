@@ -46,7 +46,7 @@ export function RefGroup({
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5 px-0.5">
         {filled != null && <StatusDot filled={filled} required={required} />}
-        <span className="text-[11px] font-medium uppercase tracking-widest text-ink-300">{label}</span>
+        <span className="text-[11px] font-medium uppercase tracking-wider text-ink-300">{label}</span>
         {count != null && max != null && (
           <span className="text-[10px] tabular-nums text-ink-600">
             {count}/{max}

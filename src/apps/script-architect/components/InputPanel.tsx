@@ -1,5 +1,5 @@
 import { useState, type ComponentType } from 'react'
-import { Package, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkles, Shuffle, FishingHook, Video, Clock, Layers } from 'lucide-react'
+import { Package, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkle, Shuffle, FishingHook, Video, Clock, Layers } from 'lucide-react'
 import type { Product, Script } from '../../../stores/types'
 import { WRITE_LENGTHS, REMIX_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNTS, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type HookCount, type VariationCount } from '../types'
 import { useBankStore } from '../../../stores/bankStore'
@@ -1101,7 +1101,7 @@ export default function InputPanel({
                   }`}
                 >
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${active ? 'bg-scripts-500/10 text-scripts-text' : 'bg-ink/5 text-ink-500'}`}>
-                    {choice === 'auto' ? <Sparkles className="h-5 w-5" strokeWidth={1.75} /> : <FishingHook className="h-5 w-5" strokeWidth={1.75} />}
+                    {choice === 'auto' ? <Sparkle className="h-5 w-5" strokeWidth={1.75} /> : <FishingHook className="h-5 w-5" strokeWidth={1.75} />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className={`text-[13px] font-medium tracking-tight ${active ? 'text-scripts-300' : 'text-ink-200'}`}>
@@ -1240,7 +1240,7 @@ function ScriptBankCard({
 function EditableField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-500">{label}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">{label}</span>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

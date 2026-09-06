@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { X, ImagePlus, Download, AlertCircle, Sparkles, Check, Package, Users, Star, Tag } from 'lucide-react'
+import { X, ImagePlus, Download, AlertCircle, Sparkle, Check, Package, Users, Star, Tag } from 'lucide-react'
 import Spinner from '../../components/Spinner'
 import type { Product } from '../../stores/types'
 import { useAssetUrl } from '../../hooks/useAssetUrl'
@@ -9,6 +9,7 @@ import { downloadImage } from '../../utils/downloadImage'
 import { imageRejectionReason, partitionImageFiles, IMAGE_ACCEPT_ATTR } from './services/imageValidation'
 import { humanizeError } from '../../utils/friendlyError'
 import { fileToDataUri } from '../../utils/kie'
+import DropOverlay from '../../components/DropOverlay'
 import SegmentedToggle from '../../components/SegmentedToggle'
 import ExpandTextModal, { ExpandButton, BracketGrowArea, BracketInput } from '../../components/ExpandableText'
 import AutoGrowTextarea from '../../components/AutoGrowTextarea'
@@ -619,14 +620,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
       onDrop={handleDrop}
       className="relative flex flex-col gap-4 lg:min-h-0 lg:flex-1"
     >
-      {overlayActive && (
-        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-xl border-2 border-dashed border-emerald-400/60 bg-emerald-500/10 backdrop-blur-sm">
-          <div className="flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-emerald-200">
-            <Sparkles className="h-4 w-4" />
-            Drop image to auto-fill product info
-          </div>
-        </div>
-      )}
+      {overlayActive && <DropOverlay icon={Sparkle} label="Drop image to Auto-fill Product Info" accent="emerald" />}
       {/* Header — title, what the autosave is doing, and the way out. The
           primary action lives up here now: as a slab pinned across the field
           column it read as the bottom of the form, which is exactly why nobody
@@ -701,7 +695,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
               className="group flex aspect-[3/2] w-full shrink-0 flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] px-3 text-center transition-colors hover:border-ink/20 md:aspect-square"
             >
               <ImagePlus className="h-6 w-6 text-ink-600 transition-colors group-hover:text-ink-400" />
-              <span className="text-[10px] font-medium uppercase tracking-widest text-ink-600 transition-colors group-hover:text-ink-500">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-ink-600 transition-colors group-hover:text-ink-500">
                 Drop to auto-fill
               </span>
             </button>
@@ -715,7 +709,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
               disabled={isExtracting}
               className="flex shrink-0 items-center justify-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-4 py-2 text-[12px] font-medium text-emerald-300 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 light:text-emerald-700"
             >
-              {isExtracting ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {isExtracting ? <Spinner className="h-3.5 w-3.5" /> : <Sparkle className="h-3.5 w-3.5" />}
               {isExtracting
                 ? 'Extracting…'
                 : `Auto-fill from ${form.extraImages.length > 0 ? `${form.extraImages.length + 1} photos` : 'image'}${listingText.trim() ? ' + copy' : ''}`}

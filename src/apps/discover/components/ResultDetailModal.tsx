@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { ArrowUpRight, Bookmark, BookmarkCheck, Download, Eye, ExternalLink, FileText, PenLine, RotateCw, Sparkles, X } from 'lucide-react'
+import { ArrowUpRight, Bookmark, BookmarkCheck, Download, Eye, ExternalLink, FileText, PenLine, RotateCw, Sparkle, X } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
@@ -216,7 +216,7 @@ export default function ResultDetailModal({
                     : undefined}
                   className="inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5"
                 >
-                  {isInstagram ? <Sparkles className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
+                  {isInstagram ? <Sparkle className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
                   {isInstagram ? 'Transcribe with AI · 10-30s' : 'Get transcript · 1 credit'}
                 </button>
               )}
@@ -253,7 +253,7 @@ export default function ResultDetailModal({
                     onClick={() => onFetchTranscript(result, true)}
                     className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-ink/10 px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:border-ink/20 hover:bg-ink/5"
                   >
-                    <Sparkles className="h-3.5 w-3.5" />
+                    <Sparkle className="h-3.5 w-3.5" />
                     Transcribe with AI · 10 credits
                   </button>
                 </div>

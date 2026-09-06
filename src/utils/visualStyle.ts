@@ -135,7 +135,7 @@ export function getContinuousStyle(id: string): ContinuousStyle {
 }
 
 // Whether this storyboard keeps the app-wide iPhone-realism suffix. A style
-// analysed from reference images is stylized by assumption — the user picks
+// analyzed from reference images is stylized by assumption — the user picks
 // UGC Realism explicitly when they want the live-action stack.
 export function styleUsesRealism(styleId: string, hasCustomBrief: boolean): boolean {
   if (hasCustomBrief) return false
@@ -213,7 +213,7 @@ export function styleBriefFor(input: { styleId: string; styleBrief?: string }): 
 // ── Stills ─────────────────────────────────────────────────────
 // Every brief is written for motion: it ends on camera language (movement,
 // judder, cadence, grain) that a single still portrait can't express, and a
-// custom brief analysed from video frames carries the same. Rather than author
+// custom brief analyzed from video frames carries the same. Rather than author
 // a second set of paragraphs — and leave bank styles with no still variant —
 // a still generation appends one instruction that scopes the brief down. The
 // medium, forms, palette, light and finish still apply; only the motion talk

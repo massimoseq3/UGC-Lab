@@ -1,6 +1,6 @@
 import { memo, useMemo, useRef, useState, useEffect } from 'react'
 import { ArrowLeft,
-  Download, Bookmark, Check, CheckSquare, Film, Image as ImageIcon, Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy, LayoutGrid, List, Maximize2,
+  Download, Bookmark, Check, Film, Image as ImageIcon, Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy, LayoutGrid, List, Maximize2,
 } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import { useBankStore } from '../../../stores/bankStore'
@@ -120,8 +120,8 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
 
   const visibleInFlight = filterMode ? inFlight.filter((g) => g.mode === filterMode) : inFlight
 
-  // The clips this grid is currently showing, newest first — what Select works
-  // over, and the order they land in the zip.
+  // The clips this grid is currently showing, newest first — what Download
+  // clips works over, and the order they land in the zip.
   const videoEntries = useMemo(
     () => entries.filter((e): e is Extract<HistoryEntry, { kind: 'video' }> => e.kind === 'video'),
     [entries],
@@ -276,8 +276,8 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                 : 'border-ink/10 text-ink-400 hover:bg-ink/5 hover:text-ink-200'
             }`}
           >
-            {selecting ? <X className="h-3.5 w-3.5" /> : <CheckSquare className="h-3.5 w-3.5" />}
-            {selecting ? 'Cancel' : 'Select'}
+            {selecting ? <X className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
+            {selecting ? 'Cancel' : 'Download clips'}
           </button>
         )}
         <ViewToggle value={viewMode} onChange={setViewMode} />
