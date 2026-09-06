@@ -2098,10 +2098,15 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
           slide under its frosted glass as you read. Absolute, not `sticky`: it
           is a sibling of the scroller and never moves, so the compositor can't
           leave it a frame behind its own container — the artifact that took the
-          glass off B-Roll's storyboard strips. */}
+          glass off B-Roll's storyboard strips. The GLASS is on the pill, not on
+          a full-width bar: the bar drew a second panel edge across the top of
+          the takes for a control that only ever occupies its middle, and a
+          backdrop root spanning the pane is a wider invalidation than a
+          switcher needs. The row it sits in is `pointer-events-none`, so the
+          dead space either side of the pill still scrolls the takes under it. */}
       {variations.length > 1 && (
-        <div className="absolute inset-x-0 top-0 z-20 flex h-[53px] select-none items-center justify-center border-b border-ink/5 bg-surface-1/70 px-5 backdrop-blur-2xl backdrop-saturate-150 light:bg-white/70">
-          <div className="flex items-center gap-1 rounded-full border border-ink/10 bg-ink/[0.02] p-0.5">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-[53px] select-none items-center justify-center px-5">
+          <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-ink/10 bg-surface-1/70 p-0.5 shadow-[0_6px_20px_-8px_rgba(0,0,0,0.45)] backdrop-blur-2xl backdrop-saturate-150 light:bg-white/70">
             {variations.map((_, i) => (
               <button
                 key={i}
