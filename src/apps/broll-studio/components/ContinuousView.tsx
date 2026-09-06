@@ -48,7 +48,7 @@ import { useBankStore } from '../../../stores/bankStore'
 import { useSettingsStore } from '../../../stores/settingsStore'
 import { useAppStore } from '../../../stores/appStore'
 import { useCreditsStore } from '../../../stores/creditsStore'
-import { useAssetUrl } from '../../../hooks/useAssetUrl'
+import { useAssetUrl, useAssetPoster, posterVideoProps, posterPending } from '../../../hooks/useAssetUrl'
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { TileActionStack, TileActionButton } from '../../../components/tileActions'
@@ -2340,6 +2340,7 @@ function ClipCard({
     ? clipState.videos[Math.min(clipState.currentVideoIndex, clipState.videos.length - 1)]
     : undefined
   const videoUrl = useAssetUrl(currentVideo?.url ?? '')
+  const videoPoster = useAssetPoster(currentVideo?.url ?? null)
   const startUrl = useAssetUrl(startRef ?? '')
   const activeClipInFlight = clipState?.inFlightVideos.find((e) => !e.error)
   const inFlight = !!activeClipInFlight
@@ -2384,9 +2385,14 @@ function ClipCard({
           <>
             <video
               {...inline.videoProps}
-              src={videoUrl}
+              {...posterVideoProps(videoUrl, videoPoster)}
               className="absolute inset-0 h-full w-full object-cover"
             />
+            {posterPending(videoPoster) && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <Spinner className="h-5 w-5 text-white/50" />
+              </div>
+            )}
             <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 to-transparent" />
             {/* Always-visible play/pause — top-left. On click, plays with audio
                 in place (stopPropagation keeps the detail modal from opening). */}

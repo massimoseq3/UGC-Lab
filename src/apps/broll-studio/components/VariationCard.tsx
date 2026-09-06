@@ -22,7 +22,7 @@ import { claimTask, releaseTask } from '../services/taskRegistry'
 import { isPollTimeout } from '../../../utils/kie'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
-import { useAssetUrl } from '../../../hooks/useAssetUrl'
+import { useAssetUrl, useAssetPoster, posterVideoProps, posterPending } from '../../../hooks/useAssetUrl'
 import { getAsBase64, getUrl, isAssetRef } from '../../../utils/assetStore'
 import { getModel, getDefaultModel, type VideoMode, type ImageResolution } from '../../../utils/models'
 import { useSettingsStore } from '../../../stores/settingsStore'
@@ -159,6 +159,9 @@ export default function VariationCard(props: VariationCardProps) {
     : null
   const resolvedImageUrl = useAssetUrl(coverImage?.imageUrl)
   const resolvedVideoUrl = useAssetUrl(coverVideo?.url)
+  // The card face is the clip's poster until it's hovered — a storyboard is a
+  // row of these, and a <video> each with a decoder each is what Safari parks.
+  const coverPoster = useAssetPoster(coverVideo?.url)
   const [detailOpen, setDetailOpen] = useState(false)
   // Which tab the modal lands on. The card body opens on Image — the still is
   // the first thing the card needs — and the hover shortcuts jump to any tab.
@@ -1040,9 +1043,14 @@ export default function VariationCard(props: VariationCardProps) {
                   and isn't reset when the mouse leaves. */}
               <video
                 {...cardVideo.videoProps}
-                src={resolvedVideoUrl}
+                {...posterVideoProps(resolvedVideoUrl, coverPoster)}
                 className="absolute inset-0 h-full w-full object-cover"
               />
+              {posterPending(coverPoster) && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <Spinner className="h-5 w-5 text-white/50" />
+                </div>
+              )}
               <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 to-transparent" />
               {/* Always-visible play/pause — top-left, the corner the type chip
                   vacated when it moved to centre. On click, plays with audio in

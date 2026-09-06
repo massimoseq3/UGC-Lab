@@ -1314,6 +1314,7 @@ function ClipVideoTile({
   return (
     <ModalVideoPlayer
       url={url}
+      videoRef={video.url}
       onClick={onSelect}
       className={selected ? 'border-broll-500/70 ring-2 ring-broll-500/40' : onSelect ? 'border-ink/10 hover:border-ink/30' : 'border-ink/10'}
       actions={

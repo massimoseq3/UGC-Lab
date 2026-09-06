@@ -459,12 +459,13 @@ export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew
 function CoverTile({ media, className = '' }: { media: CoverMedia; className?: string }) {
   // A still shows its grid-sized thumbnail (utils/mediaThumbs), never the
   // original: this mosaic is a few dozen tiles of ~100px, and every one used
-  // to decode a full-size render. A clip shows its poster frame once one has
-  // been captured — that's a picture, where a <video> is a decoder — and only
-  // mounts the element to capture it the first time.
+  // to decode a full-size render. A clip shows its poster frame — that's a
+  // picture, where a <video> is a decoder — made off screen through
+  // mediaThumbs' poster queue the first time this browser sees the clip. The
+  // element is only mounted for a clip no poster will ever come for.
   const still = useAssetThumb(media.kind === 'image' ? media.ref : null)
   const poster = useAssetPoster(media.kind === 'video' ? media.ref : null)
-  const clip = useAssetUrl(media.kind === 'video' && !poster.url ? media.ref : null)
+  const clip = useAssetUrl(media.kind === 'video' && poster.status === 'missing' ? media.ref : null)
   if (media.kind === 'video') {
     if (poster.url) return <img src={poster.url} alt="" loading="lazy" decoding="async" className={`${className} h-full w-full object-cover`} />
     if (!clip) return <span className={`${className} h-full w-full bg-ink/[0.05]`} />

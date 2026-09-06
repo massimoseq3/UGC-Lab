@@ -36,13 +36,16 @@
 // comparison: it lands 400px AHEAD, below the viewport, where nothing above it
 // moves.
 //
-// `release: true` is for a <video>, where the scarce thing is real: each
-// element holds a whole clip in memory and takes one of the browser's decoders,
-// of which there are far fewer than a working member has clips — past the
-// budget the extra elements never paint at all, so the grid sits black while
-// the tab stalls on the reads. A releasing tile must hold its own dimensions,
-// which every caller does by putting a fixed aspect on the FRAME rather than
-// letting the media size it, so nothing moves when it comes and goes.
+// `release: true` is for a <video>, where the scarce thing is real: a clip
+// that has been played holds its buffered data and one of the browser's
+// decoders, of which there are far fewer than a working member has clips —
+// past the budget the extra elements never paint at all. (At REST a grid
+// <video> is `preload="none"` wearing its poster and holds neither — see
+// utils/mediaThumbs — so releasing is the valve for the ones that got
+// hovered, not the thing keeping the count down.) A releasing tile must hold
+// its own dimensions, which every caller does by putting a fixed aspect on the
+// FRAME rather than letting the media size it, so nothing moves when it comes
+// and goes.
 //
 // `seen` is the sticky half of `near`: true from the first approach and never
 // false again, whatever `release` does afterwards. It's for what a releasing

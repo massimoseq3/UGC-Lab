@@ -16,7 +16,7 @@ import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Download, Check, Star, Film } from 'lucide-react'
 import Spinner from './Spinner'
-import { useAssetUrl, useAssetPoster } from '../hooks/useAssetUrl'
+import { useAssetUrl, useAssetPoster, posterVideoProps, posterPending } from '../hooks/useAssetUrl'
 import useNearViewport from '../hooks/useNearViewport'
 import { useAppStore } from '../stores/appStore'
 import { downloadAssetsZip } from '../utils/downloadZip'
@@ -204,8 +204,8 @@ function ClipTile({
   // grid black while the tab stalled. See hooks/useNearViewport.
   const { ref: tileRef, near, seen } = useNearViewport<HTMLButtonElement>(scrollRoot, undefined, { release: true })
   const url = useAssetUrl(near ? entry.ref : null)
-  // Keyed on SEEN: the poster is what a released tile keeps showing, and what
-  // the <video> wears until its first frame decodes when the clip comes back.
+  // Keyed on SEEN: the poster is what the tile IS at rest, what a released tile
+  // keeps showing, and what the <video> wears until its first frame decodes.
   const poster = useAssetPoster(seen ? entry.ref : null)
   return (
     <div className="flex flex-col gap-1.5">
@@ -220,14 +220,13 @@ function ClipTile({
         style={aspectStyle(entry.aspectRatio ?? '9:16')}
       >
         {url ? (
+          // `preload="none"` wearing its poster: a wall of clips holds no
+          // decoder until one is hovered. See Playground's grid tile.
           <video
-            src={url}
-            poster={poster.url}
-            onLoadedData={(e) => poster.capture(e.currentTarget)}
+            {...posterVideoProps(url, poster)}
             muted
             loop
             playsInline
-            preload="metadata"
             className={`h-full w-full object-cover transition-opacity ${picked ? '' : 'opacity-45'}`}
             onMouseEnter={(e) => { (e.currentTarget as HTMLVideoElement).play().catch(() => {}) }}
             onMouseLeave={(e) => { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
@@ -239,9 +238,14 @@ function ClipTile({
           // spinner: forty spinning icons off screen is forty animations the
           // browser keeps ticking, and nothing is actually loading down there.
           <div className="flex h-full w-full items-center justify-center">
-            {near
+            {near || poster.status === 'loading'
               ? <Spinner className="h-4 w-4 text-white/40" />
               : <Film className="h-4 w-4 text-white/20" />}
+          </div>
+        )}
+        {url && posterPending(poster) && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <Spinner className="h-4 w-4 text-white/40" />
           </div>
         )}
         <span
