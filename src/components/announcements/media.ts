@@ -27,9 +27,17 @@ export function youtubeId(url: string | null | undefined): string | null {
   }
 }
 
-/** YouTube's own thumbnail for a video id — no upload, no storage, no expiry. */
-export function youtubeThumb(id: string): string {
-  return `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
+/**
+ * YouTube's own thumbnail for a video id — no upload, no storage, no expiry.
+ *
+ * The two sizes are two SHAPES, not two resolutions: `hqdefault` is 480x360,
+ * so a 16:9 video comes back letterboxed inside a 4:3 frame, which a card
+ * cropping to fill never notices. `mqdefault` is a true 320x180 with no bars,
+ * which is what a small tile row needs — at 56px wide, cropping a third of a
+ * `hqdefault` away leaves a thumbnail with nothing in it.
+ */
+export function youtubeThumb(id: string, size: 'hq' | 'mq' = 'hq'): string {
+  return `https://i.ytimg.com/vi/${id}/${size}default.jpg`
 }
 
 /** True for a link we can safely turn into an <a href>. */
