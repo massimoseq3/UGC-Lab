@@ -119,9 +119,13 @@ export const DEFAULT_REMIX_LENGTH: RemixLength = 'default'
 export const isRemixLength = (value: unknown): value is RemixLength =>
   value === 'default' || isWriteLength(value)
 
-export const WRITE_STYLE_GROUP_META: Record<WriteStyleGroup, { label: string; hint: string }> = {
-  structure: { label: 'Structures', hint: 'How the argument is built' },
-  format: { label: 'Formats', hint: 'The kind of content the ad is disguised as' },
+// Display order — this object's key order IS the picker's section order. The
+// per-group hint came out in September 2026: it restated the heading it sat
+// under, and every option in the group carries a hint of its own that says
+// something the heading can't.
+export const WRITE_STYLE_GROUP_META: Record<WriteStyleGroup, { label: string }> = {
+  structure: { label: 'Structures' },
+  format: { label: 'Formats' },
 }
 
 export const WRITE_STYLE_META: Record<WriteStyle, { label: string; hint: string; group: WriteStyleGroup }> = {

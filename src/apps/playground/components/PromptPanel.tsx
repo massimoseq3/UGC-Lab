@@ -54,6 +54,8 @@ import { STYLE_PREVIEWS, PLAYGROUND_STYLE_ACCENT } from '../../../components/sty
 import { CONTINUOUS_STYLES, styleBriefFor, styleBriefForStill } from '../../../utils/visualStyle'
 import { useBankStore } from '../../../stores/bankStore'
 import Modal from '../../../components/Modal'
+import SectionRail, { GallerySectionHeading } from '../../../components/SectionRail'
+import { GALLERY_GRID, useSectionSpy } from '../../../components/sectionSpy'
 import ExpandTextModal, { BracketHighlightArea } from '../../../components/ExpandableText'
 import SectionCard from '../../../components/SectionCard'
 import PromptToolbar from '../../../components/PromptToolbar'
@@ -170,6 +172,8 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
   const [dragOver, setDragOver] = useState(false)
   // Preset picker overlay.
   const [presetOpen, setPresetOpen] = useState(false)
+  // The preset modal's rail: two sections, one scroll.
+  const presetSpy = useSectionSpy(['styles', 'presets'])
   // Video mode swaps the inline model dropdown for the full picker modal.
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
   // Full-screen prompt editor.
@@ -1025,7 +1029,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                          name is one click away rather than permanently on
                          screen. */
                       onPresets={presetsApplicable ? () => setPresetOpen(true) : undefined}
-                      presetsTitle="UGC prompt presets and visual styles"
+                      presetsTitle="UGC Prompt Presets & Visual Styles"
                       onEnhance={handleEnhancePrompt}
                       enhanceTitle="Enhance prompt"
                       enhanceDisabled={!state.prompt.trim()}
@@ -1075,11 +1079,29 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             open={presetOpen}
             onClose={() => setPresetOpen(false)}
             title="UGC Prompt Presets & Visual Styles"
-            subtitle="Add a look, a format, or both. Each one appends to your prompt"
-            // 672px rather than the default 512: these tiles are the only thing
-            // that says what a format looks like, and three across a narrower
-            // panel makes the frame too small to read the shot.
-            size="medium"
+            // The Characters preset picker's own width, because this is the
+            // longest picture library in the app: fourteen prompt presets under
+            // seven looks and your own saved styles. Three tiles across a 672px
+            // panel made that six screens of scroll. It is the one gallery here
+            // that still scrolls at all, which is exactly what earns it the
+            // rail — one click to the presets instead of three rows.
+            size="gallery"
+            rail={
+              <SectionRail
+                sections={[
+                  { key: 'styles', label: 'Visual Styles', count: CONTINUOUS_STYLES.length + savedStyles.length },
+                  { key: 'presets', label: 'Prompt Presets', count: (state.mode === 'image' ? IMAGE_PRESETS : VIDEO_PRESETS).length },
+                ]}
+                activeKey={presetSpy.activeKey}
+                accent="playground"
+                onJump={presetSpy.jumpTo}
+              />
+            }
+            bodyRef={presetSpy.portRef}
+            onBodyScroll={presetSpy.onScroll}
+            // A body that scrolls holds its height, or the rail's rows move
+            // under the pointer as the panel resizes itself.
+            fill
           >
             {/* Visual styles FIRST: a look is the broader decision — it applies to
                 anything you were going to make — where a preset is one specific
@@ -1089,8 +1111,8 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 no style of its own, it appends the brief to the prompt, which is
                 then the member's to edit like anything else they typed. */}
             <div className="px-4 py-3">
-              <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-ink-600">Visual styles</p>
-              <div className="grid grid-cols-3 gap-2">
+              <GallerySectionHeading label="Visual Styles" innerRef={presetSpy.register('styles')} className="mb-2.5" />
+              <div className={GALLERY_GRID}>
                 {CONTINUOUS_STYLES.map((s) => (
                   <StyleTile
                     key={s.id}
@@ -1116,8 +1138,8 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 ))}
               </div>
 
-              <p className="mb-2.5 mt-6 text-[11px] font-medium uppercase tracking-wider text-ink-600">UGC prompt presets</p>
-              <div className="grid grid-cols-3 gap-2">
+              <GallerySectionHeading label="Prompt Presets" innerRef={presetSpy.register('presets')} className="mb-2.5 mt-6" />
+              <div className={GALLERY_GRID}>
                 {(state.mode === 'image' ? IMAGE_PRESETS : VIDEO_PRESETS).map((preset) => (
                   <PresetCard
                     key={preset.id}

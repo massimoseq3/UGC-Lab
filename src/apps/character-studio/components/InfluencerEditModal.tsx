@@ -973,7 +973,7 @@ export default function InfluencerEditModal({
         onAnalyze={handleAnalyzeStyleRefs}
         isAnalyzing={isAnalyzingStyle}
         accent={INFLUENCERS_STYLE_ACCENT}
-        subjectLabel="character"
+        railAccent="influencers"
       />
     </>,
     document.body,

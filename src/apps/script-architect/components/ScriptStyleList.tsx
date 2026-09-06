@@ -1,4 +1,5 @@
 import { FileText, Video } from 'lucide-react'
+import { GallerySectionHeading } from '../../../components/SectionRail'
 import {
   WRITE_STYLE_META,
   WRITE_STYLE_GROUP_META,
@@ -23,6 +24,7 @@ export default function ScriptStyleList({
   onSelect,
   accent = 'scripts',
   formatsFirst = false,
+  registerSection,
 }: {
   // The active style, or null when nothing has been picked yet.
   value: WriteStyle | null
@@ -34,6 +36,8 @@ export default function ScriptStyleList({
   // where the question is how the argument is built. Same list either way —
   // only the reading order changes.
   formatsFirst?: boolean
+  // The rail's `register(key)` for each group, so a jump lands on its heading.
+  registerSection?: (group: WriteStyleGroup) => (el: HTMLElement | null) => void
 }) {
   const activeRing = accent === 'broll'
     ? 'border-broll-500/30 bg-broll-500/10'
@@ -52,19 +56,28 @@ export default function ScriptStyleList({
     : groups
 
   return (
-    <div className="flex flex-col gap-5 p-4">
+    <div className="flex flex-col gap-4 px-4 py-3">
       {ordered.map((group) => {
         const GroupIcon = group === 'format' ? Video : FileText
         return (
           <div key={group} className="flex flex-col gap-2">
-            <div className="px-1">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-                {WRITE_STYLE_GROUP_META[group].label}
-              </div>
-              <div className="mt-0.5 text-[11px] leading-snug text-ink-600">
-                {WRITE_STYLE_GROUP_META[group].hint}
-              </div>
-            </div>
+            {/* The group hint under the heading is gone (September 2026,
+                Massimo's call): "how the argument is built" restated the
+                heading, and every option under it carries a hint of its own
+                that actually says something. */}
+            <GallerySectionHeading
+              label={WRITE_STYLE_GROUP_META[group].label}
+              innerRef={registerSection?.(group)}
+              className="px-1"
+            />
+            {/* Two across from `lg`. Seventeen options in one column left the
+                other 600px of a 768px panel doing nothing and put structures
+                and formats a scroll apart, when they are two halves of one
+                decision. TWO and not three: at three the hints wrap to a second
+                line, and a pill three text-lines tall stops reading as a pill —
+                at two, every hint still fits on one line and the rows keep the
+                fully-rounded shape they have everywhere else. */}
+            <div className="grid grid-cols-1 gap-1.5 lg:grid-cols-2">
             {writeStylesInGroup(group).map((style) => {
               const active = style === value
               return (
@@ -72,7 +85,7 @@ export default function ScriptStyleList({
                   key={style}
                   type="button"
                   onClick={() => onSelect(style)}
-                  className={`flex items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
+                  className={`flex items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
                     active ? activeRing : 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'
                   }`}
                 >
@@ -88,6 +101,7 @@ export default function ScriptStyleList({
                 </button>
               )
             })}
+            </div>
           </div>
         )
       })}
