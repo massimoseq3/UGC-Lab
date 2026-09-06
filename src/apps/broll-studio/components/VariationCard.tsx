@@ -19,7 +19,6 @@ import { applyStyleToPrompt } from '../services/generateContinuous'
 import { startVideoTask, finishVideoTask } from '../services/generateVideo'
 import { cardClipSeconds } from '../services/clipDuration'
 import { claimTask, releaseTask } from '../services/taskRegistry'
-import { sendClipToPlayground } from '../services/sendClipToPlayground'
 import { isPollTimeout } from '../../../utils/kie'
 import { useBankStore } from '../../../stores/bankStore'
 import { useAppStore } from '../../../stores/appStore'
@@ -1161,8 +1160,8 @@ export default function VariationCard(props: VariationCardProps) {
           )}
 
           {/* Hover-reveal action stack (components/tileActions) — app-wide
-              standard order: download · save (stills only) · copy · send-to-
-              Playground (videos only) · delete. The card body stays clickable
+              standard order: download · save (stills only) · copy · expand
+              (videos only) · delete. The card body stays clickable
               to open the detail modal. It does NOT step aside while the clip
               plays with sound: watching a take is exactly when you decide to
               keep it, and having Download / Save / Copy vanish under the
@@ -1193,14 +1192,6 @@ export default function VariationCard(props: VariationCardProps) {
                 >
                   {copiedPrompt ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
                 </TileActionButton>
-                {coverKind === 'video' && coverVideo && (
-                  <TileActionButton
-                    title="Use in Playground as a source clip"
-                    onClick={() => { void sendClipToPlayground(coverVideo) }}
-                  >
-                    <Film className="h-4 w-4" />
-                  </TileActionButton>
-                )}
                 {coverKind === 'video' && resolvedVideoUrl && (
                   <ExpandVideoButton
                     videoUrl={resolvedVideoUrl}
