@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Siren } from 'lucide-react'
 import { useAnnouncementStore, unreadCount, type Announcement } from '../../stores/announcementStore'
-import SlideOver from '../SlideOver'
+import Modal from '../Modal'
 import AnnouncementCard from './AnnouncementCard'
 
 // The announcements log — every announcement that's still live, newest first,
@@ -21,7 +21,7 @@ export default function AnnouncementsPanel() {
   const unread = unreadCount(items, readIds)
 
   return (
-    <SlideOver
+    <Modal
       open={open}
       onClose={close}
       title="Announcements"
@@ -58,7 +58,7 @@ export default function AnnouncementsPanel() {
           ))
         )}
       </div>
-    </SlideOver>
+    </Modal>
   )
 }
 

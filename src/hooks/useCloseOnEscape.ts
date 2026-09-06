@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-// Escape closes any dismissible overlay — modal, slide-over, lightbox, confirm
+// Escape closes any dismissible overlay — modal, picker, lightbox, confirm
 // sheet. Every overlay in the app already closes on a backdrop click; this is
 // the keyboard half of the same contract. It was previously hand-rolled ~10
 // times (half on `window`, half on `document`) with several overlays missing it

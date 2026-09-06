@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import SectionCard, { SectionLabel } from '../../../components/SectionCard'
 import ModelPicker from '../../../components/ModelPicker'
-import ModelSidePanel from '../../../components/ModelSidePanel'
+import ModelPickerModal from '../../../components/ModelPickerModal'
 import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
 import AspectIcon from '../../../components/AspectIcon'
@@ -92,7 +92,7 @@ interface CardDetailModalProps {
   selectedProductId?: string
   selectedModelId?: string
   selectedScriptId?: string
-  // Open the script-level BankPicker (slide-in) when the user clicks a slot.
+  // Open the script-level BankPicker when the user clicks a slot.
   onOpenCharacterPicker?: () => void
   onOpenProductPicker?: () => void
   // Additional user-attached reference images (beyond the bank-keyed Influencer
@@ -185,7 +185,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
   // Image leads: the still is the first thing a card needs, and the clip is
   // rendered (or animated) off it. Video and Animate follow.
   const [tab, setTab] = useState<Tab>(initialTab ?? 'image')
-  // Video-model picker is a slide-in side panel (like the ref-image bank
+  // Video-model picker is the full picker modal (like the ref-image bank
   // picker) rather than an inline dropdown.
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
   // How many takes of this card's prompt one press fires. Persisted per browser
@@ -795,7 +795,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                   <ModelPicker appId="broll-studio" task="image" mode="text-to-image" />
                 ) : (
                   <>
-                    {/* Trigger button — opens the slide-in ModelSidePanel.
+                    {/* Trigger button — opens ModelPickerModal.
                         Mirrors ModelPicker's trigger look (provider logo + name
                         + star + "% off"), no heading (Playground style). */}
                     <button
@@ -817,11 +817,11 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                       ) : (
                         <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
                       )}
-                      {/* Chevron signals the slide-in panel; no credits badge
+                      {/* Chevron signals the picker modal; no credits badge
                           here — costs show per-model in the panel. */}
                       <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
                     </button>
-                    <ModelSidePanel
+                    <ModelPickerModal
                       appId="broll-studio"
                       task="video"
                       isOpen={modelPanelOpen}

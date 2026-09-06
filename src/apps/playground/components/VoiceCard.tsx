@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { AudioLines, Check, ChevronDown, ChevronRight } from 'lucide-react'
 import { SectionPresetPill } from '../../../components/SectionCard'
-import SlideOver from '../../../components/SlideOver'
+import Modal from '../../../components/Modal'
 import Dropdown from '../../../components/Dropdown'
 import AutoGrowTextarea from '../../../components/AutoGrowTextarea'
 import DayPill from '../../../components/DayPill'
@@ -175,7 +175,7 @@ export default function VoiceCard({
   )
 }
 
-// The preset browser — a right-edge slide-over, the same chrome as the prompt
+// The preset browser — the app's picker modal, the same chrome as the prompt
 // presets one step above it.
 //
 // **A row is a NAME, not a paragraph.** Fourteen full profiles rendered at once
@@ -206,17 +206,20 @@ function VoicePresetPicker({
   const groups = VOICE_GROUPS.filter((g) => shown.some((p) => p.group === g))
 
   return (
-    <SlideOver
+    <Modal
       open={open}
       onClose={onClose}
       title="Voice"
       subtitle="Pick a voice. It replaces what's in the box, then it's yours to edit"
       size="medium"
+      // 30 voices behind two filters — the panel holds its height so the rows
+      // don't jump every time one is narrowed.
+      fill
     >
       <div className="p-4">
-        {/* `tier="panel"` is required, not decorative: this slide-over is z-[80]
-            and a default-tier menu paints at z-[60], i.e. behind the panel its
-            own trigger is on. `fitContent` so two triggers share one row. */}
+        {/* `tier="panel"` is required, not decorative: this modal is z-[80] and
+            a default-tier menu paints at z-[60], i.e. behind the panel its own
+            trigger is on. `fitContent` so two triggers share one row. */}
         <div className="flex flex-wrap items-center gap-2">
           <Dropdown
             value={gender}
@@ -259,7 +262,7 @@ function VoicePresetPicker({
           </div>
         ))}
       </div>
-    </SlideOver>
+    </Modal>
   )
 }
 

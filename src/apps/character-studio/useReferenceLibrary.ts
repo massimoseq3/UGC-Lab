@@ -44,7 +44,7 @@ async function runPool<T>(items: T[], limit: number, fn: (item: T) => Promise<vo
  * autofill the form, with the DNA it produced, kept so a face can be reused
  * without paying for the analysis again.
  *
- * Lives here rather than inside the slide-over so a bulk analysis keeps running
+ * Lives here rather than inside the modal so a bulk analysis keeps running
  * when the panel is closed (the same rule the app's generations follow).
  * `onApply` fires only for a SINGLE dropped file — that's the "drop a photo,
  * the form fills" gesture. A bulk add never overwrites the form on its own;

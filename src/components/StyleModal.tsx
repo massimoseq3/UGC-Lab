@@ -7,7 +7,7 @@ import { useAppStore } from '../stores/appStore'
 import { useAssetUrl } from '../hooks/useAssetUrl'
 import { saveFromDataUrl } from '../utils/assetStore'
 import { CONTINUOUS_STYLES } from '../utils/visualStyle'
-import SlideOver from './SlideOver'
+import Modal from './Modal'
 // Preview art + the per-app accent palettes. They live in their own module so a
 // host that only needs an accent (or, like Playground, only the artwork) doesn't
 // drag the whole modal in with it — see the note at the top of styleArt.ts.
@@ -145,7 +145,7 @@ export default function StyleModal({
   const dragDepth = useRef(0)
 
   // Every open lands on the browse view with a clean draft. The panel stays
-  // mounted (SlideOver animates it in and out), so this replaces the remount-
+  // mounted (Modal animates it in and out), so this replaces the remount-
   // on-open key the hosts used to pass; a layout effect runs before paint, so
   // the previous session's create view never flashes.
   const wasOpen = useRef(open)
@@ -224,7 +224,7 @@ export default function StyleModal({
   }
 
   return (
-    <SlideOver
+    <Modal
       open={open}
       onClose={onClose}
       onBack={view === 'create' ? backToBrowse : undefined}
@@ -234,10 +234,11 @@ export default function StyleModal({
           ? 'The look is read from these frames, never their subjects'
           : `The look every ${subjectLabel} is rendered in`
       }
-      // The standard 380px panel, matching the Characters preset picker: the
-      // browse grid is three 9:16 tiles across now rather than two text cards,
-      // so a look is picked off its picture and the whole list fits without
-      // scrolling past the presets to reach your own styles.
+      // The standard 512px panel, matching the Characters preset picker's
+      // proportions: the browse grid is three 9:16 tiles across rather than two
+      // text cards, so a look is picked off its picture and the whole list fits
+      // without scrolling past the presets to reach your own styles. The create
+      // view is wider — it's a drop zone over a brief, not a grid of tiles.
       size={view === 'create' ? 'wide' : 'default'}
       // The create view routes to the host's own BankPicker for reference
       // frames, and that picker has to land on top of this panel.
@@ -496,7 +497,7 @@ export default function StyleModal({
           )}
         </div>
       )}
-    </SlideOver>
+    </Modal>
   )
 }
 

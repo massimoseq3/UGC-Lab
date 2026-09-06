@@ -8,7 +8,7 @@ import {
 } from '../types'
 
 // The sectioned Script Style list — Structures over Formats — as it appears
-// inside a slide-over.
+// inside the picker modal.
 //
 // Shared because B-Roll picks the same styles now: a member with no script
 // picks one there and B-Roll writes the script AND stages the shots from it.

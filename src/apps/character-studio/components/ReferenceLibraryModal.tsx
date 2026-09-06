@@ -1,12 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
 import { AlertCircle, RotateCw, ScanFace, Search, Upload } from 'lucide-react'
-import SlideOver from '../../../components/SlideOver'
+import Modal from '../../../components/Modal'
 import DayPill from '../../../components/DayPill'
 import { TileDeleteButton } from '../../../components/tileActions'
 import { groupByDay, sectionLabel } from '../../../utils/history'
 import { describeRefProfile, INTERRUPTED_REF_ERROR, type CharacterRefItem } from '../types'
 
-interface ReferenceLibrarySlideOverProps {
+interface ReferenceLibraryModalProps {
   open: boolean
   onClose: () => void
   items: CharacterRefItem[]
@@ -24,7 +24,7 @@ interface ReferenceLibrarySlideOverProps {
 // Search only earns its row once the list is long enough to scroll.
 const SEARCH_THRESHOLD = 5
 
-export default function ReferenceLibrarySlideOver({
+export default function ReferenceLibraryModal({
   open,
   onClose,
   items,
@@ -36,7 +36,7 @@ export default function ReferenceLibrarySlideOver({
   onRetry,
   canRetry,
   onRemove,
-}: ReferenceLibrarySlideOverProps) {
+}: ReferenceLibraryModalProps) {
   const [query, setQuery] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -56,7 +56,7 @@ export default function ReferenceLibrarySlideOver({
 
   // stopPropagation matters even though this panel is portaled to the body:
   // React synthetic events travel the REACT tree, not the DOM one, and the
-  // slide-over is a child of CharacterStudio's full-area drop zone. Without it
+  // modal is a child of CharacterStudio's full-area drop zone. Without it
   // every drop here ran addFiles twice — a 5-photo drop became 10 vision calls.
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -67,11 +67,15 @@ export default function ReferenceLibrarySlideOver({
   }
 
   return (
-    <SlideOver
+    <Modal
       open={open}
       onClose={onClose}
       title="Extract Character DNA"
       subtitle="Fill the form from a reference photo"
+      // Held at full height only once the list is long enough to carry a search
+      // box — below that the panel is a drop zone over a handful of rows, and a
+      // fixed 86vh would stand it in an empty box.
+      fill={items.length > SEARCH_THRESHOLD}
     >
       <div className="border-b border-ink/5 p-4">
         <div
@@ -152,7 +156,7 @@ export default function ReferenceLibrarySlideOver({
           ))}
         </div>
       )}
-    </SlideOver>
+    </Modal>
   )
 }
 

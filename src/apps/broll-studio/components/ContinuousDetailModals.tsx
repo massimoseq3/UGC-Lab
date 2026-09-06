@@ -11,7 +11,7 @@ import { clampBatchCount } from '../../../utils/batchCount'
 import { usePersistedState } from '../../../hooks/usePersistedState'
 import AspectIcon from '../../../components/AspectIcon'
 import ModelPicker from '../../../components/ModelPicker'
-import ModelSidePanel from '../../../components/ModelSidePanel'
+import ModelPickerModal from '../../../components/ModelPickerModal'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
@@ -548,7 +548,7 @@ export function ContinuousFrameModal({
                     )}
                     <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
                   </button>
-                  <ModelSidePanel
+                  <ModelPickerModal
                     appId="broll-studio"
                     task="video"
                     allowedModelIds={CONTINUOUS_MODEL_IDS}
@@ -1095,7 +1095,7 @@ export function ContinuousClipModal({
               )}
               <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
             </button>
-            <ModelSidePanel
+            <ModelPickerModal
               appId="broll-studio"
               task="video"
               allowedModelIds={CONTINUOUS_MODEL_IDS}
