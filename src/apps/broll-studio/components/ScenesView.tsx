@@ -27,6 +27,7 @@ import ClipDownloadModal, { type ClipDownloadEntry } from '../../../components/C
 import { useCloseOnAppSwitch } from '../../../hooks/useCloseOnAppSwitch'
 import useCloseOnEscape from '../../../hooks/useCloseOnEscape'
 import AnchoredPopover from '../../../components/video/AnchoredPopover'
+import { MenuSurface, MenuItem, MENU_ROW_HEIGHT } from '../../../components/Menu'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
 
 interface ScenesViewProps {
@@ -941,49 +942,47 @@ export default function ScenesView({
             anchorRef={generateAllRef}
             open={generateAllOpen}
             onClose={() => setGenerateAllOpen(false)}
-            width={214}
-            estimatedHeight={animatableKeys.length > 0 ? 122 : 86}
-            className="overflow-hidden rounded-2xl border border-ink/10 bg-surface-2 p-1 shadow-xl"
+            width={222}
+            estimatedHeight={(animatableKeys.length > 0 ? 3 : 2) * MENU_ROW_HEIGHT + 2}
           >
-            {/* In the order the work happens: stills, then the animate pass
-                over whatever has one, then clips from the prompts. */}
-            <button
-              type="button"
-              onClick={() => {
-                setGenerateAllOpen(false)
-                requestBatch(allKeys, 'All scenes', true)
-              }}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
-            >
-              <Images className="h-3.5 w-3.5 shrink-0 text-broll-300" />
-              Generate All Images
-            </button>
-            {/* Only once there's a still to animate — nothing should render
-                from a prompt the member hasn't seen a frame of. */}
-            {animatableKeys.length > 0 && (
-              <button
-                type="button"
+            <MenuSurface className="whitespace-nowrap">
+              {/* In the order the work happens: stills, then the animate pass
+                  over whatever has one, then clips from the prompts. */}
+              <MenuItem
+                icon={Images}
+                iconClassName="text-broll-300"
                 onClick={() => {
                   setGenerateAllOpen(false)
-                  requestVideoBatch(allKeys, 'All stills', true, true)
+                  requestBatch(allKeys, 'All scenes', true)
                 }}
-                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
               >
-                <Clapperboard className="h-3.5 w-3.5 shrink-0 text-broll-300" />
-                Animate All Stills
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                setGenerateAllOpen(false)
-                requestVideoBatch(allKeys, 'All scenes', true)
-              }}
-              className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
-            >
-              <VideoIcon className="h-3.5 w-3.5 shrink-0 text-broll-300" />
-              Generate All Videos
-            </button>
+                Generate All Images
+              </MenuItem>
+              {/* Only once there's a still to animate — nothing should render
+                  from a prompt the member hasn't seen a frame of. */}
+              {animatableKeys.length > 0 && (
+                <MenuItem
+                  icon={Clapperboard}
+                  iconClassName="text-broll-300"
+                  onClick={() => {
+                    setGenerateAllOpen(false)
+                    requestVideoBatch(allKeys, 'All stills', true, true)
+                  }}
+                >
+                  Animate All Stills
+                </MenuItem>
+              )}
+              <MenuItem
+                icon={VideoIcon}
+                iconClassName="text-broll-300"
+                onClick={() => {
+                  setGenerateAllOpen(false)
+                  requestVideoBatch(allKeys, 'All scenes', true)
+                }}
+              >
+                Generate All Videos
+              </MenuItem>
+            </MenuSurface>
           </AnchoredPopover>
           {/* Download clips stays its own pill and stays neutral: it's the
               export, not a generate pass, and it spends nothing. */}

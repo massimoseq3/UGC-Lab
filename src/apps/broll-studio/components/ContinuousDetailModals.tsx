@@ -1,8 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import {
-  X, Image as ImageIcon, Video as VideoIcon, Film, Coins, Volume2, VolumeX, UserRound, Package, Link2, Download, Bookmark, Check, Trash2, Copy, ArrowDown, ChevronRight, Star, Layers, Images,
-} from 'lucide-react'
+import { X, Image as ImageIcon, Video as VideoIcon, Film, Coins, Volume2, VolumeX, UserRound, Package, Link2, Download, Bookmark, Check, Trash2, Copy, ArrowDown, ChevronRight, Layers, Images } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import SectionCard, { SectionLabel, StatusDot } from '../../../components/SectionCard'
 import ConstraintChip from '../../../components/ConstraintChip'
@@ -14,7 +12,7 @@ import ModelPicker from '../../../components/ModelPicker'
 import ModelPickerModal from '../../../components/ModelPickerModal'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import ProviderLogo from '../../../components/ProviderLogo'
-import SavingsPill from '../../../components/SavingsPill'
+import ModelTriggerLabel from '../../../components/ModelTriggerLabel'
 import ExpandTextModal from '../../../components/ExpandableText'
 import PromptToolbar from '../../../components/PromptToolbar'
 import { ReferenceSlotCard, ExtraRefsRow, ProductPhotoRow, PendingMediaTile, ModalVideoPlayer, StyleNote, InFlightFailureRow } from './cardDetailParts'
@@ -535,13 +533,11 @@ export function ContinuousFrameModal({
                     {animateModel ? (
                       <>
                         <ProviderLogo provider={animateModel.provider ?? ''} />
-                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                          <span className="truncate text-[13px] font-medium text-ink-100">{animateModel.displayName}</span>
-                          {animateModel.tags.includes('recommended') && (
-                            <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
-                          )}
-                          {officialSavingsPercent(animateModelId) != null && <SavingsPill pct={officialSavingsPercent(animateModelId)!} />}
-                        </div>
+                        <ModelTriggerLabel
+                          name={animateModel.displayName}
+                          recommended={animateModel.tags.includes('recommended')}
+                          savings={officialSavingsPercent(animateModelId)}
+                        />
                       </>
                     ) : (
                       <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
@@ -1082,13 +1078,11 @@ export function ContinuousClipModal({
               {model ? (
                 <>
                   <ProviderLogo provider={model.provider ?? ''} />
-                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                    <span className="truncate text-[13px] font-medium text-ink-100">{model.displayName}</span>
-                    {model.tags.includes('recommended') && (
-                      <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
-                    )}
-                    {officialSavingsPercent(modelId) != null && <SavingsPill pct={officialSavingsPercent(modelId)!} />}
-                  </div>
+                  <ModelTriggerLabel
+                    name={model.displayName}
+                    recommended={model.tags.includes('recommended')}
+                    savings={officialSavingsPercent(modelId)}
+                  />
                 </>
               ) : (
                 <span className="flex-1 truncate text-sm text-ink-400">Select model</span>

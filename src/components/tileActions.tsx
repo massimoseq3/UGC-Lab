@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import { Check, MoreHorizontal, Star, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Check, MoreHorizontal, MoreVertical, Star, Trash2, X, type LucideIcon } from 'lucide-react'
 import Spinner from './Spinner'
+import AnchoredPopover from './video/AnchoredPopover'
+import { MenuSurface, MenuItem, MENU_ROW_HEIGHT } from './Menu'
+import useCloseOnEscape from '../hooks/useCloseOnEscape'
 
 // The hover action controls that sit on top of a generated media tile —
 // Characters' gallery, Playground's history grid, B-Roll's variation /
@@ -298,5 +301,110 @@ export function TileDeleteButton({
           ? <Check className={ICON[size]} />
           : <Trash2 className={ICON[size]} />}
     </button>
+  )
+}
+
+/**
+ * The overflow doorway: one ⋯ circle in the stack that opens the house menu,
+ * with every action SPELLED OUT beside its glyph.
+ *
+ * A tile whose actions run past three is a column of unlabelled circles, and
+ * the glyphs stop carrying it — Characters' grid tile had seven, where a copy
+ * page, a left arrow, a frame and a grid all had to be learned by hovering for
+ * the tooltip (Massimo's call, September 2026). The rule stays what it always
+ * was: the one or two actions you reach for constantly keep their circle, and
+ * everything else moves behind the ⋯ where it can be read.
+ *
+ * Open state lives with the CALLER, because the stack has to be told to stay
+ * visible while the menu is up — the pointer is over the menu, not the tile.
+ */
+export function TileMenuButton({
+  open,
+  onToggle,
+  onClose,
+  title = 'More actions',
+  count,
+  chrome = false,
+  width = 208,
+  children,
+}: {
+  open: boolean
+  onToggle: () => void
+  onClose: () => void
+  title?: string
+  // How many rows the menu holds — only used to decide whether it flips above
+  // the trigger, so an approximate number is fine.
+  count: number
+  // `true` for a themed panel row rather than a scrim over media, matching
+  // TileDeleteButton's own two skins. It also drops the hover fade — see below.
+  chrome?: boolean
+  width?: number
+  children: ReactNode
+}) {
+  const ref = useRef<HTMLButtonElement>(null)
+  useCloseOnEscape(open, onClose)
+
+  return (
+    <>
+      <button
+        ref={ref}
+        type="button"
+        title={title}
+        aria-label={title}
+        aria-expanded={open}
+        onClick={(e) => { e.stopPropagation(); onToggle() }}
+        // `chrome` is ALWAYS visible: it sits in a panel row's own line of
+        // always-on buttons, not in a stack over media — and those rows are not
+        // `group`s, so a hover fade there never comes back (which is exactly
+        // how Characters' list-row Delete had been invisible).
+        className={`${open || chrome ? 'opacity-100' : FADE} flex shrink-0 items-center justify-center rounded-full transition-colors ${
+          chrome
+            ? 'h-7 w-7 text-ink-500 hover:bg-ink/10 hover:text-ink-200'
+            : `h-8 w-8 border ${TONE.default}`
+        }`}
+      >
+        {/* VERTICAL dots (Massimo's call): the menu it opens is a column,
+            and the button itself sits in one. The touch doorway above keeps the
+            horizontal glyph — it reveals a column rather than opening a menu,
+            and on a phone the two are stacked. */}
+        <MoreVertical className={chrome ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+      </button>
+      <AnchoredPopover
+        anchorRef={ref}
+        open={open}
+        onClose={onClose}
+        width={width}
+        estimatedHeight={count * MENU_ROW_HEIGHT + 2}
+      >
+        {/* The tile's own onClick opens something — stop a pick inside the menu
+            from reaching it. The menu is portaled to the body, so this is the
+            only place that can catch it. */}
+        <div onClick={(e) => e.stopPropagation()}>
+          <MenuSurface className="whitespace-nowrap">{children}</MenuSurface>
+        </div>
+      </AnchoredPopover>
+    </>
+  )
+}
+
+/** One labelled row inside a `TileMenuButton`. */
+export function TileMenuItem({
+  icon,
+  label,
+  onClick,
+  onClose,
+  trailing,
+}: {
+  icon: LucideIcon
+  label: string
+  onClick: () => void
+  // Picking an action shuts the menu.
+  onClose: () => void
+  trailing?: ReactNode
+}) {
+  return (
+    <MenuItem icon={icon} trailing={trailing} onClick={() => { onClose(); onClick() }}>
+      {label}
+    </MenuItem>
   )
 }

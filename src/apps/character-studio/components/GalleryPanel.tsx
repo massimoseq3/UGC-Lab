@@ -13,7 +13,7 @@ import type { CharacterHistoryItem } from '../../../stores/types'
 import { createEmptyProfile, type CharacterProfile, type InFlightCharacterGen, type LaunchGenOptions } from '../types'
 import { getModel } from '../../../utils/models'
 import SegmentedToggle from '../../../components/SegmentedToggle'
-import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
+import { TileActionStack, TileActionButton, TileDeleteButton, TileMenuButton, TileMenuItem } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
 import { AwaitingCanvas } from '../../../components/GridCanvas'
 import InfluencerEditModal from './InfluencerEditModal'
@@ -1240,6 +1240,8 @@ function HistoryTile({
   // A fitted tile is one picture on the Single stage: the original. The grid
   // tile is one of hundreds: the thumbnail.
   const a = useHistoryTileActions(item, onDelete, scrollRoot ? near : true, fitted)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const closeMenu = () => setMenuOpen(false)
 
   return (
     <div
@@ -1287,12 +1289,12 @@ function HistoryTile({
         </div>
       )}
 
-      {/* Hover actions — the shared tile stack (components/tileActions). Order
-          is the app-wide standard: Download · Save · Copy · extras · Delete.
-          The inline name input takes over the bottom edge while a save is
-          being named, so the stack steps aside for it. */}
+      {/* Hover actions — the shared tile stack (components/tileActions), read
+          top to bottom: Download · Save · Edit · Delete · ⋮. The inline name
+          input takes over the bottom edge while a save is being named, so the
+          stack steps aside for it. */}
       {a.nameDraft === null && (
-        <TileActionStack forceVisible={a.deleting || a.confirmingDelete}>
+        <TileActionStack forceVisible={a.deleting || a.confirmingDelete || menuOpen}>
           <TileActionButton title="Download image" onClick={() => a.handleDownload()}>
             <Download className="h-4 w-4" />
           </TileActionButton>
@@ -1303,24 +1305,30 @@ function HistoryTile({
           >
             {a.savingToBank ? <Spinner className="h-4 w-4" /> : a.savedAsModel ? <Check className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
           </TileActionButton>
-          <TileActionButton title="Copy prompt" onClick={() => onCopyPrompt()}>
-            <Copy className="h-4 w-4" />
+          {/* Four keep their circle (Massimo's call): Download and Save, which
+              you reach for constantly and which carry a state worth seeing
+              without opening anything; Edit, directly above the trash; and
+              Delete, whose two-click arm has to be reachable without opening
+              anything. Everything else is behind the ⋮, with its name beside it
+              — seven unlabelled circles down a tile is a column you have to
+              hover to read. */}
+          <TileActionButton title="Edit image" onClick={() => onClick()}>
+            <Pencil className="h-4 w-4" />
           </TileActionButton>
-          <TileActionButton title="Reuse · load these parameters back into the form" onClick={() => onReuse()}>
-            <CornerDownLeft className="h-4 w-4" />
-          </TileActionButton>
-          <TileActionButton title="Show this one in Single view" onClick={() => onShowInSingle()}>
-            <Frame className="h-4 w-4" />
-          </TileActionButton>
-          {!a.isSheet && (
-            <TileActionButton
-              title="Make a character sheet from this portrait"
-              onClick={() => onMakeSheet()}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </TileActionButton>
-          )}
           <TileDeleteButton onDelete={a.confirmDelete} busy={a.deleting} onArmedChange={a.setConfirmingDelete} />
+          <TileMenuButton
+            open={menuOpen}
+            onToggle={() => setMenuOpen((v) => !v)}
+            onClose={() => setMenuOpen(false)}
+            count={a.isSheet ? 3 : 4}
+          >
+            <TileMenuItem icon={Copy} label="Copy Prompt" onClick={onCopyPrompt} onClose={closeMenu} />
+            <TileMenuItem icon={CornerDownLeft} label="Reuse Prompt" onClick={onReuse} onClose={closeMenu} />
+            <TileMenuItem icon={Frame} label="Show in Single View" onClick={onShowInSingle} onClose={closeMenu} />
+            {!a.isSheet && (
+              <TileMenuItem icon={LayoutGrid} label="Make Character Sheet" onClick={onMakeSheet} onClose={closeMenu} />
+            )}
+          </TileMenuButton>
         </TileActionStack>
       )}
 
@@ -1403,6 +1411,8 @@ function HistoryListRow({
   const ownRoot = useRef<HTMLElement | null>(null)
   const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot ?? ownRoot)
   const a = useHistoryTileActions(item, onDelete, scrollRoot ? near : true)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const closeMenu = () => setMenuOpen(false)
   const prompt = buildImagePrompt(item.profile).trim()
 
   // Landscape (16:9) outputs always render in a 16:9 frame so they fill edge-to-
@@ -1473,19 +1483,20 @@ function HistoryListRow({
             saving={a.savingToBank}
           />
         ) : (
-          // Canonical action order, centred: download · save · copy · reuse ·
-          // frame · make-sheet · delete (delete last).
+          // Download · Save · Delete · ⋮ — FOUR, which is what this line fits.
           //
-          // It WRAPS, and has to. It was `flex-nowrap` on the theory that
-          // compact buttons keep seven of them on one line, but this panel is a
-          // quarter of a half-pane: the line needs 178px and gets 155 at a
-          // 1084px window, so `nowrap` inside the row's `overflow-hidden` simply
-          // cut the last button off — Delete, silently unreachable on every
-          // portrait row below about a 1350px window. (Six of these already
-          // overflowed by 9px before Reuse joined them; seven is what made it
-          // obvious.) A second centred line is the honest answer at that width,
-          // and the prompt box above it owns the leftover height, so the row
-          // itself doesn't grow — its height is the media's aspect ratio.
+          // This was seven compact circles; five of them moved behind the ⋮,
+          // where they read as words instead of being seven glyphs to learn
+          // (Massimo's call, September 2026). Four is a real ceiling, not a
+          // preference: the panel is a quarter of a half-pane, so the line gets
+          // 155px at a 1084px window and less below it, and five ~28px buttons
+          // want 156. Both ways of exceeding it lose a button silently — with
+          // `flex-nowrap` the row's `overflow-hidden` cut the last one off
+          // (Delete, unreachable on every portrait row under about a 1350px
+          // window), and wrapping instead pushes the second line past the
+          // panel's own bottom edge, where the same clip eats it. Which is why
+          // the grid tile's fifth circle (Edit) is a menu row here. The wrap
+          // stays as the backstop for a narrower panel than we've measured.
           <div className="flex flex-wrap items-center justify-center gap-1">
             <ListRowButton title="Download image" onClick={a.handleDownload}>
               <Download className="h-3.5 w-3.5" />
@@ -1497,21 +1508,28 @@ function HistoryListRow({
             >
               {a.savingToBank ? <Spinner className="h-3.5 w-3.5" /> : a.savedAsModel ? <Check className="h-3.5 w-3.5" /> : <Bookmark className="h-3.5 w-3.5" />}
             </ListRowButton>
-            <ListRowButton title="Copy prompt" onClick={onCopyPrompt}>
-              <Copy className="h-3.5 w-3.5" />
-            </ListRowButton>
-            <ListRowButton title="Reuse · load these parameters back into the form" onClick={onReuse}>
-              <CornerDownLeft className="h-3.5 w-3.5" />
-            </ListRowButton>
-            <ListRowButton title="Show this one in Single view" onClick={onShowInSingle}>
-              <Frame className="h-3.5 w-3.5" />
-            </ListRowButton>
-            {!a.isSheet && (
-              <ListRowButton title="Make a character sheet from this portrait" onClick={onMakeSheet}>
-                <LayoutGrid className="h-3.5 w-3.5" />
-              </ListRowButton>
-            )}
-            <TileDeleteButton variant="chrome" onDelete={a.confirmDelete} busy={a.deleting} />
+            {/* `alwaysVisible`, because this row is NOT a `group`: the default
+                hover fade left the delete invisible here at every width, which
+                is what "Delete is missing from the list view" was. */}
+            <TileDeleteButton alwaysVisible variant="chrome" onDelete={a.confirmDelete} busy={a.deleting} />
+            <TileMenuButton
+              chrome
+              open={menuOpen}
+              onToggle={() => setMenuOpen((v) => !v)}
+              onClose={closeMenu}
+              count={a.isSheet ? 4 : 5}
+            >
+              {/* Edit leads the menu here rather than taking a circle of its
+                  own as it does on the grid tile: four is what this line fits,
+                  and the row's own picture already opens the editor. */}
+              <TileMenuItem icon={Pencil} label="Edit Image" onClick={onClick} onClose={closeMenu} />
+              <TileMenuItem icon={Copy} label="Copy Prompt" onClick={onCopyPrompt} onClose={closeMenu} />
+              <TileMenuItem icon={CornerDownLeft} label="Reuse Prompt" onClick={onReuse} onClose={closeMenu} />
+              <TileMenuItem icon={Frame} label="Show in Single View" onClick={onShowInSingle} onClose={closeMenu} />
+              {!a.isSheet && (
+                <TileMenuItem icon={LayoutGrid} label="Make Character Sheet" onClick={onMakeSheet} onClose={closeMenu} />
+              )}
+            </TileMenuButton>
           </div>
         )}
         </div>

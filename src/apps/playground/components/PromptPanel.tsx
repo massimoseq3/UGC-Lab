@@ -1,20 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  Image as ImageIcon,
-  Film,
-  Music as MusicIcon,
-  ChevronRight,
-  Volume2,
-  VolumeX,
-  Coins,
-  Star,
-  Layers,
-  Eraser,
-} from 'lucide-react'
+import { Image as ImageIcon, Film, Music as MusicIcon, ChevronRight, Volume2, VolumeX, Coins, Layers, Eraser } from 'lucide-react'
 import ModelPicker from '../../../components/ModelPicker'
 import ModelPickerModal from '../../../components/ModelPickerModal'
 import ProviderLogo from '../../../components/ProviderLogo'
-import SavingsPill from '../../../components/SavingsPill'
+import ModelTriggerLabel from '../../../components/ModelTriggerLabel'
 import SegmentedToggle from '../../../components/SegmentedToggle'
 import AspectIcon from '../../../components/AspectIcon'
 import ConstraintChip from '../../../components/ConstraintChip'
@@ -1212,13 +1201,11 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   {model ? (
                     <>
                       <ProviderLogo provider={model.provider} />
-                      <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                        <span className="truncate text-[13px] font-medium text-ink-100">{model.displayName}</span>
-                        {model.tags.includes('recommended') && (
-                          <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
-                        )}
-                        {modelSavings != null && <SavingsPill pct={modelSavings} />}
-                      </div>
+                      <ModelTriggerLabel
+                        name={model.displayName}
+                        recommended={model.tags.includes('recommended')}
+                        savings={modelSavings}
+                      />
                     </>
                   ) : (
                     <span className="flex-1 truncate text-sm text-ink-400">Select model</span>
@@ -1268,7 +1255,11 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 size="xl"
                 accent="playground"
                 noun={state.mode === 'video' ? 'clip' : 'image'}
-                label={state.mode === 'video' ? 'clips' : 'images'}
+                // Title Case, like every other label the member reads on a
+                // control (Massimo's call). `noun` stays lower case — it is
+                // written into sentences ("2 clips per press"), not shown as a
+                // label of its own.
+                label={state.mode === 'video' ? 'Clips' : 'Images'}
                 value={batchCount}
                 onChange={(n) => onChange({ ...state, batchCount: n })}
                 creditsFor={creditsForRun}
