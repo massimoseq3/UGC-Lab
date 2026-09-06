@@ -245,9 +245,11 @@ export const TTS_MODEL_SLOT = 'voice-studio:tts'
 //   STRONG  — the tier for output a person reads and acts on, where a misread
 //             style family or a hedged scene prompt costs a re-shoot rather
 //             than a retry. Two consumers: the Ad Analyzer and the Bank's
-//             product auto-fill. Scripts and B-Roll used to reach this tier's
-//             model through its registry default and now default to GPT 5.6
-//             Terra instead.
+//             product auto-fill. Scripts and B-Roll reach this tier's model
+//             through its registry default again as of September 2026, after a
+//             stint on GPT 5.6 Terra — but they reach it as a per-app
+//             `defaultFor`, not through either constant, so the picker slots
+//             stay free to move without touching the roles.
 //
 // BOTH CONSTANTS POINT AT THE SAME MODEL TODAY, and that is a lineup fact, not
 // a mistake to tidy away by collapsing them. Gemini 3 Flash held DEFAULT until
@@ -322,11 +324,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // Order matters: Gemini 3.8 Flash is FIRST so it stays getDefaultModel's
   // candidates[0] fallback for any chat consumer without an explicit defaultFor.
   // The two PICKER apps hold INDEPENDENT slots and both currently default to
-  // GPT 5.6 Terra (August 2026) — see that entry. They have diverged before and
-  // can again, which is the reason the slots are separate. Terra costs a member
-  // who never opens the picker more per run than the app-wide default does,
-  // which is the trade being made deliberately here; GPT 5.6 Luna is one row
-  // away in both for anyone who wants the cheap run back.
+  // Gemini 3.8 Flash too (September 2026, the operator's call, taking the slots
+  // from GPT 5.6 Terra) — see that entry. They have diverged before and can
+  // again, which is the reason the slots are separate. A member who never opens
+  // the picker now writes on the app-wide default rather than ~2.9× its
+  // credits, and every dearer row is one click away in both.
   //
   // NOTHING in the blurbs may name a default — one picker component serves both
   // apps, so "the default" was true in one and a lie in the other the moment
@@ -405,7 +407,17 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // first, getDefaultModel's candidates[0] — which is three ways of saying
     // that a change to this row is a change to every chat call in the app.
     // `character-studio` is here because Gemini 3 Flash carried it.
-    defaultFor: ['ad-anatomy', 'character-studio'],
+    //
+    // It also holds the unpicked default in BOTH picker apps as of September
+    // 2026 (the operator's call), taking the slots from GPT 5.6 Terra, which
+    // stays one row away in either picker. That puts Scripts and B-Roll back on
+    // the app-wide default rather than ~2.9× it on the member's own key, and on
+    // the same family every prompt in this app was tuned against. The two slots
+    // stay INDEPENDENT and have diverged before, so no blurb may name a
+    // default. No migration ships with the flip: nothing writes a resolved
+    // default into a slot, so an unpicked slot follows `defaultFor` on its own
+    // and a stored id is always a deliberate pick that this leaves alone.
+    defaultFor: ['ad-anatomy', 'character-studio', 'broll-studio', 'script-architect'],
     // OpenAI-compatible variant slug on kie.ai. The native 3.8 route speaks
     // Google's own streamGenerateContent shape, which our transport doesn't.
     chatEndpoint: '/gemini-3-8-flash-openai/v1/chat/completions',
@@ -521,11 +533,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     chatEndpoint: '/codex/v1/responses',
     chatTransport: 'openai-responses',
     chatSlug: 'gpt-5-6-terra',
-    // The unpicked default in BOTH picker apps (August 2026, the operator's
-    // call — it took the slots from Gemini 3.6 Flash, which is still one row
-    // away in either picker). The two slots stay independent and can diverge
+    // Held the unpicked default in BOTH picker apps from August 2026 (it took
+    // the slots from Gemini 3.6 Flash) until September 2026, when Gemini 3.8
+    // Flash took them at the operator's call. Still one row away in either
+    // picker, exactly as every superseded default here is; it holds no
+    // `defaultFor` any more. The two slots stay independent and can diverge
     // again, so no blurb anywhere may name a default.
-    defaultFor: ['broll-studio', 'script-architect'],
     chatRating: {
       intelligence: 4,
       blurb:
