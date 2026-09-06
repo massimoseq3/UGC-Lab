@@ -12,7 +12,7 @@ import {
   Eraser,
 } from 'lucide-react'
 import ModelPicker from '../../../components/ModelPicker'
-import ModelSidePanel from '../../../components/ModelSidePanel'
+import ModelPickerModal from '../../../components/ModelPickerModal'
 import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -53,7 +53,7 @@ import { StyleTile } from '../../../components/StyleModal'
 import { STYLE_PREVIEWS, PLAYGROUND_STYLE_ACCENT } from '../../../components/styleArt'
 import { CONTINUOUS_STYLES, styleBriefFor, styleBriefForStill } from '../../../utils/visualStyle'
 import { useBankStore } from '../../../stores/bankStore'
-import SlideOver from '../../../components/SlideOver'
+import Modal from '../../../components/Modal'
 import ExpandTextModal, { BracketHighlightArea } from '../../../components/ExpandableText'
 import SectionCard from '../../../components/SectionCard'
 import PromptToolbar from '../../../components/PromptToolbar'
@@ -168,9 +168,9 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
   const [mentionQuery, setMentionQuery] = useState('')
   // Drag-over visual hint.
   const [dragOver, setDragOver] = useState(false)
-  // Preset slide-in overlay.
+  // Preset picker overlay.
   const [presetOpen, setPresetOpen] = useState(false)
-  // Video mode swaps the inline model dropdown for the slide-in side panel.
+  // Video mode swaps the inline model dropdown for the full picker modal.
   const [modelPanelOpen, setModelPanelOpen] = useState(false)
   // Full-screen prompt editor.
   const [promptExpanded, setPromptExpanded] = useState(false)
@@ -349,7 +349,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
     : 'text-to-music'
 
   // The per-mode model memory key: what ModelPicker persists under, and what
-  // the mode-swap effect below reads back. Video's picker is ModelSidePanel,
+  // the mode-swap effect below reads back. Video's picker is ModelPickerModal,
   // which leaves persistence to its caller (elsewhere it drives per-card picks
   // that must NOT become an app default), so Playground writes the key itself.
   // Without that write the key stayed empty and every Image → Video flip fell
@@ -1020,7 +1020,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                          one panel whose whole job is that field. As a pill it
                          leads the toolbar it belongs to: everything in this row
                          acts on the prompt, and appending a preset is exactly
-                         that. The slide-over it opens still carries the full
+                         that. The modal it opens still carries the full
                          "UGC Prompt Presets & Visual Styles" title, so the long
                          name is one click away rather than permanently on
                          screen. */
@@ -1069,17 +1069,16 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             </div>
           </div>
 
-          {/* Preset picker — right-edge slide-over, same chrome as the bank
-              pickers so the app reads as one pattern. */}
-          <SlideOver
+          {/* Preset picker — the same modal chrome as the bank pickers, so the
+              app reads as one pattern. */}
+          <Modal
             open={presetOpen}
             onClose={() => setPresetOpen(false)}
             title="UGC Prompt Presets & Visual Styles"
             subtitle="Add a look, a format, or both. Each one appends to your prompt"
-            // 460px — a step under the old 560px so more of the list is on screen
-            // at once, but wider than the Characters picker's 380px: these tiles
-            // are the only thing that says what a format looks like, and at 380
-            // the frame is too small to read the shot.
+            // 672px rather than the default 512: these tiles are the only thing
+            // that says what a format looks like, and three across a narrower
+            // panel makes the frame too small to read the shot.
             size="medium"
           >
             {/* Visual styles FIRST: a look is the broader decision — it applies to
@@ -1131,7 +1130,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 ))}
               </div>
             </div>
-          </SlideOver>
+          </Modal>
 
           <ExpandTextModal
             open={promptExpanded}
@@ -1167,7 +1166,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             bottom, and Generate is where you arrive. It stays pinned from `md`
             up, where the column has the height to spare. */}
         <div className="shrink-0 px-5 pb-3 pt-2">
-          {/* Model — video uses the slide-in side panel (matching B-Roll); image
+          {/* Model — video uses the full picker modal (matching B-Roll); image
               keeps the inline dropdown (which auto-opens upward here). Music's
               picker is not here at all: it moved above the prompt box, where its
               delivery toggle is (see the note up there). */}
@@ -1187,7 +1186,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
             {state.mode === 'video' ? (
               <>
                 {/* Trigger — provider logo + name + star + "% off", an arrow
-                    (not a chevron) for the slide-in, and no credits badge. */}
+                    (not a chevron) for the picker modal, and no credits badge. */}
                 <button
                   type="button"
                   onClick={() => setModelPanelOpen(true)}
@@ -1209,7 +1208,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   )}
                   <ChevronRight className="h-4 w-4 shrink-0 text-ink-500" />
                 </button>
-                <ModelSidePanel
+                <ModelPickerModal
                   appId="playground"
                   task="video"
                   mode={pickerMode}

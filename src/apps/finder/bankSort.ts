@@ -40,7 +40,7 @@ export function sortByOrder<T extends { createdAt: number }>(items: T[], order: 
 
 // Stable partition: starred items first, original order preserved within each
 // half. Applied on top of the user's chosen sort in the bank pickers so pinned
-// items always surface at the top of the slide-over. Unconstrained generic (not
+// items always surface at the top of the picker. Unconstrained generic (not
 // `T extends { starred?: boolean }`) so bank-item unions containing types
 // without the field (VoicePreset) still pass through untouched.
 export function starredFirst<T>(items: T[]): T[] {

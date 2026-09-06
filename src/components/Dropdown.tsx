@@ -48,7 +48,7 @@ interface DropdownProps {
   // sitting just above a Generate button, where a downward menu covers it.
   placement?: 'auto' | 'above'
   // Raise the menu's overlay tier for a trigger inside a panel mounted above
-  // the default one (BankPicker's z-[80] slide-over). See `AnchoredPopover`.
+  // the default one (BankPicker's z-[80] panel). See `AnchoredPopover`.
   tier?: 'default' | 'panel'
   // Shrinks the trigger to its own content, for a wrapping row of filters
   // rather than a settings panel's full-width stack.

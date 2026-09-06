@@ -495,7 +495,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 }))
 
 // The two apps that let a member choose who writes their words. The slot key
-// matches what ModelSidePanel derives from `${appId}:${task}`, so the panel and
+// matches what ModelPickerModal derives from `${appId}:${task}`, so the panel and
 // the services agree without either knowing about the other.
 export type ScriptModelApp = 'script-architect' | 'broll-studio'
 

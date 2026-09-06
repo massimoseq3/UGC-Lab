@@ -5,7 +5,7 @@ import { WRITE_LENGTHS, REMIX_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOO
 import { useBankStore } from '../../../stores/bankStore'
 import BankPicker from '../../../components/BankPicker'
 import SegmentedToggle from '../../../components/SegmentedToggle'
-import SlideOver from '../../../components/SlideOver'
+import Modal from '../../../components/Modal'
 import ScriptModelRow from '../../../components/ScriptModelRow'
 import SectionCard, { StatusDot } from '../../../components/SectionCard'
 import ConstraintChip from '../../../components/ConstraintChip'
@@ -96,8 +96,8 @@ export default function InputPanel({
     () => (selectedProduct ? createEditableContext(selectedProduct) : null),
   )
   const [detailsOpen, setDetailsOpen] = useState(false)
-  const [styleSlideOpen, setStyleSlideOpen] = useState(false)
-  const [hookSlideOpen, setHookSlideOpen] = useState(false)
+  const [styleModalOpen, setStyleModalOpen] = useState(false)
+  const [hookModalOpen, setHookModalOpen] = useState(false)
   // The script picked from the bank for the remix source. Editing the textarea
   // clears it (reverts to the dashed picker), mirroring the B-Roll ref cards.
   const [sourceScript, setSourceScript] = useState<Script | null>(null)
@@ -570,8 +570,8 @@ export default function InputPanel({
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={() => setHookSlideOpen(true)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHookSlideOpen(true) } }}
+                  onClick={() => setHookModalOpen(true)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setHookModalOpen(true) } }}
                   className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-full border px-4 py-2.5 text-left transition-colors ${
                     hookCategory !== 'auto'
                       ? 'border-scripts-500/20 bg-scripts-500/[0.06] hover:border-scripts-500/30 hover:bg-scripts-500/10'
@@ -623,15 +623,15 @@ export default function InputPanel({
               )}
 
               {/* Script Style — leads the card, with the product under it.
-                  Tapping the button opens the style picker slide-over. Hidden in
+                  Tapping the button opens the style picker modal. Hidden in
                   the hooks format, which has its own family picker above. */}
               {!isHooksFormat && (
               <div>
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={() => setStyleSlideOpen(true)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleSlideOpen(true) } }}
+                  onClick={() => setStyleModalOpen(true)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStyleModalOpen(true) } }}
                   className={`group flex w-full cursor-pointer items-center gap-2.5 rounded-full border px-4 py-2.5 text-left transition-colors ${
                     styleChosen
                       ? 'border-scripts-500/20 bg-scripts-500/[0.06] hover:border-scripts-500/30 hover:bg-scripts-500/10'
@@ -986,9 +986,9 @@ export default function InputPanel({
           onClose={() => setScriptPickerOpen(false)}
         />
 
-        {/* Edit product details — opens in a right slide-over with full-size
-            fields, so you never scroll the form or fight tiny inline boxes. */}
-        <SlideOver
+        {/* Edit product details — opens in a modal with full-size fields, so
+            you never scroll the form or fight tiny inline boxes. */}
+        <Modal
           open={detailsOpen}
           onClose={() => setDetailsOpen(false)}
           title="Edit product details"
@@ -1030,12 +1030,12 @@ export default function InputPanel({
               <EditableField label="CTA" value={editableContext.cta} onChange={(v) => updateField('cta', v)} />
             </div>
           )}
-        </SlideOver>
+        </Modal>
 
-        {/* Style picker — opens from the right; tap a style to select it. */}
-        <SlideOver
-          open={styleSlideOpen}
-          onClose={() => setStyleSlideOpen(false)}
+        {/* Style picker — tap a style to select it. */}
+        <Modal
+          open={styleModalOpen}
+          onClose={() => setStyleModalOpen(false)}
           title="Choose a style"
           subtitle="What kind of content the ad looks like, and how it's built"
           size="wide"
@@ -1049,14 +1049,14 @@ export default function InputPanel({
               differs, and the component is shared so the slugs can't drift. */}
           <ScriptStyleList
             value={styleChosen ? writeStyle : null}
-            onSelect={(style) => { onWriteStyleChange(style); setStyleChosen(true); setStyleSlideOpen(false) }}
+            onSelect={(style) => { onWriteStyleChange(style); setStyleChosen(true); setStyleModalOpen(false) }}
           />
-        </SlideOver>
+        </Modal>
 
-        {/* Hook family picker — mirrors the style slide-over. 'auto' leads. */}
-        <SlideOver
-          open={hookSlideOpen}
-          onClose={() => setHookSlideOpen(false)}
+        {/* Hook family picker — mirrors the style picker. 'auto' leads. */}
+        <Modal
+          open={hookModalOpen}
+          onClose={() => setHookModalOpen(false)}
           title="Choose a hook style"
           subtitle={`Which formula family the ${hookCount} hooks draw from`}
           size="wide"
@@ -1068,7 +1068,7 @@ export default function InputPanel({
                 <button
                   key={choice}
                   type="button"
-                  onClick={() => { onHookCategoryChange(choice); setHookSlideOpen(false) }}
+                  onClick={() => { onHookCategoryChange(choice); setHookModalOpen(false) }}
                   className={`flex items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
                     active
                       ? 'border-scripts-500/30 bg-scripts-500/10'
@@ -1088,7 +1088,7 @@ export default function InputPanel({
               )
             })}
           </div>
-        </SlideOver>
+        </Modal>
 
         <ExpandTextModal
           open={expandedField === 'brief'}

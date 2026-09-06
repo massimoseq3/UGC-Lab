@@ -13,7 +13,7 @@ import { paneClass } from '../../components/paneClass'
 import { clampBatchCount, DEFAULT_BATCH_COUNT } from '../../utils/batchCount'
 import ControlsPanel from './components/ControlsPanel'
 import GalleryPanel, { type GalleryViewMode } from './components/GalleryPanel'
-import ReferenceLibrarySlideOver from './components/ReferenceLibrarySlideOver'
+import ReferenceLibraryModal from './components/ReferenceLibraryModal'
 import { startCharacterTask, startCharacterEditTask, finishCharacterTask, type GenerationKind } from './services/generateCharacter'
 import { humanizeError } from '../../utils/friendlyError'
 import { useReferenceLibrary } from './useReferenceLibrary'
@@ -469,7 +469,7 @@ export default function CharacterStudio() {
           face can be reused without paying for the analysis twice. Lives here
           rather than in ControlsPanel so a bulk analysis keeps running with the
           panel closed. */}
-      <ReferenceLibrarySlideOver
+      <ReferenceLibraryModal
         open={libraryOpen}
         onClose={() => setLibraryOpen(false)}
         items={library.items}

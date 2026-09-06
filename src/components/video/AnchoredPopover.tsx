@@ -9,7 +9,7 @@ import { useCloseOnAppSwitch } from '../../hooks/useCloseOnAppSwitch'
 // menus. `PresetPickerModal` relies on exactly that and says so.
 //
 // A caller mounted ABOVE that tier has the opposite problem and needs the menu
-// raised with it: `BankPicker`'s slide-over is z-[80] over a z-[70] backdrop,
+// raised with it: `BankPicker`'s panel is z-[80] over a z-[70] backdrop,
 // so it can sit over B-Roll's z-[60] card modal, and a default-tier menu opened
 // from inside it renders behind the panel — a trigger that visibly opens onto
 // nothing. That's what 'panel' is for.

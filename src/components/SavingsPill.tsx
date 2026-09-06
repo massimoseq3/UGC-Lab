@@ -3,7 +3,7 @@
 // — null for models with no verified official rate, which render no pill).
 //
 // Shared by every surface that names a model — ModelPicker's trigger and rows,
-// ModelSidePanel's rows, and the hand-rolled side-panel triggers in B-Roll and
+// ModelPickerModal's rows, and the hand-rolled side-panel triggers in B-Roll and
 // Playground. It lived as two identical copies before, and the side-panel
 // triggers had none at all, so a video model quoted its discount in the open
 // panel and dropped it the moment the panel closed.

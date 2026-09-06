@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useAppStore } from '../stores/appStore'
 
-// Overlays (slide-overs, pickers, modals) portal to document.body, so the
+// Overlays (modals, pickers, lightboxes) portal to document.body, so the
 // opacity-0 / pointer-events-none wrapper App.tsx hides background apps with
 // can't hide them — an overlay left open would keep floating above whichever
 // app the user switches to via the dock. Close it when the active app changes.

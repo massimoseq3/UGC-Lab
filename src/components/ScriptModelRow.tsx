@@ -14,7 +14,7 @@ import {
   scriptModelSlot,
   type ScriptModelApp,
 } from '../stores/settingsStore'
-import SlideOver from './SlideOver'
+import Modal from './Modal'
 import ProviderLogo from './ProviderLogo'
 import SavingsPill from './SavingsPill'
 import { ProviderRail, ProviderHeading } from './modelPalette'
@@ -149,15 +149,18 @@ export default function ScriptModelRow({ appId, className = 'mb-3' }: ScriptMode
         </div>
       </div>
 
-      <SlideOver
+      <Modal
         open={open}
         onClose={() => setOpen(false)}
         title={copy.title}
         subtitle="Stars are how strong a writer, dollars are what it costs"
         size="medium"
+        // Nine models behind a search box and a provider rail — the panel holds
+        // its height so filtering doesn't resize it under the pointer.
+        fill
       >
         <ModelPalette appId={appId} resolvedId={resolvedId} accent={accent} onClose={() => setOpen(false)} />
-      </SlideOver>
+      </Modal>
     </>
   )
 }

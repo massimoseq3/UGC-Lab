@@ -1,7 +1,7 @@
 import type { ModelEntry } from './models'
 
 // Grouping shared by every "pick a model" panel — the chat picker
-// (ScriptModelRow) and the image/video picker (ModelSidePanel).
+// (ScriptModelRow) and the image/video picker (ModelPickerModal).
 //
 // Providers are ordered ALPHABETICALLY, in the rail and in the list. There is
 // no house ranking to express here, and any other order would look like one.

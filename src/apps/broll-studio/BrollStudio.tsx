@@ -1381,7 +1381,7 @@ export default function BrollStudio() {
         onImport={handleImportPrompts}
       />
 
-      {/* Visual style slide-over — presets, the user's saved styles, and the
+      {/* Visual style modal — presets, the user's saved styles, and the
           analyse-from-references flow, all in one place. */}
       <StyleModal
         open={styleModalOpen}

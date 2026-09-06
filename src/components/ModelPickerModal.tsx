@@ -24,11 +24,13 @@ import { ProviderRail, ProviderHeading, StarBadge } from './modelPalette'
 import { providersOf, groupByProvider } from '../utils/providerGroups'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
 
-// Slide-in side-panel model picker (mirrors BankPicker's mechanics). Used by
-// B-Roll in place of the inline ModelPicker dropdown. Selection is persisted
-// through the SAME settingsStore key as ModelPicker (`appId:task[:mode]`), so
-// the two pickers stay interchangeable — swapping one for the other keeps the
-// user's saved choice.
+// The full-panel model picker — a centred modal on BankPicker's geometry (it
+// was a 380px right-edge panel until September 2026; a provider rail beside a
+// list of rows never fitted in it). Used by B-Roll and Playground in place of
+// the inline ModelPicker dropdown. Selection is persisted through the SAME
+// settingsStore key as ModelPicker (`appId:task[:mode]`), so the two pickers
+// stay interchangeable — swapping one for the other keeps the user's saved
+// choice.
 
 // Host-app accent for the selected-row tint and check/star icons. Explicit
 // class strings (not template interpolation) so Tailwind sees them; the
@@ -64,7 +66,7 @@ const TAG_TEXT: Record<Tag, string> = {
   fast: 'text-sky-300 light:text-sky-700',
   cheap: 'text-ink-400',
 }
-interface ModelSidePanelProps {
+interface ModelPickerModalProps {
   appId: string
   task: Task
   mode?: Mode
@@ -96,7 +98,7 @@ interface ModelSidePanelProps {
   onChange?: (modelId: string) => void
 }
 
-export default function ModelSidePanel({
+export default function ModelPickerModal({
   appId,
   task,
   mode,
@@ -110,7 +112,7 @@ export default function ModelSidePanel({
   enabledModelIds,
   value,
   onChange,
-}: ModelSidePanelProps) {
+}: ModelPickerModalProps) {
   const setAppModel = useSettingsStore((s) => s.setAppModel)
   const persistedKey = `${appId}:${task}${mode ? `:${mode}` : ''}`
   // Through the selector, not via a getter held in a const — see the note in
@@ -236,32 +238,43 @@ export default function ModelSidePanel({
   const panel = (
     <>
       {/* Backdrop — z-[70] sits above the sidebar (z-40) and the B-Roll
-          CardDetailModal (z-[60]) it's opened from. */}
+          CardDetailModal (z-[60]) it's opened from. A childless sibling, so a
+          drag released over it can't close the panel (see useBackdropClose). */}
       <div
-        className={`fixed inset-0 z-[70] bg-black/50 transition-opacity duration-300 ${
+        className={`fixed inset-0 z-[70] bg-black/50 transition-opacity duration-200 ${
           isOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
         }`}
         onClick={onClose}
       />
 
-      {/* Panel */}
-      <div
-        className={`fixed z-[80] flex flex-col border-ink/5 bg-surface-1/95 backdrop-blur-2xl transition-transform duration-300 ease-out ${
-          isDesktop
-            ? `right-0 top-0 bottom-0 w-[380px] border-l ${isOpen ? 'translate-x-0' : 'translate-x-full'}`
-            : `inset-x-0 bottom-0 top-14 border-t rounded-t-2xl ${isOpen ? 'translate-y-0' : 'translate-y-full'}`
-        }`}
-      >
+      {/* Centring wrapper. `pointer-events-none` so a click that misses the
+          panel still lands on the backdrop underneath and closes it. */}
+      <div className="pointer-events-none fixed inset-0 z-[80] flex items-end justify-center md:items-center md:p-4">
+        {/* Panel — the shared modal geometry (Modal.tsx, BankPicker), held at a
+            fixed 86vh because this list filters itself: a panel sized by its
+            rows would resize on every keystroke and under every capability
+            pill. On a phone it's a bottom sheet, one thing at a time. */}
+        <div
+          className={`pointer-events-auto flex w-full flex-col overflow-hidden border-ink/5 bg-surface-1/95 backdrop-blur-2xl ${
+            isDesktop
+              ? `h-[86vh] max-w-2xl rounded-3xl border shadow-2xl shadow-black/40 transition-all duration-200 ease-out ${
+                  isOpen ? 'scale-100 opacity-100' : 'pointer-events-none scale-[0.98] opacity-0'
+                }`
+              : `h-[calc(100%-3.5rem)] rounded-t-2xl border-t pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ease-out ${
+                  isOpen ? 'translate-y-0' : 'translate-y-full'
+                }`
+          }`}
+        >
         {/* Drag handle — mobile only */}
         {!isDesktop && (
-          <div className="flex justify-center pt-2 pb-1">
+          <div className="flex shrink-0 justify-center pt-2 pb-1">
             <div className="h-1 w-10 rounded-full bg-ink/20" />
           </div>
         )}
 
         {/* Header — no full-bleed border; the search block below does the
             visual separating with whitespace alone. */}
-        <div className="flex items-start justify-between px-5 pb-2 pt-5">
+        <div className="flex shrink-0 items-start justify-between px-5 pb-2 pt-5">
           <div className="min-w-0">
             <h3 className="text-[15px] font-semibold tracking-tight text-ink-100">{task === 'image' ? 'Image Model' : task === 'video' ? 'Video Model' : 'Model'}</h3>
             <p className="mt-0.5 text-[11px] text-ink-600">{filtered.length} of {models.length} models</p>
@@ -275,7 +288,7 @@ export default function ModelSidePanel({
         </div>
 
         {/* Search */}
-        <div className="px-4 pb-2">
+        <div className="shrink-0 px-4 pb-2">
           <div className="flex h-10 items-center gap-2.5 rounded-full bg-ink/[0.05] px-4 transition-colors focus-within:bg-ink/[0.08]">
             <Search className="h-3.5 w-3.5 shrink-0 text-ink-600" />
             <input
@@ -290,7 +303,7 @@ export default function ModelSidePanel({
 
         {/* Capability filter pills — tap to narrow by input shape. */}
         {availableFilters.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 px-4 pb-2">
+          <div className="flex shrink-0 flex-wrap gap-1.5 px-4 pb-2">
             {availableFilters.map((f) => {
               const active = capFilters.has(f.mode)
               return (
@@ -351,10 +364,11 @@ export default function ModelSidePanel({
         {/* Footer — requireMode caveat, mirrors ModelPicker's dropdown footer.
             Inset hairline, not full-bleed. */}
         {showRequireNote && (
-          <p className="mx-4 border-t border-ink/10 px-1 py-3 text-[11px] leading-relaxed text-ink-500">
+          <p className="mx-4 shrink-0 border-t border-ink/10 px-1 py-3 text-[11px] leading-relaxed text-ink-500">
             {requireModeNote}
           </p>
         )}
+        </div>
       </div>
     </>
   )

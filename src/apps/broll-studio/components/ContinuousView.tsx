@@ -8,7 +8,7 @@ import GenerationProgress from '../../../components/GenerationProgress'
 import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
 import { KEYFRAME_MESSAGES, INTERPOLATE_MESSAGES } from '../../../components/generatingMessages'
 import ModelPicker from '../../../components/ModelPicker'
-import ModelSidePanel from '../../../components/ModelSidePanel'
+import ModelPickerModal from '../../../components/ModelPickerModal'
 import ProviderLogo from '../../../components/ProviderLogo'
 import SavingsPill from '../../../components/SavingsPill'
 import ConstraintChip from '../../../components/ConstraintChip'
@@ -152,7 +152,7 @@ export default function ContinuousView({
   // keyframe (mirrors Line-by-Line's "also regenerate" toggle).
   const [includeExisting, setIncludeExisting] = useState(false)
   const [downloadOpen, setDownloadOpen] = useState(false)
-  // Video-model slide-in panel opened from inside the batch-generate dialog.
+  // Video-model picker opened from inside the batch-generate dialog.
   const [confirmModelPanelOpen, setConfirmModelPanelOpen] = useState(false)
   const balance = useCreditsStore((s) => s.balance)
   useCloseOnAppSwitch(!!confirmGen, () => setConfirmGen(null))
@@ -1536,10 +1536,10 @@ export default function ContinuousView({
             </div>
           </div>
 
-          {/* Video-model slide-in, opened from the batch dialog (clips only).
+          {/* Video-model picker, opened from the batch dialog (clips only).
               Portals to body, so it layers above this dialog cleanly. */}
           {confirmGen.kind === 'clips' && (
-            <ModelSidePanel
+            <ModelPickerModal
               appId="broll-studio"
               task="video"
               allowedModelIds={CONTINUOUS_MODEL_IDS}

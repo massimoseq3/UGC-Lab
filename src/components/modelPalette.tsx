@@ -3,7 +3,7 @@ import ProviderLogo from './ProviderLogo'
 
 // The shared chrome of every "pick a model" panel: a provider rail down the
 // left and a heading above each provider's models. Both the chat picker
-// (ScriptModelRow) and the image/video picker (ModelSidePanel) render these, so
+// (ScriptModelRow) and the image/video picker (ModelPickerModal) render these, so
 // picking a writer and picking a renderer feel like the same act — only the
 // per-row detail differs (stars + blurb vs resolution + duration + credits).
 // The grouping itself is in utils/providerGroups.ts.

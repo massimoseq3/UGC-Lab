@@ -28,7 +28,7 @@ interface ModelPickerProps {
   value?: string
   onChange?: (modelId: string) => void
   // When set, models whose `modes` don't include this are greyed out AND
-  // unselectable — same semantics as ModelSidePanel, which this dropdown is the
+  // unselectable — same semantics as ModelPickerModal, which this dropdown is the
   // sibling of. Greyed used to stay clickable as a soft hint, but a row you can
   // press and then watch fail reads as a bug, not a warning.
   requireMode?: Mode
@@ -51,7 +51,7 @@ interface ModelPickerProps {
   // with chips (which `large` does, at their 48px). Ignored when `compact`.
   row?: boolean
   // Cost params for the per-row credit estimate (e.g. current resolution),
-  // mirroring ModelSidePanel. Defaults to a single image at base resolution.
+  // mirroring ModelPickerModal. Defaults to a single image at base resolution.
   costParams?: CostEstimateParams
   // Restrict the list to these registry ids (e.g. B-Roll Continuous'
   // multi-cut-capable allowlist). Omit for the full task/mode catalog.
@@ -111,7 +111,7 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
   const selectedSavings = selected ? officialSavingsPercent(selected.id) : null
 
   // Whether a model is out of scope for this surface — greyed AND unselectable,
-  // same rule as ModelSidePanel's isMuted.
+  // same rule as ModelPickerModal's isMuted.
   const isMuted = (m: ModelEntry) =>
     (!!requireMode && !m.modes?.includes(requireMode)) ||
     (!!requireAnyModes && requireAnyModes.length > 0 && !requireAnyModes.some((mode) => m.modes?.includes(mode)))
@@ -274,10 +274,10 @@ function creditRange(modelId: string, tiers: string[] | undefined, costParams: C
   return `from ${formatCredits(lo)}`
 }
 
-// Row aesthetic mirrors ModelSidePanel: provider logo, name + star + colored
+// Row aesthetic mirrors ModelPickerModal: provider logo, name + star + colored
 // tag words, a quiet metadata sub-line (resolution range · [duration] ·
 // credits), and an accent-tinted selected state with an accent check. The
-// slide-in and this dropdown are one visual family; only the container differs.
+// modal and this dropdown are one visual family; only the container differs.
 function ModelRow({ model, active, muted, accent, costParams, noCredits, onClick }: ModelRowProps) {
   const isRecommended = model.tags.includes('recommended')
   // Discount vs the provider's official API — only for models with a verified

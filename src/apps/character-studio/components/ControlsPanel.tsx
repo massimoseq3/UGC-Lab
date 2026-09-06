@@ -154,7 +154,7 @@ export default function ControlsPanel({
     onProfileChange({ ...profile, [key]: value })
   }
 
-  // Scoped preset pickers — each opens the shared preset slide-over but merges
+  // Scoped preset pickers — each opens the shared preset modal but merges
   // only its own tab's keys onto the current form, leaving the other tab's
   // fields untouched.
   const [physicalPresetOpen, setPhysicalPresetOpen] = useState(false)
@@ -437,7 +437,7 @@ export default function ControlsPanel({
           inFlightCount={inFlightCount}
         />
 
-        {/* Scoped preset pickers — same slide-over as the footer's full picker,
+        {/* Scoped preset pickers — same modal as the footer's full picker,
             but each merges only its tab's fields onto the current form. */}
         {/* Every picker is mounted only while it's open — the grid, its page
             count and the rail's highlight then belong to that opening, which
