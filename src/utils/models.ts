@@ -242,20 +242,22 @@ export const TTS_MODEL_SLOT = 'voice-studio:tts'
 //   DEFAULT — the app-wide workhorse. Prompt-shaping, storyboards, shot logs:
 //             structured output against heavily-tuned prompts, read by another
 //             model rather than by a person.
-//   STRONG  — ~2.6x the credits. The tier for output a person reads and acts
+//   STRONG  — ~1.3x the credits. The tier for output a person reads and acts
 //             on, where a misread style family or a hedged scene prompt costs
-//             a re-shoot rather than a retry. The Ad Analyzer is its ONE
-//             consumer; Scripts and B-Roll used to reach the same model through
-//             its registry default and now default to GPT 5.6 Terra instead.
-//             Product auto-fill sat here twice and is now on GPT 5.6 Luna,
-//             named there by slug rather than through a third role.
+//             a re-shoot rather than a retry. Two consumers: the Ad Analyzer
+//             and the Bank's product auto-fill. Scripts and B-Roll used to
+//             reach this tier's model through its registry default and now
+//             default to GPT 5.6 Terra instead.
+//             It pointed at Gemini 3.6 Flash until September 2026, when Gemini
+//             3.8 Flash took the tier at half the rate — which is why the gap
+//             to DEFAULT is now 1.3x rather than 2.6x.
 //
 // Neither constant is what Scripts or B-Roll call any more: those two read the
 // member's own pick (see resolveScriptModel in stores/settingsStore.ts), which
 // falls back to that pair's own registry default when nothing is chosen. Every
 // OTHER chat surface still resolves through these two.
 export const CHAT_MODEL_DEFAULT = 'gemini-3-flash'
-export const CHAT_MODEL_STRONG = 'gemini-3-6-flash'
+export const CHAT_MODEL_STRONG = 'gemini-3-8-flash'
 
 // Both Gemini TTS models bill by tokens, not characters, on one rate card:
 //   input text:  140 credits / 1M tokens
@@ -307,14 +309,12 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //
   // Order matters: Gemini 3 Flash is FIRST so it stays getDefaultModel's
   // candidates[0] fallback for any chat consumer without an explicit defaultFor.
-  // The two PICKER apps do NOT share one default any more (August 2026):
-  // Scripts defaults to Grok 4.6 — takes are prose a person reads, and it's the
-  // strongest writer here that isn't priced like Opus — while B-Roll defaults to
-  // Gemini 3.6 Flash, whose job is a dozen-plus paragraph prompts under a strict
-  // tag contract rather than persuasive copy, at a third of the credits. Both
-  // cost a member who never opens the picker more per run than the app-wide
-  // default does, which is the trade being made deliberately here; GPT 5.6 Luna
-  // is one row away in both for anyone who wants the cheap run back.
+  // The two PICKER apps hold INDEPENDENT slots and both currently default to
+  // GPT 5.6 Terra (August 2026) — see that entry. They have diverged before and
+  // can again, which is the reason the slots are separate. Terra costs a member
+  // who never opens the picker more per run than the app-wide default does,
+  // which is the trade being made deliberately here; GPT 5.6 Luna is one row
+  // away in both for anyone who wants the cheap run back.
   //
   // NOTHING in the blurbs may name a default — one picker component serves both
   // apps, so "the default" was true in one and a lie in the other the moment
@@ -341,6 +341,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //   model            in cr/M   out cr/M   blended cr/1k
   //   GPT 5.6 Luna        11.2       67.2      0.0392
   //   Gemini 3 Flash        30        180      0.105
+  //   Gemini 3.8 Flash      45        225      0.135   (promo, see the entry)
   //   Gemini 3.6 Flash      90        450      0.27
   //   Grok 4.5             160        480      0.32
   //   Grok 4.6             160        480      0.32
@@ -350,8 +351,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //   Claude Opus 5        400       2000      1.20
   //
   // `official` is kie's own "Official / Fal Price" column, blended the same way
-  // — which is what makes the picker's "% off" chip real (Gemini −70%, Claude
-  // −57.5/−60%, GPT −72%, Grok −60%).
+  // — which is what makes the picker's "% off" chip real (Gemini −70%, and
+  // −85% on the 3.8 row while its launch promo runs, Claude −57.5/−60%,
+  // GPT −72%, Grok −60%).
   //
   // Cached-input and cache-write tiers exist on the OpenAI and Anthropic
   // entries and are deliberately ignored: nothing in this app reuses a prompt
@@ -377,6 +379,58 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   },
 
   {
+    id: 'gemini-3-8-flash',
+    displayName: 'Gemini 3.8 Flash',
+    provider: 'Google',
+    task: 'chat',
+    tags: ['recommended', 'new'],
+    // 45 in / 225 out credits per million (kie.ai/pricing, verified
+    // 2026-09-06) -> 0.135 blended per 1k, half of Gemini 3.6 Flash's rate
+    // against the same official list price. Those are kie's LAUNCH-PROMO
+    // figures (50% off until 2026-12-31 06:00 UTC), and this row is priced at
+    // what a member is actually billed today, the same convention every other
+    // entry follows. Re-verify after that date: undiscounted is 90 / 450, i.e.
+    // 0.27 blended, which also moves it from $$ to $$$ in `chatCostTier`.
+    pricing: { unit: 'per-1k-tokens', credits: 0.135 },
+    // Google's own list price, the same pair the 3.6 row carries: $1.50 in /
+    // $7.50 out per million. With the promo live the "% off" chip reads -85%.
+    official: chatOfficial(1.5, 7.5, KIE_PRICING),
+    // CHAT_MODEL_STRONG as of September 2026, taking the tier from Gemini 3.6
+    // Flash, which stays one row away in either picker exactly as every
+    // superseded default here does. Two surfaces resolve through that
+    // constant: the Ad Analyzer (a whole video inline, one JSON object read by
+    // a person and shot against) and the Bank's product auto-fill (a
+    // fourteen-field research brief held to a long contract). Both send
+    // `reasoning_effort` and one call in each pair sends 'medium', while kie's
+    // doc for THIS route lists low/high only — the gateway accepts it anyway
+    // (verified live 2026-09-06, alongside 'high', inline-image vision and a
+    // tagged output contract). If it ever starts rejecting the value rather
+    // than ignoring it, those two surfaces are where it shows up, as a 400.
+    defaultFor: ['ad-anatomy'],
+    // OpenAI-compatible variant slug on kie.ai. The native 3.8 route speaks
+    // Google's own streamGenerateContent shape, which our transport doesn't.
+    chatEndpoint: '/gemini-3-8-flash-openai/v1/chat/completions',
+    // NO `chatSlug`, deliberately — this is a trap, not an oversight. kie's
+    // JOBS route (createTask, what makes the Ad Analyzer's run survive a
+    // reload) has no chat route for the Gemini rows: the bare id 422s with
+    // "The model is empty", which is the CLEAN outcome — the Ad Analyzer and
+    // B-Roll both catch that and fall through to the streaming transport, so
+    // the run works and is simply unresumable. `gemini-3-8-flash-openai` IS
+    // accepted by createTask and then fails the task ("generate playground
+    // failed, task id is blank", 0 credits consumed), which is strictly worse:
+    // the caller banks a taskId, takes the resumable path, and only discovers
+    // the failure at the poll, where there is no fallback left. Gemini 3.6
+    // Flash behaves identically on both names (verified 2026-09-06), so this
+    // is the tier's standing condition, not something the 3.8 move introduced.
+    // Don't "fix" it by adding the slug — re-test the jobs route first.
+    chatRating: {
+      intelligence: 4,
+      blurb:
+        'The newest Google row. Holds long, detailed instructions well.',
+    },
+  },
+
+  {
     id: 'gemini-3-6-flash',
     displayName: 'Gemini 3.6 Flash',
     provider: 'Google',
@@ -384,18 +438,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     tags: ['new'],
     pricing: { unit: 'per-1k-tokens', credits: 0.27 },
     official: chatOfficial(1.5, 7.5, KIE_PRICING),
-    // CHAT_MODEL_STRONG, and the Ad Analyzer's pinned model: it holds a long
-    // prompt contract better than the cheaper entries, and the Ad Analyzer's
-    // call is one JSON object read by a person and shot against. It is also
-    // the only chat surface that sends a whole VIDEO inline, which is why the
-    // Ad Analyzer pins it by name. The Bank's product auto-fill is the second
-    // surface on it as of September 2026 — it left for the cheap tier in
-    // August and came back with the rewrite that turned that read into a
-    // fourteen-field research brief, which is the same "hold a long contract to
-    // the last line" job. It held the unpicked default in Scripts and B-Roll
-    // too until August 2026, when both slots moved to GPT 5.6 Terra at the
-    // operator's call; it is still one row away in either picker.
-    defaultFor: ['ad-anatomy'],
+    // Held CHAT_MODEL_STRONG — and with it the Ad Analyzer and the Bank's
+    // product auto-fill — until September 2026, when Gemini 3.8 Flash took the
+    // tier at half the rate. It holds a long prompt contract well and stays in
+    // both pickers, one row away, exactly as every superseded default here
+    // does; it holds no `defaultFor` any more. It also held the unpicked
+    // default in Scripts and B-Roll until August 2026, when both slots moved
+    // to GPT 5.6 Terra at the operator's call.
     // OpenAI-compatible variant slug on kie.ai (native 3.6 uses Google's own
     // generateContent shape; our transport speaks OpenAI chat/completions).
     chatEndpoint: '/gemini-3-6-flash-openai/v1/chat/completions',
@@ -498,14 +547,10 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // list by a wide margin — it undercuts even Gemini 3 Flash — so it's the
     // row to reach for when a member wants volume over polish.
     //
-    // The Bank's product auto-fill pins this entry BY SLUG (August 2026,
-    // finder/services/extractProductInfo.ts) — the one surface in the app on a
-    // named chat model that isn't one of the two role constants or a member's
-    // own pick. That call is a vision read, which works here because the
-    // Responses transport carries image parts as `input_image`; a whole VIDEO
-    // is what it can't take, which is the Ad Analyzer's constraint, not this
-    // one. Renaming or removing this id breaks that call at runtime — nothing
-    // resolves it through `defaultFor`.
+    // The Bank's product auto-fill ran here for a stint (August 2026) and went
+    // back to CHAT_MODEL_STRONG in September, when that read became a
+    // fourteen-field research brief held to a long contract. Nothing names this
+    // id outside the picker now.
     chatEndpoint: '/codex/v1/responses',
     chatTransport: 'openai-responses',
     chatSlug: 'gpt-5-6-luna',
