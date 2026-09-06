@@ -2,6 +2,7 @@ import { downloadAssetFromR2, deleteAssetFromR2, uploadAssetToR2 } from '../lib/
 import { isCloudEnabled } from '../lib/supabase'
 import { useAuthStore } from '../stores/authStore'
 import { useAppStore } from '../stores/appStore'
+import { deleteThumb, ensureThumbForSavedAsset, resetThumbs } from './mediaThumbs'
 
 const DB_NAME = 'ai-ugc-lab-assets'
 const DB_VERSION = 1
@@ -22,6 +23,10 @@ function cloudActive(): boolean {
 // callers for the same not-yet-cached id (e.g. an <img> and a modal preview
 // mounting together) share one createObjectURL instead of leaking the loser.
 const urlCache = new Map<string, Promise<string>>()
+// The same URLs once settled, for a synchronous read. A tile that scrolls back
+// to a clip it already resolved used to render a spinner for one frame while
+// it re-awaited the cached promise — a flash on every return trip.
+const resolvedUrls = new Map<string, string>()
 let fallbackStore: Map<string, StoredAsset> | null = null
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -95,7 +100,7 @@ function generateAssetId(): string {
 export function isAssetRef(value: string | undefined | null): boolean {
   if (typeof value !== 'string') return false
   // Two shapes are in use across the app: bare ids ("asset-xxx") from
-  // saveBase64Asset / saveFromDataUrl paths, and asset:// URIs from
+  // saveAsset / saveFromDataUrl paths, and asset:// URIs from
   // VariationCard's video write path. Both must be recognised or the
   // useAssetUrl hook hands the raw string to <img>/<video>, which then
   // tries to load `asset://…` (an unknown scheme) and fails silently.
@@ -180,6 +185,10 @@ export async function saveAsset(blob: Blob, mimeType?: string, opts: SaveAssetOp
 
   await idbPut(asset)
 
+  // The grid-sized copy, made now rather than on first view so the tile this
+  // lands in has it ready and never decodes the original. See mediaThumbs.
+  ensureThumbForSavedAsset(id, blob, asset.mimeType)
+
   if (!opts.skipCloud && cloudActive()) {
     void uploadAssetToR2(id, blob).catch((err) => {
       const msg = err instanceof Error ? err.message : String(err)
@@ -205,12 +214,6 @@ export async function saveFromDataUrl(dataUrl: string): Promise<string> {
   const res = await fetch(dataUrl)
   const blob = await res.blob()
 
-  return saveAsset(blob, mimeType)
-}
-
-export async function saveBase64Asset(base64: string, mimeType: string): Promise<string> {
-  const res = await fetch(`data:${mimeType};base64,${base64}`)
-  const blob = await res.blob()
   return saveAsset(blob, mimeType)
 }
 
@@ -274,13 +277,20 @@ export async function getUrl(refOrId: string): Promise<string | null> {
     urlCache.set(assetId, cached)
   }
   try {
-    return await cached
+    const url = await cached
+    resolvedUrls.set(assetId, url)
+    return url
   } catch {
     // Blob missing (or resolution failed) — drop the cached rejection so a
     // later call can retry once the asset lands.
     urlCache.delete(assetId)
     return null
   }
+}
+
+/** The object URL for an asset this tab has already resolved, or undefined. */
+export function peekUrl(refOrId: string): string | undefined {
+  return resolvedUrls.get(assetIdFromRef(refOrId))
 }
 
 export async function getAsBase64(assetId: string): Promise<{ base64: string; mimeType: string } | null> {
@@ -310,7 +320,9 @@ export async function resetAssetStore(): Promise<void> {
     p.then((url) => { try { URL.revokeObjectURL(url) } catch { /* ignore */ } }).catch(() => { /* never resolved */ })
   }
   urlCache.clear()
+  resolvedUrls.clear()
   fallbackStore = null
+  await resetThumbs()
 
   // Drop the open connection so deleteDatabase doesn't have to wait on it.
   if (dbPromise) {
@@ -340,8 +352,10 @@ export async function deleteAsset(refOrId: string): Promise<void> {
   const cached = urlCache.get(assetId)
   if (cached) {
     urlCache.delete(assetId)
+    resolvedUrls.delete(assetId)
     cached.then((url) => { try { URL.revokeObjectURL(url) } catch { /* ignore */ } }).catch(() => { /* never resolved */ })
   }
+  deleteThumb(assetId)
 
   await idbDelete(assetId)
 

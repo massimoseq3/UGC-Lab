@@ -2,7 +2,7 @@ import { memo, useMemo, useRef, useState, useEffect } from 'react'
 import { Image as ImageIcon, UserRound, Bookmark, X, Download, Check, Copy, LayoutGrid, List, Maximize2, RectangleVertical, Plus, Braces, ChevronDown, Pencil, Frame, History, ArrowLeft } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import { useBankStore } from '../../../stores/bankStore'
-import { useAssetUrlState } from '../../../hooks/useAssetUrl'
+import { useAssetUrlState, useAssetThumb } from '../../../hooks/useAssetUrl'
 import useNearViewport from '../../../hooks/useNearViewport'
 import { getUrl } from '../../../utils/assetStore'
 import { useAppStore } from '../../../stores/appStore'
@@ -439,8 +439,20 @@ function aspectStyle(ar: string): React.CSSProperties {
 // This gates the PICTURE only. `handleDownload` re-resolves through getUrl on
 // its own, so every action on the tile works the same whether it has painted
 // or not.
-function useHistoryTileActions(item: CharacterHistoryItem, onDelete: () => void | Promise<unknown>, near = true) {
-  const { url, status } = useAssetUrlState(near ? item.imageRef : undefined)
+// `full` asks for the ORIGINAL file rather than the grid-sized thumbnail
+// (utils/mediaThumbs). The grid tile and the list row show the thumbnail —
+// it's what keeps a wall of 4K portraits from being re-decoded every time the
+// column scrolls back over them — and the Single stage, where one picture is
+// judged large, shows the original. Downloads always re-resolve the original.
+function useHistoryTileActions(
+  item: CharacterHistoryItem,
+  onDelete: () => void | Promise<unknown>,
+  near = true,
+  full = false,
+) {
+  const thumb = useAssetThumb(near && !full ? item.imageRef : undefined)
+  const original = useAssetUrlState(near && full ? item.imageRef : undefined)
+  const { url, status } = full ? original : thumb
   const addModel = useBankStore((s) => s.addModel)
   const deleteModel = useBankStore((s) => s.deleteModel)
   const updateCharacterHistory = useBankStore((s) => s.updateCharacterHistory)
@@ -987,7 +999,7 @@ function SingleCard({
   onCopyPrompt: () => void
   onReuse: () => void
 }) {
-  const a = useHistoryTileActions(item, onDelete)
+  const a = useHistoryTileActions(item, onDelete, true, true)
   const natural = useNaturalRatio()
 
   return (
@@ -1224,8 +1236,10 @@ function HistoryTile({
 }) {
   const ownRoot = useRef<HTMLElement | null>(null)
   const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot ?? ownRoot)
-  const a = useHistoryTileActions(item, onDelete, scrollRoot ? near : true)
   const fitted = !!frameStyle
+  // A fitted tile is one picture on the Single stage: the original. The grid
+  // tile is one of hundreds: the thumbnail.
+  const a = useHistoryTileActions(item, onDelete, scrollRoot ? near : true, fitted)
 
   return (
     <div

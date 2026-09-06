@@ -43,6 +43,11 @@
 // the tab stalls on the reads. A releasing tile must hold its own dimensions,
 // which every caller does by putting a fixed aspect on the FRAME rather than
 // letting the media size it, so nothing moves when it comes and goes.
+//
+// `seen` is the sticky half of `near`: true from the first approach and never
+// false again, whatever `release` does afterwards. It's for what a releasing
+// tile keeps — a clip's poster frame, which is small, holds no decoder, and is
+// precisely the thing that should still be on the tile once the <video> is gone.
 import { useEffect, useRef, useState } from 'react'
 
 export default function useNearViewport<T extends HTMLElement>(
@@ -52,12 +57,14 @@ export default function useNearViewport<T extends HTMLElement>(
 ) {
   const ref = useRef<T | null>(null)
   const [near, setNear] = useState(false)
+  const [seen, setSeen] = useState(false)
 
   useEffect(() => {
     const el = ref.current
     if (!el) return
     const io = new IntersectionObserver(([entry]) => {
       setNear(entry.isIntersecting)
+      if (entry.isIntersecting) setSeen(true)
       // Loaded once and keeping it: stop watching, so nothing can take it back.
       if (!release && entry.isIntersecting) io.disconnect()
     }, {
@@ -68,5 +75,5 @@ export default function useNearViewport<T extends HTMLElement>(
     return () => io.disconnect()
   }, [root, rootMargin, release])
 
-  return { ref, near }
+  return { ref, near, seen }
 }
