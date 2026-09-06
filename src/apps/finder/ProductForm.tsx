@@ -9,6 +9,7 @@ import { downloadImage } from '../../utils/downloadImage'
 import { imageRejectionReason, partitionImageFiles, IMAGE_ACCEPT_ATTR } from './services/imageValidation'
 import { humanizeError } from '../../utils/friendlyError'
 import { fileToDataUri } from '../../utils/kie'
+import DropOverlay from '../../components/DropOverlay'
 import SegmentedToggle from '../../components/SegmentedToggle'
 import ExpandTextModal, { ExpandButton, BracketGrowArea, BracketInput } from '../../components/ExpandableText'
 import AutoGrowTextarea from '../../components/AutoGrowTextarea'
@@ -619,14 +620,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
       onDrop={handleDrop}
       className="relative flex flex-col gap-4 lg:min-h-0 lg:flex-1"
     >
-      {overlayActive && (
-        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-xl border-2 border-dashed border-emerald-400/60 bg-emerald-500/10 backdrop-blur-sm">
-          <div className="flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-emerald-200">
-            <Sparkles className="h-4 w-4" />
-            Drop image to auto-fill product info
-          </div>
-        </div>
-      )}
+      {overlayActive && <DropOverlay icon={Sparkles} label="Drop image to Auto-fill Product Info" accent="emerald" />}
       {/* Header — title, what the autosave is doing, and the way out. The
           primary action lives up here now: as a slab pinned across the field
           column it read as the bottom of the form, which is exactly why nobody

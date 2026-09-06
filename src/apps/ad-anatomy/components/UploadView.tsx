@@ -2,6 +2,7 @@ import { useRef, useCallback, useEffect, useState } from 'react'
 import { Upload, Eye, Coins, X, Film, Minimize2 } from 'lucide-react'
 import { formatCredits } from '../../../utils/models'
 import { readMediaDuration } from '../../../utils/media'
+import DropOverlay from '../../../components/DropOverlay'
 import { estimateAnalysisCredits } from '../services/analysisCost'
 import { VIDEO_UPLOAD_BUDGET_BYTES } from '../services/analyzeAd'
 
@@ -21,7 +22,7 @@ interface RejectedFile {
   reason: string
 }
 
-// A dropped-but-not-yet-analysed clip. Duration is read lazily from metadata
+// A dropped-but-not-yet-analyzed clip. Duration is read lazily from metadata
 // (null until it resolves) and only feeds the cost estimate.
 interface StagedFile {
   id: string
@@ -31,7 +32,7 @@ interface StagedFile {
 
 // The clip is uploaded to kie's file host, and anything over the upload budget
 // is re-encoded first (see services/analysisQueue.ts). Said here as well
-// as on the analysing screen: the pass runs in realtime, and a member who was
+// as on the analyzing screen: the pass runs in realtime, and a member who was
 // told to expect "a couple of minutes" should know before they commit which of
 // their clips is buying an extra one.
 function needsCompressing(file: File): boolean {
@@ -200,7 +201,7 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
               <span className="min-w-0 flex-1 truncate text-xs text-ink-300">{s.file.name}</span>
               {needsCompressing(s.file) && (
                 <span
-                  title={`This ad is over the ${Math.round(VIDEO_UPLOAD_BUDGET_BYTES / (1024 * 1024))}MB the analyser can upload, so it gets compressed first, which takes about as long as the ad runs.`}
+                  title={`This ad is over the ${Math.round(VIDEO_UPLOAD_BUDGET_BYTES / (1024 * 1024))}MB the analyzer can upload, so it gets compressed first, which takes about as long as the ad runs.`}
                   className="flex shrink-0 items-center gap-1 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium text-ink-400"
                 >
                   <Minimize2 className="h-2.5 w-2.5" strokeWidth={2.25} />
@@ -235,7 +236,7 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
             )}
             {totalCredits !== null && (
               <span
-                title="Estimated credits to analyse: rough and rounded up. The real charge is metered per token on your key."
+                title="Estimated credits to analyze: rough and rounded up. The real charge is metered per token on your key."
                 className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold tracking-tight"
               >
                 <Coins className="h-3 w-3" strokeWidth={2} />
@@ -244,7 +245,7 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
             )}
           </button>
 
-          {/* Said before they commit, and again on the analysing screen. A
+          {/* Said before they commit, and again on the analyzing screen. A
               whole-video read is one long call with no progress to stream, so
               the wait has to be stated or it reads as a hung page. */}
           <p className="text-center text-[11px] text-ink-600">
@@ -268,18 +269,10 @@ export default function UploadView({ onAnalyze }: UploadViewProps) {
       )}
 
       {/* Panel-scoped drag overlay — covers the Ad Analyzer surface only
-          (sidebar and app chrome remain visible). */}
-      {panelDragActive && (
-        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-[#FF5257]/10 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-4 rounded-3xl border-2 border-dashed border-[#FF5257]/50 bg-surface-2 px-12 py-10 text-center shadow-2xl">
-            <Upload className="h-10 w-10 text-[#FF5257]" />
-            <p className="text-xl font-semibold tracking-tight text-ink-100">
-              Drop your ads here to analyse
-            </p>
-            <p className="text-sm text-ink-400">MP4, MOV, WebM · max {MAX_SIZE_MB}MB each</p>
-          </div>
-        </div>
-      )}
+          (sidebar and app chrome remain visible). The accepted formats aren't
+          repeated on it: the drop zone underneath stays legible through the
+          tint, and it has said them since the panel loaded. */}
+      {panelDragActive && <DropOverlay icon={Upload} label="Drop to Analyze" accent="analyzer" />}
     </div>
   )
 }
