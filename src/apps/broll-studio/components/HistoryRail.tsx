@@ -19,7 +19,7 @@ import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history
 import { TileActionStack, TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
 import Dropdown from '../../../components/Dropdown'
-import HistoryRailToggle from '../../../components/HistoryRailToggle'
+import { RailCloseButton } from '../../../components/HistoryRailHandle'
 import RailNewButton from '../../../components/RailNewButton'
 import { brollHistoryMode } from './brollHistoryRows'
 
@@ -30,8 +30,10 @@ interface HistoryRailProps {
   activeId: string | null
   onSelect: (item: BrollHistoryItem) => void
   onDelete: (id: string) => void
-  // Empties the storyboard back to its blank canvas. Single click — nothing is
-  // deleted, and the session it clears is a row in the list right underneath.
+  // Empties the storyboard back to its blank canvas AND resets the setup
+  // column beside it. Nothing is deleted — the session it clears is a row in
+  // the list right underneath, media and all — but the inputs are the half no
+  // row hands back until you open it, so this one ARMS before it fires.
   onNew: () => void
   onCollapse: () => void
 }
@@ -311,20 +313,22 @@ export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {/* New leads the rail; the open/shut toggle sits to its LEFT, at the
-          band's own edge (September 2026, Massimo's call — the pull tab it
-          replaced was clipping this app's batch strip, which runs across the
-          top of the column beside it). The band takes the app-wide h-[57px] so
-          the hairline lines up with the input column's header. */}
+      {/* New leads the rail and gets the whole band: the rail is SHUT from the
+          lip on the seam (`HistoryRailHandle`), a tab on the rail's own edge,
+          so no close needs a slot in here. Below 980px the rail covers the
+          storyboard and that lip goes with it, so a Close does sit here — it is
+          the only way back. The band takes the app-wide h-[57px] so the
+          hairline lines up with the input column's header. */}
       <div className="flex h-[57px] shrink-0 items-center gap-1.5 border-b border-ink/5 px-3">
-        <HistoryRailToggle open onToggle={onCollapse} />
         <RailNewButton
+          confirm
           label="New Storyboard"
           accentClass="bg-broll-500"
-          title="Clear the storyboard. This session stays here in History"
+          title="Clear the storyboard and the setup column. This session stays here in History"
           onClick={onNew}
           className="flex-1"
         />
+        <RailCloseButton onCollapse={onCollapse} />
       </div>
 
       {/* The sort leads the search row, then the mode pills sit centred under
@@ -414,7 +418,7 @@ export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew
         {items.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
             <Film className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
-            <p className="text-xs text-ink-300">No sessions yet</p>
+            <p className="text-xs text-ink-300">No Sessions Yet</p>
             <p className="text-[11px] text-ink-500">Generated B-Roll sessions will land here.</p>
           </div>
         ) : groups.length === 0 ? (
@@ -594,7 +598,11 @@ function HistoryCard({
         {generating > 0 && <GeneratingPulseRing family="broll" shape="rect" />}
       </div>
 
-      <div className="flex min-h-0 flex-col gap-1 px-3 py-2.5">
+      {/* The caption block is CENTRED, matching Scripts' rail rows (Massimo's
+          call, September 2026): under a full-bleed cover the title and its
+          meta line read as the card's caption rather than as the start of a
+          left-hand column, and the two history surfaces are the same shape. */}
+      <div className="flex min-h-0 flex-col items-center gap-1 px-3 py-2.5 text-center">
         <p className="line-clamp-2 text-[13px] font-medium leading-snug text-ink-100">{title}</p>
         {/* The storyboard call died — say why, on the row it died on. Nothing
             was generated, so there's no media line to keep. */}
@@ -606,7 +614,7 @@ function HistoryCard({
             {item.storyboardError || 'Storyboard failed.'}
           </p>
         )}
-        <div className="flex items-center gap-1.5 overflow-hidden text-[11px] text-ink-500">
+        <div className="flex max-w-full items-center justify-center gap-1.5 overflow-hidden text-[11px] text-ink-500">
           {/* While a session has work in flight, the live count replaces the
               media tally — that's the answer the member is looking for when they
               open History mid-render. The timestamp stays either way. */}

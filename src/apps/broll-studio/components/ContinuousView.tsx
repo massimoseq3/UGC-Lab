@@ -1440,7 +1440,7 @@ export default function ContinuousView({
               <>
                 {/* The count and the price ride on the Generate button, same
                     as Line-by-Line's batch dialogs. */}
-                <h3 className="text-sm font-medium text-ink-100">Generate videos</h3>
+                <h3 className="text-sm font-medium text-ink-100">Generate Videos</h3>
                 <p className="mt-1 text-xs text-ink-500">{confirmGen.scope}</p>
 
                 {/* Model — the frames-to-video model every video in this batch
@@ -2425,7 +2425,7 @@ function ClipCard({
                 <ArrowRight className="h-3.5 w-3.5" />
                 <ImageIcon className="h-4 w-4" />
               </span>
-              <p className="text-[11px] font-medium text-ink-300">Keyframes ready</p>
+              <p className="text-[11px] font-medium text-ink-300">Keyframes Ready</p>
               <p className="text-[10px] leading-relaxed text-ink-500">{clipState?.editablePrompt.split('\n')[0]}</p>
             </div>
           </>
@@ -2525,7 +2525,7 @@ function AddConceptCard({ onAdd }: { onAdd: () => void }) {
     >
       <Plus className="h-4 w-4 shrink-0 text-ink-400 transition-colors group-hover/add:text-broll-300" />
       <span className="px-3 text-center text-[11px] font-medium text-ink-400 transition-colors group-hover/add:text-broll-300">
-        Add concept
+        Add Concept
       </span>
     </button>
   )

@@ -71,7 +71,7 @@ export default function ResetPasswordScreen() {
         </div>
 
         <AuthField
-          label="New password"
+          label="New Password"
           type="password"
           autoComplete="new-password"
           value={password}
@@ -82,7 +82,7 @@ export default function ResetPasswordScreen() {
         />
 
         <AuthField
-          label="Confirm password"
+          label="Confirm Password"
           type="password"
           autoComplete="new-password"
           value={confirm}

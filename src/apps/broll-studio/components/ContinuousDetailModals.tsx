@@ -407,7 +407,7 @@ export function ContinuousFrameModal({
                   {/* Start frame — the chosen still this animation begins on.
                       The dot is honest: no still means Animate is disabled. */}
                   <div className="flex flex-col gap-1.5">
-                    <SectionLabel label="Start frame" filled={!!startImageUrl} required />
+                    <SectionLabel label="Start Frame" filled={!!startImageUrl} required />
                     <div>
                       {startImageUrl ? (
                         <div className="relative max-w-[120px] overflow-hidden rounded-xl border border-ink/10 bg-ink/[0.02]" style={{ aspectRatio: '9 / 16' }}>

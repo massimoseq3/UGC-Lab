@@ -43,7 +43,7 @@ export default function LapsedScreen() {
             and the button says Unlock my workspace — a sentence restating all
             three is the one thing on this screen nobody has to read. */}
         <AuthField
-          label="Access code"
+          label="Access Code"
           type="text"
           autoComplete="off"
           autoFocus

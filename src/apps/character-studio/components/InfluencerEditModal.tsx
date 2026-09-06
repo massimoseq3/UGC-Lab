@@ -604,7 +604,7 @@ export default function InfluencerEditModal({
                         status dot: nothing in this card gates Generate. */}
                     <div className="flex flex-col gap-1.5">
                       <SectionLabel
-                        label="Reference images"
+                        label="Reference Images"
                         right={(
                           <span className="text-[10px] tabular-nums tracking-tight text-ink-600">
                             {refs.length}/{MAX_REFS}
@@ -663,7 +663,7 @@ export default function InfluencerEditModal({
                           the right), so every dot here could only ever be green
                           or neutral — decoration. Leaving both bare also keeps
                           the two labels on one left edge. */}
-                      <SectionLabel label="Visual style" />
+                      <SectionLabel label="Visual Style" />
                       <button
                         type="button"
                         onClick={() => setStyleModalOpen(true)}

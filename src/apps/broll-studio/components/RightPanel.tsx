@@ -9,6 +9,7 @@ import { useMinWidth } from '../../../hooks/useBreakpoint'
 import ScenesView from './ScenesView'
 import ContinuousView from './ContinuousView'
 import HistoryRail from './HistoryRail'
+import HistoryRailHandle from '../../../components/HistoryRailHandle'
 import HistoryRailToggle, { HistoryRailClosed } from '../../../components/HistoryRailToggle'
 import { brollHistoryMode, isRetiredOneShotRow } from './brollHistoryRows'
 import GridCanvas, { AwaitingBody } from '../../../components/GridCanvas'
@@ -57,7 +58,9 @@ interface RightPanelProps {
   activeHistoryId: string | null
   onSelectHistory: (item: BrollHistoryItem) => void
   // Canvas-clear state, owned by BrollStudio so the left panel's "New" can
-  // trigger it too. Never touches data — the session stays a History row.
+  // trigger it too. Never touches generated data — the session stays a History
+  // row — but the app's handler DOES reset the setup column alongside the
+  // canvas, which is why the rail's New button arms first.
   canvasCleared: boolean
   onClearCanvas: () => void
 }
@@ -151,14 +154,23 @@ export default function RightPanel(props: RightPanelProps) {
   // column of its own (September 2026, Massimo's call): a column narrowed the
   // storyboard by ~135px and left the button standing on bare panel beside a
   // frosted bar. In the bar, that glass runs under it and the storyboard keeps
-  // its width.
+  // its width. Open, this is undefined — the rail is shut from the lip on the
+  // seam instead.
   //
   // Two widths it can't go there, and both fall back to the column below: with
   // no storyboard there is no bar at all, and under `md` the Continuous strip's
   // pills wrap, so neither strip is the pinned single row this sits in. The
   // choice is made in CSS — `hidden md:block` here against `md:hidden` on the
   // column — so nothing has to read a breakpoint in JS.
-  const railToggle = historyOpen ? undefined : (
+  const railToggle = historyOpen ? (
+    // Open, the bar carries no button — the rail is shut from the LIP, which
+    // floats over this bar at the column's right edge. What it does carry is
+    // the lip's own width as a spacer, so the strip's scrolling pill row ends
+    // short of it instead of sliding underneath. The lip can't live IN the bar:
+    // it has to hang on the pane's edge, outside the bar's padding, or it stops
+    // being a tab on the seam.
+    <div aria-hidden className="w-6" />
+  ) : (
     <div className="hidden md:block">
       <HistoryRailToggle
         open={false}
@@ -179,10 +191,16 @@ export default function RightPanel(props: RightPanelProps) {
           below that it stands in FRONT of it — the shape the tab had, and
           picking a session hands the pane back. */}
       <div
-        className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
+        className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
           historyOpen ? 'hidden min-[980px]:flex' : 'flex'
         }`}
       >
+        {/* Open, the rail is shut from the LIP on the seam this column's
+            right edge makes with it. Shut, there is no seam to hang one on, so
+            the way back in is the labelled History button — in the storyboard
+            bar where there is one, in a stub column where there isn't. */}
+        {historyOpen && <HistoryRailHandle onCollapse={() => setHistoryOpen(false)} />}
+
         {/* The storyboard works on the same graph-paper canvas as the other
             apps' output panels. History keeps the plain surface — it's the
             reel, not the stage. */}
@@ -190,7 +208,7 @@ export default function RightPanel(props: RightPanelProps) {
         {cleared ? (
           <AwaitingBody
             icon={Film}
-            title="Awaiting storyboard"
+            title="Awaiting Storyboard"
             hint="Your next storyboard lands here. Nothing was deleted. This session is saved in History."
           />
         ) : isContinuous ? (

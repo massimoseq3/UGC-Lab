@@ -477,7 +477,7 @@ export default function InputPanel({
                 <Package className="h-[18px] w-[18px] text-ink-700" />
               </div>
               <div className="flex flex-col">
-                <span className="text-[13px] text-ink-500">No products yet</span>
+                <span className="text-[13px] text-ink-500">No Products Yet</span>
                 <button
                   onClick={handleOpenFinder}
                   className="text-left text-[11px] text-scripts-text transition-colors hover:text-ink-100"
@@ -719,14 +719,11 @@ export default function InputPanel({
                   the phone shape; the height-sharing is a desktop luxury. */}
               <div className="flex min-h-[160px] flex-1 basis-0 flex-col max-md:min-h-[220px] max-md:flex-none max-md:basis-auto">
                 <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
-                  <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-2.5">
+                  <div className="flex shrink-0 items-center px-4 pt-2.5">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <PenLine className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
                       <span className="truncate text-[13px] font-medium text-ink-200">Additional Instructions</span>
                     </div>
-                    <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
-                      optional
-                    </span>
                   </div>
                   <textarea
                     value={brief}
@@ -846,14 +843,11 @@ export default function InputPanel({
                   belongs on the field, and the row it needed outside cost the
                   textarea its height in a column that's already tight. */}
               <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
-                <div className="flex shrink-0 items-center justify-between gap-2 px-4 pt-2.5">
+                <div className="flex shrink-0 items-center px-4 pt-2.5">
                   <div className="flex min-w-0 items-center gap-1.5">
                     <PenLine className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
                     <span className="truncate text-[13px] font-medium text-ink-200">Additional Instructions</span>
                   </div>
-                  <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
-                    optional
-                  </span>
                 </div>
                 <textarea
                   value={additionalContext}

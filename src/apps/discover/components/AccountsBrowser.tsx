@@ -281,7 +281,7 @@ export default function AccountsBrowser({
       <GridCanvas>
         <AwaitingBody
           icon={Users}
-          title="No accounts tracked"
+          title="No Accounts Tracked"
           hint="Paste a creator's Instagram profile link or their @handle above. Outliers pulls their reels and scores each one against that account's own median, so you see which of their posts actually popped, not just which ones are big."
         />
       </GridCanvas>
@@ -384,7 +384,7 @@ export default function AccountsBrowser({
           <GridCanvas>
             <AwaitingBody
               icon={Users}
-              title="Pick an account"
+              title="Pick an Account"
               hint="Choose a creator to see their reels ranked by how far each one beat their own median."
             />
           </GridCanvas>
@@ -399,7 +399,7 @@ export default function AccountsBrowser({
           <GridCanvas>
             <AwaitingBody
               icon={Users}
-              title={entry ? 'Nothing matches' : 'Nothing loaded'}
+              title={entry ? 'Nothing Matches' : 'Nothing Loaded'}
               hint={
                 entry
                   ? hiddenByFilters > 0

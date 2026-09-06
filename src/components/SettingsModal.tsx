@@ -691,7 +691,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
 
                 {/* Manual orphan cleanup (auto-cleanup runs on sign-in; this is a power-user fallback) */}
                 <Card>
-                  <span className="text-[12px] font-medium text-ink-300">Clean up unused files</span>
+                  <span className="text-[12px] font-medium text-ink-300">Clean Up Unused Files</span>
                   <p className="mt-1 text-[11px] leading-relaxed text-ink-500">
                     Removes cloud files no item in your banks references. Runs automatically on sign-in. This is the on-demand sweep.
                   </p>
@@ -874,7 +874,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                   >
                     <Shield className="h-4 w-4 shrink-0 text-ink-500" />
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[12px] font-medium text-ink-200">Open Admin panel</span>
+                      <span className="block text-[12px] font-medium text-ink-200">Open Admin Panel</span>
                       <span className="block text-[11px] text-ink-500">Members, insights, and the allowlist.</span>
                     </span>
                     <ChevronRight className="h-3.5 w-3.5 shrink-0 text-ink-500" />
@@ -888,7 +888,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                 {showDemoTool && (
                   <Card>
                     <ToggleRow
-                      label="Generation info"
+                      label="Generation Info"
                       hint="Name the model on generated media: Playground's list rows and preview, and B-Roll's cards. On for everyone; this switch is yours alone and only affects this browser."
                       checked={showGenerationInfo}
                       onChange={setShowGenerationInfo}
@@ -898,7 +898,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
 
                 {showDemoTool && (
                   <Card>
-                    <span className="text-[12px] font-medium text-ink-300">Demo data</span>
+                    <span className="text-[12px] font-medium text-ink-300">Demo Data</span>
                     <p className="mt-1 text-[11px] leading-relaxed text-ink-500">
                       Placeholder content in every bank and history. Fully reversible.
                     </p>

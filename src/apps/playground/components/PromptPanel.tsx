@@ -687,12 +687,14 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
 
   // Does the output-settings row have anything to draw? Music never does, and
   // neither does a mode whose resolved model declares no constraints. The row
-  // used to be unconditional because the batch stepper always sat in it; now
-  // that the stepper rides on the model row, an unguarded row would render as
-  // an empty 8px margin above Generate.
+  // used to be unconditional because the batch stepper always sat in it; with
+  // the stepper on the model row in VIDEO mode, an unguarded row would render
+  // as an empty 8px margin above Generate. Image mode is unconditional again
+  // because its stepper lives in this row — a model that declares no image
+  // constraints still has a count to show.
   const hasOutputSettings =
     (state.mode === 'video' && !!model?.videoConstraints) ||
-    (state.mode === 'image' && !!model?.imageConstraints)
+    state.mode === 'image'
 
   return (
     <div
@@ -1253,32 +1255,42 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 one is the wrong unit most of the time. `stacked` because at
                 58px a number and its word side by side float mid-pill, and the
                 word is what makes a bare stepper on a model row read as a
-                count rather than as a nudge on the model itself. */}
-            {/* Not on Music: Suno returns a pair of tracks per call, so a
-                count here would multiply an already-doubled run. */}
-            {state.mode !== 'music' && (
+                count rather than as a nudge on the model itself.
+
+                VIDEO ONLY. Image mode's stepper moved down beside its aspect
+                chip (September 2026, Massimo's call) — that row holds two chips
+                there against video's three or four, so it has the space, and a
+                count sits more honestly among the other properties of the thing
+                being made than it does beside the model that makes it. Video
+                keeps it up here because adding a fourth control to a row that
+                already carries resolution, aspect, duration and sometimes audio
+                would wrap it.
+
+                Not on Music: Suno returns a pair of tracks per call, so a count
+                here would multiply an already-doubled run. */}
+            {state.mode === 'video' && (
               <BatchCountStepper
                 stacked
                 size="xl"
                 accent="playground"
-                noun={state.mode === 'video' ? 'clip' : 'image'}
+                noun="clip"
                 // Title Case, like every other label the member reads on a
                 // control (Massimo's call). `noun` stays lower case — it is
                 // written into sentences ("2 clips per press"), not shown as a
                 // label of its own.
-                label={state.mode === 'video' ? 'Clips' : 'Images'}
+                label="Clips"
                 value={batchCount}
                 onChange={(n) => onChange({ ...state, batchCount: n })}
                 creditsFor={creditsForRun}
               />
             )}
           </div>
-          {/* Output settings — resolution / aspect / duration / audio, all of
-              them properties of the thing being made. A model that declares no
-              constraints has none, and the row is skipped rather than rendered
-              empty with its own margin under it — which it now can be, since the
-              batch stepper moved up to the model row and no longer holds the line
-              open on its own. Sits just above Generate; dropdowns open upward. */}
+          {/* Output settings — resolution / aspect / duration / audio, plus the
+              batch count in image mode: all of them properties of the thing
+              being made. In VIDEO mode a model that declares no constraints has
+              none, and the row is skipped rather than rendered empty with its
+              own margin under it. Sits just above Generate; dropdowns open
+              upward. */}
           {hasOutputSettings && (
           <div className="mb-2 flex flex-wrap items-center gap-1.5">
           {state.mode === 'video' && model?.videoConstraints && (
@@ -1385,6 +1397,28 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 />
               )}
             </>
+          )}
+
+          {/* How many, at the RIGHT END of the image row — beside the aspect
+              ratio rather than up on the model row (September 2026, Massimo's
+              call). It belongs with the other properties of the thing being
+              made, and this row only carries two chips in image mode, so it
+              has the space video's doesn't. `size='lg'` is the chip height
+              (48px), so it reads as one of them rather than as a control of
+              its own kind; `stacked` still, because the number is the thing
+              being read and the word is what it counts. */}
+          {state.mode === 'image' && (
+            <BatchCountStepper
+              grow
+              stacked
+              size="lg"
+              accent="playground"
+              noun="image"
+              label="Images"
+              value={batchCount}
+              onChange={(n) => onChange({ ...state, batchCount: n })}
+              creditsFor={creditsForRun}
+            />
           )}
 
           </div>

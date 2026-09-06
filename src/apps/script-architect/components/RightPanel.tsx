@@ -2,6 +2,7 @@ import type { ScriptHistoryItem } from '../../../stores/types'
 import type { PendingScriptRun, RemixAngle, ScriptMode, WriteFormat } from '../types'
 import OutputPanel from './OutputPanel'
 import HistoryRail from './HistoryRail'
+import HistoryRailHandle from '../../../components/HistoryRailHandle'
 import { HistoryRailClosed } from '../../../components/HistoryRailToggle'
 
 interface RightPanelProps {
@@ -35,6 +36,8 @@ interface RightPanelProps {
   // "Clear the canvas" — owned by the app, because picking from History is what
   // uncovers it again and the app is what knows a pick happened (restoring the
   // very run that was cleared changes neither the takes nor the active id).
+  // The app's handler resets the SETUP COLUMN alongside the canvas; the rail's
+  // New button is where it fires from, and it arms first.
   cleared: boolean
   onClearCanvas: () => void
 
@@ -89,10 +92,15 @@ export default function RightPanel({
           The number is explained beside `railIsColumn` in ScriptArchitect, which
           has to agree with it. */}
       <div
-        className={`min-h-0 min-w-0 flex-1 overflow-hidden ${
+        className={`relative min-h-0 min-w-0 flex-1 overflow-hidden ${
           historyOpen ? 'hidden min-[980px]:block' : 'block'
         }`}
       >
+        {/* Open, the rail is shut from the LIP on the seam this column's
+            right edge makes with it. Shut, there is no seam to hang one on, so
+            the way back in is the labelled History button below. */}
+        {historyOpen && <HistoryRailHandle onCollapse={onToggleHistory} />}
+
         <OutputPanel
           variations={cleared ? [] : variations}
           outputAngles={outputAngles}
@@ -130,8 +138,8 @@ export default function RightPanel({
         </div>
       ) : (
         // Shut, the rail leaves a button's worth of room in its place rather
-        // than nothing: the toggle is a laid-out element in both states, so it
-        // can never land on the bar this column runs across its own top.
+        // than nothing — and that button says the word, because with the rail
+        // gone there is no seam left for the lip to be a tab of.
         <HistoryRailClosed onExpand={onToggleHistory} count={history.length + pendingRuns.length} />
       )}
     </div>

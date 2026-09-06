@@ -43,23 +43,3 @@ const BLOOM = 'radial-gradient(circle at 30% 22%, rgba(255,255,255,0.5), rgba(25
 export function metalFill([light, mid, shade]: MetalRamp, angle: number): string {
   return `${BLOOM}, linear-gradient(${angle}deg, ${light}, ${mid} 52%, ${shade})`
 }
-
-// The same material as a small PLATE — a badge, a chip — and it stops at the
-// ramp's mid stop on purpose. A 9.5px label runs the width of the pill, so a
-// fill that ran down to the shadow stop would put dark text on a dark end;
-// light → mid keeps one readable ground under the whole word.
-export function metalPlate([light, mid]: MetalRamp, angle = 160): string {
-  return `${BLOOM}, linear-gradient(${angle}deg, ${light}, ${mid})`
-}
-
-// The label on a plate. Metal is the same colour in both themes, so its text
-// is a literal too — this is engraving, not chrome that flips.
-export const METAL_PLATE_INK = '#1F2328'
-
-// The rim a plate wears, so it reads as a piece of metal rather than a
-// coloured pill. Both inset rims are LIT, top brighter than bottom, the rule
-// `.glass-fill` states for its squircles: light entering the top of a solid
-// object exits along its far edge, so a dark bottom rim reads as a printed
-// sticker. The outer shadow is what lifts it off the row.
-export const METAL_PLATE_RIM =
-  'shadow-[inset_0_1px_0_rgba(255,255,255,0.5),inset_0_-1px_0_rgba(255,255,255,0.12),0_1px_2px_rgba(0,0,0,0.22)]'

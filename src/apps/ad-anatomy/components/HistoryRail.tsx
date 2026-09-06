@@ -77,7 +77,7 @@ export default function HistoryRail({ items, selectedId, onSelect, onDelete, onN
         {items.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
             <Eye className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
-            <p className="text-xs text-ink-500">No analyses yet</p>
+            <p className="text-xs text-ink-500">No Analyses Yet</p>
           </div>
         ) : groups.length === 0 ? (
           <div className="flex h-full items-center justify-center px-6 py-4 text-center">

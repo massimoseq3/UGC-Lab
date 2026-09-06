@@ -204,7 +204,7 @@ export default function Dashboard() {
             </Widget>
             {/* Time saved */}
             <Widget index={slot(1)} className="col-span-6 items-center text-center lg:col-span-4">
-              <WidgetLabel icon={Clock} label="Time saved" />
+              <WidgetLabel icon={Clock} label="Time Saved" />
               {/* NOT `mt-auto`: bottom-aligning this block lands the figure
                   at a different height in each tile, because Money saved's
                   floor art (a bar plus two captions) is taller than a
@@ -244,7 +244,7 @@ export default function Dashboard() {
 
             {/* Money saved */}
             <Widget index={slot(2)} className="col-span-6 items-center text-center lg:col-span-4">
-              <WidgetLabel icon={PiggyBank} label="Money saved" />
+              <WidgetLabel icon={PiggyBank} label="Money Saved" />
               {/* Centres with no bar under it — see Time saved above. */}
               <div className={`w-full ${hasSpend ? 'pt-4' : 'flex flex-1 flex-col justify-center'}`}>
                 <WidgetFigure value={formatUsd(metrics.usdSaved)} />

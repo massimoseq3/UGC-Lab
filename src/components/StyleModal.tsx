@@ -305,7 +305,7 @@ export default function StyleModal({
           {usingCustom && !styleBankId && (
             <div className={`mb-4 rounded-2xl border px-4 py-3 ${accent.banner}`}>
               <div className="flex items-start justify-between gap-3">
-                <span className={`text-[10px] font-semibold uppercase tracking-wider ${accent.bannerLabel}`}>Custom style in use</span>
+                <span className={`text-[10px] font-semibold uppercase tracking-wider ${accent.bannerLabel}`}>Custom Style in Use</span>
                 <button
                   type="button"
                   onClick={() => { setDraftBrief(styleBrief ?? ''); setDraftName(''); setView('create') }}
@@ -354,7 +354,7 @@ export default function StyleModal({
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-ink/5 text-ink-500">
                 <Sparkle className="h-4 w-4" strokeWidth={1.75} />
               </span>
-              <span className="text-[11px] font-semibold leading-tight tracking-tight text-ink-200">New from images</span>
+              <span className="text-[11px] font-semibold leading-tight tracking-tight text-ink-200">New from Images</span>
             </button>
           </div>
         </div>
@@ -506,7 +506,7 @@ export default function StyleModal({
           {draftBrief && (
             <div className="mt-4 flex flex-col gap-3">
               <label className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-ink-600">Style brief</span>
+                <span className="text-[11px] font-medium uppercase tracking-wider text-ink-600">Style Brief</span>
                 <textarea
                   value={draftBrief}
                   onChange={(e) => setDraftBrief(e.target.value)}

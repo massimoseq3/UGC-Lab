@@ -95,7 +95,7 @@ export default function AuthScreen() {
         {mode === 'signup' && (
           <div className="grid grid-cols-2 gap-3">
             <AuthField
-              label="First name"
+              label="First Name"
               type="text"
               autoComplete="given-name"
               value={firstName}
@@ -152,7 +152,7 @@ export default function AuthScreen() {
 
         {mode === 'signup' && (
           <AuthField
-            label="Access code"
+            label="Access Code"
             type="text"
             autoComplete="off"
             value={signupCode}
@@ -281,7 +281,7 @@ function MembersOnlyModal({ onClose }: { onClose: () => void }) {
           <Lock className="h-5 w-5" />
         </div>
 
-        <h2 className="mt-4 text-base font-semibold tracking-tight text-ink-100">Members only</h2>
+        <h2 className="mt-4 text-base font-semibold tracking-tight text-ink-100">Members Only</h2>
         <p className="mt-2 text-[13px] leading-relaxed text-ink-400">
           Access is only for members of the UGC OS Skool community. Join (or rejoin) on Skool to get back in.
         </p>

@@ -1268,6 +1268,28 @@ export default function BrollStudio() {
     setActiveHistoryId(item.id)
   }
 
+  // "New Storyboard" in the history rail — the whole app back to a blank
+  // sheet: the storyboard canvas empties AND the setup column beside it resets
+  // (September 2026, Massimo's call; it cleared the canvas alone before, which
+  // left the last session's script, product and character sitting in the
+  // inputs of a "new" storyboard). Nothing is deleted — the session is a row
+  // in the rail underneath, media and all — but the inputs are the half no row
+  // hands back until you open it, which is why the button arms first.
+  //
+  // `adBlueprint` goes with them even though no row displays it: it is the
+  // only source of scene staging, so a blueprint left behind would keep
+  // staging shots for an ad the member has moved on from, with nothing on
+  // screen saying so.
+  const handleNewStoryboard = () => {
+    setClearedCanvasSig(canvasSig)
+    setSelectedProductId(null)
+    setSelectedModelId(null)
+    setSelectedScriptId(null)
+    setScriptText('')
+    setAdditionalContext('')
+    setAdBlueprint(null)
+  }
+
   return (
     <div className="flex h-full flex-col md:flex-row">
       <MobilePaneTabs
@@ -1348,7 +1370,7 @@ export default function BrollStudio() {
           activeHistoryId={activeHistoryId}
           onSelectHistory={handleSelectHistory}
           canvasCleared={canvasCleared}
-          onClearCanvas={() => setClearedCanvasSig(canvasSig)}
+          onClearCanvas={handleNewStoryboard}
         />
       </div>
 

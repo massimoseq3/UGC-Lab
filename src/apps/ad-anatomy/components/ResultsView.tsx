@@ -99,18 +99,17 @@ function Section({ children, className = '' }: { children: React.ReactNode; clas
   )
 }
 
-// Left-aligned card heading with a full-width bottom separator. An optional
-// action (e.g. Copy) sits at the right of the band.
+// Left-aligned card heading with a full-width bottom separator. The accent
+// color lives on the icon; the title stays neutral. An optional action (e.g.
+// Copy) sits at the right of the band.
 //
-// The glyph is MONOCHROME (September 2026, Massimo's call) — one step quieter
-// than the title beside it, so the words lead and the mark identifies. The
-// three headings carried a hue each (amber Breakdown, the analyzer red on
-// Transcript, fuchsia Scenes), which is three unrelated colours down one
-// scrolling column in an app whose own accent is a fourth: the read is a
-// scorecard, a transcript and a set of prompts, and none of them is a
-// category the colour was naming. It took the `accentClass` prop with it
-// rather than leaving a knob whose every caller passed the same thing.
-function CardHeader({ icon: Icon, title, action }: { icon: React.ElementType; title: string; action?: React.ReactNode }) {
+// The glyphs went monochrome for a day and the colour came back (September
+// 2026, Massimo's call). Fuchsia Scenes is not decoration: the same fuchsia
+// marks a Scenes run in Scripts' history rail, so a scene blueprint reads as
+// the same thing in the app that reverse-engineers one and the app that
+// rewrites it. Losing it broke that pairing, which was the only place these
+// hues were doing work.
+function CardHeader({ icon: Icon, title, accentClass = 'text-[#FF5257]/80', action }: { icon: React.ElementType; title: string; accentClass?: string; action?: React.ReactNode }) {
   return (
     // A 3-column grid, not an absolutely-positioned action slot: the two 1fr
     // gutters are equal, so the title is genuinely centred, and a pane too
@@ -121,7 +120,7 @@ function CardHeader({ icon: Icon, title, action }: { icon: React.ElementType; ti
     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-ink/5 px-4 py-3">
       <span aria-hidden />
       <span className="flex min-w-0 items-center justify-center gap-2 text-sm font-semibold tracking-tight text-ink-200">
-        <Icon className="h-4 w-4 shrink-0 text-ink-400" strokeWidth={1.5} />
+        <Icon className={`h-4 w-4 shrink-0 ${accentClass}`} strokeWidth={1.5} />
         <span className="truncate">{title}</span>
       </span>
       <div className="flex min-w-0 justify-end">{action}</div>
@@ -207,6 +206,7 @@ function BreakdownSection({ result }: { result: AnalysisResult }) {
       <CardHeader
         icon={Lightbulb}
         title="Breakdown"
+        accentClass="text-amber-400/90 light:text-amber-600"
       />
 
       <ScorecardBody result={result} />
@@ -641,6 +641,7 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
       <CardHeader
         icon={Clapperboard}
         title="Reverse-Engineered Scenes"
+        accentClass="text-fuchsia-400/90 light:text-fuchsia-700"
         action={
           // Glyph only (Massimo's call, August 2026). This is the longest title
           // in the read and it sits beside the longest label — "Reverse-

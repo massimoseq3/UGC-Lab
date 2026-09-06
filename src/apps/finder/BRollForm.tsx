@@ -128,7 +128,7 @@ export default function BRollForm({ item, onSave, onCancel }: BRollFormProps) {
             >
               <div className="flex flex-col items-center gap-2">
                 <ImagePlus className="h-6 w-6 text-ink-600 transition-colors group-hover:text-ink-400" />
-                <span className="text-[11px] text-ink-600">Upload image</span>
+                <span className="text-[11px] text-ink-600">Upload Image</span>
               </div>
             </button>
           )}

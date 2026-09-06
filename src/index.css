@@ -208,7 +208,12 @@
   --color-playground-500: #015C52;
   --color-playground-600: color-mix(in oklab, #015C52 85%, black);
 
-  /* Products — light blue #38BDF8 (bank accent + product reference cards) */
+  /* Products — light blue #38BDF8 (bank accent + product reference cards).
+     It went green for a day and came straight back — Massimo's call. The
+     family is still NAMED `gold-*` and that is deliberate: it was a deep
+     purple originally, the name has never described the hex, and renaming it
+     would touch every product-tinted class in the app for no behaviour
+     change. */
   --color-gold-100: color-mix(in oklab, #38BDF8 25%, white);
   --color-gold-200: color-mix(in oklab, #38BDF8 40%, white);
   --color-gold-300: color-mix(in oklab, #38BDF8 60%, white);

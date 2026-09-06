@@ -502,7 +502,7 @@ export default function InputPanel({
                 Doubles as the creative brief when there's no script yet — the
                 product row carries the rest, so blank stays a normal answer. */}
             <div className="relative flex min-h-[72px] flex-1 flex-col overflow-hidden rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-ink/20 max-md:min-h-[120px] max-md:flex-none">
-              <div className="flex items-center justify-between gap-2 px-4 pt-2.5">
+              <div className="flex items-center px-4 pt-2.5">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
                   {/* One name whether or not a script is loaded — it's the same
@@ -510,9 +510,6 @@ export default function InputPanel({
                       its own free-text steer. */}
                   <span className="truncate text-[13px] font-medium text-ink-200">Additional Instructions</span>
                 </div>
-                <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
-                  optional
-                </span>
               </div>
               <textarea
                 value={additionalContext}

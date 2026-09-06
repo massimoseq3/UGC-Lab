@@ -337,7 +337,7 @@ export default function ModelPickerModal({
           <div className="min-w-0 flex-1 overflow-y-auto px-2 pb-3 pt-1">
             {groups.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-1 py-12 text-center">
-                <span className="text-sm text-ink-600">No matches found</span>
+                <span className="text-sm text-ink-600">No Matches Found</span>
                 <span className="text-xs text-ink-700">Try a different search</span>
               </div>
             ) : (

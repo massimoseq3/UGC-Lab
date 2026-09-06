@@ -201,7 +201,7 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
             {characterRefs.length < MAX_CHARACTERS && (
               <MediaAddCard
                 icon={User}
-                label="Add character"
+                label="Add Character"
                 triggerRef={characterTriggerRef}
                 onClick={() => setCharacterMenuOpen((v) => !v)}
               />
@@ -241,7 +241,7 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
                 {voiceRefs.length < MAX_VOICES && (
                   <MediaAddCard
                     icon={Mic}
-                    label="Add voice"
+                    label="Add Voice"
                     triggerRef={voiceTriggerRef}
                     onClick={() => setVoiceMenuOpen((v) => !v)}
                   />
@@ -251,7 +251,7 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
           )}
 
           {clipFilled && clipRef && (
-            <RefGroup label="Source clip">
+            <RefGroup label="Source Clip">
               <div className="flex flex-col gap-1.5">
                 <MediaCard
                   icon={Film}

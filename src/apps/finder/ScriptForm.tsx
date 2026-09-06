@@ -59,7 +59,7 @@ export default function ScriptForm({ item, onSave, onCancel }: ScriptFormProps) 
         {/* Left — script editor fills the space. Uncarded on purpose: it's a
             lone control, and the border is what says "these belong together". */}
         <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <SectionLabel label="Script text" filled={!!scriptText.trim()} required />
+          <SectionLabel label="Script Text" filled={!!scriptText.trim()} required />
           <textarea
             value={scriptText}
             onChange={(e) => setScriptText(e.target.value)}
@@ -85,7 +85,7 @@ export default function ScriptForm({ item, onSave, onCancel }: ScriptFormProps) 
             </label>
 
             <label className="flex flex-col gap-1.5">
-              <SectionLabel label="Linked product" filled={!!linkedProductId} />
+              <SectionLabel label="Linked Product" filled={!!linkedProductId} />
               <select
                 value={linkedProductId}
                 onChange={(e) => setLinkedProductId(e.target.value)}

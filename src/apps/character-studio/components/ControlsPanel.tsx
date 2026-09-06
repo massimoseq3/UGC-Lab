@@ -49,7 +49,7 @@ function TabDivider({ center, left, right }: { center: ReactNode; left?: ReactNo
 
 // Copies a scoped slice of the assembled prompt (physical, or scene & pose) to
 // the clipboard. One sits on the right of each tab divider.
-function CopyPromptButton({ text, label, title }: { text: string; label: string; title: string }) {
+function CopyPromptButton({ text, label, shortLabel = 'Copy', title }: { text: string; label: string; shortLabel?: string; title: string }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = async () => {
     if (await copyToClipboard(text)) {
@@ -66,35 +66,12 @@ function CopyPromptButton({ text, label, title }: { text: string; label: string;
       className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-ink/10 bg-ink/[0.02] px-2.5 py-1 text-[11px] font-medium text-ink-400 transition-colors hover:border-ink/20 hover:bg-ink/[0.05] hover:text-ink-200 disabled:cursor-not-allowed disabled:opacity-40"
     >
       {copied ? <Check className="h-3 w-3 text-emerald-400 light:text-emerald-600" /> : <Copy className="h-3 w-3" />}
-      {/* Just "Copy" where the divider is narrow. The full label wrapped onto
-          two lines on a phone, which made a 22px pill two rows tall. The
-          divider it sits on already says which tab's fields these are. */}
-      {copied ? 'Copied' : <><span className="lg:hidden">Copy</span><span className="hidden lg:inline">{label}</span></>}
-    </button>
-  )
-}
-
-// The same copy, panel-scope and glyph-only: a 36px circle at the weight of
-// the canvas-clear button in every output panel's header, since it shares that
-// bar's job of holding one utility beside a toggle.
-function CopyPromptCircle({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false)
-  const handleCopy = async () => {
-    if (await copyToClipboard(text)) {
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1600)
-    }
-  }
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      disabled={!text.trim()}
-      title="Copy the full prompt · every field on both tabs"
-      aria-label="Copy the full prompt"
-      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-ink/[0.03]"
-    >
-      {copied ? <Check className="h-4 w-4 text-emerald-400 light:text-emerald-600" /> : <Copy className="h-4 w-4" />}
+      {/* A one-word label where the divider is narrow. The full label wrapped
+          onto two lines on a phone, which made a 22px pill two rows tall. The
+          divider it sits on already says which tab's fields these are — but
+          the Physical divider now carries TWO of these, so the short form has
+          to stay distinguishable ("All" against "Copy"). */}
+      {copied ? 'Copied' : <><span className="lg:hidden">{shortLabel}</span><span className="hidden lg:inline">{label}</span></>}
     </button>
   )
 }
@@ -237,7 +214,7 @@ export default function ControlsPanel({
           land on the same pixel — and `px-5` is the other half of that spec, so
           on a phone this pill shares its left edge with the pane tabs above it.
           It was `px-2`, from back when this toggle carried five tabs. */}
-      <div className="flex h-[57px] shrink-0 items-center gap-2 border-b border-ink/5 px-5">
+      <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
         <SegmentedToggle<TabId>
           className="h-10 !p-1"
           value={activeTab}
@@ -248,16 +225,6 @@ export default function ControlsPanel({
             icon: TAB_ICONS[tab.id],
           }))}
         />
-        {/* The WHOLE prompt, in one click. The two tab dividers below each
-            carry a copy of their own slice, and a scoped copy can't be asked
-            for the thing the model actually reads — that lived only inside the
-            Prompt JSON modal, behind a glyph, in a box built for pasting one
-            back IN. Panel-level scope, so it sits on the panel's own bar
-            rather than on a divider that belongs to one tab. Glyph-only at the
-            weight of the canvas-clear circle every output panel uses: a label
-            here would eat the toggle beside it, and the two dividers already
-            spell the word out twice. */}
-        <CopyPromptCircle text={fullPrompt} />
       </div>
 
       {/* The phone's scroll port. It starts BELOW the toggle above, which is
@@ -341,7 +308,7 @@ export default function ControlsPanel({
                      The two-click arm, the "Confirm" state and the tooltip
                      that spells out what survives all stay, and they are what
                      carries that promise now the label doesn't. */
-                  left={<ClearAllButton onClear={onClear} label="Clear all" className="!py-1 !text-[11px]" />}
+                  left={<ClearAllButton onClear={onClear} label="Clear All" className="!py-1 !text-[11px]" />}
                   center={
                     tabIndex === 0 ? (
                       <SectionPresetPill
@@ -361,7 +328,18 @@ export default function ControlsPanel({
                   }
                   right={
                     tabIndex === 0 ? (
-                      <CopyPromptButton text={physicalPrompt} label="Copy Physical" title="Copy the physical fields as a prompt" />
+                      // The WHOLE prompt sits with the scoped copies rather
+                      // than as a glyph-only circle on the panel's tab bar
+                      // (September 2026, Massimo's call). Up there it was an
+                      // unlabelled button beside a toggle, and the one action
+                      // that can't say what its scope is was the one with no
+                      // word on it; down here it is read against "Copy
+                      // Physical" standing next to it, which is what makes
+                      // "All" mean something.
+                      <div className="flex min-w-0 items-center gap-1">
+                        <CopyPromptButton text={fullPrompt} label="Copy All" shortLabel="All" title="Copy the full prompt · every field on both tabs" />
+                        <CopyPromptButton text={physicalPrompt} label="Copy Physical" title="Copy the physical fields as a prompt" />
+                      </div>
                     ) : (
                       <CopyPromptButton text={scenePrompt} label="Copy Scene & Pose" title="Copy the scene & pose fields as a prompt" />
                     )
