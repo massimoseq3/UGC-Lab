@@ -318,7 +318,7 @@ export default function StyleModal({
             </div>
           )}
 
-          <GallerySectionHeading label="Presets" innerRef={spy.register('presets')} className="mb-2.5" />
+          <GallerySectionHeading label="Presets" innerRef={spy.register('presets')} className="mb-3" />
           <div className={GALLERY_GRID}>
             {CONTINUOUS_STYLES.map((s) => (
               <StyleTile
@@ -332,7 +332,7 @@ export default function StyleModal({
             ))}
           </div>
 
-          <GallerySectionHeading label="Your Visual Styles" innerRef={spy.register('saved')} className="mb-2.5 mt-6" />
+          <GallerySectionHeading label="Your Visual Styles" innerRef={spy.register('saved')} className="mb-3 mt-6" />
           <div className={GALLERY_GRID}>
             {savedStyles.map((s) => (
               <SavedStyleCard

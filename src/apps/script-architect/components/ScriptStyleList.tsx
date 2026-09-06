@@ -68,16 +68,15 @@ export default function ScriptStyleList({
             <GallerySectionHeading
               label={WRITE_STYLE_GROUP_META[group].label}
               innerRef={registerSection?.(group)}
-              className="px-1"
+              className="mb-0.5"
             />
-            {/* Two across from `lg`. Seventeen options in one column left the
+            {/* Three across at `gallery` width, two when the panel narrows,
+                one on a phone. Seventeen options in a single column left the
                 other 600px of a 768px panel doing nothing and put structures
                 and formats a scroll apart, when they are two halves of one
-                decision. TWO and not three: at three the hints wrap to a second
-                line, and a pill three text-lines tall stops reading as a pill —
-                at two, every hint still fits on one line and the rows keep the
-                fully-rounded shape they have everywhere else. */}
-            <div className="grid grid-cols-1 gap-1.5 lg:grid-cols-2">
+                decision. `items-stretch` (the default) so the pair or trio in a
+                row match height when one of their hints wraps. */}
+            <div className="grid grid-cols-1 gap-1.5 md:grid-cols-2 xl:grid-cols-3">
             {writeStylesInGroup(group).map((style) => {
               const active = style === value
               return (

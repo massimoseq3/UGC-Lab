@@ -1113,7 +1113,7 @@ export default function InputPanel({
           title="Choose a Hook Style"
           size="gallery"
         >
-          <div className="grid grid-cols-1 gap-2 p-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 items-stretch gap-1.5 p-4 md:grid-cols-2 xl:grid-cols-3">
             {(Object.keys(HOOK_CATEGORY_META) as HookCategoryChoice[]).map((choice) => {
               const active = choice === hookCategory
               return (
@@ -1121,8 +1121,8 @@ export default function InputPanel({
                   key={choice}
                   type="button"
                   onClick={() => { onHookCategoryChange(choice); setHookModalOpen(false) }}
-                  className={`flex items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
-                    choice === 'auto' ? 'lg:col-span-2' : ''
+                  className={`flex items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
+                    choice === 'auto' ? 'md:col-span-2 xl:col-span-3' : ''
                   } ${
                     active
                       ? 'border-scripts-500/30 bg-scripts-500/10'

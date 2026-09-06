@@ -1,4 +1,5 @@
 import CountSlot from './CountSlot'
+import DayPill from './DayPill'
 import { SectionLabel } from './SectionCard'
 
 /**
@@ -120,10 +121,19 @@ export default function SectionRail({
 /**
  * The heading above one section of a gallery body.
  *
- * One component across all four pickers, so a section reads the same wherever
- * it is. Strings are written in Title Case ("Your Visual Styles") — the rail
- * renders them as typed, this renders them uppercase, and the two can't drift
- * apart by being written differently in two places.
+ * It is `DayPill` — the app's one section separator (Massimo's call, September
+ * 2026), the same centred pill that heads a day of history and a style in the
+ * Characters preset picker. It was a small uppercase label at the left edge for
+ * a day; a picker that borrows the preset picker's geometry should borrow its
+ * separator too, and a left-aligned micro-label under a full-width toolbar read
+ * as a caption for whatever was above it.
+ *
+ * The pill is what carries the Title Case a heading is written in — "Your
+ * Visual Styles", not the uppercase transform the old label applied — so the
+ * rail row and the heading say the same words the same way.
+ *
+ * `className` is the wrapper's margin, so the ref the spy registers is a plain
+ * box with no margin of its own to collapse through.
  */
 export function GallerySectionHeading({
   label,
@@ -136,11 +146,8 @@ export function GallerySectionHeading({
   className?: string
 }) {
   return (
-    <p
-      ref={innerRef}
-      className={`text-[11px] font-medium uppercase tracking-wider text-ink-600 ${className}`}
-    >
-      {label}
-    </p>
+    <div ref={innerRef} className={className}>
+      <DayPill label={label} className="" />
+    </div>
   )
 }

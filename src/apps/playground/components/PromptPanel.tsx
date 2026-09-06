@@ -1111,7 +1111,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 no style of its own, it appends the brief to the prompt, which is
                 then the member's to edit like anything else they typed. */}
             <div className="px-4 py-3">
-              <GallerySectionHeading label="Visual Styles" innerRef={presetSpy.register('styles')} className="mb-2.5" />
+              <GallerySectionHeading label="Visual Styles" innerRef={presetSpy.register('styles')} className="mb-3" />
               <div className={GALLERY_GRID}>
                 {CONTINUOUS_STYLES.map((s) => (
                   <StyleTile
@@ -1138,7 +1138,7 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 ))}
               </div>
 
-              <GallerySectionHeading label="Prompt Presets" innerRef={presetSpy.register('presets')} className="mb-2.5 mt-6" />
+              <GallerySectionHeading label="Prompt Presets" innerRef={presetSpy.register('presets')} className="mb-3 mt-6" />
               <div className={GALLERY_GRID}>
                 {(state.mode === 'image' ? IMAGE_PRESETS : VIDEO_PRESETS).map((preset) => (
                   <PresetCard

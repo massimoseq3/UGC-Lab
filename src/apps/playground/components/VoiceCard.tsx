@@ -53,12 +53,12 @@ import { VOICE_GROUPS, VOICE_PRESETS, type VoicePreset } from '../voicePresets'
 // not push the thing you actually write in off the column.
 const MAX_FIELD_HEIGHT = 120
 
-// Gender stays a FILTER, on the toolbar above the list, because it cuts across
-// every accent group rather than picking one — the same split the Characters
-// preset picker runs on, where the rail navigates the sections and the gender
-// pills narrow all of them at once. Accent used to be a second dropdown beside
-// it and is now the rail.
-const GENDERS = ['All', 'Female', 'Male'] as const
+// GENDER is what the list is sectioned by, so gender is what the rail
+// navigates (Massimo's call, September 2026) — it is the first thing anyone
+// picking a voice decides. ACCENT is the filter that cuts across both sections,
+// on the toolbar above them. Both used to be dropdowns side by side.
+const GENDERS = ['Female', 'Male'] as const
+const ACCENTS = ['All Accents', ...VOICE_GROUPS] as const
 
 export default function VoiceCard({
   value,
@@ -202,16 +202,15 @@ function VoicePresetPicker({
   value: string
   onPick: (text: string) => void
 }) {
-  const [gender, setGender] = useState<(typeof GENDERS)[number]>(GENDERS[0])
+  const [accent, setAccent] = useState<(typeof ACCENTS)[number]>(ACCENTS[0])
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  const matches = (p: VoicePreset) => gender === GENDERS[0] || p.gender === gender
-  const shown = VOICE_PRESETS.filter(matches)
-  // Every accent group keeps its rail row whatever the gender filter leaves in
-  // it — a row that vanished at zero would move the rest under the pointer, and
+  const shown = VOICE_PRESETS.filter((p) => accent === ACCENTS[0] || p.group === accent)
+  // Both gender rows stay in the rail whatever the accent filter leaves in them
+  // — a row that vanished at zero would move the other under the pointer, and
   // the count answers "why is there nothing there" outright.
-  const spy = useSectionSpy(VOICE_GROUPS)
-  const countIn = (group: string) => shown.filter((p) => p.group === group).length
+  const spy = useSectionSpy([...GENDERS])
+  const countIn = (g: string) => shown.filter((p) => p.gender === g).length
 
   return (
     <Modal
@@ -225,8 +224,8 @@ function VoicePresetPicker({
       size="gallery"
       rail={
         <SectionRail
-          heading="Accent"
-          sections={VOICE_GROUPS.map((g) => ({ key: g, label: g, count: countIn(g) }))}
+          heading="Gender"
+          sections={GENDERS.map((g) => ({ key: g, label: g, count: countIn(g) }))}
           activeKey={spy.activeKey}
           accent="playground"
           onJump={spy.jumpTo}
@@ -240,26 +239,27 @@ function VoicePresetPicker({
     >
       <div className="p-4">
         <SegmentedToggle
-          value={gender}
-          onChange={setGender}
+          value={accent}
+          onChange={setAccent}
           accent="playground"
           fitContent
-          options={GENDERS.map((g) => ({
-            value: g,
-            label: g,
-            badge: <CountSlot value={g === GENDERS[0] ? VOICE_PRESETS.length : VOICE_PRESETS.filter((p) => p.gender === g).length} />,
+          options={ACCENTS.map((a) => ({
+            value: a,
+            label: a,
+            badge: <CountSlot value={a === ACCENTS[0] ? VOICE_PRESETS.length : VOICE_PRESETS.filter((p) => p.group === a).length} />,
           }))}
         />
 
-        {VOICE_GROUPS.map((group) => (
-          <div key={group}>
-            <GallerySectionHeading label={group} innerRef={spy.register(group)} className="mb-2.5 mt-5" />
-            {/* Two across from `lg`. `items-start` so the row you opened is the
-                only one that grows — stretched, its neighbour would inflate to
-                match a paragraph it isn't showing. */}
-            <div className="grid grid-cols-1 items-start gap-1.5 lg:grid-cols-2">
+        {GENDERS.map((g) => (
+          <div key={g}>
+            <GallerySectionHeading label={g} innerRef={spy.register(g)} className="mb-3 mt-5" />
+            {/* Three across at `gallery` width, dropping to two and then one as
+                the panel narrows. `items-start` so the row you opened is the
+                only one that grows — stretched, its neighbours would inflate to
+                match a paragraph they aren't showing. */}
+            <div className="grid grid-cols-1 items-start gap-1.5 md:grid-cols-2 xl:grid-cols-3">
               {shown
-                .filter((p) => p.group === group)
+                .filter((p) => p.gender === g)
                 .map((preset) => (
                   <PresetRow
                     key={preset.id}
@@ -270,8 +270,8 @@ function VoicePresetPicker({
                     onPick={() => onPick(preset.text)}
                   />
                 ))}
-              {countIn(group) === 0 && (
-                <p className="text-[12px] text-ink-600">No {gender.toLowerCase()} voices in this accent.</p>
+              {countIn(g) === 0 && (
+                <p className="text-[12px] text-ink-600">No {g.toLowerCase()} voices with this accent.</p>
               )}
             </div>
           </div>
