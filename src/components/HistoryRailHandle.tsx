@@ -16,8 +16,14 @@ import { PanelRightClose, PanelRightOpen } from 'lucide-react'
 // makes it one control rather than two — it is in the SAME place in both
 // states, because the seam is the pane's right edge when the rail is shut and
 // the rail's own left edge when it is open. Rendered inside the output column,
-// which below `lg` is hidden while the rail stands in front of it; the rail
-// carries its own close there.
+// which below the rail's column threshold is hidden while the rail stands in
+// front of it; the rail carries its own close there.
+//
+// It rides at the TOP, on the rail's own header line rather than halfway down
+// the pane (September 2026, Massimo's call): 36px tall inside the 57px band, so
+// it sits level with the New button on the other side of the seam and the two
+// read as one row of chrome. Centred vertically it was a tab floating in the
+// middle of a column of script with nothing to belong to.
 export default function HistoryRailHandle({
   open,
   onToggle,
@@ -36,7 +42,7 @@ export default function HistoryRailHandle({
       title={title}
       aria-label={title}
       aria-expanded={open}
-      className="absolute right-0 top-1/2 z-20 flex h-14 w-6 -translate-y-1/2 items-center justify-center rounded-l-lg border border-r-0 border-ink/10 bg-surface-1 text-ink-500 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
+      className="absolute right-0 top-2.5 z-20 flex h-9 w-6 items-center justify-center rounded-l-lg border border-r-0 border-ink/10 bg-surface-1 text-ink-500 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
     >
       {open
         ? <PanelRightClose className="h-3.5 w-3.5" strokeWidth={1.75} />

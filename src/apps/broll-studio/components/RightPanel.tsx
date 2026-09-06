@@ -1,15 +1,16 @@
 import { useMemo } from 'react'
-import { Film, Plus } from 'lucide-react'
+import { Film } from 'lucide-react'
 import type { BrollResult, PromptVariation, CardState, ReferenceImage, BrollMode, ContinuousResult, ContinuousSelection, ContinuousFrameCardState, ContinuousClipCardState } from '../types'
 import type { Product, Model, BrollHistoryItem } from '../../../stores/types'
 import type { ContinuousStoryboardOp } from '../continuousEdits'
 import { useBankStore } from '../../../stores/bankStore'
 import { usePersistedState, useProjectScopedKey } from '../../../hooks/usePersistedState'
+import { useMinWidth } from '../../../hooks/useBreakpoint'
 import ScenesView from './ScenesView'
 import ContinuousView from './ContinuousView'
-import BrollHistoryView from './BrollHistoryView'
+import HistoryRail from './HistoryRail'
+import HistoryRailHandle from '../../../components/HistoryRailHandle'
 import { brollHistoryMode, isRetiredOneShotRow } from './brollHistoryRows'
-import SegmentedToggle from '../../../components/SegmentedToggle'
 import GridCanvas, { AwaitingBody } from '../../../components/GridCanvas'
 
 interface RightPanelProps {
@@ -61,11 +62,9 @@ interface RightPanelProps {
   onClearCanvas: () => void
 }
 
-type Tab = 'scenes' | 'history'
-
-// Right side of the B-Roll workspace. Owns the tab strip (Scenes / History)
-// and the persisted per-card state. Image / video settings now live INSIDE
-// each card's state — the page no longer has a global settings popover.
+// Right side of the B-Roll workspace. Owns the History rail beside the
+// storyboard and the persisted per-card state. Image / video settings live
+// INSIDE each card's state — the page has no global settings popover.
 export default function RightPanel(props: RightPanelProps) {
   const {
     mode,
@@ -109,7 +108,17 @@ export default function RightPanel(props: RightPanelProps) {
   } = props
 
   const baseKey = useProjectScopedKey('broll-studio')
-  const [tab, setTab] = usePersistedState<Tab>(`${baseKey}:rightTab`, 'scenes')
+  // Behaviour, not layout: where the rail covers the storyboard, picking a
+  // session has to hand the pane back; beside it, it must not. Keep the number
+  // in step with the `min-[980px]:` classes below — it is Scripts' threshold,
+  // and the reasoning is in `HistoryRailHandle`.
+  const railIsColumn = useMinWidth(980)
+  // Whether the rail is showing. It opens by default where it can sit BESIDE
+  // the storyboard and stays shut where it would cover it — clicking into this
+  // app should land on the clips, not on the list of the ones you made before.
+  // Its own slot: the old `:rightTab` held 'scenes' | 'history', so a stored
+  // value there means nothing here.
+  const [historyOpen, setHistoryOpen] = usePersistedState<boolean>(`${baseKey}:historyOpen`, railIsColumn)
 
   const allHistory = useBankStore((s) => s.brollHistory)
   const deleteBrollHistory = useBankStore((s) => s.deleteBrollHistory)
@@ -127,7 +136,6 @@ export default function RightPanel(props: RightPanelProps) {
   const sceneCount = isContinuous
     ? (continuousResult?.scenes.length ?? 0)
     : (result?.scenes.length ?? 0)
-  const historyCount = brollHistory.length
 
   // "Clear the canvas" — the header's + and the left panel's New both empty the
   // storyboard so the last session isn't on camera while a new one is filmed.
@@ -140,68 +148,23 @@ export default function RightPanel(props: RightPanelProps) {
   const showCanvas = cleared || !!isGenerating || sceneCount === 0
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Toggle strip — no global Settings popover anymore: each card owns its
-          own settings inside its detail modal. */}
-      {/* NO fill, and that's the point. This bar wore glass over an opaque
-          `bg-surface-0` on the theory that cards pass under it blurred — but
-          they don't: it's a SIBLING of the scroll port below, so nothing has
-          ever passed under it. What the fill actually did was make the top of
-          this panel a different tone from the batch strip under it and from
-          the storyboard under that — three surfaces in the first 150px, with a
-          visible step between each. Every other panel header in the app is a
-          hairline over the pane's own background; this one is too now. */}
-      <div className="relative z-30 flex h-[57px] shrink-0 items-center justify-between gap-3 border-b border-ink/5 px-5">
-        <SegmentedToggle<Tab>
-          className="h-10 !p-1 min-w-0"
-          value={tab}
-          onChange={setTab}
-          options={[
-            {
-              value: 'scenes',
-              // "Storyboard" alone on a phone: the mode it qualifies is already
-              // picked one row up (Line-by-Line / Continuous), and spelling it
-              // out again is what pushed this pill past its own width.
-              label: (
-                <>
-                  <span className="md:hidden">Storyboard</span>
-                  <span className="hidden md:inline">
-                    {!continuousEnabled ? 'Storyboard' : isContinuous ? 'Continuous Storyboard' : 'Line by Line Storyboard'}
-                  </span>
-                </>
-              ),
-              badge: sceneCount > 0 ? sceneCount : undefined,
-            },
-            { value: 'history', label: 'History', badge: historyCount > 0 ? historyCount : undefined },
-          ]}
-        />
-        {tab === 'scenes' && !cleared && !isGenerating && sceneCount > 0 && (
-          <button
-            type="button"
-            title="Clear the canvas"
-            onClick={onClearCanvas}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ink/10 bg-ink/[0.03] text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        )}
-      </div>
-
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+    // NO header band on this pane. It held a Storyboard / History
+    // `SegmentedToggle` and the canvas reset; History is a rail beside the
+    // storyboard now and the reset leads that rail, which left 57px saying
+    // nothing over the one thing this column is for.
+    <div className="flex h-full min-h-0">
+      {/* From 980px the rail is a column and the storyboard keeps its own;
+          below that it stands in FRONT of it — the shape the tab had, and
+          picking a session hands the pane back. */}
+      <div
+        className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
+          historyOpen ? 'hidden min-[980px]:flex' : 'flex'
+        }`}
+      >
+        <HistoryRailHandle open={historyOpen} onToggle={() => setHistoryOpen((v) => !v)} />
         {/* The storyboard works on the same graph-paper canvas as the other
             apps' output panels. History keeps the plain surface — it's the
             reel, not the stage. */}
-        {tab === 'history' ? (
-          <BrollHistoryView
-            items={brollHistory}
-            activeId={activeHistoryId}
-            onSelect={(item) => {
-              onSelectHistory(item)
-              setTab('scenes')
-            }}
-            onDelete={(id) => { deleteBrollHistory(id) }}
-          />
-        ) : (
         <CanvasFrame active={showCanvas}>
         {cleared ? (
           <AwaitingBody
@@ -259,8 +222,25 @@ export default function RightPanel(props: RightPanelProps) {
           />
         )}
         </CanvasFrame>
-        )}
       </div>
+
+      {historyOpen && (
+        <div className="flex min-h-0 w-full flex-col border-l border-ink/5 min-[980px]:w-[280px] min-[980px]:shrink-0">
+          <HistoryRail
+            items={brollHistory}
+            activeId={activeHistoryId}
+            onSelect={(item) => {
+              onSelectHistory(item)
+              // Where the rail covers the storyboard, picking a session is a
+              // request to see it.
+              if (!railIsColumn) setHistoryOpen(false)
+            }}
+            onDelete={(id) => { deleteBrollHistory(id) }}
+            onNew={onClearCanvas}
+            onCollapse={() => setHistoryOpen(false)}
+          />
+        </div>
+      )}
     </div>
   )
 }

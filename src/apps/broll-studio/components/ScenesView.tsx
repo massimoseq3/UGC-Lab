@@ -854,7 +854,7 @@ export default function ScenesView({
             type="button"
             onClick={onChangeStyle}
             title="Change the visual style every clip renders in"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 py-1.5 text-[12px] font-semibold tracking-tight text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
           >
             <Palette className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
             <span className="max-w-[180px] truncate">{result.styleBrief ? (result.styleName?.trim() || 'Custom style') : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
@@ -1682,7 +1682,6 @@ function SceneSection({
               >
                 <p
                   className="text-center text-lg font-normal not-italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200"
-                  style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
                 >
                   &ldquo;{scene.scriptLine}&rdquo;
                 </p>
@@ -1691,7 +1690,6 @@ function SceneSection({
             ) : (
               <p
                 className="text-center text-lg font-normal not-italic leading-relaxed text-ink-400"
-                style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
               >
                 &ldquo;{scene.scriptLine}&rdquo;
               </p>

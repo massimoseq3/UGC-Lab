@@ -434,6 +434,18 @@ export default function ScriptArchitect() {
     showRunEmpty(run)
   }
 
+  // "Clear" on the References card: the inputs only. Every take stays on the
+  // canvas and in History — that is what the button's arm and tooltip promise,
+  // and the output labels are pinned to their own snapshots, so the shown cards
+  // keep their wording as the live selectors reset.
+  const handleClearInputs = () => {
+    setSource('')
+    setBrief('')
+    setAdditionalContext('')
+    setSelectedProductId(null)
+    setForceTranscript(false)
+  }
+
   const handleDeleteHistory = (id: string) => {
     deleteScriptHistory(id)
     if (activeHistoryId === id) setActiveHistoryId(null)
@@ -459,6 +471,7 @@ export default function ScriptArchitect() {
         <InputPanel
           mode={mode}
           onModeChange={setMode}
+          onClearInputs={handleClearInputs}
           source={source}
           onSourceChange={setSource}
           isBlueprint={isBlueprint}

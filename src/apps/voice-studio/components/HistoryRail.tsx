@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { Search, Volume2, Bookmark, Check, Trash2, Play, Pause, AlignLeft, Download, X } from 'lucide-react'
-import ClearAllButton from '../../../components/ClearAllButton'
+import RailNewButton from '../../../components/RailNewButton'
 import { useBankStore } from '../../../stores/bankStore'
 import type { VoiceHistoryItem } from '../../../stores/types'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
@@ -33,9 +33,9 @@ interface HistoryRailProps {
   onShowDetails: (item: VoiceHistoryItem) => void
   // Empties the script box back to a blank slate. It is this rail's "New" for
   // the same reason the Ad Analyzer's is: starting another one is the action
-  // that belongs at the top of the list of the ones you have made. It keeps the
-  // two-click arm it had in the editor's action row — a typed script is the one
-  // thing here a stray click could actually lose.
+  // that belongs at the top of the list of the ones you have made. Single
+  // click — it carried `ClearAllButton`'s two-click arm for a day and lost it
+  // in September 2026 (Massimo's call).
   onNew: () => void
   onCollapse: () => void
 }
@@ -223,12 +223,12 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onDele
           states; the Close here renders only below 980px, where the rail covers
           the script and takes that tab with it. */}
       <div className="flex h-[57px] shrink-0 items-center gap-2 border-b border-ink/5 px-3">
-        <ClearAllButton
-          variant="primary"
-          accentClass="bg-voice-500"
+        <RailNewButton
           label="New Voiceover"
+          accentClass="bg-voice-500"
+          title="Clear the script box. Every read you've made stays here"
+          onClick={onNew}
           className="flex-1"
-          onClear={onNew}
         />
         <button
           type="button"

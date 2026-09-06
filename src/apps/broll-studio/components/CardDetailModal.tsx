@@ -1079,7 +1079,6 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                   {scriptLine && (
                     <span
                       className="min-w-0 truncate text-[15px] not-italic leading-tight text-ink-300"
-                      style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
                       title={scriptLine}
                     >
                       &ldquo;{scriptLine}&rdquo;

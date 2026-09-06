@@ -470,11 +470,14 @@ export default function InputPanel({
               Generate, sat at the very top of the column above the References
               heading, and sat inside the References card.)
               Continuous has no deliveries — it's narration over footage — so
-              it isn't rendered there at all. **B-Roll Clips leads the toggle,
-              Dialogue Clips is still the default**: the order reads left to
-              right as the plainer thing first, while the default stays on the
-              one most members are here to make. Position and default are
-              separate here on purpose — don't "fix" one to match the other. */}
+              it isn't rendered there at all. **B-Roll Clips leads the toggle
+              AND is the default** (September 2026, Massimo's call). Position
+              and default were deliberately split for a month — the plainer
+              thing first, the default on the one most members were here to
+              make — and that reading is what changed, not the reasoning: an
+              opening storyboard of silent b-roll is what most sessions want,
+              and a member laying dialogue over it is picking a mode rather
+              than correcting one. */}
           {isLineMode(mode) && (
             <SegmentedToggle<BrollDelivery>
               className="mb-2 h-12 shrink-0 !p-1"

@@ -1300,7 +1300,7 @@ export default function ContinuousView({
           type="button"
           onClick={onChangeStyle}
           title="Change the look every clip renders in"
-          className="inline-flex min-w-0 items-center gap-1 rounded-full border border-broll-500/25 bg-broll-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
+          className="inline-flex min-w-0 items-center gap-1 rounded-full border border-broll-500/25 bg-broll-500/10 px-2 py-0.5 text-[11px] font-semibold tracking-tight text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
         >
           <Palette className="h-3 w-3 shrink-0" strokeWidth={2} />
           <span className="truncate">{style.label}</span>
@@ -1880,7 +1880,6 @@ function SceneRow({
             >
               <span
                 className="truncate text-lg font-normal not-italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200"
-                style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
               >
                 &ldquo;{scene.scriptLine}&rdquo;
               </span>
@@ -1995,7 +1994,6 @@ function FinalFrameRow({
             </span>
             <p
               className="text-lg font-normal not-italic leading-relaxed text-ink-400"
-              style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
             >
               The end state the last clip lands on
             </p>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Film, ArrowDownUp, Check, ChevronDown, AlertCircle } from 'lucide-react'
+import { Search, Film, ArrowDownUp, Check, ChevronDown, AlertCircle, X } from 'lucide-react'
 import { GeneratingChip, GeneratingPulseRing } from '../../../components/GeneratingChip'
 import type { BrollHistoryItem } from '../../../stores/types'
 import {
@@ -18,15 +18,20 @@ import { getContinuousStyle } from '../services/generateContinuous'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
 import { TileActionStack, TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
+import RailNewButton from '../../../components/RailNewButton'
 import { brollHistoryMode } from './brollHistoryRows'
 
-interface BrollHistoryViewProps {
-  // Already filtered by the parent (see isRetiredOneShotRow) so the tab's
+interface HistoryRailProps {
+  // Already filtered by the parent (see isRetiredOneShotRow) so the rail's
   // count and this list can't disagree.
   items: BrollHistoryItem[]
   activeId: string | null
   onSelect: (item: BrollHistoryItem) => void
   onDelete: (id: string) => void
+  // Empties the storyboard back to its blank canvas. Single click — nothing is
+  // deleted, and the session it clears is a row in the list right underneath.
+  onNew: () => void
+  onCollapse: () => void
 }
 
 // ── Card cover media ─────────────────────────────────────────────────────
@@ -220,7 +225,7 @@ function sortTs(it: BrollHistoryItem, sort: SortId): number {
   return it.createdAt
 }
 
-export default function BrollHistoryView({ items, activeId, onSelect, onDelete }: BrollHistoryViewProps) {
+export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew, onCollapse }: HistoryRailProps) {
   const [query, setQuery] = useState('')
   const [modeFilter, setModeFilter] = useState<ModeFilter>('all')
   const [sort, setSort] = usePersistedState<SortId>('broll-studio:historySort', 'newest')
@@ -308,25 +313,40 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
     return groupByDay(filtered, (it) => sortTs(it, sort), sort === 'oldest' ? 'asc' : 'desc')
   }, [items, query, activeModeFilter, sort, titles])
 
-  if (items.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-6">
-        <Film className="h-10 w-10 text-ink-800" strokeWidth={1.5} />
-        <p className="text-sm text-ink-300">No sessions yet</p>
-        <p className="text-center text-xs text-ink-500">Generated B-Roll sessions will land here.</p>
-      </div>
-    )
-  }
-
   const sortLabel = SORTS.find((s) => s.id === sort)?.label ?? 'Newest first'
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {/* New leads the rail, above the filters — the Ad Analyzer's shape, and
+          its band takes the app-wide h-[57px] so the hairline lines up with the
+          input column's header. The rail's open/shut control is the pull tab on
+          the seam (`HistoryRailHandle`), reachable in both states; the Close
+          here renders only below 980px, where the rail covers the storyboard
+          and takes that tab with it. */}
+      <div className="flex h-[57px] shrink-0 items-center gap-2 border-b border-ink/5 px-3">
+        <RailNewButton
+          label="New Storyboard"
+          accentClass="bg-broll-500"
+          title="Clear the storyboard. This session stays here in History"
+          onClick={onNew}
+          className="flex-1"
+        />
+        <button
+          type="button"
+          onClick={onCollapse}
+          title="Close history"
+          aria-label="Close history"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-100 min-[980px]:hidden"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
       {/* Search + filters + sort. It stays put on a phone: this bar wore a
           CollapsingBar for a week and lost it (August 2026) — a filter row
           that rolls away on a scroll and unrolls on the way back up moves the
           list under the thumb reading it. */}
-      <div className="border-b border-ink/5 px-5 py-4">
+      <div className="shrink-0 border-b border-ink/5 px-3 py-2.5">
         {/* ONE row: search, then the mode pills, then sort (August 2026,
             Massimo's call). The field had the first line to itself and the pills
             and sort the next, which spent ~40px of a panel that is otherwise all
@@ -411,18 +431,28 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {groups.length === 0 ? (
+      {/* A CONTAINER query, not a viewport one: this list is 280px wide as a
+          rail and most of the pane when it stands in front of the storyboard,
+          and `sm:grid-cols-2` (a viewport rule) put two 130px cards side by
+          side in the rail. */}
+      <div className="@container min-h-0 flex-1 overflow-y-auto">
+        {items.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+            <Film className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
+            <p className="text-xs text-ink-300">No sessions yet</p>
+            <p className="text-[11px] text-ink-500">Generated B-Roll sessions will land here.</p>
+          </div>
+        ) : groups.length === 0 ? (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <span className="text-sm text-ink-500">No matches.</span>
           </div>
         ) : (
-          <div className="flex flex-col gap-6 px-5 py-4">
+          <div className="flex flex-col gap-6 px-3 py-4">
             {groups.map(([dayTs, dayItems]) => (
               <div key={dayTs} className="flex flex-col gap-3">
                 <DayPill label={sectionLabel(dayTs)} className="" />
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 @min-[520px]:grid-cols-2 @min-[820px]:grid-cols-3 @min-[1100px]:grid-cols-4">
                   {dayItems.map((item) => (
                     <HistoryCard
                       key={item.id}

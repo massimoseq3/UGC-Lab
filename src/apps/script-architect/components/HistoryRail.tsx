@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { Search, FileText, Plus, X } from 'lucide-react'
+import { Search, FileText, X } from 'lucide-react'
 import type { ScriptHistoryItem } from '../../../stores/types'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
 import { WRITE_STYLE_META, HOOK_CATEGORY_META, isHookCategoryChoice, parseHooks, hooksPlainText, type PendingScriptRun } from '../types'
 import { TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
+import RailNewButton from '../../../components/RailNewButton'
 import { GeneratingChip } from '../../../components/GeneratingChip'
 
 const isHooksItem = (item: ScriptHistoryItem) => item.mode === 'write' && item.writeFormat === 'hooks'
@@ -143,15 +144,13 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onSele
           rail covers the takes and that tab goes with them, so a Close does sit
           here — it is the only way back. */}
       <div className="flex h-[57px] shrink-0 items-center gap-2 border-b border-ink/5 px-3">
-        <button
-          type="button"
-          onClick={onNew}
+        <RailNewButton
+          label="New Script"
+          accentClass="bg-scripts-500"
           title="Clear the takes panel. Every take stays here in History"
-          className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-full border border-white/15 bg-scripts-500 px-4 py-2 text-[13px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all glass-fill glass-fill-soft btn-soft-shadow hover:brightness-110"
-        >
-          <Plus className="h-4 w-4 shrink-0" strokeWidth={2.5} />
-          <span className="truncate">New Script</span>
-        </button>
+          onClick={onNew}
+          className="flex-1"
+        />
         <button
           type="button"
           onClick={onCollapse}

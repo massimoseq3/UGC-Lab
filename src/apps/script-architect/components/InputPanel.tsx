@@ -8,6 +8,7 @@ import SegmentedToggle from '../../../components/SegmentedToggle'
 import Modal from '../../../components/Modal'
 import ScriptModelRow from '../../../components/ScriptModelRow'
 import SectionCard, { StatusDot } from '../../../components/SectionCard'
+import ClearAllButton from '../../../components/ClearAllButton'
 import ConstraintChip from '../../../components/ConstraintChip'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import PromptToolbar from '../../../components/PromptToolbar'
@@ -21,7 +22,12 @@ interface InputPanelProps {
   mode: ScriptUiMode
   onModeChange: (mode: ScriptUiMode) => void
   // Resets the input column to a blank slate. Inputs only — generated scripts
-  // stay in the Output pane and in History.
+  // stay in the Output pane and in History, which is what the two-click arm and
+  // the tooltip promise. It leads the References card's header (September 2026,
+  // Massimo's call), where it sits over the rows it empties; it was an iconOnly
+  // circle beside the mode toggle before it was dropped outright in the pass
+  // that moved History into a rail.
+  onClearInputs: () => void
   // The merged Remix source — a plain winning transcript OR an Ad Analyzer
   // scene blueprint; the format is auto-detected (see detectSceneBlueprint).
   source: string
@@ -57,6 +63,7 @@ interface InputPanelProps {
 export default function InputPanel({
   mode,
   onModeChange,
+  onClearInputs,
   source,
   onSourceChange,
   isBlueprint,
@@ -560,7 +567,12 @@ export default function InputPanel({
                   (August 2026) — the picker above it is the one you set once and
                   leave, where the product is what changes from script to script,
                   so it belongs nearest the button you press next. */}
-              <SectionCard icon={Layers} title="References" className="mb-2">
+              <SectionCard
+                icon={Layers}
+                title="References"
+                className="mb-2"
+                left={<ClearAllButton label="Clear" onClear={onClearInputs} />}
+              >
               {/* Hook Style — the hooks format's replacement for the Script Style
                   picker. 'auto' (Best Mix) is the default and renders as the
                   dashed unset affordance; picking a family flips it solid, and
@@ -748,6 +760,7 @@ export default function InputPanel({
               title="References"
               className="mb-2 flex flex-1 flex-col max-md:flex-none"
               contentClassName="flex flex-1 flex-col gap-2"
+              left={<ClearAllButton label="Clear" onClear={onClearInputs} />}
             >
             <div className="flex min-h-[140px] flex-1 flex-col max-md:min-h-[240px] max-md:flex-none">
               {/* Select from bank (header) + paste manually (textarea) merged into
