@@ -803,24 +803,16 @@ export default function ScenesView({
           nothing about a scroll moves it. It never scrolled away anyway (it was
           pinned at `top-0` from the first pixel), so the only thing given up is
           cards passing under it blurred. `relative z-20` so a card's own
-          positioned hover chrome can't paint over it. */}
-      {/* It is GLASS, and the glass is the app's own (September 2026, Massimo's
-          call): a faint `bg-ink/[0.04]` wash under `.glass-fill
-          .glass-fill-soft`, the broad-surface tuning of the same two layers the
-          dock tiles and every Generate CTA wear. The strip painted NO fill at
-          all before this — the band you saw was the page gradient showing
-          through the panel — so a bar carrying the panel's whole batch row was
-          the one piece of chrome here with no surface of its own.
+          positioned hover chrome can't paint over it.
 
-          The `backdrop-blur-xl backdrop-saturate-150` is honest about what it
-          samples: nothing scrolls under this row (it is a sibling ABOVE the
-          scroll port, which is the whole point of the note above), so today it
-          only re-blurs a static gradient and the look comes from the wash and
-          the two glass layers. It is kept because this is exactly the case the
-          backdrop-filter rule allows — small, static chrome — and because a
-          backdrop that never changes is a backdrop root that never re-runs.
-          Don't promote it to a bigger surface, and don't put it back on a
-          `sticky` bar. See docs/performance.md. */}
+          It draws NO fill of its own, and that is the answer that keeps coming
+          back. It wore the app's own glass for a day in September 2026 (a faint
+          `bg-ink/[0.04]` wash under `.glass-fill .glass-fill-soft`, plus a
+          blur) and Massimo reverted it on sight: with nothing scrolling
+          underneath, the wash had nothing to sit over and simply lifted a 57px
+          band a shade off the panel it belongs to, which reads as a seam rather
+          than as glass. Same finding as the header's opaque fill in August —
+          the band here is the hairline, not a surface. */}
       {/* ONE line, at EVERY width: what the storyboard IS on the left, what you
           can do to it on the right (August 2026, Massimo's call).
 
@@ -851,7 +843,7 @@ export default function ScenesView({
           than a width — see the note below, which the flex parent doesn't
           change: with both margins negative the row still resolves to exactly
           the strip's padding box. */}
-      <div className="glass-fill glass-fill-soft relative z-20 flex h-[57px] shrink-0 items-center border-b border-ink/5 bg-ink/[0.04] px-5 backdrop-blur-xl backdrop-saturate-150">
+      <div className="relative z-20 flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
         {/* NOT `w-full` alongside `-mx-5`: `width: 100%` resolves against the
             strip's CONTENT box, so the port came out 40px narrower than the
             strip and the negative margin then spent all of it on the left —
