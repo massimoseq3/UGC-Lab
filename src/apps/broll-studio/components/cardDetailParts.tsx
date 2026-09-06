@@ -510,9 +510,8 @@ function VideoTile({
         </span>
       )}
       {/* Hover action stack — top-right vertical column, app-wide standard
-          order: download · copy · delete (video has no save-to-bank), with
-          Expand hung BELOW the delete circle — it opens a lightbox rather than
-          acting on the tile. Stays put while the clip plays with sound: watching a
+          order: download · copy · expand · delete (video has no save-to-bank).
+          Stays put while the clip plays with sound: watching a
           take is when you decide to keep it, and it's clear of the play/mute
           buttons on the left. */}
       <TileActionStack>
@@ -529,7 +528,6 @@ function VideoTile({
         <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
           <Copy className="h-4 w-4" />
         </TileActionButton>
-        <TileDeleteButton onDelete={onDelete} />
         {url && (
           <ExpandVideoButton
             videoUrl={url}
@@ -538,6 +536,7 @@ function VideoTile({
             aspectRatio={aspectRatio}
           />
         )}
+        <TileDeleteButton onDelete={onDelete} />
       </TileActionStack>
     </div>
       {/* Same caption line as the still tile above — see the note there. */}
