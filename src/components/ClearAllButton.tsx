@@ -11,6 +11,14 @@ interface ClearAllButtonProps {
   // the output panels use to clear their canvas. For a header row where the
   // word is the only thing making it a pill.
   iconOnly?: boolean
+  // 'primary' is the full-width accent button a history rail leads with, the
+  // shape the Ad Analyzer's "New Analysis" already wears. Same two-click arm —
+  // that is the promise the label doesn't make, and a bigger button is more
+  // worth arming, not less.
+  variant?: 'pill' | 'primary'
+  // variant='primary' only: the idle fill, since Tailwind can't build a class
+  // name from a prop (e.g. 'bg-voice-500'). The armed state overrides it.
+  accentClass?: string
 }
 
 // Shared "New" affordance: a subtle gray pill in the top-left of every
@@ -20,7 +28,14 @@ interface ClearAllButtonProps {
 // or when the pointer leaves, so a stray first click is harmless. Framed as
 // "New" (not "Clear") because it clears *inputs only* — generated outputs
 // stay on screen and in the history banks.
-export default function ClearAllButton({ onClear, className = '', label = 'Create new', iconOnly = false }: ClearAllButtonProps) {
+export default function ClearAllButton({
+  onClear,
+  className = '',
+  label = 'Create new',
+  iconOnly = false,
+  variant = 'pill',
+  accentClass = 'bg-ink',
+}: ClearAllButtonProps) {
   const [armed, setArmed] = useState(false)
   const timer = useRef<number | null>(null)
 
@@ -41,6 +56,27 @@ export default function ClearAllButton({ onClear, className = '', label = 'Creat
     setArmed(true)
     if (timer.current) window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => { setArmed(false); timer.current = null }, 3000)
+  }
+
+  if (variant === 'primary') {
+    return (
+      <button
+        type="button"
+        onClick={handleClick}
+        onMouseLeave={armed ? disarm : undefined}
+        title={armed ? 'Click again to clear inputs. Your outputs stay in history' : undefined}
+        className={`flex min-w-0 items-center justify-center gap-2 rounded-full border px-4 py-2 text-[13px] font-bold tracking-tight text-white transition-all glass-fill glass-fill-soft btn-soft-shadow hover:brightness-110 ${
+          armed
+            ? 'border-amber-300/25 bg-amber-500'
+            : `border-white/15 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] ${accentClass}`
+        } ${className}`}
+      >
+        {armed
+          ? <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+          : <Plus className="h-4 w-4 shrink-0" strokeWidth={2.5} />}
+        <span className="truncate">{armed ? 'Confirm' : label}</span>
+      </button>
+    )
   }
 
   return (

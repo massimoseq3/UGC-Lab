@@ -14,14 +14,15 @@ import { enhanceScriptWithTags } from './services/enhanceScript'
 import { humanizeError } from '../../utils/friendlyError'
 import EditorArea from './components/EditorArea'
 import { VOICE_BATCH_MAX } from './components/GenerateBar'
-import HistoryView from './components/HistoryView'
+import HistoryRail from './components/HistoryRail'
+import HistoryRailHandle from '../../components/HistoryRailHandle'
 import HistoryDetailsView from './components/HistoryDetailsView'
-import SegmentedToggle from '../../components/SegmentedToggle'
 import { clampBatchCount } from '../../utils/batchCount'
 import SidePanel from './components/SidePanel'
 import BottomPlayer from './components/BottomPlayer'
 import BankPicker from '../../components/BankPicker'
 import { usePersistedState, useProjectScopedKey } from '../../hooks/usePersistedState'
+import { useMinWidth } from '../../hooks/useBreakpoint'
 
 // Persisted in-flight TTS tasks. Survive a refresh so the user doesn't lose
 // a gen (and the kie credit) when the tab reloads mid-generation. Stale
@@ -103,10 +104,20 @@ export default function VoiceStudio() {
   const [detailsItem, setDetailsItem] = useState<VoiceHistoryItem | null>(null)
   // Phone-only: which of the two panes is on screen (ignored from md up).
   const [pane, setPane] = useState<'editor' | 'settings'>('editor')
-  // The output pane's own toggle: the script you're reading, or the reads
-  // you've made of it. History moved here from the settings column in
-  // September 2026 — it's an output, and it belongs beside the other one.
-  const [rightTab, setRightTab] = useState<'script' | 'history'>('script')
+  // Behaviour, not layout: where the rail covers the script, opening a read's
+  // details has to hand the pane back; beside it, it must not. Keep the number
+  // in step with the `min-[1060px]:` classes below.
+  //
+  // 1060 where Scripts uses 980, because this app's settings column is a fixed
+  // 460px rather than 380: the same 280px rail and the same ~320px floor for
+  // the column it sits beside land 80px further out.
+  const railIsColumn = useMinWidth(1060)
+  // Whether the history rail is showing. Persisted, because it is a working
+  // preference rather than a per-run state. It opens by default where it can
+  // sit BESIDE the script and stays shut where it would cover it — on a phone
+  // this pane's job is the script box. Only ever a default; the stored answer,
+  // once there is one, is the member's.
+  const [historyOpen, setHistoryOpen] = usePersistedState<boolean>(`${baseKey}:historyOpen`, railIsColumn)
 
   const history = useBankStore((s) => s.voiceHistory)
   const activePlayerItem = useMemo<VoiceHistoryItem | null>(
@@ -234,7 +245,7 @@ export default function VoiceStudio() {
     // (the in-progress rows), which is the app-wide "Generate flips to the
     // output pane" rule. The script is untouched and one click back.
     setPane('editor')
-    setRightTab('history')
+    setHistoryOpen(true)
   }
 
   // Mount-time resume: poll every persisted in-flight TTS taskId that survived
@@ -281,10 +292,10 @@ export default function VoiceStudio() {
   const [prevDetails, setPrevDetails] = useState(detailsItem)
   if (detailsItem !== prevDetails) {
     setPrevDetails(detailsItem)
-    if (detailsItem) { setRightTab('history'); setPane('editor') }
+    // The details view rides over the script column, so the rail only has to
+    // stand down where it is covering that column rather than sitting beside it.
+    if (detailsItem) { setPane('editor'); if (!railIsColumn) setHistoryOpen(false) }
   }
-
-  const historyCount = history.length + pendingVoices.length
 
   const handleDeleteHistoryItem = (id: string) => {
     deleteVoiceHistory(id)
@@ -346,60 +357,67 @@ export default function VoiceStudio() {
           />
         </div>
 
-        {/* Right — the output column: the script you're reading, or the reads
-            you've made of it, behind one toggle. The player is its FOOTER
-            rather than a passenger in the generate row, so it spans both tabs:
-            it's the transport for whatever is playing, whichever list you're
-            looking at. */}
+        {/* Right — the output column: the script, with the reads you've made of
+            it in a rail beside it. It carried a Script / History
+            `SegmentedToggle` in a 57px band until September 2026; the rail
+            replaced the toggle and the band had nothing left to hold. The
+            player is this column's FOOTER and spans the rail too — it's the
+            transport for whatever is playing, whichever list you're looking
+            at. */}
         <div className={paneClass(pane === 'editor', 'md:flex-1 md:overflow-hidden')}>
           <div className="flex min-h-0 flex-1 flex-col">
-            <div className="flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
-              <SegmentedToggle<'script' | 'history'>
-                className="h-10 !p-1"
-                value={rightTab}
-                onChange={setRightTab}
-                options={[
-                  { value: 'script', label: 'Script' },
-                  { value: 'history', label: 'History', badge: historyCount > 0 ? historyCount : undefined },
-                ]}
-              />
-            </div>
+            <div className="flex min-h-0 flex-1">
+              {/* From 1060px the rail is a column beside the script; below it
+                  there is no room for three columns next to a fixed 460px
+                  settings panel, so it stands in FRONT of the script — the
+                  shape the tab had, and opening a read's details hands the pane
+                  back.
+                  The details view rides over this column, opaque, the same
+                  shape the settings column used when it owned History. */}
+              <div
+                className={`relative min-h-0 min-w-0 flex-1 overflow-hidden ${
+                  historyOpen ? 'hidden min-[1060px]:block' : 'block'
+                }`}
+              >
+                {/* The rail's one open/shut control, on the seam this column
+                    makes with it — see HistoryRailHandle. */}
+                <HistoryRailHandle open={historyOpen} onToggle={() => setHistoryOpen((v) => !v)} />
 
-            {/* Body — the base layer switches instantly between the two; the
-                details view rides on top of it, opaque, the same shape the
-                settings column used when it owned History. */}
-            <div className="relative min-h-0 flex-1 overflow-hidden">
-              {rightTab === 'script' ? (
                 <EditorArea
                   scriptText={scriptText}
                   onScriptChange={(v) => { setScriptText(v); setSelectedScript(null) }}
                   onSelectScript={() => setScriptPickerOpen(true)}
                   selectedScript={selectedScript}
                   onClearScript={() => setSelectedScript(null)}
-                  onClearInputs={() => { setSelectedScript(null); setScriptText('') }}
                   canGenerate={scriptText.trim().length > 0}
                   onEnhance={handleEnhance}
                   isEnhancing={isEnhancing}
                   highlightField={highlightField}
                 />
-              ) : (
-                <HistoryView
-                  items={history}
-                  pending={pendingVoices}
-                  activeId={activePlayerItem?.id ?? null}
-                  onSelect={setActivePlayerItem}
-                  onDelete={handleDeleteHistoryItem}
-                  onShowDetails={setDetailsItem}
-                />
-              )}
 
-              {detailsItem && (
-                <div className="absolute inset-0 bg-surface-1">
-                  <HistoryDetailsView
-                    item={detailsItem}
-                    onClose={() => setDetailsItem(null)}
-                    onRestoreText={handleRestoreText}
-                    onRestoreSettings={handleRestoreSettings}
+                {detailsItem && (
+                  <div className="absolute inset-0 bg-surface-1">
+                    <HistoryDetailsView
+                      item={detailsItem}
+                      onClose={() => setDetailsItem(null)}
+                      onRestoreText={handleRestoreText}
+                      onRestoreSettings={handleRestoreSettings}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {historyOpen && (
+                <div className="flex min-h-0 w-full flex-col border-l border-ink/5 min-[1060px]:w-[280px] min-[1060px]:shrink-0">
+                  <HistoryRail
+                    items={history}
+                    pending={pendingVoices}
+                    activeId={activePlayerItem?.id ?? null}
+                    onSelect={setActivePlayerItem}
+                    onDelete={handleDeleteHistoryItem}
+                    onShowDetails={setDetailsItem}
+                    onNew={() => { setSelectedScript(null); setScriptText('') }}
+                    onCollapse={() => setHistoryOpen(false)}
                   />
                 </div>
               )}

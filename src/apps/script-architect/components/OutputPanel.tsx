@@ -1325,16 +1325,27 @@ function VariationCard({
             </button>
           </div>
         ) : (
+          // The takes column is the one this app narrows — a history rail took
+          // 280px off it — so this row has to survive ~290px of usable width.
+          // Three rules do it, and each one alone fails: `whitespace-nowrap`
+          // (without it a label that no longer fits wraps INSIDE its own pill,
+          // so three buttons grew a second line each), the `min-w` floor (which
+          // makes the ROW wrap instead — two buttons on one line and the third
+          // under them, every label intact — where `min-w-0` let all three
+          // squeeze down to "Sa… / … / B…"), and shedding "Send to" below `2xl`,
+          // which is where all three do fit on one line.
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowSaveForm(true)}
-              className={`flex flex-1 min-w-0 items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-[12px] font-medium tracking-tight transition-colors ${
+              className={`flex min-w-[8.5rem] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border px-4 py-2.5 text-[12px] font-medium tracking-tight transition-colors ${
                 saved
                   ? 'border-green-500/20 bg-green-500/10 text-green-400 light:text-green-600'
                   : 'border-ink/15 text-ink-300 hover:bg-ink/[0.06] hover:text-ink-100'
               }`}
             >
-              {saved ? (<><Check className="h-3.5 w-3.5" /> Saved</>) : (<><Bookmark className="h-3.5 w-3.5" /> Save to Bank</>)}
+              {saved
+                ? (<><Check className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Saved</span></>)
+                : (<><Bookmark className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Save to Bank</span></>)}
             </button>
             {isHooks ? (
               // A hook pack has no full-script send target — each line is a
@@ -1345,29 +1356,29 @@ function VariationCard({
                 {isSpokenScript && (
                   <button
                     onClick={handleSendToVoiceStudio}
-                    className="flex flex-1 min-w-0 items-center justify-center gap-2 rounded-full border border-voice-500/20 bg-voice-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-voice-400 transition-colors hover:bg-voice-500/20"
+                    className="flex min-w-[8.5rem] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-voice-500/20 bg-voice-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-voice-400 transition-colors hover:bg-voice-500/20"
                   >
-                    <Mic className="h-4 w-4" strokeWidth={1.75} />
-                    Send to Voiceovers
-                    <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    <Mic className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                    <span className="truncate"><span className="hidden 2xl:inline">Send to </span>Voiceovers</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                   </button>
                 )}
                 <button
                   onClick={handleSendToBrollStudio}
-                  className="flex flex-1 min-w-0 items-center justify-center gap-2 rounded-full border border-broll-500/20 bg-broll-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-broll-400 transition-colors hover:bg-broll-500/20"
+                  className="flex min-w-[8.5rem] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-broll-500/20 bg-broll-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-broll-400 transition-colors hover:bg-broll-500/20"
                 >
-                  <Film className="h-4 w-4" strokeWidth={1.75} />
-                  Send to B-Roll
+                  <Film className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                  <span className="truncate"><span className="hidden 2xl:inline">Send to </span>B-Roll</span>
                   <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
                 </button>
                 {!isSpokenScript && (
                   <button
                     onClick={handleSendToPlayground}
-                    className="flex flex-1 min-w-0 items-center justify-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-emerald-400 light:text-emerald-600 transition-colors hover:bg-emerald-500/20"
+                    className="flex min-w-[8.5rem] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-emerald-400 light:text-emerald-600 transition-colors hover:bg-emerald-500/20"
                   >
-                    <ImagePlay className="h-4 w-4" strokeWidth={1.75} />
-                    Send to Playground
-                    <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    <ImagePlay className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                    <span className="truncate"><span className="hidden 2xl:inline">Send to </span>Playground</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                   </button>
                 )}
               </>
