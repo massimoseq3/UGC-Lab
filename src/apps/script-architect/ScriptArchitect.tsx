@@ -412,7 +412,7 @@ export default function ScriptArchitect() {
         accent="scripts"
       />
 
-      <div className={paneClass(pane === 'input', 'md:w-1/2 md:shrink-0 md:border-r md:border-ink/5')}>
+      <div className={paneClass(pane === 'input', 'md:w-1/3 md:min-w-[380px] md:shrink-0 md:border-r md:border-ink/5')}>
         <InputPanel
           mode={mode}
           onModeChange={setMode}
@@ -446,7 +446,7 @@ export default function ScriptArchitect() {
         />
       </div>
 
-      <div className={paneClass(pane === 'output', 'md:w-1/2')}>
+      <div className={paneClass(pane === 'output', 'md:w-2/3')}>
         <RightPanel
           variations={variations}
           mode={resolvedMode}
