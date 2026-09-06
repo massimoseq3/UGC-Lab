@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import {
-  Box, AlertCircle, Sparkle, Image as ImageIcon, Video as VideoIcon, Play, Pause, Volume2, VolumeX, Plus, Coins, Check, X, ArrowRight, Download, Copy, Bookmark, Film, ChevronRight, Star, Link2, Link2Off, RefreshCw, Pencil, SplitSquareVertical, Merge, Trash2, Palette,
-} from 'lucide-react'
+import { Box, AlertCircle, Sparkle, Image as ImageIcon, Video as VideoIcon, Play, Pause, Volume2, VolumeX, Plus, Coins, Check, X, ArrowRight, Download, Copy, Bookmark, Film, ChevronRight, Link2, Link2Off, RefreshCw, Pencil, SplitSquareVertical, Merge, Trash2, Palette } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import GenerationProgress from '../../../components/GenerationProgress'
 import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
@@ -10,7 +8,7 @@ import { KEYFRAME_MESSAGES, INTERPOLATE_MESSAGES } from '../../../components/gen
 import ModelPicker from '../../../components/ModelPicker'
 import ModelPickerModal from '../../../components/ModelPickerModal'
 import ProviderLogo from '../../../components/ProviderLogo'
-import SavingsPill from '../../../components/SavingsPill'
+import ModelTriggerLabel from '../../../components/ModelTriggerLabel'
 import ConstraintChip from '../../../components/ConstraintChip'
 import AspectIcon from '../../../components/AspectIcon'
 import { ContinuousFrameModal, ContinuousClipModal } from './ContinuousDetailModals'
@@ -1432,13 +1430,11 @@ export default function ContinuousView({
                     {getModel(continuousModelId) ? (
                       <>
                         <ProviderLogo provider={getModel(continuousModelId)?.provider ?? ''} />
-                        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                          <span className="truncate text-[13px] font-medium text-ink-100">{getModel(continuousModelId)?.displayName}</span>
-                          {getModel(continuousModelId)?.tags.includes('recommended') && (
-                            <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
-                          )}
-                          {officialSavingsPercent(continuousModelId) != null && <SavingsPill pct={officialSavingsPercent(continuousModelId)!} />}
-                        </div>
+                        <ModelTriggerLabel
+                          name={getModel(continuousModelId)?.displayName ?? ''}
+                          recommended={!!getModel(continuousModelId)?.tags.includes('recommended')}
+                          savings={officialSavingsPercent(continuousModelId)}
+                        />
                       </>
                     ) : (
                       <span className="flex-1 truncate text-sm text-ink-400">Select model</span>

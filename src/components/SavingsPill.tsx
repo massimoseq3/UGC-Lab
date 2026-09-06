@@ -7,11 +7,11 @@
 // Playground. It lived as two identical copies before, and the side-panel
 // triggers had none at all, so a video model quoted its discount in the open
 // panel and dropped it the moment the panel closed.
-export default function SavingsPill({ pct }: { pct: number }) {
+export default function SavingsPill({ pct, className = '' }: { pct: number; className?: string }) {
   return (
     <span
       title="vs the provider's official API price"
-      className="shrink-0 rounded-full border border-dashboard-500/25 bg-dashboard-500/15 px-1.5 py-px text-[10px] font-medium text-dashboard-300"
+      className={`shrink-0 rounded-full border border-dashboard-500/25 bg-dashboard-500/15 px-1.5 py-px text-[10px] font-medium text-dashboard-300 ${className}`}
     >
       {pct}% off
     </span>

@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, type ElementType } from 'react'
 import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, ChevronDown, Sparkle, Check, LayoutGrid, Copy, Bookmark, Star, Palette, Eye, Heart, MessageCircle, Share2, Search } from 'lucide-react'
 import Spinner from '../../components/Spinner'
+import { MenuSurface, MenuItem } from '../../components/Menu'
 import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, SwipeItem } from '../../stores/types'
 import type { BankType } from '../../utils/constants'
 import type { ModelFilter } from './Finder'
@@ -54,24 +55,21 @@ export function SortControl({ value, onChange, options }: { value: SortOrder; on
         <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-ink-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="absolute right-0 z-30 mt-2 min-w-[184px] rounded-2xl border border-ink/10 bg-surface-2 p-1.5 shadow-xl shadow-black/30">
+        <MenuSurface className="absolute right-0 z-30 mt-2">
           {options.map((o) => {
             const active = o.value === value
             return (
-              <button
+              <MenuItem
                 key={o.value}
-                type="button"
+                selected={active}
                 onClick={() => { onChange(o.value); setOpen(false) }}
-                className={`flex w-full items-center justify-between gap-3 rounded-full px-3.5 py-2 text-[13px] font-medium tracking-tight transition-colors ${
-                  active ? 'bg-ink/[0.06] text-ink-100' : 'text-ink-400 hover:bg-ink/[0.04] hover:text-ink-200'
-                }`}
+                trailing={active ? <Check className="h-4 w-4 text-ink-200" /> : undefined}
               >
-                <span className="truncate">{o.label}</span>
-                {active && <Check className="h-3.5 w-3.5 shrink-0 text-ink-200" />}
-              </button>
+                {o.label}
+              </MenuItem>
             )
           })}
-        </div>
+        </MenuSurface>
       )}
     </div>
   )

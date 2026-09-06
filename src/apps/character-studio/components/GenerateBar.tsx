@@ -81,7 +81,8 @@ export default function GenerateBar({
     // `max-md:px-5` because on a phone this is not a card — the rounding and
     // the border are `md:` only, so it's a full-bleed band and its contents
     // belong on the column's own edge, with the toggles and the fields above.
-    <div className="min-w-0 space-y-2 border-t border-ink/5 bg-surface-0 p-3 max-md:px-5 md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
+    // `@container` so the row below can stack off THIS bar's width — see there.
+    <div className="@container min-w-0 space-y-2 border-t border-ink/5 bg-surface-0 p-3 max-md:px-5 md:rounded-t-2xl md:border md:border-b-0 md:border-ink/5 md:bg-ink/[0.03]">
       {error && (
         <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">
           <p className="text-xs leading-relaxed text-red-300 light:text-red-700">{error}</p>
@@ -103,12 +104,19 @@ export default function GenerateBar({
           halves: the picker fills the left half (matching the preset pill above),
           the two chips share the right half. The footer chips open upward;
           resolution shows its credit cost. */}
-      {/* Wraps on a phone: the right half holds THREE controls (resolution,
-          aspect, and a −/+ stepper that needs ~90px to be pressable), and half
-          of a 351px column can't seat them — the stepper's minus button fell
-          off the edge. Model on its own line, the three chips under it. */}
+      {/* It STACKS below 520px of bar — model on its own line, the three chips
+          under it — and that is a CONTAINER query, not a viewport one. The right
+          half holds THREE controls (resolution, aspect, and a −/+ stepper that
+          needs ~90px to be pressable), so it wants ~256px and the row only
+          works at twice that. What squeezes it is the COLUMN, which is a third
+          of the pane: at `max-md:` the two halves stayed side by side down to a
+          768px window, where this column is ~350px and each half got 170 — the
+          stepper's minus button fell off the edge and the model name rendered
+          as "GPT I…" (Massimo's call, September 2026). Stacking also hands the
+          model trigger a full line, which is what brings its "% off" pill back
+          (see `ModelTriggerLabel`). */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="min-w-0 flex-1 max-md:basis-full">
+        <div className="min-w-0 flex-1 @max-[520px]:basis-full">
           <ModelPicker
             appId="character-studio"
             task="image"
@@ -117,7 +125,7 @@ export default function GenerateBar({
             costParams={{ imageCount: 1, resolution }}
           />
         </div>
-        <div className="flex min-w-0 flex-1 items-center gap-2 max-md:basis-full">
+        <div className="flex min-w-0 flex-1 items-center gap-2 @max-[520px]:basis-full">
           <ConstraintChip
             grow
             size="lg"

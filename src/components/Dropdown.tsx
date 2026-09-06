@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { ChevronDown, Check } from 'lucide-react'
 import AnchoredPopover from './video/AnchoredPopover'
+import { MenuSurface, MenuItem, MENU_ROW_HEIGHT, MENU_MIN_WIDTH } from './Menu'
 
 // Per-app accent for the open-state border and the selected row. Explicit class
 // strings (not template interpolation) so Tailwind sees them.
@@ -58,6 +59,8 @@ interface DropdownProps {
   // hook patterns carry a count after the name — where the default clipped
   // "Conditional callout 76" to "Conditional callou…". Only the menu moves;
   // the trigger still fits its own content, so the filter row keeps its shape.
+  // The default is `MenuSurface`'s own min-width: a narrower wrapper would let
+  // the menu overhang the box AnchoredPopover positions for it.
   menuMinWidth?: number
   className?: string
 }
@@ -80,7 +83,7 @@ export default function Dropdown({
   placement = 'auto',
   tier = 'default',
   fitContent = false,
-  menuMinWidth = 168,
+  menuMinWidth = MENU_MIN_WIDTH,
   className = '',
 }: DropdownProps) {
   const anchorRef = useRef<HTMLButtonElement>(null)
@@ -130,39 +133,45 @@ export default function Dropdown({
         open={open}
         onClose={() => setOpen(false)}
         width={width}
-        estimatedHeight={Math.min(options.length * 38 + 8, 280)}
+        estimatedHeight={Math.min(options.length * MENU_ROW_HEIGHT + 2, 320)}
         placement={placement}
         tier={tier}
       >
-        <div className="menu-scroll max-h-[280px] overflow-y-auto rounded-2xl border border-ink/10 bg-surface-2 p-1 shadow-xl shadow-black/20">
-          {items.map((o) => {
-            const selected = o.value === value
-            return (
-              <button
-                key={o.value}
-                type="button"
-                onClick={() => { onChange(o.value); setOpen(false) }}
-                className={`flex w-full items-center justify-between gap-2 rounded-full px-3 py-2 text-left text-sm transition-colors ${
-                  selected ? `${tone.selected} text-ink-50` : 'text-ink-200 hover:bg-ink/[0.06]'
-                }`}
-              >
-                <span className="truncate">{o.label}</span>
-                {/* The COUNT is last and the check sits to its left, appearing
-                    only on the selected row. Reserving a slot for the tick on
-                    the right instead — the obvious first try — pushed every
-                    row's content off-centre: measured 17px of inset on the
-                    left against 48px on the right, which is what read as the
-                    menu being lopsided. This way the pills still hold one
-                    column (the tick grows leftward into the label's slack,
-                    which truncates), and the row's two paddings match. */}
-                <span className="flex shrink-0 items-center gap-1.5">
-                  {selected && <Check className={`h-3.5 w-3.5 ${tone.check}`} />}
-                  {o.count != null && <CountPill value={o.count} muted={!selected} />}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+        {/* The scroller is INSIDE the surface, not the surface itself:
+            `MenuSurface` is `overflow-hidden` so its full-bleed rows are
+            clipped to the rounded corners, and stacking `overflow-y-auto` on
+            the same element leaves which one wins to stylesheet order. */}
+        <MenuSurface>
+          <div className="menu-scroll max-h-[320px] overflow-y-auto">
+            {/* The COUNT is last and the check sits to its left, appearing only
+                on the selected row. Reserving a slot for the tick on the right
+                instead — the obvious first try — pushed every row's content
+                off-centre: measured 17px of inset on the left against 48px on the
+                right, which is what read as the menu being lopsided. This way the
+                pills still hold one column (the tick grows leftward into the
+                label's slack, which truncates), and the row's two paddings
+                match. */}
+            {items.map((o) => {
+              const selected = o.value === value
+              return (
+                <MenuItem
+                  key={o.value}
+                  selected={selected}
+                  selectedClassName={`${tone.selected} text-ink-50`}
+                  onClick={() => { onChange(o.value); setOpen(false) }}
+                  trailing={(
+                    <>
+                      {selected && <Check className={`h-4 w-4 ${tone.check}`} />}
+                      {o.count != null && <CountPill value={o.count} muted={!selected} />}
+                    </>
+                  )}
+                >
+                  {o.label}
+                </MenuItem>
+              )
+            })}
+          </div>
+        </MenuSurface>
       </AnchoredPopover>
     </>
   )
