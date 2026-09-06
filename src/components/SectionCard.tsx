@@ -24,7 +24,6 @@ export default function SectionCard({
   contentClassName = 'flex flex-col gap-2',
   onHeaderClick,
   divider = true,
-  shadow = true,
 }: {
   icon?: ElementType
   title: string
@@ -49,13 +48,9 @@ export default function SectionCard({
   // draws no rule — otherwise the card reads as a heading with its content
   // clipped off rather than as something put away.
   divider?: boolean
-  // Off for a card that is the LAST child of a scrolling column: a scroller
-  // clips its descendants' shadows, so what renders is a halo down the sides
-  // stopping dead at the bottom corners, which reads as the card being sliced.
-  shadow?: boolean
 }) {
   return (
-    <div className={`rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 ${shadow ? 'card-soft-shadow' : ''} ${className}`}>
+    <div className={`rounded-2xl border border-ink/5 bg-ink/[0.02] p-3 card-soft-shadow ${className}`}>
       {/* A 3-column grid, not absolutely-positioned edge slots: the two 1fr
           gutters are equal, so the title is genuinely centred, and a pane too
           narrow for all three squeezes them instead of letting a pill land on

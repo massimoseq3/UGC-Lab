@@ -816,14 +816,14 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                       {supportsFrames && (
                         <div className="grid grid-cols-2 gap-2">
                           <FrameSlot
-                            label="Start frame"
+                            label="Start Frame"
                             value={startFrameValue()}
                             onChange={(v) => setSlot('start', v)}
                             bankType="brolls"
                             tabs={PLAYGROUND_FRAME_TABS}
                           />
                           <FrameSlot
-                            label="End frame"
+                            label="End Frame"
                             value={supportsEndFrame ? endFrameValue() : null}
                             onChange={(v) => supportsEndFrame && setSlot('end', v)}
                             bankType="brolls"
@@ -1046,16 +1046,13 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   open={state.voiceOpen ?? true}
                   onChange={(voiceProfile) => onChange({ ...state, voiceProfile })}
                   onToggleOpen={() => onChange({ ...state, voiceOpen: !(state.voiceOpen ?? true) })}
-                  // No shadow: this is the LAST child of the input column, whose
-                  // bottom edge sits exactly on the scroller's clip edge, and a
-                  // scroller clips its descendants' shadows — what rendered was a
-                  // halo down the sides stopping dead at the bottom corners, which
-                  // reads as the card being sliced off (reported in light mode,
-                  // the only theme where the shadow is visible at all). Padding
-                  // on the column would fix it and break something worse: bottom
-                  // padding on a scroll container is scrolled content, so the gap
-                  // above the generate band would change as you scroll.
-                  shadow={false}
+                  // This column's own shape, not B-Roll's card-modal one: no
+                  // hairline and its own tighter padding. The shared `section`
+                  // shell was tried here and put back on sight (Massimo's call)
+                  // — this card is the last thing in a cramped column directly
+                  // under the prompt box, where a rule is one more horizontal
+                  // line in a stack that already has too many.
+                  variant="plain"
                 />
               )}
 
