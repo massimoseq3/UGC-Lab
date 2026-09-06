@@ -921,6 +921,31 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 </SectionCard>
               )}
 
+              {/* Music's delivery toggle sits ABOVE the prompt box, where the
+                  model row no longer does (September 2026, Massimo's call). It
+                  isn't an output setting the way resolution and duration are —
+                  it changes what you write in the box directly underneath, since
+                  a track with lyrics wants words in the prompt and an
+                  instrumental one wants none. So it reads as the first half of
+                  the question the box asks, not as something picked on the way to
+                  Generate. The model went the other way in the same pass: which
+                  model is a property of the RUN, so it stays in the footer band
+                  with every other mode's, directly over the button that fires it.
+                  `h-12` matches B-Roll's Dialogue Clips / B-Roll Clips pair — the
+                  same question asked of a generation. */}
+              {state.mode === 'music' && (
+                <SegmentedToggle<'instrumental' | 'lyrics'>
+                  className="h-12 shrink-0 !p-1"
+                  accent="playground"
+                  value={state.instrumental ? 'instrumental' : 'lyrics'}
+                  onChange={(v) => onChange({ ...state, instrumental: v === 'instrumental' })}
+                  options={[
+                    { value: 'instrumental', label: 'Instrumental' },
+                    { value: 'lyrics', label: 'Lyrics' },
+                  ]}
+                />
+              )}
+
               {/* Prompt — takes the column's leftover height, and never more.
                   `grow` fills the gap that would otherwise sit between the box and
                   the pinned footer; every wrapper below is `min-h-0` so the box can
@@ -1155,14 +1180,14 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
         <div className="shrink-0 px-5 pb-3 pt-2">
           {/* Model — video uses the full picker modal (matching B-Roll); image
               and music keep the inline dropdown (which auto-opens upward here).
-              Music's pair sat ABOVE the prompt box for a stint (August 2026) on
-              the reasoning that neither is an output setting; they came back
-              down here in September 2026 (Massimo's call) because what a member
-              reads top to bottom in this panel is the mode tabs, then the thing
-              they type, and standing two full-width controls between the two put
-              the panel's whole subject 110px down the column. Every mode now
-              settles what it is making in the same band, directly over the
-              button that makes it. */}
+              Music's model row sat ABOVE the prompt box for a stint (August
+              2026) alongside its delivery toggle, on the reasoning that neither
+              is an output setting; it came down here in September 2026
+              (Massimo's call) and the toggle stayed up there. Which model runs
+              is a property of the RUN, like the batch count beside it, so every
+              mode now names its model in the same band directly over Generate —
+              and the two controls no longer stand between the mode tabs and the
+              box the panel exists for. */}
           {/* The model row is a TWO-UP: the picker, and the how-many stepper
               beside it at the same 58px picker-row height. The count used to
               ride in the settings row below, where a video model that declares
@@ -1250,23 +1275,6 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
               />
             )}
           </div>
-          {/* Music's delivery toggle — the one thing that is settled about the
-              track before it is written, so it takes the slot the other modes'
-              output settings take: under the model, over Generate. `h-12` is
-              the `size='lg'` chip height those settings run at, so the band is
-              the same three rows in every mode. */}
-          {state.mode === 'music' && (
-            <SegmentedToggle<'instrumental' | 'lyrics'>
-              className="mb-2 h-12 !p-1"
-              accent="playground"
-              value={state.instrumental ? 'instrumental' : 'lyrics'}
-              onChange={(v) => onChange({ ...state, instrumental: v === 'instrumental' })}
-              options={[
-                { value: 'instrumental', label: 'Instrumental' },
-                { value: 'lyrics', label: 'Lyrics' },
-              ]}
-            />
-          )}
           {/* Output settings — resolution / aspect / duration / audio, all of
               them properties of the thing being made. A model that declares no
               constraints has none, and the row is skipped rather than rendered
