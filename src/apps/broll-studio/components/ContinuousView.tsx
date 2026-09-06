@@ -2158,7 +2158,7 @@ function FrameConceptCard({
     <div className="group flex flex-col gap-1.5">
       <div
         onClick={onOpen}
-        className={`relative aspect-[9/16] cursor-pointer overflow-hidden rounded-xl border bg-ink/[0.02] transition-all hover:-translate-y-px card-soft-shadow ${
+        className={`relative aspect-[9/16] cursor-pointer overflow-hidden rounded-xl border bg-ink/[0.02] transition-all card-soft-shadow ${
           isKeyframe ? 'border-broll-400/70 ring-2 ring-broll-500/30' : 'border-ink/[0.08] hover:border-ink/15'
         }`}
       >
@@ -2372,7 +2372,7 @@ function ClipCard({
       <div
         onClick={onOpen}
         {...inline.hoverProps}
-        className="relative aspect-[9/16] cursor-pointer overflow-hidden rounded-xl border-2 border-broll-500/80 bg-broll-500/[0.06] transition-all hover:border-broll-500 hover:-translate-y-px card-soft-shadow"
+        className="relative aspect-[9/16] cursor-pointer overflow-hidden rounded-xl border-2 border-broll-500/80 bg-broll-500/[0.06] transition-all hover:border-broll-500 card-soft-shadow"
       >
         {inFlight ? (
           <GeneratingMediaFill

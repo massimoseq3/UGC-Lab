@@ -1021,7 +1021,7 @@ export default function VariationCard(props: VariationCardProps) {
         <div
           onClick={() => openDetail('image')}
           {...cardVideo.hoverProps}
-          className="relative aspect-[9/16] cursor-pointer overflow-hidden rounded-xl border border-ink/[0.08] bg-ink/[0.02] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
+          className="relative aspect-[9/16] cursor-pointer overflow-hidden rounded-xl border border-ink/[0.08] bg-ink/[0.02] transition-all hover:border-ink/15 card-soft-shadow"
         >
           {cardState.isGeneratingImage || isGeneratingImageInFlight ? (
             <GeneratingMediaFill

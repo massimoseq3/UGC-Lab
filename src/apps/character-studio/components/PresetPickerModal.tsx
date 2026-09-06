@@ -113,7 +113,7 @@ function PresetCard({ entry, savedId, onClick }: {
   const assetUrl = useAssetUrl(entry.imageRef)
   const url = entry.imageUrl ?? assetUrl
   return (
-    <div className="group relative aspect-[9/16] w-full overflow-hidden rounded-xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-influencers-500/40 hover:-translate-y-px card-soft-shadow">
+    <div className="group relative aspect-[9/16] w-full overflow-hidden rounded-xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-influencers-500/40 card-soft-shadow">
       <button
         type="button"
         onClick={onClick}

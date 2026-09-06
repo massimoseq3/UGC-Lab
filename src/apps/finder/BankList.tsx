@@ -113,7 +113,7 @@ function ProductCard({ item, onEdit, onDelete, inFlight }: { item: Product; onEd
   return (
     <div
       onClick={onEdit}
-      className="group relative aspect-square cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
+      className="group relative aspect-square cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 card-soft-shadow"
     >
       {resolvedImage ? (
         // lazy + async decode: bank tiles are full-resolution GENERATIONS —
@@ -201,7 +201,7 @@ function ModelCard({ item, onEdit, onDelete }: { item: Model; onEdit: () => void
   return (
     <div
       onClick={onEdit}
-      className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow ${landscape ? 'col-span-3' : ''}`}
+      className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 card-soft-shadow ${landscape ? 'col-span-3' : ''}`}
     >
       <div className={`relative w-full ${landscape ? 'aspect-video' : 'aspect-[9/16]'}`}>
         {resolvedImage ? (
@@ -284,7 +284,7 @@ function ScriptCard({ item, onEdit, onDelete, showDate = true }: { item: Script;
   return (
     <div
       onClick={onEdit}
-      className="group relative flex aspect-[9/16] cursor-pointer flex-col overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] p-4 transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
+      className="group relative flex aspect-[9/16] cursor-pointer flex-col overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] p-4 transition-all hover:border-ink/15 card-soft-shadow"
     >
       {/* Header: badge + title */}
       <div className="flex flex-col gap-2">
@@ -383,7 +383,7 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
   }
 
   return (
-    <div onClick={onEdit} className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:bg-ink/[0.05] hover:-translate-y-px card-soft-shadow ${landscape ? 'col-span-2 sm:col-span-3' : ''}`}>
+    <div onClick={onEdit} className={`group relative cursor-pointer overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:bg-ink/[0.05] card-soft-shadow ${landscape ? 'col-span-2 sm:col-span-3' : ''}`}>
       {/* Thumbnail — portrait by default; landscape stills go wide (aspect-video)
           and span three columns, matching the Influencers sheet behaviour. */}
       <div className={`relative w-full overflow-hidden ${landscape ? 'aspect-video' : 'aspect-[9/16]'}`}>
@@ -490,7 +490,7 @@ function StyleCard({ item, onEdit, onDelete }: { item: StylePreset; onEdit: () =
   return (
     <div
       onClick={onEdit}
-      className="group relative flex aspect-[9/16] cursor-pointer flex-col overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
+      className="group relative flex aspect-[9/16] cursor-pointer flex-col overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.03] transition-all hover:border-ink/15 card-soft-shadow"
     >
       {thumbs.length > 0 ? (
         <div className={`absolute inset-0 grid gap-px ${thumbs.length === 1 ? '' : thumbs.length === 2 ? 'grid-rows-2' : 'grid-cols-2 grid-rows-2'}`}>
@@ -580,7 +580,7 @@ function SwipeCard({ item, onDelete }: { item: SwipeItem; onDelete: () => void }
     <>
     <div
       onClick={() => setOpen(true)}
-      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.02] transition-all hover:border-ink/15 hover:-translate-y-px card-soft-shadow"
+      className="group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-ink/5 bg-ink/[0.02] transition-all hover:border-ink/15 card-soft-shadow"
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-black">
         {url
