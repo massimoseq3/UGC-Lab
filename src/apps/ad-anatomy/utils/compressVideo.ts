@@ -39,12 +39,24 @@ const MAX_LONG_EDGE = 720
 const LOW_BITRATE_THRESHOLD = 700_000
 const LOW_BITRATE_LONG_EDGE = 480
 const MIN_VIDEO_BITRATE = 250_000
-const MAX_VIDEO_BITRATE = 4_000_000
+// Ceiling on the asked-for bitrate, and it is what bounds a SHORT ad: spread
+// over a few seconds the budget buys a bitrate no encoder needs, so the cap is
+// the only thing standing between a 10s ad and a wildly bigger file than it has
+// any reason to be. 2.5Mbps at 720-on-the-long-edge is already a clean encode.
+const MAX_VIDEO_BITRATE = 2_500_000
 const AUDIO_BITRATE = 64_000
-const TARGET_FPS = 24
-// Leave room inside the budget for VBR overshoot: the bitrate we ask for is an
-// average and the encoder is free to miss it.
-const BUDGET_HEADROOM = 0.8
+// Capture frame rate. The model samples the clip at roughly ONE frame a second
+// and reads those frames like stills, so everything above a few fps is spent on
+// motion nothing ever looks at — and frame rate is the biggest lever there is
+// on how many bits the encoder wants. 12 still catches every cut a viewer would
+// see while asking for roughly a third less than 24 did.
+const TARGET_FPS = 12
+// Leave room inside the budget for the encoder to miss the bitrate it is given
+// — and it misses HIGH. This is deliberately generous: an ad that comes back
+// over budget costs a second realtime pass, which is a wait the member watches,
+// while aiming low costs a little quality on a clip only a model ever sees. At
+// 0.55 the first pass tolerates the encoder overshooting by 1.8x.
+const BUDGET_HEADROOM = 0.55
 // How many realtime passes we are willing to spend landing under the budget.
 // Two is almost always enough — the first pass measures the encoder's real
 // overshoot on THIS clip and the second corrects for it — and three is the
@@ -59,6 +71,18 @@ const RETRY_HEADROOM = 0.9
 // the bitrate we ask for (the floor, the container, or an encoder ignoring us),
 // so another identical wait would buy nothing.
 const MIN_PASS_IMPROVEMENT = 0.05
+// In-pass rate control. `videoBitsPerSecond` is a request an encoder can ignore
+// outright, and the only lever left once it is running is how many frames we
+// hand it — so the recording watches its own accumulating size and thins the
+// frame clock when the run projects over budget. It is the half of this file
+// that does not depend on the encoder cooperating at all: fewer frames is fewer
+// bits whatever its rate control is doing. Projection starts a few seconds in
+// (the first chunks carry the headers and a keyframe, so an early estimate
+// reads high) and the floor is low because a model sampling one frame a second
+// cannot tell 4fps from 12.
+const PROJECTION_AFTER_SEC = 3
+const PROJECTION_TRIGGER = 0.95
+const MIN_ADAPTIVE_FPS = 4
 // Past this, a realtime pass is a wait nobody would sit through and the bitrate
 // needed to hit the budget is below anything readable. Trimming is the answer.
 const MAX_DURATION_SEC = 180
@@ -131,22 +155,41 @@ function decodedAudioBytes(video: HTMLVideoElement): number {
 //
 // Falls back to a page timer if a worker can't be created (a CSP that forbids
 // blob: workers) — degraded, but the same clip it used to produce.
-function startFrameClock(intervalMs: number, onTick: () => void): () => void {
+interface FrameClock {
+  /** Retime the clock mid-recording — the one lever left once the encoder is running. */
+  retime(intervalMs: number): void
+  stop(): void
+}
+
+function startFrameClock(intervalMs: number, onTick: () => void): FrameClock {
   try {
     const blobUrl = URL.createObjectURL(
-      new Blob([`const id=setInterval(()=>postMessage(0),${intervalMs});onmessage=()=>{clearInterval(id);close()}`], {
-        type: 'text/javascript',
-      }),
+      new Blob(
+        [
+          `let id;const run=(ms)=>{clearInterval(id);id=setInterval(()=>postMessage(0),ms)};run(${intervalMs});` +
+            `onmessage=(e)=>{if(e.data==='stop'){clearInterval(id);close()}else run(e.data)}`,
+        ],
+        { type: 'text/javascript' },
+      ),
     )
     const worker = new Worker(blobUrl)
     worker.onmessage = () => onTick()
-    return () => {
-      worker.terminate()
-      URL.revokeObjectURL(blobUrl)
+    return {
+      retime: (ms) => worker.postMessage(ms),
+      stop: () => {
+        worker.terminate()
+        URL.revokeObjectURL(blobUrl)
+      },
     }
   } catch {
-    const timer = window.setInterval(onTick, intervalMs)
-    return () => window.clearInterval(timer)
+    let timer = window.setInterval(onTick, intervalMs)
+    return {
+      retime: (ms) => {
+        window.clearInterval(timer)
+        timer = window.setInterval(onTick, ms)
+      },
+      stop: () => window.clearInterval(timer),
+    }
   }
 }
 
@@ -205,7 +248,13 @@ interface PassResult {
  * copy) on anything that makes the run unusable; an oversized result is NOT a
  * failure here — that is the caller's to re-aim.
  */
-async function encodePass(file: File, mimeType: string, videoBitrate: number, pass: number): Promise<PassResult> {
+async function encodePass(
+  file: File,
+  mimeType: string,
+  videoBitrate: number,
+  pass: number,
+  targetBytes: number,
+): Promise<PassResult> {
   const objectUrl = URL.createObjectURL(file)
   const video = document.createElement('video')
   video.src = objectUrl
@@ -322,22 +371,24 @@ async function encodePass(file: File, mimeType: string, videoBitrate: number, pa
   }
 
   const chunks: Blob[] = []
+  const clipSeconds = video.duration || MAX_DURATION_SEC
   const recorded = new Promise<Blob>((resolve, reject) => {
     // Not requestAnimationFrame: it stops dead in a hidden tab, which would
     // freeze the picture while the audio kept recording. See startFrameClock.
-    const stopClock = startFrameClock(Math.round(1000 / TARGET_FPS), () => {
+    let fps = TARGET_FPS
+    const clock = startFrameClock(Math.round(1000 / fps), () => {
       if (video.readyState >= 2) ctx.drawImage(video, 0, 0, width, height)
       sampleLevel()
     })
     const watchdog = window.setTimeout(
       () => stop(new FriendlyError('Compressing this ad timed out. Re-export it as a smaller file and try again.')),
-      (video.duration || MAX_DURATION_SEC) * 1000 + STALL_GRACE_MS,
+      clipSeconds * 1000 + STALL_GRACE_MS,
     )
     let settled = false
     const stop = (err?: Error) => {
       if (settled) return
       settled = true
-      stopClock()
+      clock.stop()
       window.clearTimeout(watchdog)
       video.pause()
       if (recorder.state !== 'inactive') recorder.stop()
@@ -345,8 +396,28 @@ async function encodePass(file: File, mimeType: string, videoBitrate: number, pa
     }
     cleanups.push(() => stop())
 
+    // `recorder.start(1000)` hands a chunk over every second, which makes the
+    // run's own size readable WHILE it happens rather than only once it is too
+    // late to do anything about it. Project it out to the full clip, and thin
+    // the frame clock if that projection is heading past the budget — the only
+    // control we have left over an encoder that is ignoring the bitrate it was
+    // handed. Bits already spent can't be recovered, so this is a backstop
+    // under a deliberately conservative first aim, not a substitute for one.
+    const startedAt = performance.now()
+    let recordedBytes = 0
     recorder.ondataavailable = (e) => {
-      if (e.data.size > 0) chunks.push(e.data)
+      if (e.data.size <= 0) return
+      chunks.push(e.data)
+      recordedBytes += e.data.size
+      const elapsed = (performance.now() - startedAt) / 1000
+      if (elapsed < PROJECTION_AFTER_SEC || fps <= MIN_ADAPTIVE_FPS) return
+      const projected = (recordedBytes / elapsed) * clipSeconds
+      if (projected <= targetBytes * PROJECTION_TRIGGER) return
+      fps = Math.max(MIN_ADAPTIVE_FPS, Math.round(fps / 2))
+      clock.retime(Math.round(1000 / fps))
+      console.log(
+        `[ad-anatomy] pass ${pass} projects ${(projected / (1024 * 1024)).toFixed(1)}MB — thinning to ${fps}fps`,
+      )
     }
     recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }))
     recorder.onerror = (e) => {
@@ -358,7 +429,7 @@ async function encodePass(file: File, mimeType: string, videoBitrate: number, pa
     video.onended = () => stop()
     video.onerror = () => stop(new FriendlyError('Playback of the ad failed while compressing it. Re-export it and try again.'))
 
-    console.log(`[ad-anatomy] pass ${pass}: re-encoding ${width}x${height} @ ${Math.round(videoBitrate / 1000)}kbps as ${mimeType}`)
+    console.log(`[ad-anatomy] pass ${pass}: re-encoding ${width}x${height} @ ${Math.round(videoBitrate / 1000)}kbps, ${TARGET_FPS}fps, as ${mimeType}`)
     recorder.start(1000)
     video.play().catch(() => stop(new FriendlyError('Could not play the ad to compress it. Re-export it and try again.')))
   })
@@ -426,7 +497,7 @@ export async function compressVideoForAnalysis(
       Math.min(MAX_VIDEO_BITRATE, Math.max(MIN_VIDEO_BITRATE, (aim * 8) / duration - AUDIO_BITRATE)),
     )
     onPass?.(pass)
-    const result = await encodePass(file, mimeType, videoBitrate, pass)
+    const result = await encodePass(file, mimeType, videoBitrate, pass, targetBytes)
     passes = pass
     // A silent capture is final however small the file is — see encodePass.
     if (result.silentDespiteAudio) {
