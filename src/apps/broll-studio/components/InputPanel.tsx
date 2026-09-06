@@ -332,7 +332,7 @@ export default function InputPanel({
           <SectionCard
             icon={Layers}
             title="References"
-            className="mb-2 flex flex-[5] flex-col max-md:flex-none"
+            className="mb-2 flex flex-[5] flex-col max-lg:flex-none"
             contentClassName="flex flex-1 flex-col gap-2"
             right={
               /* Bring your own prompts — write them in Claude (or anywhere) and
@@ -408,7 +408,7 @@ export default function InputPanel({
                 between them. With basis-0 they were always an even split whatever
                 was in them — a matched pair on an empty panel, and a script fighting
                 for room the moment one was pasted in. */}
-            <div className={`flex min-h-[140px] flex-1 flex-col overflow-hidden rounded-3xl border transition-colors max-md:min-h-[220px] max-md:flex-none ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
+            <div className={`flex min-h-[140px] flex-1 flex-col overflow-hidden rounded-3xl border transition-colors max-lg:min-h-[220px] max-lg:flex-none ${selectedScript ? 'border-scripts-500/30 bg-scripts-500/[0.06] focus-within:border-scripts-500/50' : 'border-dashed border-ink/10 bg-ink/[0.02] focus-within:border-ink/20'} ${highlightField === 'script' ? 'animate-field-flash' : ''}`}>
               <BankCard
                 icon={FileText}
                 label="Script / Hooks"
@@ -501,8 +501,9 @@ export default function InputPanel({
                 still one tap away on the expand button for anything longer.
                 Doubles as the creative brief when there's no script yet — the
                 product row carries the rest, so blank stays a normal answer. */}
-            <div className="relative flex min-h-[72px] flex-1 flex-col overflow-hidden rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-ink/20 max-md:min-h-[120px] max-md:flex-none">
-              <div className="flex items-center px-4 pt-2.5">
+            <div className="relative flex min-h-[72px] flex-1 flex-col overflow-hidden rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-ink/20 max-lg:min-h-[120px] max-lg:flex-none">
+              {/* Centred, like every other box header in this column. */}
+              <div className="flex items-center justify-center px-4 pt-2.5">
                 <div className="flex min-w-0 items-center gap-1.5">
                   <Pencil className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
                   {/* One name whether or not a script is loaded — it's the same

@@ -30,6 +30,15 @@ interface ProductFormProps {
   // second extraction here would bill the member twice for one photo, which is
   // what the file-based version of this prop used to do.
   onDetachExtraction?: (job: Promise<ProductExtraction>, rowId: Promise<string | null>) => void
+  // Hosted inside a `Modal` (the Scripts panel's Edit Product Details) rather
+  // than in the Bank's own pane. The modal already draws a title bar with a
+  // close button and a pinned footer, so the form drops its own header row —
+  // its two jobs move out rather than being duplicated two rows apart. The
+  // footer's button submits through `formId`, and `onAutosaveStateChange` is
+  // how "Saving… / Saved" reaches a footer that lives outside this component.
+  embedded?: boolean
+  formId?: string
+  onAutosaveStateChange?: (state: 'idle' | 'saving' | 'saved') => void
 }
 
 const FIELD_META: Record<string, { label: string; type: 'text' | 'textarea'; required?: boolean; hint?: string }> = {
@@ -92,6 +101,50 @@ const worthSaving = (f: FormState) =>
 
 // One extra-angle thumbnail. Its own component so `useAssetUrl` can resolve
 // each stored `asset://` ref (a hook can't run inside a .map callback).
+// The form's primary action and what its autosave is doing, as ONE bar across
+// the bottom of whatever is holding the form. It started as a slab pinned
+// across the FIELD column, moved up into a header row because that slab read as
+// the bottom of a column that actually scrolled, and landed here (September
+// 2026, Massimo's call) once the modal proved the shape: a bar the full width
+// of the panel is the end of the FORM, not the end of a column, so it says
+// "you're finished" without lying about where the fields stop.
+//
+// Exported so the Scripts modal can render the same bar in `Modal`'s own pinned
+// footer — inside the modal the form fills the body, and a footer of its own
+// would scroll away with the body on a phone.
+export function ProductFormFooter({
+  autosaveState,
+  isNew,
+  saving,
+  disabled,
+  formId,
+}: {
+  autosaveState: 'idle' | 'saving' | 'saved'
+  isNew: boolean
+  saving?: boolean
+  disabled?: boolean
+  // Set when the button is outside the <form> it submits.
+  formId?: string
+}) {
+  return (
+    <div className="flex items-center justify-end gap-3">
+      <span className="flex items-center gap-1.5 text-[11px] text-ink-500">
+        {autosaveState === 'saving' && <><Spinner className="h-3 w-3" />Saving…</>}
+        {autosaveState === 'saved' && <><Check className="h-3 w-3" />Saved</>}
+      </span>
+      <button
+        type="submit"
+        form={formId}
+        disabled={disabled}
+        className="flex h-9 items-center gap-2 rounded-full bg-ink px-5 text-[13px] font-medium tracking-tight text-ink-900 transition-colors hover:bg-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {saving && <Spinner className="h-3.5 w-3.5" />}
+        {isNew ? 'Add Product' : 'Done'}
+      </button>
+    </div>
+  )
+}
+
 function ExtraImageThumb({ src, onRemove }: { src: string; onRemove: () => void }) {
   const resolved = useAssetUrl(src)
   return (
@@ -109,34 +162,7 @@ function ExtraImageThumb({ src, onRemove }: { src: string; onRemove: () => void 
   )
 }
 
-// Fades the bottom edge of a scroll port while there's more below it, and stops
-// fading at the end. A permanent fade is decoration; one that comes and goes is
-// the only thing on screen telling you the column moves.
-function useScrollFade<T extends HTMLElement>() {
-  const ref = useRef<T>(null)
-  const [more, setMore] = useState(false)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const update = () => setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 8)
-    update()
-    el.addEventListener('scroll', update, { passive: true })
-    // The port itself resizes with the window; its content resizes as fields
-    // grow — both change whether there's anything below the fold.
-    const observer = new ResizeObserver(update)
-    observer.observe(el)
-    if (el.firstElementChild) observer.observe(el.firstElementChild)
-    return () => {
-      el.removeEventListener('scroll', update)
-      observer.disconnect()
-    }
-  }, [])
-
-  return [ref, more] as const
-}
-
-export default function ProductForm({ item, onSave, onAutosave, onCancel, onDetachExtraction }: ProductFormProps) {
+export default function ProductForm({ item, onSave, onAutosave, onCancel, onDetachExtraction, embedded = false, formId, onAutosaveStateChange }: ProductFormProps) {
   const [form, setForm] = useState<FormState>({
     productImage: item?.productImage ?? '',
     extraImages: item?.extraImages ?? [],
@@ -174,13 +200,26 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
   const [overlayActive, setOverlayActive] = useState(false)
   const [expandedField, setExpandedField] = useState<string | null>(null)
   const [activeSection, setActiveSection] = useState<SectionKey>('identity')
-  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [autosaveState, rawSetAutosaveState] = useState<'idle' | 'saving' | 'saved'>('idle')
+  // The embedded host renders the footer this state belongs on, so it is
+  // reported outward as well as kept. Read through a ref so a parent handing
+  // down a fresh callback each render can't be a dependency of anything.
+  const autosaveListenerRef = useRef(onAutosaveStateChange)
+  autosaveListenerRef.current = onAutosaveStateChange
+  const setAutosaveState = (state: 'idle' | 'saving' | 'saved') => {
+    rawSetAutosaveState(state)
+    autosaveListenerRef.current?.(state)
+  }
   const resolvedAssetUrl = useAssetUrl(form.productImage)
   const displayImage = localPreview ?? resolvedAssetUrl
   const addToast = useAppStore((s) => s.addToast)
 
-  const [fieldsRef, fieldsHaveMore] = useScrollFade<HTMLDivElement>()
-  const [sideRef, sideHasMore] = useScrollFade<HTMLDivElement>()
+  // The field column's scroll port. Only the section spy reads it — the ports
+  // used to wear a mask that faded their bottom edge while there was more
+  // below, and it came off in September 2026 (Massimo's call): a column that
+  // scrolls should look like a column that scrolls.
+  const fieldsRef = useRef<HTMLDivElement>(null)
+  const sideRef = useRef<HTMLDivElement>(null)
   const sectionRefs = useRef<Partial<Record<SectionKey, HTMLDivElement | null>>>({})
 
   // Reload only when the form is pointed at a DIFFERENT product. Deliberately
@@ -613,6 +652,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
 
   return (
     <form
+      id={formId}
       onSubmit={handleSubmit}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -621,38 +661,20 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
       className="relative flex flex-col gap-4 lg:min-h-0 lg:flex-1"
     >
       {overlayActive && <DropOverlay icon={Sparkle} label="Drop image to Auto-fill Product Info" accent="emerald" />}
-      {/* Header — title, what the autosave is doing, and the way out. The
-          primary action lives up here now: as a slab pinned across the field
-          column it read as the bottom of the form, which is exactly why nobody
-          could tell the column scrolled. */}
-      <div className="flex shrink-0 items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <h3 className="text-sm font-semibold tracking-tight text-ink-200">
-            {item ? 'Edit product' : 'New product'}
-          </h3>
-          <span className="flex items-center gap-1.5 text-[11px] text-ink-500">
-            {autosaveState === 'saving' && <><Spinner className="h-3 w-3" />Saving…</>}
-            {autosaveState === 'saved' && <><Check className="h-3 w-3" />Saved</>}
-          </span>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="submit"
-            disabled={saving || isExtracting}
-            className="flex h-9 items-center gap-2 rounded-full bg-ink px-4 text-[13px] font-medium tracking-tight text-ink-900 transition-colors hover:bg-ink-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {saving && <Spinner className="h-3.5 w-3.5" />}
-            {item ? 'Done' : 'Add product'}
-          </button>
-          <button
-            type="button"
-            onClick={handleClose}
-            title="Close · everything is already saved"
-            className="text-ink-500 transition-colors hover:text-ink-300"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+      {/* Header — the title and the way out. Embedded in a modal there is
+          already a title bar above carrying both, so the row goes. */}
+      <div className={`shrink-0 items-center justify-between gap-3 ${embedded ? 'hidden' : 'flex'}`}>
+        <h3 className="min-w-0 truncate text-sm font-semibold tracking-tight text-ink-200">
+          {item ? 'Edit Product' : 'New Product'}
+        </h3>
+        <button
+          type="button"
+          onClick={handleClose}
+          title="Close · everything is already saved"
+          className="shrink-0 text-ink-500 transition-colors hover:text-ink-300"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
 
       {/* Side-by-side: the photos on the left, every field down the right. */}
@@ -662,7 +684,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
             the photo above them is what the right column is describing. */}
         <div
           ref={sideRef}
-          className={`flex w-full shrink-0 flex-col gap-4 md:w-[300px] lg:min-h-0 lg:overflow-y-auto lg:pr-1 ${sideHasMore ? 'scroll-fade-b' : ''}`}
+          className="flex w-full shrink-0 flex-col gap-4 md:w-[300px] lg:min-h-0 lg:overflow-y-auto lg:pr-1"
         >
           {displayImage ? (
             <div className="group/img relative aspect-[3/2] w-full shrink-0 overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] md:aspect-square">
@@ -800,12 +822,17 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
               other axis too, so a card flush against this box had its shadow
               sliced off down both sides and along the bottom — the shadow is
               0/8px offset on a 24px blur, so it needs ~20px of room. The
-              negative margins hand that room back out of the pane's own `p-5`
-              and the 24px gap beside the photo column, which keeps every card
-              at exactly the width and position it had. */}
+              negative margin hands that room back out of the pane's own `p-5`,
+              which keeps every card at exactly the width it had.
+              Vertically it gives back only HALF the parent's gap: it used to
+              take all of it, which put the port's clip edge flush against the
+              jump strip, so a field label scrolling past was sliced by a bar it
+              looked pinned to. Content passes under the strip 6px clear of it
+              now, the way the Ad Analyzer's section toggle sits above its own
+              scroller. */}
           <div
             ref={fieldsRef}
-            className={`min-h-0 flex-1 lg:-mx-5 lg:-mt-3 lg:overflow-y-auto lg:px-5 lg:pt-3 ${fieldsHaveMore ? 'scroll-fade-b' : ''}`}
+            className="min-h-0 flex-1 lg:-mx-5 lg:-mt-1.5 lg:overflow-y-auto lg:px-5 lg:pt-3"
           >
             <div className="flex flex-col gap-3 pb-8">
               {/* One SectionCard per section. This was a left-aligned small-caps
@@ -855,6 +882,21 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
           </div>
         </div>
       </div>
+
+      {/* The bar across the bottom of the form — hidden in the modal, which
+          renders the same component in its own pinned footer. `-mt-2` against
+          the form's own `gap-4`: 16px of empty column above the hairline read
+          as a gap the form had stopped filling. */}
+      {!embedded && (
+        <div className="-mt-2 shrink-0 border-t border-ink/5 pt-4">
+          <ProductFormFooter
+            autosaveState={autosaveState}
+            isNew={!item}
+            saving={saving}
+            disabled={saving || isExtracting}
+          />
+        </div>
+      )}
 
       {expandedField && (
         <ExpandTextModal

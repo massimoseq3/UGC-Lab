@@ -2091,8 +2091,8 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
           <PenLine className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
           <p className="text-sm text-ink-700">
             {copyMode === 'write'
-              ? (writeFormat === 'hooks' ? `Your ${hookCount} hooks will appear here` : 'Your takes will appear here')
-              : copyMode === 'remix' ? 'Your script variations will appear here' : 'Your scene prompts will appear here'}
+              ? (writeFormat === 'hooks' ? `Your ${hookCount} Hooks will appear here` : 'Your Takes will appear here')
+              : copyMode === 'remix' ? 'Your Script Variations will appear here' : 'Your Scene prompts will appear here'}
           </p>
           {error && (
             <div className="mt-2 flex max-w-sm items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2">

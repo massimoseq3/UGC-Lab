@@ -402,7 +402,7 @@ export default function VaultBrowser({
           </button>
           <span className="flex min-w-0 items-center gap-2 pl-1 text-[13px] font-medium text-ink-200">
             {/* Outliers' gold as a literal — the app's `gold-*` family is
-                #38BDF8, which is light blue and belongs to the Products bank. */}
+                #0EA5E9, which is sky blue and belongs to the Products bank. */}
             <FolderOpen className="h-4 w-4 shrink-0 text-[#D9A404] light:text-[#8A6A00]" strokeWidth={1.75} />
             <span className="truncate">{folderName}</span>
           </span>
