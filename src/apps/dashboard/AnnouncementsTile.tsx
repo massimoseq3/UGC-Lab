@@ -54,9 +54,12 @@ export default function AnnouncementsTile({ index, className = '' }: { index: nu
         />
       )}
 
-      {recent.length === 0 ? (
-        <p className="mt-auto pt-4 text-[12px] leading-snug text-ink-500">Nothing new</p>
-      ) : (
+      {/* Empty, this tile is its label and nothing else (September 2026,
+          Massimo's call). It said "Nothing new", which is a sentence spent
+          telling you that the list you are looking at is the length you can
+          already see — and the dot above is what reports news anyway, by
+          being absent. */}
+      {recent.length > 0 && (
         // The log reads LEFT-aligned inside a centred tile: everything else on
         // this wall is a figure or a picture, which centre, and a stack of
         // ragged-both-ends titles is the one thing here that is read rather
