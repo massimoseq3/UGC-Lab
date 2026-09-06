@@ -106,12 +106,16 @@ export default function VoiceStudio() {
   const [pane, setPane] = useState<'editor' | 'settings'>('editor')
   // Behaviour, not layout: where the rail covers the script, opening a read's
   // details has to hand the pane back; beside it, it must not. Keep the number
-  // in step with the `min-[1060px]:` classes below.
+  // in step with the `min-[980px]:` classes below.
   //
-  // 1060 where Scripts uses 980, because this app's settings column is a fixed
-  // 460px rather than 380: the same 280px rail and the same ~320px floor for
-  // the column it sits beside land 80px further out.
-  const railIsColumn = useMinWidth(1060)
+  // The same 980 Scripts uses, deliberately, even though this app's settings
+  // column is a fixed 460px against Scripts' 380 — so the script box here is
+  // ~240px at the threshold where the takes there get ~320. Two numbers were
+  // tried first and the extra 80px put a 994px window (Safari at half a 1080p
+  // screen) on opposite sides of the line in the two apps, which is the one
+  // thing a member reads as a bug rather than as a tight fit. A narrow script
+  // box is a paste target with a one-click escape; no sidebar at all is not.
+  const railIsColumn = useMinWidth(980)
   // Whether the history rail is showing. Persisted, because it is a working
   // preference rather than a per-run state. It opens by default where it can
   // sit BESIDE the script and stays shut where it would cover it — on a phone
@@ -367,7 +371,7 @@ export default function VoiceStudio() {
         <div className={paneClass(pane === 'editor', 'md:flex-1 md:overflow-hidden')}>
           <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex min-h-0 flex-1">
-              {/* From 1060px the rail is a column beside the script; below it
+              {/* From 980px the rail is a column beside the script; below it
                   there is no room for three columns next to a fixed 460px
                   settings panel, so it stands in FRONT of the script — the
                   shape the tab had, and opening a read's details hands the pane
@@ -376,7 +380,7 @@ export default function VoiceStudio() {
                   shape the settings column used when it owned History. */}
               <div
                 className={`relative min-h-0 min-w-0 flex-1 overflow-hidden ${
-                  historyOpen ? 'hidden min-[1060px]:block' : 'block'
+                  historyOpen ? 'hidden min-[980px]:block' : 'block'
                 }`}
               >
                 {/* The rail's one open/shut control, on the seam this column
@@ -408,7 +412,7 @@ export default function VoiceStudio() {
               </div>
 
               {historyOpen && (
-                <div className="flex min-h-0 w-full flex-col border-l border-ink/5 min-[1060px]:w-[280px] min-[1060px]:shrink-0">
+                <div className="flex min-h-0 w-full flex-col border-l border-ink/5 min-[980px]:w-[280px] min-[980px]:shrink-0">
                   <HistoryRail
                     items={history}
                     pending={pendingVoices}

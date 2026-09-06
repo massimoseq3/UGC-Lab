@@ -229,7 +229,7 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onDele
       {/* New leads the rail, above the search — the Ad Analyzer's shape, and
           its band takes the app-wide h-[57px]. The rail's open/shut control is
           the pull tab on the seam (`HistoryRailHandle`), reachable in BOTH
-          states; the Close here renders only below 1060px, where the rail covers
+          states; the Close here renders only below 980px, where the rail covers
           the script and takes that tab with it. */}
       <div className="flex h-[57px] shrink-0 items-center gap-2 border-b border-ink/5 px-3">
         <ClearAllButton
@@ -244,7 +244,7 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onDele
           onClick={onCollapse}
           title="Close history"
           aria-label="Close history"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-100 min-[1060px]:hidden"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-100 min-[980px]:hidden"
         >
           <X className="h-4 w-4" />
         </button>
