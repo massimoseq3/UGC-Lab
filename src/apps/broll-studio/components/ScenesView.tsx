@@ -817,22 +817,23 @@ export default function ScenesView({
           the content already stood off by), which is what keeps scene one clear
           of the bar at scroll-top. Those two numbers move together.
 
-          `bg-surface-0/72` + `backdrop-blur-2xl`, and NO `backdrop-saturate`.
-          Translucent enough to read the storyboard through, blurred hard enough
-          to read as frosted rather than as a dirty window. The saturate was in
-          here for a build and came straight out (Massimo's report): the panel's
-          own left divider is a neutral `border-ink/5` hairline and the bar runs
-          right up against it, so a saturated wash of whatever card is passing
-          underneath put a maroon band against that line and read as the LINE
-          changing colour. Nothing is drawn over the divider — it belongs to the
-          input column and ends one pixel before this bar starts — so the fix is
-          the cast, not the line: a frost that stays neutral leaves the hairline
-          reading as the hairline at every scroll position. The same report
-          asked for less see-through, hence 72% rather than the 55% it shipped
-          at. The opaque `bg-surface-0` under the `supports-` guard is not
-          decoration — with no blur, a translucent band over moving stills is
-          unreadable, so a browser without backdrop-filter gets the solid band.
-          `z-20` so a card's own positioned hover chrome can't paint over it. */}
+          The fill is `.app-backdrop-frost` (index.css), which is the PAGE
+          GRADIENT at 72% and viewport-anchored, over a 40px blur — not a flat
+          token. That distinction is the whole of two bug reports. It shipped as
+          `bg-surface-0/72` and read DARKER than the columns either side of it,
+          and the panel's left divider — a neutral hairline with the page
+          gradient on one side and this band on the other — read as changing
+          colour, "glowing" as saturated cards passed beneath. `index.css`
+          already had the finding written down for the opaque case: a flat token
+          cannot match a radial gradient that moves ~10 units across one bar's
+          width, and at 72% it was still 72% of the wrong colour. Matched to the
+          gradient the bar is pixel-identical to its surroundings at rest, so
+          the divider reads the same above, inside and below the band, and the
+          only thing that ever tints it is the storyboard actually showing
+          through — which is the point. No `backdrop-saturate` for the same
+          reason: saturating whatever card is underneath is what made that wash
+          read as coloured. `z-20` so a card's own positioned hover chrome can't
+          paint over it. */}
       {/* ONE line, at EVERY width: what the storyboard IS on the left, what you
           can do to it on the right (August 2026, Massimo's call).
 
@@ -863,7 +864,7 @@ export default function ScenesView({
           than a width — see the note below, which the flex parent doesn't
           change: with both margins negative the row still resolves to exactly
           the strip's padding box. */}
-      <div className="absolute inset-x-0 top-0 z-20 flex h-[57px] items-center border-b border-ink/5 bg-surface-0 px-5 supports-[backdrop-filter]:bg-surface-0/72 supports-[backdrop-filter]:backdrop-blur-2xl">
+      <div className="absolute inset-x-0 top-0 z-20 flex h-[57px] items-center border-b border-ink/5 app-backdrop-frost px-5">
         {/* NOT `w-full` alongside `-mx-5`: `width: 100%` resolves against the
             strip's CONTENT box, so the port came out 40px narrower than the
             strip and the negative margin then spent all of it on the left —

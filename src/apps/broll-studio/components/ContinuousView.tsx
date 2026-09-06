@@ -1200,20 +1200,22 @@ export default function ContinuousView({
           the scroll port, not a `sticky` child inside it: see the note on the
           Line-by-Line strip for why (a glass sticky bar lagged its own
           scroller on the way back up and read as coming loose). It never
-          scrolled away. It is an ABSOLUTE overlay now, like its Line-by-Line
-          twin — read that strip's note for the three shapes this went through
-          and why absolute is the one that gets both halves (no lag, and the
-          storyboard actually passing under it blurred).
+          scrolled away. It is an ABSOLUTE overlay now — read the Line-by-Line
+          strip's note for the three shapes this went through, why absolute is
+          the one that gets both halves (no lag, and the storyboard actually
+          passing under it blurred), and what `.app-backdrop-frost` is.
 
-          `md:h-[57px]` is the twin's height, so the two tabs of one panel dress
-          the same band the same way and both line up with the History rail's
-          own 57px across the seam. It is only pinned from `md`, because below
-          that this strip's pills WRAP — it is the wider of the two rows, four
-          pills against the other's three — and a stated height would clip the
-          second line. That is also why the scroll port's top inset is
-          breakpoint-matched: `pt-5` below `md`, where the strip is back in
-          normal flow, and `md:pt-[77px]` above it. Those numbers move with the
-          height. */}
+          It IS that strip now, in every respect (September 2026, Massimo's
+          call): same `h-[57px]`, same one-line `w-max min-w-full` scroller,
+          same style-pill-left / actions-right split. It was a CENTRED row that
+          WRAPPED below `md`, which is what "the buttons got mangled" was — four
+          centred pills read as a different control from the three the other tab
+          lays out, and the wrap forced a `md:` fork on the height and on the
+          scroll port's inset that this shape simply doesn't need. Nothing on
+          the line shrinks and the line itself scrolls, so a stated 57px is safe
+          at every width and the port's `pt-[77px]` (57 + the 20px the content
+          already stood off by) is unconditional. Those two numbers move
+          together. */}
       {/* The strip is the BATCH BUTTONS and nothing else, centred. The meta
           pills used to share the line and lost the squeeze to buttons that
           can't shrink, painting over the first of them on a narrow window; they
@@ -1228,7 +1230,7 @@ export default function ContinuousView({
           This strip was left as it was because its actions are a different set;
           bringing it across is the obvious follow-up, and until then the two
           tabs of one panel do dress the same job two ways. */}
-      <div className="relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 bg-surface-0 px-5 py-3.5 supports-[backdrop-filter]:bg-surface-0/72 supports-[backdrop-filter]:backdrop-blur-2xl md:absolute md:inset-x-0 md:top-0 md:h-[57px] md:py-0">
+      <div className="app-backdrop-frost absolute inset-x-0 top-0 z-20 flex h-[57px] items-center border-b border-ink/5 px-5">
         {/* One CENTRED line that scrolls when the pills outrun the panel. The
             `w-max min-w-full` shape is what allows both: at `min-w-full` the row
             is exactly the port when it fits (so centring does the work) and
@@ -1245,13 +1247,36 @@ export default function ContinuousView({
             port spans the strip and `px-5` puts both ends back on the panel's
             own inset. Invisible while the row was centred (it just shifted the
             centre 20px left); it shows the moment anything is right-aligned. */}
-        <div className="-mx-5 overflow-x-auto scrollbar-hide px-5">
+        <div className="-mx-5 min-w-0 flex-1 overflow-x-auto scrollbar-hide px-5">
         {/* The generate steps are ONE tinted family in graded depths, lightest
-            first — the same ramp as the Line-by-Line strip, so the two tabs of
-            one panel don't dress the same job two ways. Download clips stays
-            neutral: it's the export, not a generate step, and it spends
-            nothing. */}
-        <div className="flex w-full flex-wrap items-center justify-center gap-2 md:w-max md:min-w-full md:flex-nowrap md:whitespace-nowrap">
+            first. The lighter step is `/[0.12]` rather than the `/[0.05]` it
+            carried: on a 38px pill against a frosted bar that fill was a ghost,
+            which is the other half of "mangled" — a button that looks disabled
+            is a button nobody presses. It still sits a clear step under the
+            videos pass, which is what the ramp is for. Download clips is green
+            (see the note on it): it's the export, not a generate step. */}
+        <div className="flex w-max min-w-full flex-nowrap items-center gap-2 whitespace-nowrap">
+          {/* The look every clip renders in — LEADING the line, exactly as on
+              the Line-by-Line strip, at the batch pills' own size. It came up
+              out of the meta caption under the separator, where it was the one
+              control in a row of read-only pills and a different size from
+              every button it belongs with. `shrink-0` like everything else on
+              the line, with the NAME capped instead: a custom style can be
+              titled anything, and an uncapped one would push the batch buttons
+              off the end of a bar that fits. */}
+          <button
+            type="button"
+            onClick={onChangeStyle}
+            title="Change the look every clip renders in"
+            className="inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 text-[12px] font-semibold tracking-tight text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
+          >
+            <Palette className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+            <span className="max-w-[180px] truncate">{style.label}</span>
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60" strokeWidth={2.5} />
+          </button>
+          {/* Holds the two ends apart while there is room, and disappears the
+              moment there isn't — `flex-1` contributes nothing to `w-max`. */}
+          <span className="flex-1" aria-hidden />
           <button
             type="button"
             onClick={() => requestFrames()}
@@ -1259,7 +1284,7 @@ export default function ContinuousView({
             // card rendering on its own doesn't, so the two can overlap.
             disabled={chainRunning}
             title="Generate a keyframe image for every frame that doesn't have one yet"
-            className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-broll-500/15 bg-broll-500/[0.05] px-3.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/30 hover:bg-broll-500/[0.12] disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-broll-500/30 bg-broll-500/[0.12] px-3.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {chainRunning ? <Spinner className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
             {chainRunning
@@ -1297,38 +1322,30 @@ export default function ContinuousView({
         </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-5 pb-4 pt-5 md:pt-[77px]">
+      <div className="flex-1 overflow-y-auto px-5 pb-4 pt-[77px]">
       {/* The storyboard's caption — scene count, look, running time, and how
           many keyframes are picked. Below the separator rather than in the bar
           above it: up there it was what squeezed the batch buttons off their own
           line.
 
-          The look is the one item here that IS a control (August 2026): it left
-          the input column, where it was a required row asking for a decision
-          before a single frame existed, and became the pill in front of the
-          frames it applies to — accent-tinted, unlike the neutral meta pills
-          beside it, because it's the one you can press. An unpicked session
-          folds to the mode default rather than blocking Generate. The read-only
-          meta stays desktop-only as it has been; the pill doesn't, since a phone
-          would otherwise have no way to change the look but a card modal. It
-          spells out `uppercase` because preflight resets `text-transform` on a
-          <button>, so the row's own class stops reaching it once it's pressable. */}
+          It is READ-ONLY now. The look was the one control in here — it left
+          the input column in August, where it was a required row asking for a
+          decision before a single frame existed, and landed in this caption as
+          the pill in front of the frames it applies to. It has moved once more
+          (September 2026) up into the batch strip, where its Line-by-Line twin
+          already sat: a control at 11px in a row of read-only meta was both the
+          wrong size for a button and the wrong company for one. Nothing else
+          here is pressable, so the row can go back to being a caption.
+
+          It stays desktop-only, as it always has been — and that no longer
+          strands a phone, because the strip the pill moved to is the one thing
+          on this panel that renders at every width. */}
       <div className="mb-8 flex min-w-0 max-w-full flex-wrap items-center justify-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-ink-400">
         {/* Scene count matches the per-line storyboard's — small-caps and dim,
             the same eyebrow treatment as the pills beside it. */}
         <span className="hidden font-semibold text-ink-500 md:inline">
           {result.scenes.length} {result.scenes.length === 1 ? 'Scene' : 'Scenes'}
         </span>
-        <button
-          type="button"
-          onClick={onChangeStyle}
-          title="Change the look every clip renders in"
-          className="inline-flex min-w-0 items-center gap-1 rounded-full border border-broll-500/25 bg-broll-500/10 px-2 py-0.5 text-[11px] font-semibold tracking-tight text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
-        >
-          <Palette className="h-3 w-3 shrink-0" strokeWidth={2} />
-          <span className="truncate">{style.label}</span>
-          <ChevronRight className="h-3 w-3 shrink-0 opacity-70" strokeWidth={2.5} />
-        </button>
         <span className="hidden rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300 md:inline">~{totalSeconds}s</span>
         <span className="hidden rounded-full border border-ink/10 bg-ink/[0.04] px-2 py-0.5 text-[10px] text-ink-300 md:inline">{framesPicked}/{result.frames.length} keyframes picked</span>
       </div>
