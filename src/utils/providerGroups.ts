@@ -10,9 +10,11 @@ import type { ModelEntry } from './models'
 // in modelPalette.tsx so that file exports components only (react-refresh).
 
 // The one exception to alphabetical: a provider listed here sinks to the
-// bottom. Alibaba Tongyi is a single model (Wan 2.7) and the letter A was
-// putting it above every provider anyone actually reaches for. This is a tail,
-// not a ranking — keep it to providers that are genuinely a footnote.
+// bottom. Alibaba Tongyi is two speed tiers of one model (Wan 3.0 and 3.0
+// Prime — it was a single Wan 2.7 row when this was written) and the letter A
+// was putting it above every provider anyone actually reaches for. This is a
+// tail, not a ranking — keep it to providers that are genuinely a footnote,
+// and drop the entry if Alibaba ever becomes one of them.
 const TAIL_PROVIDERS = ['Alibaba Tongyi']
 
 export function sortProviders(providers: string[]): string[] {

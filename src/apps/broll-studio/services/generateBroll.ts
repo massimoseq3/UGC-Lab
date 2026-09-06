@@ -852,7 +852,8 @@ const TAG_BRIEFS: Record<VariationTag, string> = {
 }
 
 /**
- * Generate a new prompt variation for a scene using Gemini 3 Flash.
+ * Generate a new prompt variation for a scene, on whatever model this app's
+ * picker has resolved to (see resolveScriptModel).
  */
 export async function generateNewVariation(
   sceneNumber: number,
