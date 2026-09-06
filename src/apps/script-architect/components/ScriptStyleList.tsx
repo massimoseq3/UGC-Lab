@@ -58,7 +58,7 @@ export default function ScriptStyleList({
         return (
           <div key={group} className="flex flex-col gap-2">
             <div className="px-1">
-              <div className="text-[11px] font-semibold uppercase tracking-widest text-ink-500">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">
                 {WRITE_STYLE_GROUP_META[group].label}
               </div>
               <div className="mt-0.5 text-[11px] leading-snug text-ink-600">

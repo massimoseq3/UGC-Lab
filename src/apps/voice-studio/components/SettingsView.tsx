@@ -11,7 +11,7 @@ import SectionCard, { SectionPresetPill, StatusDot } from '../../../components/S
 // settings now sit inside titled section cards, and a 13px sentence-case label
 // under a 13px card title reads as two competing headings. Slider carries the
 // same class on its own label — keep the two in step.
-const SETTING_LABEL = 'text-[11px] font-medium uppercase tracking-widest text-ink-300'
+const SETTING_LABEL = 'text-[11px] font-medium uppercase tracking-wider text-ink-300'
 
 interface SettingsViewProps {
   settings: VoiceSettings
