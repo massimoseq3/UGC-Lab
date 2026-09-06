@@ -797,6 +797,96 @@ textarea,
   background-image: radial-gradient(circle farthest-corner at 0% 0%, #ffffff 0%, #f6f6f7 45%, #e9e9eb 100%);
 }
 
+/* The same idea for a bar you can SEE THROUGH — B-Roll's two storyboard strips,
+   which are absolute overlays with the storyboard scrolling under them.
+
+   It shipped for a build as `bg-surface-0/72` and drew the exact complaint the
+   note above already predicted: the band read DARKER than the columns either
+   side of it, and the panel's left divider — a neutral hairline with the page
+   gradient on one side and this token on the other — read as changing colour,
+   "glowing" as saturated cards passed beneath. A flat token cannot match a
+   radial gradient that moves ~10 units across one bar's width, and at 72% it
+   was still 72% of the wrong colour.
+
+   So the tint is the page gradient itself, at alpha, `fixed` to the viewport
+   exactly as `.app-backdrop-fill` and the canvas are. At rest the bar is
+   pixel-identical to what surrounds it and the divider reads the same above,
+   inside and below the band; the remaining 28% is the blurred storyboard, which
+   is the whole point of the overlay — 10% of it at the alpha this settled on,
+   which is enough for a card passing underneath to TINT the bar while the bar
+   stays firmly a dark pane rather than turning into the card. It was walked
+   down to 45% and back up through 68% and 82% to get here: the tint is meant
+   to be felt, not read. Don't push it much further — past ~0.95 the bar is
+   opaque for all practical purposes and the overlay stops earning the blur it
+   costs; if it ever needs to go there, make it `.app-backdrop-fill` and drop
+   the pseudo-element with it. Alpha is free to move:
+   at rest the tint IS the backdrop, so every value paints exactly the same
+   colour and only the scrolled case changes — there is no seam to reintroduce
+   by tuning it. No `saturate` anywhere: saturating whatever card is
+   under there is what turned that wash coloured in the first place.
+
+   No backdrop-filter (older Safari, some Linux GTK builds) means no blur, and a
+   translucent band over moving stills is unreadable — so the fallback is the
+   opaque `.app-backdrop-fill` gradient. Alpha only rides in under `@supports`.
+
+   Keep the stops in step with `.app-backdrop-fill` above and with
+   `GRADIENT_STOPS` / `MID_STOP` in `components/AppBackground.tsx` — one design
+   in three places now. */
+.app-backdrop-frost {
+  background-color: var(--color-surface-0);
+  background-image: radial-gradient(circle farthest-corner at 0% 0%, #1f1f22 0%, #09090b 45%, #000000 100%);
+  background-attachment: fixed;
+}
+[data-theme="light"] .app-backdrop-frost {
+  background-image: radial-gradient(circle farthest-corner at 0% 0%, #ffffff 0%, #f6f6f7 45%, #e9e9eb 100%);
+}
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  /* The blur goes on a PSEUDO-ELEMENT, never on the bar itself, and that is
+     load-bearing rather than tidy. `backdrop-filter` makes an element a
+     containing block for fixed-position descendants, and both engines apply the
+     same rule to that element's OWN `background-attachment: fixed` — the
+     positioning area stops being the viewport and becomes the element's border
+     box. Put the two on one element and the whole radial gradient is squeezed
+     into a 57px band instead of being a 57px window onto a viewport-sized one,
+     which is a different colour by construction: it read as a pale strip, and
+     the neutral hairline down its left edge lost the contrast it has everywhere
+     else on that line, so the divider looked thinner inside the band than below
+     it. Split across two boxes, the tint anchors to the viewport as intended and
+     the frost still samples what is behind. `z-index: -1` puts the pseudo behind
+     its own parent's background — the callers all carry a `z-` class, so the bar
+     is its own stacking context and the pseudo cannot escape it. */
+  .app-backdrop-frost {
+    background-color: transparent;
+    background-image: radial-gradient(
+      circle farthest-corner at 0% 0%,
+      rgb(31 31 34 / 0.9) 0%,
+      rgb(9 9 11 / 0.9) 45%,
+      rgb(0 0 0 / 0.9) 100%
+    );
+  }
+  .app-backdrop-frost::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    /* 30px. This walked down from 40 and back up through 10 and 18, and the
+       walk is the point: the first pass down was really chasing the squeezed
+       gradient above — a pale band makes any blur look like smear. With the
+       tint painting the right colour the blur can be heavy again, and heavy is
+       what reads as thick glass rather than as a dirty window. */
+    -webkit-backdrop-filter: blur(30px);
+    backdrop-filter: blur(30px);
+  }
+  [data-theme="light"] .app-backdrop-frost {
+    background-image: radial-gradient(
+      circle farthest-corner at 0% 0%,
+      rgb(255 255 255 / 0.9) 0%,
+      rgb(246 246 247 / 0.9) 45%,
+      rgb(233 233 235 / 0.9) 100%
+    );
+  }
+}
+
 /* A floor, not a size: nothing on a phone renders SMALLER than the app's own
    field type (13px, what a ChipField or a prompt box wears on a desktop), and
    nothing renders bigger than it either. The rule only lifts the 11–12px
