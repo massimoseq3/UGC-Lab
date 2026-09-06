@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type SyntheticEvent } from 'react'
 import { isAssetRef, getUrl, peekUrl } from '../utils/assetStore'
 import { capturePoster, getPosterUrl, getStillThumbUrl, isThumbMissing, peekThumbUrl } from '../utils/mediaThumbs'
 
@@ -113,32 +113,43 @@ export function useAssetThumb(ref: string | undefined | null): { url: string | u
 }
 
 /**
- * A clip's POSTER frame (`utils/mediaThumbs`), for the <video>'s `poster` and
- * for the picture a tile keeps showing after it has released the clip itself.
- * `url` is undefined until one has been captured on this browser; wire
- * `capture` to the <video>'s `onLoadedData` and the first time the tile has a
- * decoded frame it becomes the poster, for good.
+ * A clip's POSTER frame (`utils/mediaThumbs`): the picture a grid tile IS at
+ * rest, the `poster` its `<video preload="none">` wears, and what the tile
+ * keeps showing after it has released the clip itself. Resolved from the
+ * thumbs store, or made off the clip through mediaThumbs' poster queue the
+ * first time this browser asks. `capture` is a bonus path — wire it to the
+ * <video>'s `onLoadedData` and a clip that gets played before its queued
+ * poster lands hands its frame over on the spot.
+ *
+ * `status` is what a tile renders while `url` is empty: `loading` means one is
+ * on its way (show the busy face), `missing` means this clip could not be
+ * decoded here and no poster will come (the tile lets the element try a frame
+ * of its own instead).
  *
  * Gate the ref on the tile having been SEEN, never on `near`: the poster is
  * small and holds no decoder, so it is exactly the thing that should survive
  * the release.
  */
+export type PosterStatus = 'idle' | 'loading' | 'ready' | 'missing'
+
 export function useAssetPoster(ref: string | undefined | null): {
   url: string | undefined
+  status: PosterStatus
   capture: (video: HTMLVideoElement) => void
 } {
   const [entry, setEntry] = useState<{ ref: string; url: string | undefined }>()
   const isAsset = !!ref && isAssetRef(ref)
   const peeked = isAsset ? peekThumbUrl(ref) : undefined
+  const knownMissing = isAsset && !peeked && isThumbMissing(ref)
 
   useEffect(() => {
-    if (!isAsset || peeked) return
+    if (!isAsset || peeked || knownMissing) return
     let cancelled = false
     getPosterUrl(ref!).then((resolved) => {
       if (!cancelled) setEntry({ ref: ref!, url: resolved ?? undefined })
     })
     return () => { cancelled = true }
-  }, [ref, isAsset, peeked])
+  }, [ref, isAsset, peeked, knownMissing])
 
   const capture = (video: HTMLVideoElement) => {
     if (!isAsset || peeked) return
@@ -148,6 +159,43 @@ export function useAssetPoster(ref: string | undefined | null): {
     })
   }
 
-  const url = !isAsset ? undefined : peeked ?? (entry && entry.ref === ref ? entry.url : undefined)
-  return { url, capture }
+  if (!isAsset) return { url: undefined, status: 'idle', capture }
+  if (peeked) return { url: peeked, status: 'ready', capture }
+  if (entry && entry.ref === ref) return { url: entry.url, status: entry.url ? 'ready' : 'missing', capture }
+  return { url: undefined, status: knownMissing ? 'missing' : 'loading', capture }
+}
+
+export type PosterState = ReturnType<typeof useAssetPoster>
+
+/**
+ * The attributes every clip tile's `<video>` takes, spread after its player
+ * props: `preload="none"` wearing the poster, so a wall of clips holds NO
+ * decoder until one is hovered or played (Safari parks every decoder past a
+ * handful, and a parked element never paints — see docs/performance.md). A
+ * clip no poster will ever come for (`'missing'`) is asked for a frame of its
+ * own instead: `metadata` plus a `#t=0.1` fragment, the one combination that
+ * makes Safari decode and paint a frame without playing.
+ */
+export function posterVideoProps(url: string, poster: PosterState): {
+  src: string
+  poster: string | undefined
+  preload: 'none' | 'metadata'
+  onLoadedData: (e: SyntheticEvent<HTMLVideoElement>) => void
+} {
+  const posterless = poster.status === 'missing'
+  return {
+    src: posterless ? `${url}#t=0.1` : url,
+    poster: poster.url,
+    preload: posterless ? 'metadata' : 'none',
+    onLoadedData: (e) => poster.capture(e.currentTarget),
+  }
+}
+
+/**
+ * True while the clip is mounted but its poster is still on its way: a
+ * `preload="none"` element paints nothing until it's played, so the tile shows
+ * its busy face OVER the element until the picture lands.
+ */
+export function posterPending(poster: PosterState): boolean {
+  return !poster.url && poster.status === 'loading'
 }

@@ -4,7 +4,7 @@ import { CornerDownLeft,
 } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import { useBankStore } from '../../../stores/bankStore'
-import { useAssetUrlState, useAssetUrl, useAssetThumb, useAssetPoster } from '../../../hooks/useAssetUrl'
+import { useAssetUrlState, useAssetUrl, useAssetThumb, useAssetPoster, posterVideoProps, posterPending } from '../../../hooks/useAssetUrl'
 import { useInlineVideo, useExclusiveVideo } from '../../../hooks/useInlineVideo'
 import { useAppStore } from '../../../stores/appStore'
 import { getUrl } from '../../../utils/assetStore'
@@ -544,21 +544,13 @@ function HistoryListRow({
       <div className="relative min-w-0 flex-[3] bg-black light:bg-[#EAEAEC]" style={{ aspectRatio: frameAspect }}>
         {status === 'ready' && url ? (
           entry.kind === 'video' ? (
-            // `#t=0.1` is load-bearing, not decoration: with `preload="metadata"`
-            // Safari fetches the duration and dimensions but decodes no frame, so
-            // the element painted as an empty black box — the clip was there and
-            // invisible until you pressed play, while the grid tiles (which
-            // autoplay muted on hover) looked fine. The media fragment makes it
-            // seek to 0.1s, which forces that frame to decode and show. Same fix
-            // as B-Roll's history CoverTile.
+            // `preload="none"` wearing its poster (posterVideoProps), like the
+            // grid tile: a list of clips holds no decoder until one is played.
             <video
               {...rowVideo}
-              src={`${url}#t=0.1`}
-              poster={poster.url}
-              onLoadedData={(e) => poster.capture(e.currentTarget)}
+              {...posterVideoProps(url, poster)}
               controls
               playsInline
-              preload="metadata"
               className="absolute inset-0 h-full w-full object-contain"
             />
           ) : (
@@ -577,9 +569,16 @@ function HistoryListRow({
           <img src={poster.url} alt="" decoding="async" className="absolute inset-0 h-full w-full object-contain" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
-            {status === 'loading'
+            {status === 'loading' || (entry.kind === 'video' && poster.status === 'loading')
               ? <Spinner className="h-6 w-6 text-ink-600" />
               : entry.kind === 'video' ? <Film className="h-7 w-7 text-ink-700" /> : <ImageIcon className="h-7 w-7 text-ink-700" />}
+          </div>
+        )}
+        {/* The clip before its poster: nothing paints until it's played, so
+            the busy face sits over the controls until the picture lands. */}
+        {entry.kind === 'video' && status === 'ready' && !!url && posterPending(poster) && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <Spinner className="h-6 w-6 text-ink-600" />
           </div>
         )}
       </div>
@@ -829,15 +828,19 @@ function VideoTile({
   onCopyPrompt: () => void
   onReuse?: () => void
 }) {
-  // Off-window tiles hold no clip: a <video> each is a blob in memory and a
-  // decoder, and the browser runs out of the second long before this list does.
-  // Safe to release because the tile's height is `ratio`, not the clip's.
+  // Off-window tiles hold no clip: a <video> each is a blob in memory, and the
+  // element goes with the tile when it scrolls well clear. Safe to release
+  // because the tile's height is `ratio`, not the clip's.
   const { ref: tileRef, near, seen } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: true })
   const { url, status } = useAssetUrlState(near ? item.videoUrl : null)
-  // The poster is keyed on SEEN, not near: it's the picture the tile keeps once
-  // the clip is released, and the one the <video> wears until its first frame
-  // decodes when the clip comes back — so releasing is invisible.
+  // The poster is keyed on SEEN, not near: it's the picture the tile IS at
+  // rest, the one it keeps once the clip is released, and the one the <video>
+  // wears until its first frame decodes — so releasing is invisible.
   const poster = useAssetPoster(seen ? item.videoUrl : null)
+  const showVideo = status === 'ready' && !!url
+  // Something is on its way: the clip itself, or the poster the tile shows
+  // until it's hovered. A tile nobody has scrolled near yet is neither.
+  const busy = status === 'loading' || posterPending(poster)
   // Hover-autoplay must stay muted (browsers block unmuted autoplay), but an
   // explicit Play click is a user gesture and plays in place with sound — and
   // stops whatever clip was playing elsewhere in the app.
@@ -858,12 +861,18 @@ function VideoTile({
         }`}
         style={ratio}
       >
-        {status === 'ready' && url ? (
+        {/* `preload="none"` wearing its poster (posterVideoProps), on purpose
+            and load-bearing: a wall of clips holds NO decoder until one is
+            hovered or played. Mounted as `metadata`, every tile near the window
+            opened its own decoder in the same tick, and Safari — which runs a
+            handful and parks the rest — left the parked ones black and brought
+            the others in one at a time. The poster is what the tile shows;
+            `play()` on hover loads the clip from a blob already in memory, and
+            the poster stays up until its first frame lands. */}
+        {showVideo ? (
           <video
             {...inline.videoProps}
-            src={url}
-            poster={poster.url}
-            onLoadedData={(e) => poster.capture(e.currentTarget)}
+            {...posterVideoProps(url, poster)}
             className={`h-full w-full object-cover transition-opacity ${
               selecting && !selected ? 'opacity-60 group-hover:opacity-100' : ''
             }`}
@@ -879,9 +888,17 @@ function VideoTile({
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
-            {status === 'loading'
+            {busy
               ? <Spinner className="h-5 w-5 text-ink-500" />
               : <Film className="h-6 w-6 text-ink-700" />}
+          </div>
+        )}
+        {/* The clip is here before its poster: the element paints nothing
+            until it's played, so the busy face sits over it until the picture
+            lands. */}
+        {showVideo && posterPending(poster) && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <Spinner className="h-5 w-5 text-ink-500" />
           </div>
         )}
 

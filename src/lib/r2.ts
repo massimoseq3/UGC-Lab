@@ -5,6 +5,7 @@
 
 import { getSupabase, isCloudEnabled, ensureFreshSession, forceRefreshSession } from './supabase'
 import { useAuthStore } from '../stores/authStore'
+import { makeConcurrencyGate } from '../utils/concurrencyGate'
 
 interface SignedUrlResponse {
   url: string
@@ -365,28 +366,8 @@ const MAX_CONCURRENT_DOWNLOADS = 4
 
 // The upload path above keeps its own hand-rolled copy of this, deliberately
 // untouched: it works, and rewriting a proven queue to share a helper is risk
-// spent for no behaviour change.
-function makeConcurrencyGate(max: number) {
-  let active = 0
-  const queue: Array<() => void> = []
-  return {
-    acquire(): Promise<void> {
-      if (active < max) {
-        active++
-        return Promise.resolve()
-      }
-      return new Promise<void>((resolve) => { queue.push(resolve) })
-    },
-    release(): void {
-      const next = queue.shift()
-      // Hand the slot straight over rather than decrementing and re-incrementing
-      // — the count is unchanged because it never actually goes idle.
-      if (next) next()
-      else active--
-    },
-  }
-}
-
+// spent for no behaviour change. The gate itself lives in `utils/concurrencyGate`
+// since September 2026, because `mediaThumbs` needed the same shape.
 const downloadGate = makeConcurrencyGate(MAX_CONCURRENT_DOWNLOADS)
 
 export async function downloadAssetFromR2(assetId: string): Promise<Blob | null> {

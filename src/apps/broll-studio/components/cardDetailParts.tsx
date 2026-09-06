@@ -22,7 +22,7 @@ import { ImageTile as RefImageTile, AddTile } from '../../../components/video/re
 import { SectionLabel } from '../../../components/SectionCard'
 import type { CardState, ReferenceImage } from '../types'
 import type { BRoll, AnyBankItem } from '../../../stores/types'
-import { useAssetUrlState, useAssetUrl } from '../../../hooks/useAssetUrl'
+import { useAssetUrlState, useAssetUrl, useAssetPoster, posterVideoProps, posterPending } from '../../../hooks/useAssetUrl'
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { getUrl } from '../../../utils/assetStore'
 import { startOfDay, sectionLabel } from '../../../utils/history'
@@ -447,6 +447,7 @@ function VideoTile({
   onCopyPrompt: () => void
 }) {
   const url = useAssetUrl(videoRef)
+  const poster = useAssetPoster(videoRef)
   // Hover autoplays muted (browsers block unmuted autoplay); the Play button
   // is a user gesture, so it plays with sound — and only one clip in the app
   // plays at a time.
@@ -467,9 +468,10 @@ function VideoTile({
       style={ratio}
     >
       {url ? (
-        <video {...inline.videoProps} src={url} className="h-full w-full object-cover" />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center">
+        <video {...inline.videoProps} {...posterVideoProps(url, poster)} className="h-full w-full object-cover" />
+      ) : null}
+      {(!url || posterPending(poster)) && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <Spinner className="h-5 w-5 text-ink-500" />
         </div>
       )}
@@ -584,12 +586,17 @@ export function PendingMediaTile(props: GeneratingMediaProps & { aspectRatio?: s
 // Line-by-Line.
 export function ModalVideoPlayer({
   url,
+  videoRef,
   children,
   actions,
   className = 'border-ink/10',
   onClick,
 }: {
   url: string | null | undefined
+  // The clip's asset ref, for its poster (utils/mediaThumbs) — `url` is the
+  // resolved object URL and can't be looked up. Without it the element decodes
+  // its own first frame, the way it did before posters.
+  videoRef?: string | null
   children?: React.ReactNode
   // The hover action column, kept a separate slot from `children` so a caller
   // can position it against the badges. Both stay on screen while the clip
@@ -603,6 +610,7 @@ export function ModalVideoPlayer({
 }) {
   const inline = useInlineVideo()
   const { hovering, unmuted, togglePlay, toggleMute } = inline
+  const poster = useAssetPoster(videoRef ?? null)
   return (
     <div
       {...inline.hoverProps}
@@ -612,12 +620,14 @@ export function ModalVideoPlayer({
       {url ? (
         <video
           {...inline.videoProps}
-          src={url}
-          preload="metadata"
+          {...(videoRef ? posterVideoProps(url, poster) : { src: url, preload: 'metadata' as const })}
           className="aspect-[9/16] w-full object-cover"
         />
       ) : (
         <div className="flex aspect-[9/16] w-full items-center justify-center"><Spinner className="h-4 w-4 text-white/40" /></div>
+      )}
+      {url && posterPending(poster) && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center"><Spinner className="h-4 w-4 text-white/40" /></div>
       )}
       {url && (
         <button

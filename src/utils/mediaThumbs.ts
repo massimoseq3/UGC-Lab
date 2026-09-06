@@ -19,20 +19,34 @@
 // is still what every download, lightbox and generation input reads, through
 // `getUrl` as before. Only the picture on the tile changed.
 //
-// Clips get the same treatment as a POSTER: the first frame, grabbed off the
-// tile's own <video> the first time it has one (no second decoder is opened for
-// it) or off a hidden element at save time. A video tile RELEASES its clip when
-// it scrolls well clear of the window — a <video> is a decoder, and the browser
-// has far fewer of those than a member has clips — and until now a released
-// tile was a black box. It shows its poster instead, and the <video> that
-// comes back wears the same poster until its first frame decodes, so a clip
-// leaving and returning is never seen as anything but its picture.
+// Clips get the same treatment as a POSTER: the first frame, made off a hidden
+// element at save time, or — for a clip this browser has never had a poster for
+// (generated before posters existed, or pulled down from R2 on a second device)
+// — the first time a tile asks for it, through `posterGate`. It used to wait
+// for the tile's own <video> to decode a frame and grab that, which sounds free
+// and wasn't: the grid mounted a <video> for every tile near the window, Safari
+// runs a handful of decoders and parks the rest, and a parked element never
+// fires `loadeddata` — so the tiles it parked stayed black, with no poster to
+// fall back to, and the ones it did decode arrived one at a time (September
+// 2026, Massimo's recording). The queue is what makes a first look at a fresh
+// browser fill in order at a steady pace instead: two hidden decoders at a
+// time, oldest ask first, each result kept on disk so it is paid for once.
+//
+// The other half of that fix is on the tile: a grid <video> is
+// `preload="none"` and wears its poster, so a wall of clips holds NO decoder
+// until one is hovered or played. `capturePoster` off the tile's own element
+// still exists and is still wired, as a bonus for a clip that gets played
+// before its queued poster lands. A video tile RELEASES its clip when it
+// scrolls well clear of the window and shows the poster instead; the <video>
+// that comes back wears the same poster until its first frame decodes, so a
+// clip leaving and returning is never seen as anything but its picture.
 //
 // Its own database rather than a second store in the assets one: bumping that
 // DB's version blocks while another tab holds the old one open, and a blocked
 // upgrade there would take every asset read down with it for a thumbnail.
 // A missing thumbnail costs nothing but a regeneration.
 import { assetIdFromRef, getBlob, isAssetRef } from './assetStore'
+import { makeConcurrencyGate } from './concurrencyGate'
 
 // Long edge of a still thumbnail and of a poster frame. A grid tile is ~150–300
 // CSS px wide and a list row's media column ~500 on a half pane, both on 2x
@@ -46,6 +60,21 @@ const DB_VERSION = 1
 const STORE_NAME = 'thumbs'
 const DB_OPEN_TIMEOUT_MS = 10_000
 const POSTER_LOAD_TIMEOUT_MS = 15_000
+const POSTER_SEEK_TIMEOUT_MS = 3_000
+// The frame a poster is taken from. Not 0: several encoders (and Safari on
+// most of them) hand back a black or half-decoded first frame at t=0, which
+// is exactly the picture that would then sit on the tile for good.
+const POSTER_AT_SECONDS = 0.1
+
+// How many thumbnails / posters are MADE at once. Generation is the expensive
+// half — a full-size decode for a still, a whole hidden <video> for a clip —
+// and a fresh browser scrolling a gallery asks for a window's worth in one
+// tick. Two hidden decoders is what Safari keeps running without parking one;
+// three still decodes are enough to stay ahead of a scroll without stalling
+// the main thread, where WebKit does its `createImageBitmap` work. Reads of a
+// thumbnail that already exists are NOT gated — those are an IndexedDB get.
+const posterGate = makeConcurrencyGate(2)
+const stillGate = makeConcurrencyGate(3)
 
 interface StoredThumb {
   id: string
@@ -161,6 +190,11 @@ export function isThumbMissing(ref: string): boolean {
 }
 
 function remember(id: string, blob: Blob): string {
+  // Two roads can arrive with a poster for one id — the queued generation and
+  // a `capturePoster` off a tile that got played first. Whoever is second
+  // keeps the URL already on the tile rather than swapping it for a twin.
+  const known = thumbUrls.get(id)
+  if (known) return known
   const url = URL.createObjectURL(blob)
   thumbUrls.set(id, url)
   missing.delete(id)
@@ -182,7 +216,14 @@ async function encodeFrame(source: CanvasImageSource, w: number, h: number): Pro
   // JPEG: no alpha, but a generated still or a video frame has none either, and
   // a JPEG is a fifth the bytes of the same picture as PNG — bytes that are read
   // back off disk on every fresh mount of a gallery.
-  if (typeof OffscreenCanvas !== 'undefined') {
+  //
+  // A VIDEO frame always goes through a DOM canvas. WebKit's OffscreenCanvas
+  // does not take an HTMLVideoElement as a source (it throws, or draws
+  // nothing, depending on the version) — and since every failure here is
+  // swallowed into "no poster", Safari quietly never had a poster for any clip.
+  // An ImageBitmap is fine either way, and OffscreenCanvas keeps that encode
+  // off the main thread where the browser can.
+  if (typeof OffscreenCanvas !== 'undefined' && !(source instanceof HTMLVideoElement)) {
     const canvas = new OffscreenCanvas(w, h)
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
@@ -234,9 +275,11 @@ function frameFromVideo(video: HTMLVideoElement): Promise<Blob | null> {
   return encodeFrame(video, size.w, size.h)
 }
 
-// A poster off a clip that isn't on screen: a hidden element, the first frame,
-// then torn down. Used at save time, so the tile a generation lands in has its
-// poster the first time it is ever released.
+// A poster off a clip that isn't on screen: a hidden element, a frame just
+// past the start, then torn down. Used at save time, and by `getPosterUrl` for
+// a clip that has no poster on this browser yet. Always called inside
+// `posterGate` — this is a whole decoder for the few hundred milliseconds it
+// runs, and a window's worth of them at once is the stall the gate exists for.
 async function posterFromBlob(blob: Blob): Promise<Blob | null> {
   const objectUrl = URL.createObjectURL(blob)
   const v = document.createElement('video')
@@ -250,6 +293,17 @@ async function posterFromBlob(blob: Blob): Promise<Blob | null> {
       v.onerror = () => { clearTimeout(timer); reject(new Error('poster load failed')) }
       v.src = objectUrl
     })
+    // Nudge off t=0 (see POSTER_AT_SECONDS). A seek that doesn't land in time
+    // falls back to whatever frame the element has — a poster a little early
+    // beats no poster.
+    const target = Math.min(POSTER_AT_SECONDS, Number.isFinite(v.duration) ? v.duration / 2 : POSTER_AT_SECONDS)
+    if (target > 0) {
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, POSTER_SEEK_TIMEOUT_MS)
+        v.onseeked = () => { clearTimeout(timer); resolve() }
+        try { v.currentTime = target } catch { clearTimeout(timer); resolve() }
+      })
+    }
     return await frameFromVideo(v)
   } catch {
     return null
@@ -278,7 +332,7 @@ export function getStillThumbUrl(ref: string): Promise<string | null> {
     if (!blob) {
       const original = await getBlob(id)
       if (!original) return null
-      blob = await downscaleStill(original)
+      blob = await stillGate.run(() => downscaleStill(original))
       if (!blob) { missing.add(id); return null }
       await idbPut(id, blob)
     }
@@ -287,9 +341,11 @@ export function getStillThumbUrl(ref: string): Promise<string | null> {
 }
 
 /**
- * A clip's poster frame, if one has been captured on this browser. Never
- * generates one itself: the tile that mounts the <video> captures it off that
- * element (`capturePoster`), so no second decoder is opened for it.
+ * A clip's poster frame: stored → made off the clip through `posterGate` →
+ * `null` only when the clip itself can't be decoded here (then `missing` stops
+ * every tile re-asking, and a later `capturePoster` off a played clip can still
+ * fill it). Shared across concurrent callers, so a mosaic asking for the same
+ * clip three times costs one decoder.
  */
 export function getPosterUrl(ref: string): Promise<string | null> {
   if (!isAssetRef(ref)) return Promise.resolve(null)
@@ -298,8 +354,14 @@ export function getPosterUrl(ref: string): Promise<string | null> {
   if (known) return Promise.resolve(known)
   if (missing.has(id)) return Promise.resolve(null)
   return share(id, async () => {
-    const blob = await idbGet(id)
-    if (!blob) { missing.add(id); return null }
+    let blob = await idbGet(id)
+    if (!blob) {
+      const clip = await getBlob(id)
+      if (!clip) return null
+      blob = await posterGate.run(() => posterFromBlob(clip))
+      if (!blob) { missing.add(id); return null }
+      await idbPut(id, blob)
+    }
     return remember(id, blob)
   })
 }
@@ -314,17 +376,17 @@ export async function capturePoster(ref: string, video: HTMLVideoElement): Promi
   const id = assetIdFromRef(ref)
   const known = thumbUrls.get(id)
   if (known) return known
-  const inFlight = pending.get(id)
-  if (inFlight) {
-    const settled = await inFlight
-    if (settled) return settled
+  // This element already holds a decoded frame, which is the whole cost of a
+  // poster — so it is taken now, even if a queued generation for the same clip
+  // is still waiting its turn. `remember` keeps whichever lands first.
+  const blob = await frameFromVideo(video)
+  if (!blob) {
+    const inFlight = pending.get(id)
+    return inFlight ? inFlight : null
   }
-  return share(id, async () => {
-    const blob = await frameFromVideo(video)
-    if (!blob) return null
-    await idbPut(id, blob)
-    return remember(id, blob)
-  })
+  const url = remember(id, blob)
+  await idbPut(id, blob)
+  return url
 }
 
 /**
@@ -336,7 +398,13 @@ export function ensureThumbForSavedAsset(id: string, blob: Blob, mimeType: strin
   const kind = mimeType.startsWith('image/') ? 'image' : mimeType.startsWith('video/') ? 'video' : null
   if (!kind || thumbUrls.has(id) || pending.has(id)) return
   void share(id, async () => {
-    const thumb = kind === 'image' ? await downscaleStill(blob) : await posterFromBlob(blob)
+    const thumb = kind === 'image'
+      ? await stillGate.run(() => downscaleStill(blob))
+      : await posterGate.run(() => posterFromBlob(blob))
+    // A still that failed here is one too small to need a thumbnail (the
+    // tile uses the original). A clip that failed is NOT marked: save-time is
+    // the busiest moment in the tab, so `getPosterUrl` gets one more try
+    // when a tile first asks.
     if (!thumb) { if (kind === 'image') missing.add(id); return null }
     await idbPut(id, thumb)
     return remember(id, thumb)

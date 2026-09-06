@@ -7,7 +7,7 @@ import type { BankType } from '../../utils/constants'
 import type { ModelFilter } from './Finder'
 import { useBankStore } from '../../stores/bankStore'
 import { useAppStore } from '../../stores/appStore'
-import { useAssetUrl, useAssetThumb } from '../../hooks/useAssetUrl'
+import { useAssetUrl, useAssetThumb, useAssetPoster, posterVideoProps } from '../../hooks/useAssetUrl'
 import { getAsBase64, getUrl, isAssetRef } from '../../utils/assetStore'
 import { downloadImage } from '../../utils/downloadImage'
 import { copyToClipboard } from '../../utils/clipboard'
@@ -343,6 +343,7 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
   // download below re-resolves the original.
   const resolvedImage = useAssetThumb(hasImage ? item.imageUrl : undefined).url
   const resolvedVideo = useAssetUrl(!hasImage ? firstVideoUrl : undefined)
+  const videoPoster = useAssetPoster(!hasImage ? firstVideoUrl : undefined)
   const isVideoOnly = !hasImage && !!resolvedVideo
 
   const handleDownload = async (e: React.MouseEvent) => {
@@ -395,14 +396,26 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : isVideoOnly ? (
-          <video
-            src={resolvedVideo}
-            preload="metadata"
-            muted
-            playsInline
-            onLoadedMetadata={(e) => setLandscape(e.currentTarget.videoWidth > e.currentTarget.videoHeight)}
-            className="absolute inset-0 h-full w-full object-cover"
-          />
+          // The clip's poster (utils/mediaThumbs) is the card, like a still's
+          // thumbnail; the <video> only mounts until one exists, and a clip
+          // with none decodes its own frame (posterVideoProps).
+          videoPoster.url ? (
+            <img
+              src={videoPoster.url}
+              alt=""
+              onLoad={(e) => setLandscape(e.currentTarget.naturalWidth > e.currentTarget.naturalHeight)}
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : (
+            <video
+              {...posterVideoProps(resolvedVideo, videoPoster)}
+              muted
+              playsInline
+              onLoadedMetadata={(e) => setLandscape(e.currentTarget.videoWidth > e.currentTarget.videoHeight)}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          )
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-ink/[0.04]">
             <Film className="h-10 w-10 text-ink-800" strokeWidth={1} />
