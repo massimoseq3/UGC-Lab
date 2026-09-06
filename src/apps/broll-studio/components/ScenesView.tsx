@@ -827,7 +827,16 @@ export default function ScenesView({
           shoulder to shoulder in one swipeable line that starts at the scene
           count. `-mx-5 px-5` so it scrolls edge to edge while its first and last
           pills still sit on the panel's own inset. */}
-      <div className="relative z-20 shrink-0 border-b border-ink/5 px-5 py-3.5">
+      {/* `h-[57px]`, the app-wide panel-header height, NOT vertical padding
+          around the pills: the History rail's own band next door is 57px, so
+          `py-3.5` made this strip 61px and the two hairlines missed each other
+          by 4px across the seam (Massimo's report, September 2026). A stated
+          height is also what keeps them level if a pill on either side ever
+          changes size. The scroll port under it takes `flex-1 min-w-0` rather
+          than a width — see the note below, which the flex parent doesn't
+          change: with both margins negative the row still resolves to exactly
+          the strip's padding box. */}
+      <div className="relative z-20 flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
         {/* NOT `w-full` alongside `-mx-5`: `width: 100%` resolves against the
             strip's CONTENT box, so the port came out 40px narrower than the
             strip and the negative margin then spent all of it on the left —
@@ -837,7 +846,7 @@ export default function ScenesView({
             port spans the strip and `px-5` puts both ends back on the panel's
             own inset. Invisible while the row was centred (it just shifted the
             centre 20px left); it shows the moment anything is right-aligned. */}
-        <div className="-mx-5 overflow-x-auto scrollbar-hide px-5">
+        <div className="-mx-5 min-w-0 flex-1 overflow-x-auto scrollbar-hide px-5">
         <div className="flex w-max min-w-full flex-nowrap items-center gap-2 whitespace-nowrap">
           {/* The look every clip in this storyboard renders in — the one piece
               of meta left on the line. It is CUT TO THE BATCH PILLS' OWN SIZE

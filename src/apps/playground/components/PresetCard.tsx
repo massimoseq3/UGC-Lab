@@ -61,7 +61,10 @@ export default function PresetCard({ preset, onClick }: PresetCardProps) {
       )}
 
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2.5 pt-7">
-        <span className="block truncate text-center text-[13px] font-semibold tracking-tight text-zinc-100">
+        {/* Wraps to two lines rather than truncating, matching StyleTile in the
+            grid beside it: at the gallery's tile size "Product Hero Shot" and
+            "3D Pixar Animation" both clipped on one line. */}
+        <span className="block line-clamp-2 text-center text-[12px] font-semibold leading-tight tracking-tight text-zinc-100">
           {preset.title}
         </span>
       </div>

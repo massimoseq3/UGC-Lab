@@ -1417,6 +1417,7 @@ export default function BrollStudio() {
         onAnalyze={handleAnalyzeStyleRefs}
         isAnalyzing={isAnalyzingStyle}
         accent={BROLL_STYLE_ACCENT}
+        railAccent="broll"
       />
     </div>
   )

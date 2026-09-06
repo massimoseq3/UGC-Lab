@@ -1,7 +1,7 @@
 import { useState, type ComponentType } from 'react'
 import { Package, PenLine, ChevronRight, FileText, Clapperboard, RefreshCw, X, Sparkle, Shuffle, FishingHook, Video, Clock, Layers } from 'lucide-react'
 import type { Product, Script } from '../../../stores/types'
-import { WRITE_LENGTHS, REMIX_LENGTHS, WRITE_STYLE_META, HOOK_CATEGORY_META, HOOK_COUNTS, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type HookCount, type VariationCount } from '../types'
+import { WRITE_LENGTHS, REMIX_LENGTHS, WRITE_STYLE_META, writeStylesInGroup, HOOK_CATEGORY_META, HOOK_COUNTS, VARIATION_COUNTS, createEditableContext, type EditableProductContext, type ScriptUiMode, type WriteStyle, type WriteFormat, type WriteLength, type RemixLength, type HookCategoryChoice, type HookCount, type VariationCount } from '../types'
 import { useBankStore } from '../../../stores/bankStore'
 import BankPicker from '../../../components/BankPicker'
 import SegmentedToggle from '../../../components/SegmentedToggle'
@@ -16,6 +16,8 @@ import { useAppStore } from '../../../stores/appStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { enhanceBrief } from '../services/generateScript'
 import ScriptStyleList from './ScriptStyleList'
+import SectionRail from '../../../components/SectionRail'
+import { useSectionSpy } from '../../../components/sectionSpy'
 import { humanizeError } from '../../../utils/friendlyError'
 
 interface InputPanelProps {
@@ -104,6 +106,8 @@ export default function InputPanel({
   )
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [styleModalOpen, setStyleModalOpen] = useState(false)
+  // The style picker's rail: Structures over Formats, one scroll.
+  const styleSpy = useSectionSpy(['structure', 'format'])
   const [hookModalOpen, setHookModalOpen] = useState(false)
   // The script picked from the bank for the remix source. Editing the textarea
   // clears it (reverts to the dashed picker), mirroring the B-Roll ref cards.
@@ -1016,8 +1020,12 @@ export default function InputPanel({
         <Modal
           open={detailsOpen}
           onClose={() => setDetailsOpen(false)}
-          title="Edit product details"
+          title="Edit Product Details"
           subtitle="Edit for this script, or push the changes back to your bank"
+          // Fourteen fields down a 512px column was the drawer shape it was
+          // built in. Two columns halves it; it is a form, read down a column,
+          // so it keeps a short scroll rather than going gallery-wide.
+          size="wide"
           footer={
             <div className="flex flex-col gap-2">
               <button
@@ -1038,7 +1046,7 @@ export default function InputPanel({
           }
         >
           {editableContext && (
-            <div className="flex flex-col gap-4 p-5">
+            <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
               <EditableField label="Name" value={editableContext.productName} onChange={(v) => updateField('productName', v)} />
               <EditableField label="Description" value={editableContext.productDescription} onChange={(v) => updateField('productDescription', v)} />
               <EditableField label="Unique Mechanism" value={editableContext.uniqueMechanism} onChange={(v) => updateField('uniqueMechanism', v)} />
@@ -1061,9 +1069,25 @@ export default function InputPanel({
         <Modal
           open={styleModalOpen}
           onClose={() => setStyleModalOpen(false)}
-          title="Choose a style"
-          subtitle="What kind of content the ad looks like, and how it's built"
-          size="wide"
+          title="Choose a Script Style"
+          // Seventeen options across two sections, two across, with the two
+          // sections in a rail. It was a single column down a 768px panel:
+          // structure and format are two halves of one decision and you were
+          // scrolling between them.
+          size="gallery"
+          rail={
+            <SectionRail
+              sections={[
+                { key: 'structure', label: 'Structures', count: writeStylesInGroup('structure').length },
+                { key: 'format', label: 'Formats', count: writeStylesInGroup('format').length },
+              ]}
+              activeKey={styleSpy.activeKey}
+              accent="scripts"
+              onJump={styleSpy.jumpTo}
+            />
+          }
+          bodyRef={styleSpy.portRef}
+          onBodyScroll={styleSpy.onScroll}
         >
           {/* Two sections: Structures (how the argument is built) on top, then
               Formats (the kind of content the ad imitates). Structures lead HERE
@@ -1075,18 +1099,21 @@ export default function InputPanel({
           <ScriptStyleList
             value={styleChosen ? writeStyle : null}
             onSelect={(style) => { onWriteStyleChange(style); setStyleChosen(true); setStyleModalOpen(false) }}
+            registerSection={styleSpy.register}
           />
         </Modal>
 
-        {/* Hook family picker — mirrors the style picker. 'auto' leads. */}
+        {/* Hook family picker — mirrors the style picker, minus the rail: one
+            list, no sections, and a rail of one row is a label wearing a
+            control's clothes. 'auto' leads, full width, because it is the
+            "don't make me choose" option rather than one of the eight. */}
         <Modal
           open={hookModalOpen}
           onClose={() => setHookModalOpen(false)}
-          title="Choose a hook style"
-          subtitle={`Which formula family the ${hookCount} hooks draw from`}
-          size="wide"
+          title="Choose a Hook Style"
+          size="gallery"
         >
-          <div className="flex flex-col gap-2 p-4">
+          <div className="grid grid-cols-1 items-stretch gap-1.5 p-4 md:grid-cols-2 xl:grid-cols-3">
             {(Object.keys(HOOK_CATEGORY_META) as HookCategoryChoice[]).map((choice) => {
               const active = choice === hookCategory
               return (
@@ -1094,7 +1121,9 @@ export default function InputPanel({
                   key={choice}
                   type="button"
                   onClick={() => { onHookCategoryChange(choice); setHookModalOpen(false) }}
-                  className={`flex items-center gap-3 rounded-full border px-4 py-3 text-left transition-colors ${
+                  className={`flex items-center gap-3 rounded-full border px-4 py-2.5 text-left transition-colors ${
+                    choice === 'auto' ? 'md:col-span-2 xl:col-span-3' : ''
+                  } ${
                     active
                       ? 'border-scripts-500/30 bg-scripts-500/10'
                       : 'border-ink/5 bg-ink/[0.02] hover:border-ink/10 hover:bg-ink/[0.04]'

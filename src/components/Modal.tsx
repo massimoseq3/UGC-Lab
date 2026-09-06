@@ -1,3 +1,4 @@
+import type { ReactNode, RefObject, UIEventHandler } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft } from 'lucide-react'
 import { useCloseOnAppSwitch } from '../hooks/useCloseOnAppSwitch'
@@ -12,10 +13,30 @@ interface ModalProps {
   children: React.ReactNode
   // Optional pinned footer (e.g. action buttons) below the scroll area.
   footer?: React.ReactNode
-  // Panel width, all centred: 'default' 512px for a column of rows or a
-  // three-up tile grid, 'medium' 672px where the tiles are the only thing
-  // saying what an option looks like, 'wide' 768px for a two-column body.
-  size?: 'default' | 'medium' | 'wide'
+  // Panel width, all centred: 'default' 512px for a column of rows, 'medium'
+  // 672px for a list beside a rail, 'wide' 768px for a two-column body of rows
+  // or form fields, and 'gallery' 1152px — BankPicker's and the Characters
+  // preset picker's own width, for a body that is a WALL OF PICTURES or a
+  // sectioned list you browse rather than read.
+  //
+  // A grid of 9:16 tiles is the one body that can't be narrowed without either
+  // shrinking the picture past reading it or stacking it into a scroll: seven
+  // style previews three across a 512px panel is four rows you have to scroll
+  // to compare, when the same tiles at the same size fit on one screen the
+  // moment the panel is as wide as the picker every member already browses
+  // their characters in.
+  size?: 'default' | 'medium' | 'wide' | 'gallery'
+  // A table of contents down the left, from `lg` up — see components/SectionRail.
+  // Given one, the modal lays the rail beside the scrolling body instead of
+  // letting the body fill the panel, and hands the scroller back through
+  // `bodyRef` / `onBodyScroll` so the rail's spy can measure it.
+  //
+  // Below `lg` there is no room for a 204px column beside a grid, so the rail
+  // simply doesn't render and the sections are reached by scrolling — the same
+  // rule BankPicker follows.
+  rail?: ReactNode
+  bodyRef?: RefObject<HTMLDivElement | null>
+  onBodyScroll?: UIEventHandler<HTMLDivElement>
   // Optional back arrow left of the title, for a panel with a second view
   // inside it (StyleModal's "New style from references").
   onBack?: () => void
@@ -49,6 +70,9 @@ export default function Modal({
   onBack,
   layer = 'default',
   fill = false,
+  rail,
+  bodyRef,
+  onBodyScroll,
 }: ModalProps) {
   useCloseOnAppSwitch(open, onClose)
 
@@ -59,7 +83,14 @@ export default function Modal({
   const portalTarget = typeof document !== 'undefined' ? document.body : null
   if (!portalTarget) return null
 
-  const width = size === 'wide' ? 'max-w-3xl' : size === 'medium' ? 'max-w-2xl' : 'max-w-lg'
+  const width =
+    size === 'gallery'
+      ? 'max-w-6xl'
+      : size === 'wide'
+        ? 'max-w-3xl'
+        : size === 'medium'
+          ? 'max-w-2xl'
+          : 'max-w-lg'
 
   return createPortal(
     <>
@@ -122,7 +153,30 @@ export default function Modal({
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+          {/* `scrollbar-gutter: stable` on the body, not just `overflow-y-auto`.
+              The app keeps its native scrollbars invisible but reserves their
+              11px track so layout stays stable (index.css) — and that only
+              holds while the element actually overflows. A body that FILTERS
+              ITSELF crosses that line both ways: narrowing Choose a Voice to
+              Female stops the list scrolling, the track goes away, and the 11px
+              lands back in the content box, which moved every centred section
+              pill and the toggle 6px sideways (Massimo's report, September
+              2026). Reserving it in both states costs nothing on a phone, where
+              the track is 0px wide to begin with. */}
+          {rail ? (
+            <div className="flex min-h-0 flex-1">
+              <div className="hidden w-[204px] shrink-0 flex-col gap-4 overflow-y-auto border-r border-ink/5 px-3 py-4 lg:flex">
+                {rail}
+              </div>
+              <div ref={bodyRef} onScroll={onBodyScroll} className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+                {children}
+              </div>
+            </div>
+          ) : (
+            <div ref={bodyRef} onScroll={onBodyScroll} className="min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]">
+              {children}
+            </div>
+          )}
           {footer && <div className="shrink-0 border-t border-ink/5 p-4">{footer}</div>}
         </div>
       </div>

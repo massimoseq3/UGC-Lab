@@ -8,6 +8,8 @@ import { useAssetUrl } from '../hooks/useAssetUrl'
 import { saveFromDataUrl } from '../utils/assetStore'
 import { CONTINUOUS_STYLES } from '../utils/visualStyle'
 import Modal from './Modal'
+import SectionRail, { GallerySectionHeading, type RailAccent } from './SectionRail'
+import { GALLERY_GRID, useSectionSpy } from './sectionSpy'
 // Preview art + the per-app accent palettes. They live in their own module so a
 // host that only needs an accent (or, like Playground, only the artwork) doesn't
 // drag the whole modal in with it — see the note at the top of styleArt.ts.
@@ -54,8 +56,10 @@ interface StyleModalProps {
   isAnalyzing: boolean
   // Host app's accent classes — see StyleModalAccent.
   accent: StyleModalAccent
-  // What the style applies to in this host ("every clip" / "every character").
-  subjectLabel?: string
+  // Which family the rail's active row wears. A separate prop rather than a
+  // field on StyleModalAccent, because that interface is shared with hosts
+  // (Playground) that render the tiles without ever opening this modal.
+  railAccent: RailAccent
 }
 
 // A style is a look, so the card is a picture of it — the same 9:16 tile the
@@ -97,10 +101,14 @@ export function StyleTile({
         </div>
       )}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/45 to-transparent p-2.5 pt-7">
-        {/* Wraps to two lines rather than truncating: at three tiles across a
-            380px panel, anything past ~12 characters clipped — which hit both
-            the longer preset names and most user-named saved styles. */}
-        <span className="block line-clamp-2 text-[12px] font-semibold leading-tight tracking-tight text-zinc-100">{name}</span>
+        {/* Centred, matching Playground's preset cards — a name plate under a
+            9:16 picture reads as a caption for it, and left-aligning it in a
+            grid of tiles left every short name hanging off one edge.
+
+            Wraps to two lines rather than truncating: at this tile size
+            anything past ~12 characters clipped, which hit both the longer
+            preset names and most user-named saved styles. */}
+        <span className="block line-clamp-2 text-center text-[12px] font-semibold leading-tight tracking-tight text-zinc-100">{name}</span>
       </div>
       {active && (
         <span className={`absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full text-white ${accent.solid}`}>
@@ -127,7 +135,7 @@ export default function StyleModal({
   onAnalyze,
   isAnalyzing,
   accent,
-  subjectLabel = 'clip',
+  railAccent,
 }: StyleModalProps) {
   const savedStyles = useBankStore((s) => s.styles)
   const addStyle = useBankStore((s) => s.addStyle)
@@ -223,23 +231,45 @@ export default function StyleModal({
     if (images.length > 0) onAddStyleRefs(images)
   }
 
+  // Two sections, so two rail rows. Marginal on its own — but it says at a
+  // glance how many looks are yours, and it is the same control the Characters
+  // preset picker one click away carries.
+  const spy = useSectionSpy(['presets', 'saved'])
+
   return (
     <Modal
       open={open}
       onClose={onClose}
       onBack={view === 'create' ? backToBrowse : undefined}
-      title={view === 'create' ? 'New style from references' : 'Visual style'}
-      subtitle={
-        view === 'create'
-          ? 'The look is read from these frames, never their subjects'
-          : `The look every ${subjectLabel} is rendered in`
+      title={view === 'create' ? 'New Visual Style' : 'Choose a Visual Style'}
+      // Browse carries no subtitle: the title says what you are picking and
+      // every tile under it is a picture of one, so a line explaining that a
+      // look is a look is a line nobody reads. The create view keeps its own,
+      // which teaches something the panel can't show — the style is read off
+      // the frames, not their subjects.
+      subtitle={view === 'create' ? 'The look is read from these frames, never their subjects' : undefined}
+      // Browse is the Characters preset picker's own width, and for the same
+      // reason: it is a wall of 9:16 pictures. Three tiles across a 512px panel
+      // put seven presets on four rows, so comparing Claymation with Anime was
+      // a scroll. At `gallery` the built-in looks are one row and your own are
+      // the next. The create view stays narrow — it is a drop zone over a
+      // brief, not a grid of tiles.
+      size={view === 'create' ? 'wide' : 'gallery'}
+      rail={
+        view === 'browse' ? (
+          <SectionRail
+            sections={[
+              { key: 'presets', label: 'Presets', count: CONTINUOUS_STYLES.length },
+              { key: 'saved', label: 'Your Visual Styles', count: savedStyles.length },
+            ]}
+            activeKey={spy.activeKey}
+            accent={railAccent}
+            onJump={spy.jumpTo}
+          />
+        ) : undefined
       }
-      // The standard 512px panel, matching the Characters preset picker's
-      // proportions: the browse grid is three 9:16 tiles across rather than two
-      // text cards, so a look is picked off its picture and the whole list fits
-      // without scrolling past the presets to reach your own styles. The create
-      // view is wider — it's a drop zone over a brief, not a grid of tiles.
-      size={view === 'create' ? 'wide' : 'default'}
+      bodyRef={spy.portRef}
+      onBodyScroll={spy.onScroll}
       // The create view routes to the host's own BankPicker for reference
       // frames, and that picker has to land on top of this panel.
       layer="below-pickers"
@@ -288,8 +318,8 @@ export default function StyleModal({
             </div>
           )}
 
-          <p className="mb-2.5 text-[11px] font-medium uppercase tracking-wider text-ink-600">Presets</p>
-          <div className="grid grid-cols-3 gap-2">
+          <GallerySectionHeading label="Presets" innerRef={spy.register('presets')} className="mb-3" />
+          <div className={GALLERY_GRID}>
             {CONTINUOUS_STYLES.map((s) => (
               <StyleTile
                 key={s.id}
@@ -302,8 +332,8 @@ export default function StyleModal({
             ))}
           </div>
 
-          <p className="mb-2.5 mt-6 text-[11px] font-medium uppercase tracking-wider text-ink-600">Your styles</p>
-          <div className="grid grid-cols-3 gap-2">
+          <GallerySectionHeading label="Your Visual Styles" innerRef={spy.register('saved')} className="mb-3 mt-6" />
+          <div className={GALLERY_GRID}>
             {savedStyles.map((s) => (
               <SavedStyleCard
                 key={s.id}

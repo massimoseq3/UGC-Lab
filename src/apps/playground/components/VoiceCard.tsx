@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { AudioLines, Check, ChevronDown, ChevronRight } from 'lucide-react'
 import { SectionPresetPill } from '../../../components/SectionCard'
 import Modal from '../../../components/Modal'
-import Dropdown from '../../../components/Dropdown'
+import SegmentedToggle from '../../../components/SegmentedToggle'
+import SectionRail, { GallerySectionHeading } from '../../../components/SectionRail'
+import { useSectionSpy } from '../../../components/sectionSpy'
 import AutoGrowTextarea from '../../../components/AutoGrowTextarea'
-import DayPill from '../../../components/DayPill'
+import CountSlot from '../../../components/CountSlot'
 import { VOICE_GROUPS, VOICE_PRESETS, type VoicePreset } from '../voicePresets'
 
 // The voice profile, in its own box under the prompt, appended to the end of
@@ -51,8 +53,13 @@ import { VOICE_GROUPS, VOICE_PRESETS, type VoicePreset } from '../voicePresets'
 // not push the thing you actually write in off the column.
 const MAX_FIELD_HEIGHT = 120
 
-const GENDERS = ['All voices', 'Female', 'Male'] as const
-const ACCENTS = ['All accents', ...VOICE_GROUPS] as const
+// ACCENT is what the list is sectioned by, so accent is what the rail
+// navigates: three groups, each worth scrolling to. GENDER is the filter that
+// cuts across all three, centred on the toolbar above them — two values, which
+// is a pill row rather than a rail. Both used to be dropdowns side by side, and
+// the pair was tried the other way round for a day (gender in the rail) before
+// landing here (Massimo's call, September 2026).
+const GENDERS = ['All', 'Female', 'Male'] as const
 
 export default function VoiceCard({
   value,
@@ -196,58 +203,72 @@ function VoicePresetPicker({
   value: string
   onPick: (text: string) => void
 }) {
-  const [gender, setGender] = useState<string>(GENDERS[0])
-  const [accent, setAccent] = useState<string>(ACCENTS[0])
+  const [gender, setGender] = useState<(typeof GENDERS)[number]>(GENDERS[0])
   const [expanded, setExpanded] = useState<string | null>(null)
 
-  const matches = (p: VoicePreset) =>
-    (gender === GENDERS[0] || p.gender === gender) && (accent === ACCENTS[0] || p.group === accent)
-  const shown = VOICE_PRESETS.filter(matches)
-  const groups = VOICE_GROUPS.filter((g) => shown.some((p) => p.group === g))
+  const shown = VOICE_PRESETS.filter((p) => gender === GENDERS[0] || p.gender === gender)
+  // Every accent row stays in the rail whatever the gender filter leaves in it
+  // — a row that vanished at zero would move the rest under the pointer, and
+  // the count answers "why is there nothing there" outright.
+  const spy = useSectionSpy(VOICE_GROUPS)
+  const countIn = (group: string) => shown.filter((p) => p.group === group).length
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Voice"
-      subtitle="Pick a voice. It replaces what's in the box, then it's yours to edit"
-      size="medium"
-      // 30 voices behind two filters — the panel holds its height so the rows
-      // don't jump every time one is narrowed.
+      title="Choose a Voice"
+      // The Characters preset picker's shape: the accent groups down the left,
+      // the one list beside them, and gender as a filter across all three. It
+      // was a single column of fifteen rows down a 672px panel, most of which
+      // was empty air to the right of each name.
+      size="gallery"
+      rail={
+        <SectionRail
+          heading="Accent"
+          sections={VOICE_GROUPS.map((g) => ({ key: g, label: g, count: countIn(g) }))}
+          activeKey={spy.activeKey}
+          accent="playground"
+          onJump={spy.jumpTo}
+        />
+      }
+      bodyRef={spy.portRef}
+      onBodyScroll={spy.onScroll}
+      // A row opens to its full profile, so the panel holds its height rather
+      // than resizing under the pointer every time one is expanded.
       fill
     >
       <div className="p-4">
-        {/* `tier="panel"` is required, not decorative: this modal is z-[80] and
-            a default-tier menu paints at z-[60], i.e. behind the panel its own
-            trigger is on. `fitContent` so two triggers share one row. */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Dropdown
+        {/* Centred, like the section pills under it — the toggle is three short
+            words on a 900px body, and left-aligned it read as the start of a
+            toolbar that has nothing else in it. `dense` because it is a filter
+            over a list, not a mode switch: at full size a 48px slab of three
+            short words stood taller than the section pills it narrows. */}
+        <div className="flex justify-center">
+          <SegmentedToggle
             value={gender}
-            options={GENDERS}
             onChange={setGender}
             accent="playground"
-            tier="panel"
+            dense
             fitContent
-          />
-          <Dropdown
-            value={accent}
-            options={ACCENTS}
-            onChange={setAccent}
-            accent="playground"
-            tier="panel"
-            fitContent
-            menuMinWidth={200}
+            options={GENDERS.map((g) => ({
+              value: g,
+              label: g,
+              badge: <CountSlot value={g === GENDERS[0] ? VOICE_PRESETS.length : VOICE_PRESETS.filter((p) => p.gender === g).length} />,
+            }))}
           />
         </div>
 
-        {groups.map((group) => (
-          <div key={group}>
-            {/* The house group separator, the same one the Characters template
-                library is grouped by. */}
-            <DayPill label={group} className="mb-2 mt-4" />
-            <div className="flex flex-col gap-1.5">
+        {VOICE_GROUPS.map((g) => (
+          <div key={g}>
+            <GallerySectionHeading label={g} innerRef={spy.register(g)} className="mb-3 mt-5" />
+            {/* Three across at `gallery` width, dropping to two and then one as
+                the panel narrows. `items-start` so the row you opened is the
+                only one that grows — stretched, its neighbours would inflate to
+                match a paragraph they aren't showing. */}
+            <div className="grid grid-cols-1 items-start gap-1.5 md:grid-cols-2 xl:grid-cols-3">
               {shown
-                .filter((p) => p.group === group)
+                .filter((p) => p.group === g)
                 .map((preset) => (
                   <PresetRow
                     key={preset.id}
@@ -258,6 +279,9 @@ function VoicePresetPicker({
                     onPick={() => onPick(preset.text)}
                   />
                 ))}
+              {countIn(g) === 0 && (
+                <p className="text-[12px] text-ink-600">No {gender.toLowerCase()} voices in this accent.</p>
+              )}
             </div>
           </div>
         ))}
