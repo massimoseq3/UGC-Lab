@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight, Check, Search, Sparkles } from 'lucide-react'
+import { ChevronRight, Check, Search, Sparkle } from 'lucide-react'
 import {
   listScriptModels,
   getModel,
@@ -117,7 +117,7 @@ export default function ScriptModelRow({ appId, className = 'mb-3' }: ScriptMode
               for the bare 24px provider mark, which left this row's icon
               visibly smaller than the rows above it. */}
           <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${accent.bg}`}>
-            {model ? <ProviderLogo provider={model.provider} size="sm" /> : <Sparkles className={`h-[18px] w-[18px] ${accent.text}`} strokeWidth={1.75} />}
+            {model ? <ProviderLogo provider={model.provider} size="sm" /> : <Sparkle className={`h-[18px] w-[18px] ${accent.text}`} strokeWidth={1.75} />}
           </div>
           <div className="min-w-0 flex-1">
             {/* Neutral text too — on a neutral row an accent-coloured name is
@@ -275,6 +275,15 @@ function ModelCard({
         active ? accent.bg : 'hover:bg-ink/[0.04]'
       }`}
     >
+      {/* The provider's own mark, on the same disc the image/video picker's
+          rows wear — the two pickers are one panel with different row detail,
+          and only this one was reading as a bare list of words. It rides the
+          first line rather than the block's centre: these rows run three lines
+          deep (name, blurb, rate) and a vertically centred disc floats beside
+          the blurb instead of beside the name it belongs to. */}
+      <div className="mt-px shrink-0">
+        <ProviderLogo provider={model.provider} size="sm" />
+      </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           <span className="text-[13px] font-semibold leading-snug text-ink-100">{model.displayName}</span>

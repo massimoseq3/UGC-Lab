@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, type ElementType } from 'react'
-import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, ChevronDown, Sparkles, Check, LayoutGrid, Copy, Bookmark, Star, Palette, Eye, Heart, MessageCircle, Share2, Search } from 'lucide-react'
+import { Package, UserRound, FileText, Mic, Film, Plus, Video, Download, ChevronDown, Sparkle, Check, LayoutGrid, Copy, Bookmark, Star, Palette, Eye, Heart, MessageCircle, Share2, Search } from 'lucide-react'
 import Spinner from '../../components/Spinner'
 import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, SwipeItem } from '../../stores/types'
 import type { BankType } from '../../utils/constants'
@@ -861,7 +861,7 @@ function ProductsBankZone({ children, onBulkFiles }: { children: React.ReactNode
         if (files.length > 0) onBulkFiles(files)
       }}
     >
-      {overlay && <DropOverlay icon={Sparkles} label="Drop image(s) to Bulk-add Products" accent="emerald" />}
+      {overlay && <DropOverlay icon={Sparkle} label="Drop image(s) to Bulk-add Products" accent="emerald" />}
       {children}
     </div>
   )
