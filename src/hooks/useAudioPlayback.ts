@@ -3,7 +3,6 @@ import {
   claimAudioSlot,
   releaseAudioSlot,
   resolveAudioUrl,
-  waveformPeaks,
 } from '../utils/audioPlayback'
 
 // One card's own player: the transport behind a generated clip's play button,
@@ -26,8 +25,6 @@ export interface AudioPlayback {
   // element reports a real one).
   position: number
   duration: number
-  // Decoded peaks for the whole clip, or null while they're still coming.
-  peaks: number[] | null
   toggle: () => void
   seekTo: (seconds: number) => void
 }
@@ -37,7 +34,6 @@ export function useAudioPlayback(ref: string | null, fallbackDuration = 0): Audi
   const [isPlaying, setIsPlaying] = useState(false)
   const [position, setPosition] = useState(0)
   const [duration, setDuration] = useState(fallbackDuration)
-  const [peaks, setPeaks] = useState<number[] | null>(null)
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const rafRef = useRef(0)
@@ -77,17 +73,12 @@ export function useAudioPlayback(ref: string | null, fallbackDuration = 0): Audi
     setIsLoaded(false)
     setIsPlaying(false)
     setPosition(0)
-    setPeaks(null)
   }, [ref, teardown])
 
   const load = async (source: string) => {
     const token = ++loadTokenRef.current
     setIsLoaded(true)
     setPosition(0)
-    void waveformPeaks(source).then((p) => {
-      // A newer load claimed this card while the clip decoded.
-      if (loadTokenRef.current === token) setPeaks(p)
-    })
 
     let url: string
     try {
@@ -145,8 +136,7 @@ export function useAudioPlayback(ref: string | null, fallbackDuration = 0): Audi
     void load(ref)
   }
 
-  // Click anywhere on the waveform to jump there — the strip shows the whole
-  // clip, so a position on it is a position in the audio.
+  // Jump to a point on the progress line.
   const seekTo = (seconds: number) => {
     const audio = audioRef.current
     if (!audio) return
@@ -159,7 +149,6 @@ export function useAudioPlayback(ref: string | null, fallbackDuration = 0): Audi
     isPlaying,
     position,
     duration: duration || fallbackDuration,
-    peaks,
     toggle,
     seekTo,
   }

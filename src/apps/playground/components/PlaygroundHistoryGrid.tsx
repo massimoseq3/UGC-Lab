@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useState, useEffect } from 'react'
-import { ArrowLeft,
+import { CornerDownLeft,
   Download, Bookmark, Check, Film, Image as ImageIcon, Music as MusicIcon, Play, Pause, Volume2, VolumeX, X, ImagePlay, Copy, LayoutGrid, List, Maximize2,
 } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
@@ -15,8 +15,7 @@ import { sectionLabel, groupByDay } from '../../../utils/history'
 import { downloadImage } from '../../../utils/downloadImage'
 import { downloadAssetsZip } from '../../../utils/downloadZip'
 import type { ImageHistoryItem, VideoHistoryItem, MusicHistoryItem } from '../../../stores/types'
-import AudioTile, { MusicArtwork, MusicWaveStrip } from './AudioTile'
-import { useAudioPlayback } from '../../../hooks/useAudioPlayback'
+import MusicRow from './MusicRow'
 import GenerationProgress from '../../../components/GenerationProgress'
 import { TileActionStack, TileActionButton, TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
@@ -131,6 +130,8 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
   // itself there — and switching views or tabs drops a selection that would
   // otherwise be invisible while it survived.
   const canSelect = viewMode === 'grid' && videoEntries.length > 0
+  // The Music tab renders one row shape in both views (see MusicRow).
+  const musicOnly = filterMode === 'music'
   useEffect(() => {
     setSelecting(false)
     setPicked(new Set())
@@ -243,7 +244,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
             {zipping ? 'Zipping…' : `Download ${pickedCount} clip${pickedCount === 1 ? '' : 's'}`}
           </button>
         )}
-        {viewMode === 'list' && (
+        {viewMode === 'list' && !musicOnly && (
           <div className="flex items-center gap-2.5" title="Card size">
             <Maximize2 className="h-3.5 w-3.5 text-ink-500" />
             <input
@@ -280,7 +281,11 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
             {selecting ? 'Cancel' : 'Download clips'}
           </button>
         )}
-        <ViewToggle value={viewMode} onChange={setViewMode} />
+        {/* Neither control has anything to do in the Music tab: a track has no
+            thumbnail, so it wears the same row in both views and the size
+            slider drives a media frame it doesn't have. A switch that changes
+            nothing is worse than no switch. */}
+        {!musicOnly && <ViewToggle value={viewMode} onChange={setViewMode} />}
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
@@ -314,7 +319,11 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                 {dayItems.map((entry) => {
                   const ar = entry.kind === 'music' ? null : entry.data.aspectRatio
                   return (
-                  <div key={`${entry.kind}-${entry.data.id}`} className={ar && isLandscape(ar) ? 'col-span-2' : ''}>
+                  // A track has no thumbnail, so it wears the same row in both
+                  // views and takes the full width to do it — a Voiceovers-shaped
+                  // card squeezed into a quarter-width cell would truncate the
+                  // prompt that is the only thing naming the track.
+                  <div key={`${entry.kind}-${entry.data.id}`} className={entry.kind === 'music' ? 'col-span-full' : ar && isLandscape(ar) ? 'col-span-2' : ''}>
                     {entry.kind === 'image' && (
                       <ImageTile
                         item={entry.data}
@@ -342,7 +351,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                       />
                     )}
                     {entry.kind === 'music' && (
-                      <AudioTile
+                      <MusicRow
                         item={entry.data}
                         onDownload={async () => {
                           const url = await getUrl(entry.data.audioRef)
@@ -359,7 +368,21 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {dayItems.map((entry) => (
+                {dayItems.map((entry) => entry.kind === 'music' ? (
+                  // Same row as the grid draws — audio has no thumbnail, so
+                  // there is no second shape for the list to put it in.
+                  <MusicRow
+                    key={`music-${entry.data.id}`}
+                    item={entry.data}
+                    onDownload={async () => {
+                      const u = await getUrl(entry.data.audioRef)
+                      if (u) downloadImage(u, `playground-${entry.data.id}`, 'mp3')
+                    }}
+                    onDelete={() => deleteMusicHistory(entry.data.id)}
+                    onCopyPrompt={() => handleCopyPrompt(entry.data.prompt)}
+                    onReuse={onReusePrompt && entry.data.prompt ? () => onReusePrompt(entry.data.prompt) : undefined}
+                  />
+                ) : (
                   <HistoryListRow
                     key={`${entry.kind}-${entry.data.id}`}
                     entry={entry}
@@ -375,18 +398,14 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                       if (entry.kind === 'image') {
                         const u = await getUrl(entry.data.imageUrl)
                         if (u) downloadImage(u, `playground-${entry.data.id}`)
-                      } else if (entry.kind === 'video') {
+                      } else {
                         const u = await getUrl(entry.data.videoUrl)
                         if (u) downloadImage(u, `playground-${entry.data.id}`, 'mp4')
-                      } else {
-                        const u = await getUrl(entry.data.audioRef)
-                        if (u) downloadImage(u, `playground-${entry.data.id}`, 'mp3')
                       }
                     }}
                     onDelete={() => {
                       if (entry.kind === 'image') deleteImageHistory(entry.data.id)
-                      else if (entry.kind === 'video') deleteVideoHistory(entry.data.id)
-                      else deleteMusicHistory(entry.data.id)
+                      else deleteVideoHistory(entry.data.id)
                     }}
                   />
                 ))}
@@ -456,7 +475,9 @@ function HistoryListRow({
   onDelete,
   onAnimate,
 }: {
-  entry: HistoryEntry
+  // Never a track: music has no thumbnail and wears `MusicRow` in both views,
+  // so this row only ever frames a still or a clip.
+  entry: Exclude<HistoryEntry, { kind: 'music' }>
   mediaAspect: number
   isSaving: boolean
   scrollRoot: React.RefObject<HTMLElement | null>
@@ -474,7 +495,7 @@ function HistoryListRow({
   // coming and going moves nothing, while a still that released would resize
   // this row from above the viewport. See useNearViewport.
   const { ref: rowRef, near, seen } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: entry.kind === 'video' })
-  const mediaRef = entry.kind === 'image' ? entry.data.imageUrl : entry.kind === 'video' ? entry.data.videoUrl : null
+  const mediaRef = entry.kind === 'image' ? entry.data.imageUrl : entry.data.videoUrl
   // A still renders its grid-sized copy, never the original (see
   // utils/mediaThumbs); a clip renders the original, with its poster frame
   // standing in while it loads and after it's released.
@@ -482,35 +503,21 @@ function HistoryListRow({
   const clip = useAssetUrlState(near && entry.kind === 'video' ? mediaRef : null)
   const { url, status } = entry.kind === 'video' ? clip : still
   const poster = useAssetPoster(seen && entry.kind === 'video' ? mediaRef : null)
-  // Music rows play from their own artwork, with the waveform under the prompt
-  // — the same transport the grid tile and Voiceovers' history cards use.
-  const coverUrl = useAssetUrl(entry.kind === 'music' ? entry.data.coverImageRef ?? null : null)
-  const musicPlayer = useAudioPlayback(
-    entry.kind === 'music' ? entry.data.audioRef : null,
-    entry.kind === 'music' ? entry.data.durationSeconds ?? 0 : 0,
-  )
   // Native controls here, but the same one-clip-at-a-time rule as the tiles.
   const rowVideo = useExclusiveVideo()
   const prompt = entry.data.prompt
   const isSaved = entry.kind === 'image' ? !!entry.data.linkedBRollId : false
 
-  const ratioStr = entry.kind === 'music' ? null : entry.data.aspectRatio
-  const frameAspect = frameAspectFor(ratioStr, mediaAspect)
+  const frameAspect = frameAspectFor(entry.data.aspectRatio, mediaAspect)
 
   const meta: string[] = []
   if (entry.kind === 'image') {
     if (entry.data.resolution) meta.push(entry.data.resolution)
     if (entry.data.aspectRatio) meta.push(entry.data.aspectRatio)
-  } else if (entry.kind === 'video') {
+  } else {
     if (entry.data.resolution) meta.push(entry.data.resolution)
     if (entry.data.durationSeconds) meta.push(`${entry.data.durationSeconds}s`)
     if (entry.data.aspectRatio) meta.push(entry.data.aspectRatio)
-  } else {
-    // Instrumental is a chip on the artwork already — the pills carry what it
-    // doesn't say.
-    if (entry.data.durationSeconds) meta.push(`${Math.round(entry.data.durationSeconds)}s`)
-    else if (musicPlayer.duration > 0) meta.push(`${Math.round(musicPlayer.duration)}s`)
-    if (!entry.data.instrumental) meta.push('Lyrics')
   }
 
   return (
@@ -520,15 +527,7 @@ function HistoryListRow({
           position; portraits follow the slider-driven aspect, growing taller as it
           moves right. */}
       <div className="relative min-w-0 flex-[3] bg-black light:bg-[#EAEAEC]" style={{ aspectRatio: frameAspect }}>
-        {entry.kind === 'music' ? (
-          <MusicArtwork
-            coverUrl={coverUrl}
-            instrumental={entry.data.instrumental}
-            isPlaying={musicPlayer.isPlaying}
-            onToggle={musicPlayer.toggle}
-            className="absolute inset-0"
-          />
-        ) : status === 'ready' && url ? (
+        {status === 'ready' && url ? (
           entry.kind === 'video' ? (
             // `#t=0.1` is load-bearing, not decoration: with `preload="metadata"`
             // Safari fetches the duration and dimensions but decodes no frame, so
@@ -580,9 +579,6 @@ function HistoryListRow({
             same reading order Characters' list row uses, so a row looks the
             same across the two apps. Hidden when generation info is off. */}
         <ModelPill modelId={entry.data.modelId} className="self-start" />
-        {entry.kind === 'music' && entry.data.title && (
-          <p className="truncate text-[13px] font-semibold text-ink-100">{entry.data.title}</p>
-        )}
         {meta.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             {meta.map((m) => (
@@ -595,7 +591,6 @@ function HistoryListRow({
             {prompt}
           </div>
         )}
-        {entry.kind === 'music' && <MusicWaveStrip player={musicPlayer} className="shrink-0" />}
         {/* Canonical action order: download · save · copy · [reuse] · [animate] · delete. */}
         <div className="flex items-center gap-1">
           <ListRowButton title="Download" onClick={onDownload}>
@@ -617,7 +612,7 @@ function HistoryListRow({
           )}
           {onReuse && (
             <ListRowButton title="Reuse this prompt" onClick={onReuse}>
-              <ArrowLeft className="h-4 w-4" />
+              <CornerDownLeft className="h-4 w-4" />
             </ListRowButton>
           )}
           {onAnimate && (
@@ -776,7 +771,7 @@ function ImageTile({
               panel the prompt is going to. */}
           {onReuse && (
             <TileActionButton title="Reuse this prompt" onClick={(e) => { e.stopPropagation(); onReuse() }}>
-              <ArrowLeft className="h-4 w-4" />
+              <CornerDownLeft className="h-4 w-4" />
             </TileActionButton>
           )}
           {onAnimate && (
@@ -927,7 +922,7 @@ function VideoTile({
             )}
             {onReuse && (
               <TileActionButton title="Reuse this prompt" onClick={(e) => { e.stopPropagation(); onReuse() }}>
-                <ArrowLeft className="h-4 w-4" />
+                <CornerDownLeft className="h-4 w-4" />
               </TileActionButton>
             )}
             <TileDeleteButton onDelete={onDelete} />
@@ -1188,7 +1183,7 @@ function PreviewModal({
                 changed is behind the overlay. */}
             {onReuse && (
               <ModalBarButton onClick={() => { onReuse(); onClose() }}>
-                <ArrowLeft className="h-4 w-4" />
+                <CornerDownLeft className="h-4 w-4" />
                 <span>Reuse prompt</span>
               </ModalBarButton>
             )}
