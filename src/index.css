@@ -208,18 +208,20 @@
   --color-playground-500: #015C52;
   --color-playground-600: color-mix(in oklab, #015C52 85%, black);
 
-  /* Products — light blue #38BDF8 (bank accent + product reference cards).
-     It went green for a day and came straight back — Massimo's call. The
-     family is still NAMED `gold-*` and that is deliberate: it was a deep
-     purple originally, the name has never described the hex, and renaming it
-     would touch every product-tinted class in the app for no behaviour
-     change. */
-  --color-gold-100: color-mix(in oklab, #38BDF8 25%, white);
-  --color-gold-200: color-mix(in oklab, #38BDF8 40%, white);
-  --color-gold-300: color-mix(in oklab, #38BDF8 60%, white);
-  --color-gold-400: color-mix(in oklab, #38BDF8 80%, white);
-  --color-gold-500: #38BDF8;
-  --color-gold-600: color-mix(in oklab, #38BDF8 85%, black);
+  /* Products — sky blue #0EA5E9 (bank accent + product reference cards).
+     It went green for a day and came straight back, and moved off the paler
+     #0EA5E9 in September 2026 — both Massimo's call. The family is still NAMED
+     `gold-*` and that is deliberate: it was a deep purple originally, the name
+     has never described the hex, and renaming it would touch every
+     product-tinted class in the app for no behaviour change. Change it in TWO
+     places or the two halves drift: here (both themes) and
+     `BANK_META.products.accent` in utils/constants.ts. */
+  --color-gold-100: color-mix(in oklab, #0EA5E9 25%, white);
+  --color-gold-200: color-mix(in oklab, #0EA5E9 40%, white);
+  --color-gold-300: color-mix(in oklab, #0EA5E9 60%, white);
+  --color-gold-400: color-mix(in oklab, #0EA5E9 80%, white);
+  --color-gold-500: #0EA5E9;
+  --color-gold-600: color-mix(in oklab, #0EA5E9 85%, black);
 
   /* Ad Analyzer — red #FF5257 (used as literal hex in ad-anatomy) */
   --color-analyzer-500: #FF5257;
@@ -296,11 +298,11 @@
   --color-playground-400: color-mix(in oklab, #015C52 95%, black);
   --color-playground-600: color-mix(in oklab, #015C52 85%, black);
 
-  --color-gold-100: color-mix(in oklab, #38BDF8 35%, black);
-  --color-gold-200: color-mix(in oklab, #38BDF8 50%, black);
-  --color-gold-300: color-mix(in oklab, #38BDF8 70%, black);
-  --color-gold-400: color-mix(in oklab, #38BDF8 95%, black);
-  --color-gold-600: color-mix(in oklab, #38BDF8 85%, black);
+  --color-gold-100: color-mix(in oklab, #0EA5E9 35%, black);
+  --color-gold-200: color-mix(in oklab, #0EA5E9 50%, black);
+  --color-gold-300: color-mix(in oklab, #0EA5E9 70%, black);
+  --color-gold-400: color-mix(in oklab, #0EA5E9 95%, black);
+  --color-gold-600: color-mix(in oklab, #0EA5E9 85%, black);
 
   --color-dashboard-100: color-mix(in oklab, #059669 35%, black);
   --color-dashboard-200: color-mix(in oklab, #059669 50%, black);
@@ -585,15 +587,6 @@ textarea,
 .scroll-fade-r {
   -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
   mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
-}
-
-/* Bottom-edge fade for a vertical scroller (the Product form's field column).
-   Applied ONLY while there is content below the fold — a fade that's always
-   there is decoration, one that appears and clears is the affordance: it says
-   the column keeps going, and stops saying it at the end. */
-.scroll-fade-b {
-  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent 100%);
-  mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent 100%);
 }
 
 /* ── Backgrounded apps stop painting ────────────────────────────────

@@ -16,6 +16,11 @@ import { useAppStore } from '../../../stores/appStore'
 import { useAssetUrl } from '../../../hooks/useAssetUrl'
 import { enhanceBrief } from '../services/generateScript'
 import ScriptStyleList from './ScriptStyleList'
+// The Bank's own product form, hosted here. A deliberate cross-app import (the
+// shape `finder/SwipeDetail` already borrows from Outliers): the alternative is
+// a second fourteen-field form that drifts from the real one the moment either
+// gains a field, which is exactly what this replaced.
+import ProductEditModal from '../../finder/ProductEditModal'
 import SectionRail from '../../../components/SectionRail'
 import { useSectionSpy } from '../../../components/sectionSpy'
 import { humanizeError } from '../../../utils/friendlyError'
@@ -98,12 +103,13 @@ export default function InputPanel({
   const [scriptPickerOpen, setScriptPickerOpen] = useState(false)
   // Which big text box is open in the full-screen editor (null = none).
   const [expandedField, setExpandedField] = useState<null | 'brief' | 'source' | 'additionalContext'>(null)
-  // Seed the editable context from a product that's already selected on mount
-  // (persisted selection / history reload) so the "Edit product details"
-  // dropdown is available immediately — not only after picking a new product.
-  const [editableContext, setEditableContext] = useState<EditableProductContext | null>(
-    () => (selectedProduct ? createEditableContext(selectedProduct) : null),
-  )
+  // What the writer is told about the product, read straight off the bank row.
+  // It is DERIVED, never held: editing product details edits the product, for
+  // every app that reads it, so there is no script-scoped copy to drift from
+  // the bank.
+  const editableContext: EditableProductContext | null = selectedProduct
+    ? createEditableContext(selectedProduct)
+    : null
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [styleModalOpen, setStyleModalOpen] = useState(false)
   // The style picker's rail: Structures over Formats, one scroll.
@@ -144,7 +150,6 @@ export default function InputPanel({
   const canUndoContext = contextIndex > 0
   const canRedoContext = contextIndex < contextHistory.length - 1
   const products = useBankStore((s) => s.products)
-  const updateProduct = useBankStore((s) => s.updateProduct)
   const openApp = useAppStore((s) => s.openApp)
   const sendToApp = useAppStore((s) => s.sendToApp)
   const addToast = useAppStore((s) => s.addToast)
@@ -174,29 +179,18 @@ export default function InputPanel({
   const showCount = !blueprintActive
   const showLength = !isHooksFormat
 
-  // Slide-over footer actions. The edits already live in `editableContext`
-  // (used for this generation), so "save for this script" just dismisses;
-  // "update in bank" persists them back onto the saved product.
-  const handleSaveForScript = () => {
+  // A different product means a different form — and no reason to still be
+  // holding the last one's open. Done during render (prop-change sync) so it
+  // never setState-from-effect.
+  //
+  // Keyed on the ID, never on the object: `selectedProduct` is looked up out of
+  // the bank, so every autosave the details modal makes hands back a new object
+  // for the SAME product — and an identity check closed the modal on the first
+  // keystroke that reached the bank, which read as the edit being rejected.
+  const [prevProductId, setPrevProductId] = useState(selectedProduct?.id ?? null)
+  if ((selectedProduct?.id ?? null) !== prevProductId) {
+    setPrevProductId(selectedProduct?.id ?? null)
     setDetailsOpen(false)
-    addToast('Saved for this script')
-  }
-  const handleUpdateBank = async () => {
-    if (!selectedProduct || !editableContext) return
-    await updateProduct(selectedProduct.id, editableContext)
-    setDetailsOpen(false)
-    addToast('Product updated in bank', 'success')
-  }
-
-  // Rebuild the editable context whenever a different product is selected.
-  // Done during render (prop-change sync) so it never setState-from-effect.
-  const [prevProduct, setPrevProduct] = useState(selectedProduct)
-  if (selectedProduct !== prevProduct) {
-    setPrevProduct(selectedProduct)
-    if (selectedProduct) {
-      setEditableContext(createEditableContext(selectedProduct))
-      setDetailsOpen(false)
-    }
   }
 
   // Set the brief from one of our own actions (typing / undo / redo / enhance):
@@ -328,11 +322,6 @@ export default function InputPanel({
     openApp('finder')
   }
 
-  const updateField = (field: keyof EditableProductContext, value: string) => {
-    if (!editableContext) return
-    setEditableContext({ ...editableContext, [field]: value })
-  }
-
   // Bank pick → fill the source text AND remember the chosen item so the
   // picker card shows the filled state. The pipeline follows from the picked
   // item's content (a Scenes bank item auto-detects as a blueprint).
@@ -390,7 +379,7 @@ export default function InputPanel({
            rule; each half keeps its own hover so it's still obvious which
            one you're about to press. */
         <div
-          className={`overflow-hidden border border-gold-500/25 bg-gold-500/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-inset ring-gold-500/10 ${editableContext ? 'rounded-2xl' : 'rounded-full'}`}
+          className="overflow-hidden rounded-2xl border border-gold-500/25 bg-gold-500/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] ring-1 ring-inset ring-gold-500/10"
         >
           {/* Whole-card-clickable — hitting any part of the populated
               product card opens the picker. The refresh icon is a hover
@@ -400,7 +389,7 @@ export default function InputPanel({
             tabIndex={0}
             onClick={() => setProductPickerOpen(true)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProductPickerOpen(true) } }}
-            className={`group flex w-full cursor-pointer items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-gold-500/10 ${editableContext ? 'rounded-t-2xl' : 'rounded-full'}`}
+            className="group flex w-full cursor-pointer items-center gap-2.5 rounded-t-2xl px-4 py-2.5 text-left transition-colors hover:bg-gold-500/10"
           >
             <StatusDot filled />
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gold-500/15">
@@ -432,24 +421,21 @@ export default function InputPanel({
             </div>
           </div>
 
-          {editableContext && (
-            <>
-              {/* Inset, so the rule reads as a seam inside one card rather
-                  than a cut between two. */}
-              <div className="mx-4 border-t border-dashed border-gold-500/40" />
-              <button
-                type="button"
-                onClick={() => setDetailsOpen(true)}
-                className="flex w-full items-center justify-between gap-2 rounded-b-2xl px-4 py-2.5 text-left transition-colors hover:bg-gold-500/10"
-              >
-                <div className="flex items-center gap-2">
-                  <PenLine className="h-3.5 w-3.5 text-scripts-text" strokeWidth={1.75} />
-                  <span className="text-[12px] font-medium text-ink-200">Edit product details for this script</span>
-                </div>
-                <ChevronRight className="h-4 w-4 text-ink-400" strokeWidth={2} />
-              </button>
-            </>
-          )}
+          {/* Inset, so the rule reads as a seam inside one card rather than a
+              cut between two. The label says "Edit Product Details" and means
+              it: this edits the bank row, not a copy of it kept for this run. */}
+          <div className="mx-4 border-t border-dashed border-gold-500/40" />
+          <button
+            type="button"
+            onClick={() => setDetailsOpen(true)}
+            className="flex w-full items-center justify-between gap-2 rounded-b-2xl px-4 py-2.5 text-left transition-colors hover:bg-gold-500/10"
+          >
+            <div className="flex items-center gap-2">
+              <PenLine className="h-3.5 w-3.5 text-scripts-text" strokeWidth={1.75} />
+              <span className="text-[12px] font-medium text-ink-200">Edit Product Details</span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-ink-400" strokeWidth={2} />
+          </button>
         </div>
       ) : (
         <div>
@@ -712,14 +698,22 @@ export default function InputPanel({
               {/* No top margin: the product row above already carries mb-2, and
                   the pair of them stacked a 16px gap where every other row in the
                   column sits 8 apart. */}
-              {/* max-md: the growable boxes stop sharing the leftover height. On a
-                  phone there IS no leftover — the column is shorter than its own
-                  contents — so flex-1 just squeezes every box until the card's
-                  overflow-hidden slices it. Fixed floors + a scrolling column is
-                  the phone shape; the height-sharing is a desktop luxury. */}
-              <div className="flex min-h-[160px] flex-1 basis-0 flex-col max-md:min-h-[220px] max-md:flex-none max-md:basis-auto">
+              {/* max-lg: the growable boxes stop sharing the leftover height.
+                  Below that width there IS no leftover — the column is shorter
+                  than its own contents — so flex-1 just squeezes every box down
+                  to its floor, and you end up scrolling INSIDE the textarea
+                  rather than down the column. Fixed floors + a scrolling column
+                  is the answer; height-sharing is a wide-window luxury. It was
+                  `max-md` until September 2026 (Massimo's report): between 768
+                  and 1024 the column is narrow enough that the same text wraps
+                  to half again the lines, so the squeeze started well before the
+                  breakpoint that relieved it. The column's own `overflow-y-auto`
+                  and the pinned Generate band are untouched — only which of them
+                  gives up height changes. */}
+              <div className="flex min-h-[160px] flex-1 basis-0 flex-col max-lg:min-h-[220px] max-lg:flex-none max-lg:basis-auto">
                 <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
-                  <div className="flex shrink-0 items-center px-4 pt-2.5">
+                  {/* Centred, like every other box header in this column. */}
+                  <div className="flex shrink-0 items-center justify-center px-4 pt-2.5">
                     <div className="flex min-w-0 items-center gap-1.5">
                       <PenLine className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
                       <span className="truncate text-[13px] font-medium text-ink-200">Additional Instructions</span>
@@ -759,11 +753,11 @@ export default function InputPanel({
             <SectionCard
               icon={Layers}
               title="References"
-              className="mb-2 flex flex-1 flex-col max-md:flex-none"
+              className="mb-2 flex flex-1 flex-col max-lg:flex-none"
               contentClassName="flex flex-1 flex-col gap-2"
               left={<ClearAllButton label="Clear" onClear={onClearInputs} />}
             >
-            <div className="flex min-h-[140px] flex-1 flex-col max-md:min-h-[240px] max-md:flex-none">
+            <div className="flex min-h-[140px] flex-1 flex-col max-lg:min-h-[240px] max-lg:flex-none">
               {/* Select from bank (header) + paste manually (textarea) merged into
                   one rounded box so the two sources read as a single input. One
                   box serves both remix pipelines: the pasted source's format is
@@ -834,7 +828,7 @@ export default function InputPanel({
             // the box's overflow-hidden sliced the footer toolbar in half. A
             // min-height on the section overrides its auto min-size, so it shrinks
             // to a real, known floor and everything inside shrinks with it.
-            <div className="flex min-h-[120px] flex-1 flex-col max-md:min-h-[200px] max-md:flex-none">
+            <div className="flex min-h-[120px] flex-1 flex-col max-lg:min-h-[200px] max-lg:flex-none">
               {/* Single rounded box (matches the Write New brief): a header row
                   naming the field, the textarea taking whatever height is left,
                   then Enhance / Clear / Undo / Redo + Expand in a footer. The
@@ -843,7 +837,8 @@ export default function InputPanel({
                   belongs on the field, and the row it needed outside cost the
                   textarea its height in a column that's already tight. */}
               <div className="relative flex min-h-0 grow flex-col overflow-hidden rounded-3xl border border-ink/10 bg-ink/[0.02] transition-colors focus-within:border-scripts-500/30">
-                <div className="flex shrink-0 items-center px-4 pt-2.5">
+                {/* Centred, like every other box header in this column. */}
+                <div className="flex shrink-0 items-center justify-center px-4 pt-2.5">
                   <div className="flex min-w-0 items-center gap-1.5">
                     <PenLine className="h-3.5 w-3.5 shrink-0 text-ink-500" strokeWidth={2} />
                     <span className="truncate text-[13px] font-medium text-ink-200">Additional Instructions</span>
@@ -1009,55 +1004,19 @@ export default function InputPanel({
           onClose={() => setScriptPickerOpen(false)}
         />
 
-        {/* Edit product details — opens in a modal with full-size fields, so
-            you never scroll the form or fight tiny inline boxes. */}
-        <Modal
-          open={detailsOpen}
+        {/* Edit Product Details — the Bank's own product form, opened where the
+            product is picked. It is that page in a modal, photo column and
+            Auto-fill included, rather than a second copy of its fields: this
+            edits THE product, so it should look and behave like editing the
+            product. It was a script-scoped fourteen-field panel with a "save
+            for this script only" fork, which meant a member could fix a pain
+            point here, generate off the fix, and leave the bank — and therefore
+            B-Roll, the Ad Analyzer and the next script — still holding the old
+            wording. */}
+        <ProductEditModal
+          product={detailsOpen ? selectedProduct : null}
           onClose={() => setDetailsOpen(false)}
-          title="Edit Product Details"
-          subtitle="Edit for this script, or push the changes back to your bank"
-          // Fourteen fields down a 512px column was the drawer shape it was
-          // built in. Two columns halves it; it is a form, read down a column,
-          // so it keeps a short scroll rather than going gallery-wide.
-          size="wide"
-          footer={
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={handleSaveForScript}
-                className="w-full glass-fill glass-fill-soft rounded-full border border-white/15 bg-scripts-500 px-5 py-2.5 text-[13px] font-bold tracking-tight text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),inset_0_-1px_0_rgba(255,255,255,0.08)] transition-all hover:brightness-110"
-              >
-                Save for this script only
-              </button>
-              <button
-                type="button"
-                onClick={handleUpdateBank}
-                className="w-full rounded-full border border-ink/10 bg-ink/[0.02] px-5 py-2.5 text-[13px] font-medium tracking-tight text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.05] hover:text-ink-100"
-              >
-                Update product in bank
-              </button>
-            </div>
-          }
-        >
-          {editableContext && (
-            <div className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
-              <EditableField label="Name" value={editableContext.productName} onChange={(v) => updateField('productName', v)} />
-              <EditableField label="Description" value={editableContext.productDescription} onChange={(v) => updateField('productDescription', v)} />
-              <EditableField label="Unique Mechanism" value={editableContext.uniqueMechanism} onChange={(v) => updateField('uniqueMechanism', v)} />
-              <EditableField label="Target Market" value={editableContext.targetMarket} onChange={(v) => updateField('targetMarket', v)} />
-              <EditableField label="Pain Points" value={editableContext.painPoints} onChange={(v) => updateField('painPoints', v)} />
-              <EditableField label="Benefits" value={editableContext.benefits} onChange={(v) => updateField('benefits', v)} />
-              <EditableField label="Before / After" value={editableContext.beforeAfter} onChange={(v) => updateField('beforeAfter', v)} />
-              <EditableField label="Current Alternatives" value={editableContext.currentAlternatives} onChange={(v) => updateField('currentAlternatives', v)} />
-              <EditableField label="USPs" value={editableContext.usps} onChange={(v) => updateField('usps', v)} />
-              <EditableField label="Proof" value={editableContext.proof} onChange={(v) => updateField('proof', v)} />
-              <EditableField label="Objections" value={editableContext.objections} onChange={(v) => updateField('objections', v)} />
-              <EditableField label="Not For" value={editableContext.notFor} onChange={(v) => updateField('notFor', v)} />
-              <EditableField label="Offer" value={editableContext.offer} onChange={(v) => updateField('offer', v)} />
-              <EditableField label="CTA" value={editableContext.cta} onChange={(v) => updateField('cta', v)} />
-            </div>
-          )}
-        </Modal>
+        />
 
         {/* Style picker — tap a style to select it. */}
         <Modal
@@ -1257,19 +1216,5 @@ function ScriptBankCard({
         </button>
       </div>
     </div>
-  )
-}
-
-function EditableField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">{label}</span>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={3}
-        className="w-full rounded-2xl border border-ink/10 bg-ink/[0.02] px-4 py-3 text-[13px] leading-relaxed text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-scripts-500/30 resize-none"
-      />
-    </label>
   )
 }

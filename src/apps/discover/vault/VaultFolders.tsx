@@ -142,7 +142,7 @@ function FolderTile({ tile }: { tile: Tile }) {
           rather than leaving a ragged row. */}
       <div className="flex min-h-[44px] items-center gap-2.5 px-3 py-2.5">
         {/* Outliers' gold as a literal — the app's `gold-*` Tailwind family is
-            #38BDF8, which is light blue and belongs to the Products bank. */}
+            #0EA5E9, which is sky blue and belongs to the Products bank. */}
         <span
           className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
             tile.starred

@@ -19,6 +19,7 @@ import BRollForm from './BRollForm'
 import StyleForm from './StyleForm'
 import { partitionImageFiles } from './services/imageValidation'
 import { saveProductDraft, adoptDetachedExtraction } from './services/saveProductDraft'
+import { persistProductImages, newImageMemo, type ImageMemo } from './services/productImages'
 import type { ProductExtraction } from './services/extractProductInfo'
 
 const BANK_TYPES: BankType[] = ['products', 'models', 'scripts', 'voices', 'brolls', 'styles', 'swipes']
@@ -29,35 +30,6 @@ const BANK_TYPES: BankType[] = ['products', 'models', 'scripts', 'voices', 'brol
 // that isn't there. Switching Outliers back on brings the tab and its rows back
 // untouched — nothing here deletes a swipe.
 const BANK_OWNER_APP: Partial<Record<BankType, string>> = { swipes: 'discover' }
-
-// One photo's trip from data URI to stored asset, remembered by the exact bytes
-// it came in as. The form autosaves, and it adopts the asset ref a save hands
-// back through React state — so a debounce that fires in the window before that
-// adoption commits offers us the SAME data URI a second time. Persisting it
-// twice minted a second asset, which `updateProduct` then read as a replaced
-// photo and purged the first for; the form's pending adoption put the first ref
-// back on the row, so the second was purged in its turn — and the row was left
-// pointing at a blob that no longer existed. That is the placeholder card, and
-// it took every angle on the product with it.
-//
-// The map is per open form (cleared with the rest of the form's scratch state)
-// and holds the in-flight PROMISE, not the resolved ref, so a submit racing an
-// autosave over the same photo waits on the one save instead of starting a
-// second. Keying by the data URI costs nothing — JS strings are shared, so this
-// is another reference to bytes the form is already holding.
-type ImageMemo = Map<string, Promise<string>>
-
-function persistImage(src: string, memo: ImageMemo): Promise<string> {
-  if (!src.startsWith('data:')) return Promise.resolve(src)
-  const inFlight = memo.get(src)
-  if (inFlight) return inFlight
-  const pending = saveFromDataUrl(src)
-  memo.set(src, pending)
-  // A failed save must not be remembered, or the retry would hand back the
-  // same rejection for as long as the form stays open.
-  pending.catch(() => { if (memo.get(src) === pending) memo.delete(src) })
-  return pending
-}
 
 // Everything ONE open form accumulates: the row its autosaves write into, and
 // the photos it has already persisted.
@@ -80,20 +52,7 @@ interface FormScratch {
   images: ImageMemo
 }
 
-const newFormScratch = (): FormScratch => ({ rowId: null, images: new Map() })
-
-// Photos arrive from the Product form as data URIs on first add; already-saved
-// ones come back as asset:// refs and pass through untouched.
-async function persistProductImages(data: Omit<Product, 'id' | 'createdAt'>, memo: ImageMemo) {
-  const saved: Omit<Product, 'id' | 'createdAt'> = { ...data }
-  if (saved.productImage) {
-    saved.productImage = await persistImage(saved.productImage, memo)
-  }
-  if (saved.extraImages?.length) {
-    saved.extraImages = await Promise.all(saved.extraImages.map((src) => persistImage(src, memo)))
-  }
-  return saved
-}
+const newFormScratch = (): FormScratch => ({ rowId: null, images: newImageMemo() })
 
 // Influencers bank sub-filter. An entry is a "sheet" when `sheetImage` is set,
 // otherwise a portrait. Local-only UI state — not persisted.
