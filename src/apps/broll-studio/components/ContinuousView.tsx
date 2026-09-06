@@ -1246,7 +1246,7 @@ export default function ContinuousView({
             {chainRunning ? <Spinner className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
             {chainRunning
               ? chainAt ? `Frame ${chainAt.step} of ${chainAt.of}…` : 'Generating frames…'
-              : 'Generate frames'}
+              : 'Generate Frames'}
           </button>
           <button
             type="button"
@@ -1258,7 +1258,7 @@ export default function ContinuousView({
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/50 bg-broll-500/[0.24] px-3.5 py-1.5 text-[11px] font-medium text-broll-200 transition-colors hover:border-broll-500/65 hover:bg-broll-500/[0.32] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <VideoIcon className="h-3.5 w-3.5" />
-            Generate all videos
+            Generate All Videos
           </button>
           {allClipEntries.length > 0 && (
             <button
@@ -1268,7 +1268,7 @@ export default function ContinuousView({
               className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
             >
               <Download className="h-3.5 w-3.5" />
-              {`Download clips (${allClipEntries.length})`}
+              {`Download Clips (${allClipEntries.length})`}
             </button>
           )}
         </div>

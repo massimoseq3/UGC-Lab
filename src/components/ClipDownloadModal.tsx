@@ -130,7 +130,7 @@ export default function ClipDownloadModal({
       >
         <div className="flex items-center justify-between gap-3 border-b border-ink/5 px-5 py-3.5">
           <div className="min-w-0">
-            <h3 className="text-sm font-medium text-ink-100">Download clips</h3>
+            <h3 className="text-sm font-medium text-ink-100">Download Clips</h3>
             <p className="mt-0.5 text-[11px] text-ink-500">{subtitle}</p>
           </div>
           <button
