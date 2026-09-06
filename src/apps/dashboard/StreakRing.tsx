@@ -31,8 +31,10 @@ export default function StreakRing({ current, best }: { current: number; best: n
   const record = current > 0 && current >= best
 
   // Today rides at the head of the arc, like a body at its point in orbit.
-  // Angle starts at twelve o'clock and sweeps clockwise, matching the arc's
-  // own -90° rotation.
+  // Angle starts at twelve o'clock and sweeps clockwise. The -90° is baked in
+  // HERE, which is why the rotation below wraps only the two circles: rotating
+  // the whole svg would apply it to this marker a second time and park it a
+  // quarter turn behind the arc it is supposed to sit on.
   const angle = progress * 2 * Math.PI - Math.PI / 2
   const head = { x: SIZE / 2 + R * Math.cos(angle), y: SIZE / 2 + R * Math.sin(angle) }
 
@@ -42,7 +44,7 @@ export default function StreakRing({ current, best }: { current: number; best: n
         width={BOX}
         height={BOX}
         viewBox={`${-PAD} ${-PAD} ${BOX} ${BOX}`}
-        className="absolute -rotate-90"
+        className="absolute"
         style={{ left: -PAD, top: -PAD }}
       >
         <defs>
@@ -55,26 +57,28 @@ export default function StreakRing({ current, best }: { current: number; best: n
             <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#059669" floodOpacity="0.9" />
           </filter>
         </defs>
-        <circle
-          cx={SIZE / 2}
-          cy={SIZE / 2}
-          r={R}
-          fill="none"
-          strokeWidth={STROKE}
-          className="stroke-ink/[0.08] light:stroke-black/[0.07]"
-        />
-        <circle
-          cx={SIZE / 2}
-          cy={SIZE / 2}
-          r={R}
-          fill="none"
-          strokeWidth={STROKE}
-          strokeLinecap="round"
-          strokeDasharray={CIRCUMFERENCE}
-          strokeDashoffset={CIRCUMFERENCE * (1 - progress)}
-          filter={record ? `url(#${arcGlow})` : undefined}
-          className="stroke-dashboard-500 transition-[stroke-dashoffset] duration-700 ease-out"
-        />
+        <g transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}>
+          <circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={R}
+            fill="none"
+            strokeWidth={STROKE}
+            className="stroke-ink/[0.08] light:stroke-black/[0.07]"
+          />
+          <circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={R}
+            fill="none"
+            strokeWidth={STROKE}
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={CIRCUMFERENCE * (1 - progress)}
+            filter={record ? `url(#${arcGlow})` : undefined}
+            className="stroke-dashboard-500 transition-[stroke-dashoffset] duration-700 ease-out"
+          />
+        </g>
         {current > 0 && (
           <circle cx={head.x} cy={head.y} r={3.5} filter={`url(#${headGlow})`} className="fill-dashboard-300" />
         )}

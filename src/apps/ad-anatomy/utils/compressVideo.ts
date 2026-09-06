@@ -1,9 +1,9 @@
 // Re-encodes an oversized ad in the browser so it still fits inside the
-// analyser's upload budget.
+// analyzer's upload budget.
 //
 // WHY THIS EXISTS. The clip is uploaded to kie's file host and the POST that
 // carries it is base64, which is 4/3 of the bytes it encodes — so a real ad
-// walks past the budget the analyser can send and comes back rejected before a
+// walks past the budget the analyzer can send and comes back rejected before a
 // single frame is read. That is the "video is too large" rejection members were
 // hitting, and it fired on files the app had already accepted.
 //
@@ -471,7 +471,7 @@ export async function compressVideoForAnalysis(
   const mimeType = pickContainer()
   if (!mimeType || !canCompressVideo()) {
     throw new FriendlyError(
-      'This browser cannot compress video, so this ad is too large to analyse here. Try Chrome, or export a smaller version of the clip.',
+      'This browser cannot compress video, so this ad is too large to analyze here. Try Chrome, or export a smaller version of the clip.',
     )
   }
 
@@ -481,7 +481,7 @@ export async function compressVideoForAnalysis(
   }
   if (duration > MAX_DURATION_SEC) {
     throw new FriendlyError(
-      `This ad is ${Math.round(duration)} seconds long and too large to send as-is. Trim it to under ${MAX_DURATION_SEC / 60} minutes and analyse it again.`,
+      `This ad is ${Math.round(duration)} seconds long and too large to send as-is. Trim it to under ${MAX_DURATION_SEC / 60} minutes and analyze it again.`,
     )
   }
 

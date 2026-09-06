@@ -8,6 +8,7 @@ import type { CharacterProfile, CharacterRefItem, InFlightCharacterGen, LaunchGe
 import { createEmptyProfile, profileFromFlat } from './types'
 import type { AspectRatio, ImageResolution } from '../../utils/models'
 import { getDefaultModel, clampImageResolution } from '../../utils/models'
+import DropOverlay from '../../components/DropOverlay'
 import MobilePaneTabs from '../../components/MobilePaneTabs'
 import { paneClass } from '../../components/paneClass'
 import { clampBatchCount, DEFAULT_BATCH_COUNT } from '../../utils/batchCount'
@@ -74,7 +75,7 @@ export default function CharacterStudio() {
   // alone; flipping back to Portrait still shows 1:1.
   const sheetAspect = (profile.aspectRatio ?? '').includes('16:9') ? '16:9' : '9:16'
 
-  // Which analysed reference photo currently fills the form. The photo itself
+  // Which analyzed reference photo currently fills the form. The photo itself
   // lives in the reference library below — this is only the pointer, so the
   // autofill pill and the library agree on which row is in play.
   const [activeRefId, setActiveRefId] = usePersistedState<string | null>(`${baseKey}:activeRef`, null)
@@ -89,7 +90,7 @@ export default function CharacterStudio() {
   // Phone-only: which of the two panes is on screen (ignored from md up).
   const [pane, setPane] = useState<'controls' | 'gallery'>('controls')
 
-  // Fill the form from an analysed reference and mark it as the active one.
+  // Fill the form from an analyzed reference and mark it as the active one.
   const applyReference = useCallback((item: CharacterRefItem) => {
     if (!item.profile) return
     setProfile(item.profile)
@@ -203,7 +204,7 @@ export default function CharacterStudio() {
     e.preventDefault()
   }
   // Drops anywhere on the app go into the reference library, same as the pill —
-  // several at once are analysed as a batch. Validation lives there.
+  // several at once are analyzed as a batch. Validation lives there.
   const handleOverlayDrop = (e: React.DragEvent) => {
     e.preventDefault()
     dragDepthRef.current = 0
@@ -465,7 +466,7 @@ export default function CharacterStudio() {
         />
       </div>
 
-      {/* The reference library — every photo analysed for autofill, kept so a
+      {/* The reference library — every photo analyzed for autofill, kept so a
           face can be reused without paying for the analysis twice. Lives here
           rather than in ControlsPanel so a bulk analysis keeps running with the
           panel closed. */}
@@ -483,17 +484,8 @@ export default function CharacterStudio() {
         onRemove={handleRemoveRef}
       />
 
-      {/* Full-area drag overlay — mirrors the Products bank dropzone: a full-bleed
-          dashed border with a light tint and a single centered pill, rather than
-          a dimming backdrop behind a large card. */}
-      {overlayActive && (
-        <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-green-400/60 bg-green-500/10 backdrop-blur-sm">
-          <div className="flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-green-200">
-            <Dna className="h-4 w-4" />
-            Drop to extract DNA
-          </div>
-        </div>
-      )}
+      {/* Full-area drag overlay — see components/DropOverlay. */}
+      {overlayActive && <DropOverlay icon={Dna} label="Drop to Extract DNA" accent="green" className="z-50" />}
     </div>
   )
 }

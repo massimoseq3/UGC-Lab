@@ -20,6 +20,7 @@ import { formatCount } from '../discover/services/scoring'
 import SwipeDetail from './SwipeDetail'
 import { groupByDay, sectionLabel } from '../../utils/history'
 import DayPill from '../../components/DayPill'
+import DropOverlay from '../../components/DropOverlay'
 
 // Custom sort dropdown — replaces the native <select> so the menu is themed
 // (not the stock OS popup) and the trigger font matches the bank toggle.
@@ -860,14 +861,7 @@ function ProductsBankZone({ children, onBulkFiles }: { children: React.ReactNode
         if (files.length > 0) onBulkFiles(files)
       }}
     >
-      {overlay && (
-        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center rounded-xl border-2 border-dashed border-emerald-400/60 bg-emerald-500/10 backdrop-blur-sm">
-          <div className="flex items-center gap-2 rounded-full bg-black/70 px-4 py-2 text-sm font-medium text-emerald-200">
-            <Sparkles className="h-4 w-4" />
-            Drop image(s) to bulk-add products
-          </div>
-        </div>
-      )}
+      {overlay && <DropOverlay icon={Sparkles} label="Drop image(s) to Bulk-add Products" accent="emerald" />}
       {children}
     </div>
   )

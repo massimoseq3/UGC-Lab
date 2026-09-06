@@ -293,7 +293,7 @@ function TranscriptSection({ result, fileName }: { result: AnalysisResult; fileN
 // those headers, so a lone scene handed over without one was silently remixed
 // as a plain spoken script — no scene rewrite, no voice profile, three script
 // variations written off a video prompt. And a lone scene is the COMMON case,
-// not an edge one: the analyser's chunking rule returns a single scene for any
+// not an edge one: the analyzer's chunking rule returns a single scene for any
 // ad of 15 seconds or less. The bare prompt is still one click away on the
 // scene's own Copy button, which hands over `scene.prompt` verbatim.
 function sceneHeader(s: Scene): string {
@@ -396,7 +396,7 @@ function MiniButton({ onClick, icon: Icon, label }: { onClick: () => void; icon:
 
 // The look, saveable to the Styles bank: `brief` is written to the same
 // contract a bank style holds (how it looks, never what's in it), so the member
-// can render their OWN ad in the analysed ad's look.
+// can render their OWN ad in the analyzed ad's look.
 function VisualStyleBlock({ style, adTitle }: { style: MasterVisualStyle; adTitle: string }) {
   const { copied, copy } = useCopy()
   const addStyle = useBankStore((s) => s.addStyle)
@@ -667,7 +667,7 @@ function ReverseEngineeredSection({ result, fileName }: { result: AnalysisResult
         </div>
 
         {/* The ad-wide look and voice, above the shots they hold together.
-            Both are absent on results analysed before they existed, and the
+            Both are absent on results analyzed before they existed, and the
             voice is absent on an ad with no speech. */}
         {reverseEngineeredPrompt.masterVisualStyle && (
           <VisualStyleBlock style={reverseEngineeredPrompt.masterVisualStyle} adTitle={adTitle} />

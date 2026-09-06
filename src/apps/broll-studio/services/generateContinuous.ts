@@ -66,7 +66,7 @@ export function sceneDuration(scriptLine: string, modelId: string): number {
 }
 
 // ── Visual styles ──────────────────────────────────────────────
-// The style registry, the reference-frame analyser, and brief resolution now
+// The style registry, the reference-frame analyzer, and brief resolution now
 // live in utils/visualStyle.ts — Characters consumes them too, and apps don't
 // import from each other. Re-exported here so B-Roll's own call sites (and any
 // persisted imports) keep working unchanged.

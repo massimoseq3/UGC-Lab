@@ -1,6 +1,6 @@
 // The Ad Analyzer → B-Roll handoff.
 //
-// THE RULE THIS FILE EXISTS FOR: the analysed scenes describe SOMEONE ELSE'S
+// THE RULE THIS FILE EXISTS FOR: the analyzed scenes describe SOMEONE ELSE'S
 // ad. They name the original creator's face, hair and wardrobe and the original
 // brand's packaging on purpose — the recreation prompts exist to reproduce that
 // ad one-for-one. Shipping them into B-Roll beside the member's own product and
@@ -12,7 +12,7 @@
 // the ad's CRAFT — its beats, rhythm, framing and camera. The transcript becomes B-Roll's
 // script; the ad's beat map and shot craft ride `BrollInput.sceneStaging`, the
 // same seam a Script Style format uses. B-Roll writes fresh prompts against the
-// member's own refs, shot the way the analysed ad was shot.
+// member's own refs, shot the way the analyzed ad was shot.
 //
 // The beat map is identity-free by construction (timings, beat names, scene
 // labels). The shot reference is not, so it ships behind an explicit exclusion

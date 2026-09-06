@@ -15,7 +15,7 @@ interface GenerationProgressProps {
   messageClassName?: string
   // Optional named phase for multi-stage jobs, e.g. {step: 1, of: 2, label:
   // 'logging every cut'} → "Pass 1 of 2 — logging every cut". Borrowed from the
-  // Ad Analyzer's analysing pane: on a job with real stages, knowing WHICH
+  // Ad Analyzer's analyzing pane: on a job with real stages, knowing WHICH
   // stage you're in is far more reassuring than a rotating status line alone.
   // Omit it for single-stage generations.
   phase?: { step: number; of: number; label?: string; noun?: string }

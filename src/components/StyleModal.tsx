@@ -22,7 +22,7 @@ const MAX_REFS = 4
 export interface StyleSelection {
   brief: string
   // Display name — set when the style came from (or was just saved to) the
-  // bank. A one-off analysed brief has none and reads as "Custom style".
+  // bank. A one-off analyzed brief has none and reads as "Custom style".
   name: string | null
   bankId: string | null
 }
@@ -136,7 +136,7 @@ export default function StyleModal({
 
   // 'browse' picks an existing look; 'create' reads a new one off references.
   const [view, setView] = useState<'browse' | 'create'>('browse')
-  // The analysed paragraph, editable before it's used or saved. Empty until the
+  // The analyzed paragraph, editable before it's used or saved. Empty until the
   // vision pass returns.
   const [draftBrief, setDraftBrief] = useState('')
   const [draftName, setDraftName] = useState('')
@@ -270,7 +270,7 @@ export default function StyleModal({
     >
       {view === 'browse' ? (
         <div className="px-5 py-4">
-          {/* A one-off analysed brief isn't in the bank, so no card can carry
+          {/* A one-off analyzed brief isn't in the bank, so no card can carry
               its selected state — surface it here with a way back out. */}
           {usingCustom && !styleBankId && (
             <div className={`mb-4 rounded-2xl border px-4 py-3 ${accent.banner}`}>
