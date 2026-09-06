@@ -68,3 +68,20 @@ export function seedColor(id: string): string {
     `linear-gradient(${angle}deg, ${light}, ${mid} 52%, ${shade})`
   )
 }
+
+// The rim every play disc wears over that fill, so the button reads as a piece
+// of metal rather than a coloured circle with a triangle stamped on it
+// (September 2026, Massimo's call — it "felt tacky").
+//
+// Both inset rims are LIT, top brighter than bottom, which is the same rule
+// `.glass-fill` states for its squircles: light entering the top of a solid
+// object exits along its far edge, so a dark bottom rim reads as a printed
+// sticker. The outer shadow is what lifts it off the card. The glyph shrank
+// with it — a 16px triangle on a 40px disc is the stock-media-player look, and
+// what says "press me" here is the disc, not the size of the mark on it.
+//
+// No `hover:scale-*`: a button that jumps under the pointer is the other half
+// of what read as cheap. `hover:brightness-110` lifts the metal instead, and
+// unlike a tint token it means the same thing in both themes.
+export const PLAY_DISC_RIM =
+  'shadow-[inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-1px_0_rgba(255,255,255,0.14),0_1px_3px_rgba(0,0,0,0.28)]'

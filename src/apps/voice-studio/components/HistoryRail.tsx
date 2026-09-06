@@ -4,16 +4,15 @@ import ClearAllButton from '../../../components/ClearAllButton'
 import { useBankStore } from '../../../stores/bankStore'
 import type { VoiceHistoryItem } from '../../../stores/types'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
-import { seedColor } from './seedColor'
+import { seedColor, PLAY_DISC_RIM } from './seedColor'
 import { GeneratingChip, GeneratingPulseRing } from '../../../components/GeneratingChip'
 import DayPill from '../../../components/DayPill'
-import Waveform from '../../../components/Waveform'
+import AudioScrubber from '../../../components/AudioScrubber'
 import {
   claimAudioSlot,
   formatClock,
   releaseAudioSlot,
   resolveAudioUrl,
-  waveformPeaks,
 } from '../../../utils/audioPlayback'
 
 // A voiceover that's been fired but hasn't landed yet. Rendered as a card at the
@@ -58,9 +57,6 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onDele
   const [isPlaying, setIsPlaying] = useState(false)
   const [position, setPosition] = useState(0)
   const [duration, setDuration] = useState(0)
-  // Peaks for the loaded clip — the whole waveform, decoded once and drawn at
-  // rest while playback fills it left to right.
-  const [peaks, setPeaks] = useState<number[] | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const rafRef = useRef(0)
   const loadTokenRef = useRef(0)
@@ -98,11 +94,6 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onDele
     setIsPlaying(false)
     setPosition(0)
     setDuration(item.duration || 0)
-    setPeaks(null)
-    void waveformPeaks(item.audioUrl).then((p) => {
-      // A newer card claimed the player while this decoded.
-      if (loadTokenRef.current === token) setPeaks(p)
-    })
 
     let url: string
     try {
@@ -334,15 +325,15 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onDele
                             target, and the colour still says which voice it is. */}
                         <button
                           onClick={(e) => { e.stopPropagation(); togglePlay(item) }}
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white shadow-sm ring-2 transition-transform hover:scale-105 ${
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white ring-2 transition-all hover:brightness-110 ${PLAY_DISC_RIM} ${
                             isPlayingThis ? 'ring-voice-400/60' : 'ring-transparent'
                           }`}
                           style={{ background: seedColor(item.voiceId) }}
                           title={isPlayingThis ? 'Pause' : 'Play'}
                         >
                           {isPlayingThis
-                            ? <Pause className="h-4 w-4 fill-current" />
-                            : <Play className="h-4 w-4 translate-x-px fill-current" />}
+                            ? <Pause className="h-3.5 w-3.5 fill-current" />
+                            : <Play className="h-3.5 w-3.5 translate-x-px fill-current" />}
                         </button>
 
                         <div className="min-w-0 flex-1">
@@ -380,25 +371,33 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onDele
                         {item.scriptPreview}
                       </p>
 
-                      {/* Waveform — the whole clip, filling left to right as it
-                          plays, and clickable to seek. Opens on play; the
-                          grid-rows trick animates it in and out without a fixed
-                          height to keep in step with the bar row. */}
+                      {/* The progress line, in the shape the player under this
+                          column already draws (`AudioScrubber`) rather than the
+                          waveform it used to. A waveform earns its space on a
+                          music track, where you scan it for the drop; on a
+                          six-second read it was decoration over the one thing a
+                          player has to say — where you are — and the same clip
+                          rendered two different ways on the card and in the
+                          footer read as two different controls.
+                          Opens on play; the grid-rows trick animates it in and
+                          out without a fixed height to keep in step with. */}
                       <div
                         className={`grid transition-all duration-300 ease-out ${
-                          showWave ? 'mt-3 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
+                          showWave ? 'mt-2.5 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
                         }`}
                       >
                         <div className="overflow-hidden">
-                          <div className="flex items-center gap-2 rounded-2xl border border-ink/[0.07] bg-ink/[0.02] px-3 py-1.5">
-                            <Waveform
-                              peaks={isLoaded ? peaks : null}
+                          <div className="flex items-center gap-2 px-0.5 py-1">
+                            <span className="shrink-0 text-[10px] tabular-nums text-ink-500">
+                              {formatClock(position)}
+                            </span>
+                            <AudioScrubber
                               progress={clipDuration > 0 ? position / clipDuration : 0}
                               onSeek={isLoaded ? (f) => seekTo(f * clipDuration) : undefined}
                               className="min-w-0 flex-1"
                             />
-                            <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] tabular-nums text-ink-400">
-                              {formatClock(position)}
+                            <span className="shrink-0 text-[10px] tabular-nums text-ink-500">
+                              {formatClock(clipDuration)}
                             </span>
                           </div>
                         </div>
