@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Box, AlertCircle, Sparkle, Image as ImageIcon, Video as VideoIcon, Play, Pause, Volume2, VolumeX, Plus, Coins, Check, X, ArrowRight, Download, Copy, Bookmark, Film, ChevronRight, Link2, Link2Off, RefreshCw, Pencil, SplitSquareVertical, Merge, Trash2, Palette } from 'lucide-react'
+import { Box, AlertCircle, Sparkle, Image as ImageIcon, Video as VideoIcon, Play, Pause, Volume2, VolumeX, Plus, Coins, Check, X, ArrowRight, Download, Copy, Bookmark, ChevronRight, Link2, Link2Off, RefreshCw, Pencil, SplitSquareVertical, Merge, Trash2, Palette } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import GenerationProgress from '../../../components/GenerationProgress'
 import { GeneratingMediaFill } from '../../../components/GeneratingMedia'
@@ -61,7 +61,6 @@ import { humanizeError } from '../../../utils/friendlyError'
 import { downloadImage } from '../../../utils/downloadImage'
 import ClipDownloadModal, { type ClipDownloadEntry } from '../../../components/ClipDownloadModal'
 import { copyToClipboard } from '../../../utils/clipboard'
-import { sendClipToPlayground } from '../services/sendClipToPlayground'
 import type { ContinuousStoryboardOp } from '../continuousEdits'
 import { useBackdropClose } from '../../../hooks/useBackdropClose'
 
@@ -2424,7 +2423,7 @@ function ClipCard({
         )}
 
         {/* Hover action stack — top-right, app-wide order: download · copy ·
-            send-to-Playground. No save (video) and no trash (structural card).
+            expand. No save (video) and no trash (structural card).
             Stays put while the clip plays with sound — watching a take is when
             you decide to keep it, and it's clear of the play/mute buttons. */}
         {currentVideo && (
@@ -2440,12 +2439,6 @@ function ClipCard({
               onClick={() => { void handleCopy() }}
             >
               {copied ? <Check className="h-4 w-4 text-emerald-300" /> : <Copy className="h-4 w-4" />}
-            </TileActionButton>
-            <TileActionButton
-              title="Use in Playground as a source clip"
-              onClick={() => { void sendClipToPlayground(currentVideo) }}
-            >
-              <Film className="h-4 w-4" />
             </TileActionButton>
             {videoUrl && (
               <ExpandVideoButton

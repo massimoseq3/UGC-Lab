@@ -26,7 +26,6 @@ import { useAssetUrlState, useAssetUrl } from '../../../hooks/useAssetUrl'
 import { useInlineVideo } from '../../../hooks/useInlineVideo'
 import { getUrl } from '../../../utils/assetStore'
 import { startOfDay, sectionLabel } from '../../../utils/history'
-import { sendClipToPlayground } from '../services/sendClipToPlayground'
 import { downloadImage } from '../../../utils/downloadImage'
 
 // ─── Style note ──────────────────────────────────────────────────────────
@@ -295,10 +294,6 @@ export function ModalGallery({
                       }}
                       onDelete={() => onDeleteVideo(entry.idx)}
                       onCopyPrompt={() => onCopyPrompt(entry.prompt)}
-                      onSendToPlayground={() => {
-                        const v = cardState.videos[entry.idx]
-                        if (v) void sendClipToPlayground(v)
-                      }}
                     />
                   </div>
                 )
@@ -439,7 +434,6 @@ function VideoTile({
   onClick,
   onDelete,
   onCopyPrompt,
-  onSendToPlayground,
 }: {
   videoRef: string
   modelId?: string
@@ -451,7 +445,6 @@ function VideoTile({
   onClick: () => void
   onDelete: () => void
   onCopyPrompt: () => void
-  onSendToPlayground: () => void
 }) {
   const url = useAssetUrl(videoRef)
   // Hover autoplays muted (browsers block unmuted autoplay); the Play button
@@ -517,8 +510,9 @@ function VideoTile({
         </span>
       )}
       {/* Hover action stack — top-right vertical column, app-wide standard
-          order: download · copy · send-to-Playground · delete (video has no
-          save-to-bank). Stays put while the clip plays with sound: watching a
+          order: download · copy · delete (video has no save-to-bank), with
+          Expand hung BELOW the delete circle — it opens a lightbox rather than
+          acting on the tile. Stays put while the clip plays with sound: watching a
           take is when you decide to keep it, and it's clear of the play/mute
           buttons on the left. */}
       <TileActionStack>
@@ -535,6 +529,7 @@ function VideoTile({
         <TileActionButton title="Copy prompt" onClick={(e) => { e.stopPropagation(); onCopyPrompt() }}>
           <Copy className="h-4 w-4" />
         </TileActionButton>
+        <TileDeleteButton onDelete={onDelete} />
         {url && (
           <ExpandVideoButton
             videoUrl={url}
@@ -543,13 +538,6 @@ function VideoTile({
             aspectRatio={aspectRatio}
           />
         )}
-        <TileActionButton
-          title="Use in Playground as a source clip"
-          onClick={(e) => { e.stopPropagation(); onSendToPlayground() }}
-        >
-          <Film className="h-4 w-4" />
-        </TileActionButton>
-        <TileDeleteButton onDelete={onDelete} />
       </TileActionStack>
     </div>
       {/* Same caption line as the still tile above — see the note there. */}
