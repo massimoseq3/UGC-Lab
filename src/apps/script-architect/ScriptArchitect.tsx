@@ -5,6 +5,7 @@ import MobilePaneTabs from '../../components/MobilePaneTabs'
 import { paneClass } from '../../components/paneClass'
 import { useReportActivity } from '../../stores/activityStore'
 import { useBankStore } from '../../stores/bankStore'
+import { useMinWidth } from '../../hooks/useBreakpoint'
 import type { Product, ScriptHistoryItem } from '../../stores/types'
 import InputPanel from './components/InputPanel'
 import RightPanel from './components/RightPanel'
@@ -122,6 +123,37 @@ export default function ScriptArchitect() {
   const watchedRunIdRef = useRef<string | null>(null)
   // Phone-only: which of the two panes is on screen (ignored from md up).
   const [pane, setPane] = useState<'input' | 'output'>('input')
+  // Behaviour, not layout: where the rail stands in FRONT of the takes, picking
+  // a run has to hand the pane back; beside them it must not, browsing the list
+  // being the whole point of a rail. The layout itself is pure CSS — this only
+  // has to agree with it, so keep the number in step with the
+  // `min-[980px]:` classes in RightPanel and HistoryRail.
+  //
+  // 980, not Tailwind's `lg`: the threshold is the width at which all three
+  // columns fit — a 380px input panel, the 280px rail, and ~320px of readable
+  // takes. `lg` (1024) is the nearest breakpoint and it is 44px too high, which
+  // put a 994px window (Safari at half a 1080p screen) on the covering side of
+  // a line it clears.
+  const railIsColumn = useMinWidth(980)
+  // Whether the history rail is showing. Persisted, because it is a working
+  // preference rather than a per-run state — a member recording their screen
+  // shuts it once, not once per session. It opens by default where it can sit
+  // BESIDE the takes and stays shut where it would cover them: on a phone the
+  // first thing this pane should show is the thing you pressed Generate for,
+  // not the list of what you pressed it for before. Only ever a default — the
+  // stored answer, once there is one, is the member's.
+  //
+  // The slot is `:historyRail`, not the `:historyOpen` this was built under:
+  // renaming it once made every browser that had shut the rail while it was
+  // being built re-default rather than carry a stale `false` into the finished
+  // thing. That is free only while a feature is unreleased — after that a
+  // default flip needs the one-shot reset marker `appVisibilityStore` uses.
+  const [historyOpen, setHistoryOpen] = usePersistedState<boolean>(`${baseKey}:historyRail`, railIsColumn)
+  // "Clear the canvas" state. Holds a signature of the output that was cleared,
+  // so the next generation (or a history restore) fills the panel again on its
+  // own. Nothing is deleted — every take is already a History row; this exists
+  // so the last run isn't sitting on camera while a new one is filmed.
+  const [clearedSig, setClearedSig] = useState<string | null>(null)
   const [highlightField, setHighlightField] = useState<string | null>(null)
 
   // Pulse the dock dot while any script is being written.
@@ -149,6 +181,13 @@ export default function ScriptArchitect() {
   const resolvedMode: ScriptMode = mode === 'write'
     ? 'write'
     : isBlueprint && !forceTranscript ? 'reverse-engineer' : 'remix'
+
+  // The Output pane is a slot addressed by id, so "is it watching something
+  // write?" is a lookup, not a flag. Non-null is the one state that draws the
+  // writing face.
+  const watchedRun = pendingRuns.find((r) => r.id === activeHistoryId) ?? null
+  const outputSig = `${activeHistoryId ?? ''}|${variations.length}|${(variations[0] ?? '').slice(0, 64)}`
+  const cleared = !watchedRun && variations.length > 0 && clearedSig === outputSig
 
   // Consume inter-app payloads. Both Ad Analyzer send actions land in the
   // same merged source box — the format detection picks the pipeline.
@@ -203,6 +242,7 @@ export default function ScriptArchitect() {
   const showRunEmpty = (run: PendingScriptRun) => {
     watchedRunIdRef.current = run.id
     pinRun(run)
+    setClearedSig(null)
     setVariations([])
     setOutputAngles(null)
     setOutputVoiceProfile('')
@@ -334,6 +374,14 @@ export default function ScriptArchitect() {
   const handleSelectHistory = (item: ScriptHistoryItem) => {
     // The pane is on finished work now, so a run that lands may take it back.
     watchedRunIdRef.current = null
+    // A click in History is a request to SEE that run, so it always uncovers
+    // the canvas — including when the run picked is the one that was cleared,
+    // which the signature alone reads as "still the thing I cleared" and left
+    // blank. That was reported as history rows not opening at all.
+    setClearedSig(null)
+    // Where the rail stands in front of the takes, picking a run is a request
+    // to read it — so it hands the pane back. Beside them it stays open.
+    if (!railIsColumn) setHistoryOpen(false)
     setMode(item.mode === 'write' ? 'write' : 'remix')
     setVariations(item.variations)
     setActiveHistoryId(item.id)
@@ -388,7 +436,20 @@ export default function ScriptArchitect() {
   // not what clicking a status card asks for.
   const handleWatchPending = (run: PendingScriptRun) => {
     setError(null)
+    if (!railIsColumn) setHistoryOpen(false)
     showRunEmpty(run)
+  }
+
+  // "Clear" on the References card: the inputs only. Every take stays on the
+  // canvas and in History — that is what the button's arm and tooltip promise,
+  // and the output labels are pinned to their own snapshots, so the shown cards
+  // keep their wording as the live selectors reset.
+  const handleClearInputs = () => {
+    setSource('')
+    setBrief('')
+    setAdditionalContext('')
+    setSelectedProductId(null)
+    setForceTranscript(false)
   }
 
   const handleDeleteHistory = (id: string) => {
@@ -416,6 +477,7 @@ export default function ScriptArchitect() {
         <InputPanel
           mode={mode}
           onModeChange={setMode}
+          onClearInputs={handleClearInputs}
           source={source}
           onSourceChange={setSource}
           isBlueprint={isBlueprint}
@@ -446,7 +508,7 @@ export default function ScriptArchitect() {
         />
       </div>
 
-      <div className={paneClass(pane === 'output', 'md:w-2/3')}>
+      <div className={paneClass(pane === 'output', 'md:min-w-0 md:flex-1')}>
         <RightPanel
           variations={variations}
           mode={resolvedMode}
@@ -457,18 +519,23 @@ export default function ScriptArchitect() {
           hookCategoryLabel={HOOK_CATEGORY_META[outputHookCategory].label}
           hookCount={hookCount}
           linkedProductId={selectedProduct?.id ?? null}
-          pendingRuns={pendingRuns}
-          onWatchPending={handleWatchPending}
+          watchedRun={watchedRun}
+          activeHistoryId={activeHistoryId}
           error={error}
           onEditVariation={(index, text) =>
             setVariations((prev) => prev.map((v, i) => (i === index ? text : v)))
           }
           voiceProfile={outputVoiceProfile}
           onEditVoiceProfile={setOutputVoiceProfile}
+          cleared={cleared}
+          onClearCanvas={() => setClearedSig(outputSig)}
           history={scriptHistory}
-          activeHistoryId={activeHistoryId}
+          pendingRuns={pendingRuns}
           onSelectHistory={handleSelectHistory}
+          onWatchPending={handleWatchPending}
           onDeleteHistory={handleDeleteHistory}
+          historyOpen={historyOpen}
+          onToggleHistory={() => setHistoryOpen((v) => !v)}
         />
       </div>
     </div>

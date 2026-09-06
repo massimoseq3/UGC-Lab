@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Film, ArrowDownUp, Check, ChevronDown, AlertCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Search, Film, AlertCircle } from 'lucide-react'
 import { GeneratingChip, GeneratingPulseRing } from '../../../components/GeneratingChip'
 import type { BrollHistoryItem } from '../../../stores/types'
 import {
@@ -18,15 +18,22 @@ import { getContinuousStyle } from '../services/generateContinuous'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
 import { TileActionStack, TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
+import Dropdown from '../../../components/Dropdown'
+import HistoryRailToggle from '../../../components/HistoryRailToggle'
+import RailNewButton from '../../../components/RailNewButton'
 import { brollHistoryMode } from './brollHistoryRows'
 
-interface BrollHistoryViewProps {
-  // Already filtered by the parent (see isRetiredOneShotRow) so the tab's
+interface HistoryRailProps {
+  // Already filtered by the parent (see isRetiredOneShotRow) so the rail's
   // count and this list can't disagree.
   items: BrollHistoryItem[]
   activeId: string | null
   onSelect: (item: BrollHistoryItem) => void
   onDelete: (id: string) => void
+  // Empties the storyboard back to its blank canvas. Single click — nothing is
+  // deleted, and the session it clears is a row in the list right underneath.
+  onNew: () => void
+  onCollapse: () => void
 }
 
 // ── Card cover media ─────────────────────────────────────────────────────
@@ -220,22 +227,11 @@ function sortTs(it: BrollHistoryItem, sort: SortId): number {
   return it.createdAt
 }
 
-export default function BrollHistoryView({ items, activeId, onSelect, onDelete }: BrollHistoryViewProps) {
+export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew, onCollapse }: HistoryRailProps) {
   const [query, setQuery] = useState('')
   const [modeFilter, setModeFilter] = useState<ModeFilter>('all')
   const [sort, setSort] = usePersistedState<SortId>('broll-studio:historySort', 'newest')
-  const [sortOpen, setSortOpen] = useState(false)
-  const sortRef = useRef<HTMLDivElement>(null)
 
-  // Close the sort menu on an outside click.
-  useEffect(() => {
-    if (!sortOpen) return
-    const onDown = (e: MouseEvent) => {
-      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [sortOpen])
 
   // Which mode pills to show — only offer a filter when more than one mode is
   // actually present, so a Line-only history isn't cluttered with dead pills.
@@ -308,121 +304,115 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
     return groupByDay(filtered, (it) => sortTs(it, sort), sort === 'oldest' ? 'asc' : 'desc')
   }, [items, query, activeModeFilter, sort, titles])
 
-  if (items.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-6">
-        <Film className="h-10 w-10 text-ink-800" strokeWidth={1.5} />
-        <p className="text-sm text-ink-300">No sessions yet</p>
-        <p className="text-center text-xs text-ink-500">Generated B-Roll sessions will land here.</p>
-      </div>
-    )
-  }
-
-  const sortLabel = SORTS.find((s) => s.id === sort)?.label ?? 'Newest first'
-
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      {/* Search + filters + sort. It stays put on a phone: this bar wore a
-          CollapsingBar for a week and lost it (August 2026) — a filter row
-          that rolls away on a scroll and unrolls on the way back up moves the
-          list under the thumb reading it. */}
-      <div className="border-b border-ink/5 px-5 py-4">
-        {/* ONE row: search, then the mode pills, then sort (August 2026,
-            Massimo's call). The field had the first line to itself and the pills
-            and sort the next, which spent ~40px of a panel that is otherwise all
-            list — and neither line was close to full. The field takes what's
-            left of the row (`flex-1` off a 200px floor) and the row wraps on its
-            own when there isn't room, which is what a phone gets. */}
-        <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {/* New leads the rail; the open/shut toggle sits to its LEFT, at the
+          band's own edge (September 2026, Massimo's call — the pull tab it
+          replaced was clipping this app's batch strip, which runs across the
+          top of the column beside it). The band takes the app-wide h-[57px] so
+          the hairline lines up with the input column's header. */}
+      <div className="flex h-[57px] shrink-0 items-center gap-1.5 border-b border-ink/5 px-3">
+        <HistoryRailToggle open onToggle={onCollapse} />
+        <RailNewButton
+          label="New Storyboard"
+          accentClass="bg-broll-500"
+          title="Clear the storyboard. This session stays here in History"
+          onClick={onNew}
+          className="flex-1"
+        />
+      </div>
+
+      {/* Search on its own row, then the mode pills and the sort centred under
+          it. They shared ONE wrapping row until September 2026, which is right
+          in a wide panel and wrong in a 280px rail: the field sat at its
+          `min-w-[200px]` floor with dead space beside it, and the sort wrapped
+          underneath left-aligned against the field's edge. Two stacked rows
+          cost ~40px of a column that is otherwise all list, and buy a field
+          that fills its own width and a control that is centred rather than
+          hanging off one side.
+
+          It stays put on a phone: this bar wore a CollapsingBar for a week and
+          lost it (August 2026) — a filter row that rolls away on a scroll and
+          unrolls on the way back up moves the list under the thumb reading it. */}
+      <div className="flex shrink-0 flex-col gap-2 border-b border-ink/5 px-3 py-2.5">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search history..."
-            className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-sm text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-broll-500/40"
+            className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-[12.5px] text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-broll-500/40"
           />
         </div>
 
-        {/* Mode filter pills, then the sort dropdown. Sort is always shown; the
-            mode pills only when more than one mode is present. A live "N
-            sessions rendering" chip leads them whenever anything is in flight,
-            so the queue is visible without scanning every row. */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            {generatingRows > 0 && (
-              <span className="flex items-center rounded-full border border-broll-500/30 bg-broll-500/10 px-2.5 py-1 text-[11px]">
-                <GeneratingChip
-                  label={`${generatingRows} session${generatingRows === 1 ? '' : 's'} rendering`}
-                />
-              </span>
-            )}
-            {showModeFilters &&
-              MODE_FILTERS.map((f) => {
-                const active = activeModeFilter === f.id
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setModeFilter(f.id)}
-                    className={`rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
-                      active
-                        ? 'border-broll-500/40 bg-broll-500/15 text-broll-200'
-                        : 'border-ink/10 bg-ink/[0.03] text-ink-400 hover:bg-ink/[0.06] hover:text-ink-200'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                )
-              })}
-          </div>
-
-          <div ref={sortRef} className="relative shrink-0">
-            <button
-              type="button"
-              onClick={() => setSortOpen((o) => !o)}
-              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1 text-[11px] font-medium text-ink-300 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
-              title="Sort history"
-            >
-              <ArrowDownUp className="h-3 w-3" />
-              <span>{sortLabel}</span>
-              <ChevronDown className={`h-3 w-3 transition-transform ${sortOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {sortOpen && (
-              <div className="absolute right-0 top-full z-20 mt-1.5 w-44 overflow-hidden rounded-xl border border-ink/10 bg-surface-2 p-1 shadow-lg shadow-black/20">
-                {SORTS.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => {
-                      setSort(s.id)
-                      setSortOpen(false)
-                    }}
-                    className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[12px] transition-colors ${
-                      sort === s.id ? 'bg-broll-500/15 text-broll-200' : 'text-ink-300 hover:bg-ink/[0.06] hover:text-ink-100'
-                    }`}
-                  >
-                    <span>{s.label}</span>
-                    {sort === s.id && <Check className="h-3.5 w-3.5 shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+        {/* Mode filter pills, then the sort. Sort is always shown; the mode
+            pills only when more than one mode is present. A live "N sessions
+            rendering" chip leads them whenever anything is in flight, so the
+            queue is visible without scanning every row. */}
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          {generatingRows > 0 && (
+            <span className="flex items-center rounded-full border border-broll-500/30 bg-broll-500/10 px-2.5 py-1 text-[11px]">
+              <GeneratingChip
+                label={`${generatingRows} session${generatingRows === 1 ? '' : 's'} rendering`}
+              />
+            </span>
+          )}
+          {showModeFilters &&
+            MODE_FILTERS.map((f) => {
+              const active = activeModeFilter === f.id
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setModeFilter(f.id)}
+                  className={`rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
+                    active
+                      ? 'border-broll-500/40 bg-broll-500/15 text-broll-200'
+                      : 'border-ink/10 bg-ink/[0.03] text-ink-400 hover:bg-ink/[0.06] hover:text-ink-200'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              )
+            })}
+          {/* A PORTALED dropdown (`Dropdown` → `AnchoredPopover`), not a
+              locally-positioned menu. This rail is a 280px `overflow-y-auto`
+              column, so an `absolute` menu is clipped by it — reported with the
+              options cut off down their left edge. `Dropdown` is the app's only
+              select for exactly this reason. */}
+          <Dropdown
+            value={sort}
+            options={SORTS.map((o) => ({ value: o.id, label: o.label }))}
+            onChange={(v) => setSort(v as SortId)}
+            accent="broll"
+            fitContent
+            dense
+          />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {groups.length === 0 ? (
+      {/* A CONTAINER query, not a viewport one: this list is 280px wide as a
+          rail and most of the pane when it stands in front of the storyboard,
+          and `sm:grid-cols-2` (a viewport rule) put two 130px cards side by
+          side in the rail. */}
+      <div className="@container min-h-0 flex-1 overflow-y-auto">
+        {items.length === 0 ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+            <Film className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
+            <p className="text-xs text-ink-300">No sessions yet</p>
+            <p className="text-[11px] text-ink-500">Generated B-Roll sessions will land here.</p>
+          </div>
+        ) : groups.length === 0 ? (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <span className="text-sm text-ink-500">No matches.</span>
           </div>
         ) : (
-          <div className="flex flex-col gap-6 px-5 py-4">
+          <div className="flex flex-col gap-6 px-3 py-4">
             {groups.map(([dayTs, dayItems]) => (
               <div key={dayTs} className="flex flex-col gap-3">
                 <DayPill label={sectionLabel(dayTs)} className="" />
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-3 @min-[520px]:grid-cols-2 @min-[820px]:grid-cols-3 @min-[1100px]:grid-cols-4">
                   {dayItems.map((item) => (
                     <HistoryCard
                       key={item.id}

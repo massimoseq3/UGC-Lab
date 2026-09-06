@@ -220,22 +220,22 @@ export default function BrollStudio() {
   // covers the toggle, the right panel, Generate and the import modal at once.
   const continuousEnabled = useFeatureEnabled('broll-continuous')
   const mode: BrollMode = continuousEnabled ? storedMode : 'line'
-  // Line-by-Line delivery: 'dialogue' (every card the character speaking that
-  // line, staged three different ways — THE DEFAULT since August 2026) or
-  // 'silent' (every card silent b-roll, for a voiceover laid over in the edit).
-  // Not a mode: both produce the same per-line storyboard.
+  // Line-by-Line delivery: 'silent' (every card silent b-roll, for a voiceover
+  // laid over in the edit — THE DEFAULT since September 2026, Massimo's call)
+  // or 'dialogue' (every card the character speaking that line, staged three
+  // different ways). Not a mode: both produce the same per-line storyboard.
   const [lineDelivery, setLineDelivery] = usePersistedState<BrollDelivery>(
     `${baseKey}:lineDelivery`,
-    'dialogue',
+    'silent',
     // `sanitize` runs on the fallback too when the slot is empty, so flipping
     // the default means flipping this — it decides what an ABSENT value means.
-    // Only an explicit stored 'silent' stays silent (a member who picked B-Roll
-    // Clips keeps it); anything missing or unrecognised lands on dialogue. The
-    // mode check still wins: a member sitting in the short-lived Dialogue *mode*
-    // has that in the mode slot and a stale delivery in this one.
+    // Only an explicit stored 'dialogue' opens on dialogue (a member who picked
+    // Dialogue Clips keeps it); anything missing or unrecognised lands on
+    // silent. The mode check still wins: a member sitting in the short-lived
+    // Dialogue *mode* has that in the mode slot and a stale delivery in this one.
     {
       sanitize: (raw) =>
-        readPersistedMode(baseKey) === 'dialogue' ? 'dialogue' : raw === 'silent' ? 'silent' : 'dialogue',
+        readPersistedMode(baseKey) === 'dialogue' ? 'dialogue' : raw === 'dialogue' ? 'dialogue' : 'silent',
     },
   )
 

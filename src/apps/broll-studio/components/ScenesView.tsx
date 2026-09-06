@@ -854,7 +854,7 @@ export default function ScenesView({
             type="button"
             onClick={onChangeStyle}
             title="Change the visual style every clip renders in"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 py-1.5 text-[12px] font-semibold tracking-tight text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
           >
             <Palette className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
             <span className="max-w-[180px] truncate">{result.styleBrief ? (result.styleName?.trim() || 'Custom style') : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
@@ -885,7 +885,7 @@ export default function ScenesView({
             className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/50 bg-broll-500/[0.24] px-3.5 py-1.5 text-[11px] font-medium text-broll-200 transition-colors hover:border-broll-500/65 hover:bg-broll-500/[0.32]"
           >
             <Sparkle className="h-3.5 w-3.5" />
-            <span>Generate all</span>
+            <span>Generate All</span>
             <ChevronDown
               className={`h-3.5 w-3.5 shrink-0 opacity-70 transition-transform duration-200 ${generateAllOpen ? 'rotate-180' : ''}`}
               strokeWidth={2.5}
@@ -910,7 +910,7 @@ export default function ScenesView({
               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
             >
               <Images className="h-3.5 w-3.5 shrink-0 text-broll-300" />
-              Generate all images
+              Generate All Images
             </button>
             {/* Only once there's a still to animate — nothing should render
                 from a prompt the member hasn't seen a frame of. */}
@@ -924,7 +924,7 @@ export default function ScenesView({
                 className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
               >
                 <Clapperboard className="h-3.5 w-3.5 shrink-0 text-broll-300" />
-                Animate all stills
+                Animate All Stills
               </button>
             )}
             <button
@@ -936,7 +936,7 @@ export default function ScenesView({
               className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[12px] font-medium text-ink-200 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
             >
               <VideoIcon className="h-3.5 w-3.5 shrink-0 text-broll-300" />
-              Generate all videos
+              Generate All Videos
             </button>
           </AnchoredPopover>
           {/* Download clips stays its own pill and stays neutral: it's the
@@ -954,7 +954,7 @@ export default function ScenesView({
                   worst just above the phone breakpoint; with the three generate
                   passes behind one menu, the bar is a style pill and two
                   buttons and the full label fits. */}
-              <span>{`Download clips (${allClipEntries.length})`}</span>
+              <span>{`Download Clips (${allClipEntries.length})`}</span>
             </button>
           )}
         </div>

@@ -8,6 +8,7 @@ import SegmentedToggle from '../../../components/SegmentedToggle'
 import Modal from '../../../components/Modal'
 import ScriptModelRow from '../../../components/ScriptModelRow'
 import SectionCard, { StatusDot } from '../../../components/SectionCard'
+import ClearAllButton from '../../../components/ClearAllButton'
 import ConstraintChip from '../../../components/ConstraintChip'
 import ExpandTextModal, { ExpandButton } from '../../../components/ExpandableText'
 import PromptToolbar from '../../../components/PromptToolbar'
@@ -21,7 +22,12 @@ interface InputPanelProps {
   mode: ScriptUiMode
   onModeChange: (mode: ScriptUiMode) => void
   // Resets the input column to a blank slate. Inputs only — generated scripts
-  // stay in the Output pane and in History.
+  // stay in the Output pane and in History, which is what the two-click arm and
+  // the tooltip promise. It leads the References card's header (September 2026,
+  // Massimo's call), where it sits over the rows it empties; it was an iconOnly
+  // circle beside the mode toggle before it was dropped outright in the pass
+  // that moved History into a rail.
+  onClearInputs: () => void
   // The merged Remix source — a plain winning transcript OR an Ad Analyzer
   // scene blueprint; the format is auto-detected (see detectSceneBlueprint).
   source: string
@@ -57,6 +63,7 @@ interface InputPanelProps {
 export default function InputPanel({
   mode,
   onModeChange,
+  onClearInputs,
   source,
   onSourceChange,
   isBlueprint,
@@ -560,7 +567,12 @@ export default function InputPanel({
                   (August 2026) — the picker above it is the one you set once and
                   leave, where the product is what changes from script to script,
                   so it belongs nearest the button you press next. */}
-              <SectionCard icon={Layers} title="References" className="mb-2">
+              <SectionCard
+                icon={Layers}
+                title="References"
+                className="mb-2"
+                left={<ClearAllButton label="Clear" onClear={onClearInputs} />}
+              >
               {/* Hook Style — the hooks format's replacement for the Script Style
                   picker. 'auto' (Best Mix) is the default and renders as the
                   dashed unset affordance; picking a family flips it solid, and
@@ -748,6 +760,7 @@ export default function InputPanel({
               title="References"
               className="mb-2 flex flex-1 flex-col max-md:flex-none"
               contentClassName="flex flex-1 flex-col gap-2"
+              left={<ClearAllButton label="Clear" onClear={onClearInputs} />}
             >
             <div className="flex min-h-[140px] flex-1 flex-col max-md:min-h-[240px] max-md:flex-none">
               {/* Select from bank (header) + paste manually (textarea) merged into
@@ -895,12 +908,22 @@ export default function InputPanel({
               around two words. All at 58px, the picker-row height the column's
               other rows share.
 
-              TWO rows on a phone: the model takes the full width (`basis-full`)
-              and the two pearls sit side by side under it. Half of a 335px column
-              is 167px for a control whose whole job is naming the model that
-              writes your script, and the name is the half that was being cut.
-              The chips take `basis-0` there so they split the second row evenly
-              rather than inheriting the desktop ratio.
+              TWO rows once the row itself drops under 440px: the model takes the
+              full width (`basis-full`) and the two pearls sit side by side under
+              it. Half of a 335px column is 167px for a control whose whole job is
+              naming the model that writes your script, and the name is the half
+              that was being cut. The chips take `basis-0` there so they split the
+              second row evenly rather than inheriting the desktop ratio.
+
+              A CONTAINER query, not a viewport one: this column is `w-1/3` over a
+              380px floor, so what decides whether three controls fit is the
+              column's own width and the viewport is only a proxy for it — and it
+              was the wrong proxy. `max-md` put the break at 768px, which is where
+              the column stops being a column at all; from 768 to ~1320 the row is
+              on one line at its 380px floor, which is 162px for the model. That is
+              the reported clip — "GPT 5.6…" over a `$$$$$` spilling out past the
+              chevron, with "3 Variations" wrapping inside its own pearl.
+
               They were a chip band stacked over the model row, which made two
               rows out of one decision each. Both chips are pearls rather than
               fields: the pair was two full-width `SegmentedToggle` slabs, then
@@ -908,8 +931,9 @@ export default function InputPanel({
               control nobody sweeps through. Each hides on its own — Hooks have no
               duration, the blueprint rewrite has no count. Everything here opens
               UPWARD: a downward menu covers the button you're heading for. */}
-          <div className="mb-2 flex flex-wrap items-stretch gap-1.5">
-            <ScriptModelRow appId="script-architect" className="min-w-0 flex-[2] max-md:basis-full" />
+          <div className="@container mb-2">
+          <div className="flex flex-wrap items-stretch gap-1.5">
+            <ScriptModelRow appId="script-architect" className="min-w-0 flex-[2] @max-[440px]:basis-full" />
             {showLength && (
               // The clock carries the meaning the old dim "Length" label did —
               // "15s" alone doesn't say what it measures, and a chip has no
@@ -919,7 +943,7 @@ export default function InputPanel({
               // It sits in the MIDDLE of the row, so its menu anchors left and
               // has room either side; the count on the right is the one that has
               // to hang its menu off the panel edge.
-              <div className="flex min-w-0 flex-1 max-md:basis-0">
+              <div className="flex min-w-0 flex-1 @max-[440px]:basis-0">
                 <ConstraintChip
                   grow
                   size="xl"
@@ -943,7 +967,8 @@ export default function InputPanel({
                 />
               </div>
             )}
-            {showCount && <div className="flex min-w-0 flex-1 max-md:basis-0">{countChip}</div>}
+            {showCount && <div className="flex min-w-0 flex-1 @max-[440px]:basis-0">{countChip}</div>}
+          </div>
           </div>
           {/* `disabled:hover:bg-scripts-500` — a disabled button must not answer
               the pointer. `:hover` still matches one, so the blocker state

@@ -56,7 +56,7 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
 
   return createPortal((
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm sm:px-6"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm sm:px-6 modal-fade"
       {...backdrop}
     >
       <button
@@ -69,7 +69,7 @@ function ModalShell({ onClose, children }: { onClose: () => void; children: Reac
       </button>
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink-950/95 shadow-2xl max-md:h-[calc(100dvh-1rem)]"
+        className="flex h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink-950/95 shadow-2xl max-md:h-[calc(100dvh-1rem)] modal-pop"
       >
         {children}
       </div>

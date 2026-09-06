@@ -2,8 +2,9 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Play, Pause, RotateCcw, RotateCw, Download, ChevronDown, AlignLeft } from 'lucide-react'
 import type { VoiceHistoryItem } from '../../../stores/types'
 import { getUrl } from '../../../utils/assetStore'
-import { seedColor } from './seedColor'
+import { seedColor, PLAY_DISC_RIM } from './seedColor'
 import { claimAudioSlot, releaseAudioSlot } from '../../../utils/audioPlayback'
+import AudioScrubber from '../../../components/AudioScrubber'
 
 interface BottomPlayerProps {
   item: VoiceHistoryItem
@@ -31,10 +32,8 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(item.duration || 0)
-  const [scrubbing, setScrubbing] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const animRef = useRef<number>(0)
-  const trackRef = useRef<HTMLDivElement>(null)
 
   // Stable identity for the app-wide playback slot — a History card's play
   // button pauses this player rather than talking over it.
@@ -134,41 +133,15 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
     setCurrentTime(audio.currentTime)
   }
 
-  // Seek from a pointer position on the track. Shared by the press and every
-  // move of a drag, so a click and a scrub are the same code path.
-  const seekToClientX = (clientX: number) => {
+  // Seek to a fraction of the clip. The track itself — press, drag, pointer
+  // capture and all — is `AudioScrubber`, shared with the History cards.
+  const seekToFraction = (fraction: number) => {
     const audio = audioRef.current
-    if (!audio || !trackRef.current) return
+    if (!audio) return
     const dur = audio.duration || duration
     if (!dur) return
-    const rect = trackRef.current.getBoundingClientRect()
-    const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
     audio.currentTime = fraction * dur
     setCurrentTime(audio.currentTime)
-  }
-
-  // Drag-to-scrub. Pointer capture is what makes it usable: the track is a
-  // ~150px sliver in a row full of buttons, and without capture the drag dies
-  // the moment the pointer leaves it — which on a 6-second read is instantly.
-  // Captured, the pointer keeps reporting to the track wherever it travels,
-  // including outside the window.
-  const startScrub = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    setScrubbing(true)
-    seekToClientX(e.clientX)
-  }
-
-  const moveScrub = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
-    seekToClientX(e.clientX)
-  }
-
-  const endScrub = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId)
-    }
-    setScrubbing(false)
   }
 
   const handleDownload = async () => {
@@ -178,8 +151,6 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
     a.download = `${item.voiceName}-${Date.now()}.mp3`
     a.click()
   }
-
-  const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0
 
   return (
     // The player is the output column's own FOOTER (September 2026), so it
@@ -197,12 +168,14 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
           avatar + name block beside it used to say and no longer has room to. */}
       <button
         onClick={togglePlay}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white shadow-sm transition-transform hover:scale-105"
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white transition-all hover:brightness-110 ${PLAY_DISC_RIM}`}
         style={{ background: seedColor(item.voiceId) }}
         title={isPlaying ? `Pause ${item.voiceName}` : `Play ${item.voiceName}`}
         aria-label={isPlaying ? 'Pause' : 'Play'}
       >
-        {isPlaying ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 translate-x-px fill-current" />}
+        {isPlaying
+          ? <Pause className="h-3 w-3 fill-current" />
+          : <Play className="h-3 w-3 translate-x-px fill-current" />}
       </button>
 
       {/* The ±10s pair is the first thing to go when the bar is narrow, and
@@ -235,38 +208,13 @@ export default function BottomPlayer({ item, onClose, onShowDetails }: BottomPla
         {formatTime(currentTime)}
       </span>
 
-      {/* Scrubber track — single source of truth for seeking. `mx-1` is the
-          thumb's overhang: it's `-translate-x-1/2`, so at 0:00 half of it sits
-          outside the track, and on a touch screen it's permanently visible —
-          without the margin it lands on top of the elapsed-time label. */}
-      <div
-        ref={trackRef}
-        onPointerDown={startScrub}
-        onPointerMove={moveScrub}
-        onPointerUp={endScrub}
-        onPointerCancel={endScrub}
-        className="group relative mx-1 -my-2 flex min-w-[56px] flex-1 cursor-pointer touch-none items-center py-2"
-      >
-        {/* The bar is 6px; the grab area is the `py-2` around it (`-my-2` keeps
-            that off the row's height). A hit target the height of the line
-            itself is a click you have to aim, and a drag you can't start. */}
-        <div className="relative h-1.5 w-full rounded-full bg-ink/[0.08]">
-          {/* Played portion in the app's own blue rather than the ink ramp —
-              `ink-100` is near-black in light mode, which read as a dead bar
-              instead of the accent the play button beside it wears. `voice-500`
-              is the literal accent and doesn't flip between themes. */}
-          <div
-            className="absolute inset-y-0 left-0 rounded-full bg-voice-500"
-            style={{ width: `${progressPct}%` }}
-          />
-          <div
-            className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-voice-500 shadow transition-opacity group-hover:opacity-100 touch:opacity-100 ${
-              scrubbing ? 'opacity-100' : 'opacity-0'
-            }`}
-            style={{ left: `${progressPct}%` }}
-          />
-        </div>
-      </div>
+      {/* Scrubber track — single source of truth for seeking, and the same
+          component the History cards draw. */}
+      <AudioScrubber
+        progress={duration > 0 ? currentTime / duration : 0}
+        onSeek={seekToFraction}
+        className="min-w-[56px] flex-1"
+      />
 
       <span className="min-w-[32px] shrink-0 text-[11px] tabular-nums text-ink-500">
         {formatTime(duration)}

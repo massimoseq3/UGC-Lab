@@ -492,7 +492,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
 
   return createPortal((
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm sm:px-6"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm sm:px-6 modal-fade"
       {...backdrop}
     >
       <button
@@ -506,7 +506,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
 
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink-950/95 shadow-2xl max-md:h-[calc(100dvh-1rem)]"
+        className="flex h-[92dvh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-ink/10 bg-ink-950/95 shadow-2xl max-md:h-[calc(100dvh-1rem)] modal-pop"
       >
         {/* Body — a 50/50 grid on a desktop, each column scrolling its own
             content. The variation's tag + roll/scene line lives in the right

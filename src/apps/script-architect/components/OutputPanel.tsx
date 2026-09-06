@@ -1325,16 +1325,30 @@ function VariationCard({
             </button>
           </div>
         ) : (
+          // The takes column is the one this app narrows — a history rail took
+          // 280px off it — so this row has to survive ~290px of usable width.
+          // Two rules do it and each one alone fails: `whitespace-nowrap`
+          // (without it a label that no longer fits wraps INSIDE its own pill,
+          // so three buttons grew a second line each) and the `min-w` floor,
+          // which makes the ROW wrap instead — two buttons on one line and the
+          // third under them, every label intact — where `min-w-0` let all
+          // three squeeze down to "Sa… / … / B…". The floor is sized to the
+          // longest label WHOLE: shedding "Send to" at narrow widths was tried
+          // for a day and came out (September 2026, Massimo's call), because
+          // "Voiceovers" beside "Save to Bank" reads as a place rather than as
+          // something the button does to this take.
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setShowSaveForm(true)}
-              className={`flex flex-1 min-w-0 items-center justify-center gap-2 rounded-full border px-4 py-2.5 text-[12px] font-medium tracking-tight transition-colors ${
+              className={`flex min-w-[12rem] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border px-4 py-2.5 text-[12px] font-medium tracking-tight transition-colors ${
                 saved
                   ? 'border-green-500/20 bg-green-500/10 text-green-400 light:text-green-600'
                   : 'border-ink/15 text-ink-300 hover:bg-ink/[0.06] hover:text-ink-100'
               }`}
             >
-              {saved ? (<><Check className="h-3.5 w-3.5" /> Saved</>) : (<><Bookmark className="h-3.5 w-3.5" /> Save to Bank</>)}
+              {saved
+                ? (<><Check className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Saved</span></>)
+                : (<><Bookmark className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">Save to Bank</span></>)}
             </button>
             {isHooks ? (
               // A hook pack has no full-script send target — each line is a
@@ -1345,29 +1359,29 @@ function VariationCard({
                 {isSpokenScript && (
                   <button
                     onClick={handleSendToVoiceStudio}
-                    className="flex flex-1 min-w-0 items-center justify-center gap-2 rounded-full border border-voice-500/20 bg-voice-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-voice-400 transition-colors hover:bg-voice-500/20"
+                    className="flex min-w-[12rem] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-voice-500/20 bg-voice-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-voice-400 transition-colors hover:bg-voice-500/20"
                   >
-                    <Mic className="h-4 w-4" strokeWidth={1.75} />
-                    Send to Voiceovers
-                    <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    <Mic className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                    <span className="truncate">Send to Voiceovers</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                   </button>
                 )}
                 <button
                   onClick={handleSendToBrollStudio}
-                  className="flex flex-1 min-w-0 items-center justify-center gap-2 rounded-full border border-broll-500/20 bg-broll-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-broll-400 transition-colors hover:bg-broll-500/20"
+                  className="flex min-w-[12rem] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-broll-500/20 bg-broll-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-broll-400 transition-colors hover:bg-broll-500/20"
                 >
-                  <Film className="h-4 w-4" strokeWidth={1.75} />
-                  Send to B-Roll
+                  <Film className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                  <span className="truncate">Send to B-Roll</span>
                   <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
                 </button>
                 {!isSpokenScript && (
                   <button
                     onClick={handleSendToPlayground}
-                    className="flex flex-1 min-w-0 items-center justify-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-emerald-400 light:text-emerald-600 transition-colors hover:bg-emerald-500/20"
+                    className="flex min-w-[12rem] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-[12px] font-medium tracking-tight text-emerald-400 light:text-emerald-600 transition-colors hover:bg-emerald-500/20"
                   >
-                    <ImagePlay className="h-4 w-4" strokeWidth={1.75} />
-                    Send to Playground
-                    <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    <ImagePlay className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+                    <span className="truncate">Send to Playground</span>
+                    <ArrowUpRight className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
                   </button>
                 )}
               </>
@@ -1956,6 +1970,8 @@ function SceneBeatBlock({
 // `h-[53px]` and the scroller's `pt-[73px]` (this + the column's own 20px
 // inset) — a Tailwind class can't be built from a variable.
 const SWITCHER_H = 53
+// Below this the takes are just a column you scroll (see `showSwitcher`).
+const SWITCHER_MIN_TAKES = 5
 
 export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, hookCount = DEFAULT_HOOK_COUNT, linkedProductId, pendingRun, error, runId, onEditVariation, voiceProfile, onEditVoiceProfile }: OutputPanelProps) {
   // Resolve the linked product so saved scripts get a meaningful default title
@@ -1993,9 +2009,15 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
   }, [runId])
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // The switcher only floats when it's rendered, so the scroll maths only owes
-  // it clearance then.
-  const switcherOffset = variations.length > 1 ? SWITCHER_H : 0
+  // The switcher earns its 53px only on a batch you'd actually lose your place
+  // in (September 2026, Massimo's call). At three takes it was a row of glass
+  // over the top of the first one for a column you can read straight down —
+  // the whole point of the scroll-jump shape is that the takes are one
+  // continuous column, and at that length scrolling IS the switcher.
+  const showSwitcher = variations.length >= SWITCHER_MIN_TAKES
+  // It only floats when it's rendered, so the scroll maths only owes it
+  // clearance then.
+  const switcherOffset = showSwitcher ? SWITCHER_H : 0
 
   const scrollToTake = (i: number) => {
     setActiveTake(i)
@@ -2104,7 +2126,7 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
           backdrop root spanning the pane is a wider invalidation than a
           switcher needs. The row it sits in is `pointer-events-none`, so the
           dead space either side of the pill still scrolls the takes under it. */}
-      {variations.length > 1 && (
+      {showSwitcher && (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-[53px] select-none items-center justify-center px-5">
           <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-ink/10 bg-surface-1/70 p-0.5 shadow-[0_6px_20px_-8px_rgba(0,0,0,0.45)] backdrop-blur-2xl backdrop-saturate-150 light:bg-white/70">
             {variations.map((_, i) => (
@@ -2128,7 +2150,7 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className={`flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto p-5 ${variations.length > 1 ? 'pt-[73px]' : ''}`}
+        className={`flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto p-5 ${showSwitcher ? 'pt-[73px]' : ''}`}
       >
         {/* Above the takes and inside the scroller: it's the first thing on the
             page but it isn't a header — it scrolls away with everything else,

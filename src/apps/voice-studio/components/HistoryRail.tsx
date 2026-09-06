@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { Search, Volume2, Bookmark, Check, Trash2, Play, Pause, AlignLeft, Download } from 'lucide-react'
+import RailNewButton from '../../../components/RailNewButton'
+import HistoryRailToggle from '../../../components/HistoryRailToggle'
 import { useBankStore } from '../../../stores/bankStore'
 import type { VoiceHistoryItem } from '../../../stores/types'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
-import { seedColor } from './seedColor'
+import { seedColor, PLAY_DISC_RIM } from './seedColor'
 import { GeneratingChip, GeneratingPulseRing } from '../../../components/GeneratingChip'
 import DayPill from '../../../components/DayPill'
-import Waveform from '../../../components/Waveform'
+import AudioScrubber from '../../../components/AudioScrubber'
 import {
   claimAudioSlot,
   formatClock,
   releaseAudioSlot,
   resolveAudioUrl,
-  waveformPeaks,
 } from '../../../utils/audioPlayback'
 
 // A voiceover that's been fired but hasn't landed yet. Rendered as a card at the
@@ -24,16 +25,26 @@ export interface PendingVoice {
   scriptPreview: string
 }
 
-interface HistoryViewProps {
+interface HistoryRailProps {
   items: VoiceHistoryItem[]
   pending: PendingVoice[]
   activeId: string | null
   onSelect: (item: VoiceHistoryItem) => void
   onDelete: (id: string) => void
   onShowDetails: (item: VoiceHistoryItem) => void
+  // Empties the script box back to a blank slate. It is this rail's "New" for
+  // the same reason the Ad Analyzer's is: starting another one is the action
+  // that belongs at the top of the list of the ones you have made. Single
+  // click — it carried `ClearAllButton`'s two-click arm for a day and lost it
+  // in September 2026 (Massimo's call).
+  onNew: () => void
+  onCollapse: () => void
 }
 
-export default function HistoryView({ items, pending, activeId, onSelect, onDelete, onShowDetails }: HistoryViewProps) {
+// The reads you have made, as the rail beside the script rather than a tab
+// sharing its pane — so the words being read are on screen while you listen
+// back to them.
+export default function HistoryRail({ items, pending, activeId, onSelect, onDelete, onShowDetails, onNew, onCollapse }: HistoryRailProps) {
   const [query, setQuery] = useState('')
   const [saveFormId, setSaveFormId] = useState<string | null>(null)
   const [saveLabel, setSaveLabel] = useState('')
@@ -47,9 +58,6 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
   const [isPlaying, setIsPlaying] = useState(false)
   const [position, setPosition] = useState(0)
   const [duration, setDuration] = useState(0)
-  // Peaks for the loaded clip — the whole waveform, decoded once and drawn at
-  // rest while playback fills it left to right.
-  const [peaks, setPeaks] = useState<number[] | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const rafRef = useRef(0)
   const loadTokenRef = useRef(0)
@@ -87,11 +95,6 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
     setIsPlaying(false)
     setPosition(0)
     setDuration(item.duration || 0)
-    setPeaks(null)
-    void waveformPeaks(item.audioUrl).then((p) => {
-      // A newer card claimed the player while this decoded.
-      if (loadTokenRef.current === token) setPeaks(p)
-    })
 
     let url: string
     try {
@@ -211,43 +214,55 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
     setTimeout(() => setSavedId(null), 3000)
   }
 
-  if (items.length === 0 && pending.length === 0) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 p-6">
-        <Volume2 className="h-10 w-10 text-ink-800" strokeWidth={1.5} />
-        <p className="text-sm text-ink-300">No voiceovers yet</p>
-        <p className="text-center text-xs text-ink-500">Your generated voiceovers will land here.</p>
-      </div>
-    )
-  }
+  const isEmpty = items.length === 0 && pending.length === 0
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
-      {/* Search */}
-      <div className="border-b border-ink/5 px-5 py-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search history..."
-            className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-sm text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-voice-500/40"
-          />
-        </div>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      {/* New leads the rail; the open/shut toggle sits to its LEFT, at the
+          band's own edge (September 2026, Massimo's call — the pull tab it
+          replaced was clipping the bar across the top of the column beside
+          it). The band takes the app-wide h-[57px] so the hairline lines up
+          with the input column's header. */}
+      <div className="flex h-[57px] shrink-0 items-center gap-1.5 border-b border-ink/5 px-3">
+        <HistoryRailToggle open onToggle={onCollapse} />
+        <RailNewButton
+          label="New Voiceover"
+          accentClass="bg-voice-500"
+          title="Clear the script box. Every read you've made stays here"
+          onClick={onNew}
+          className="flex-1"
+        />
+      </div>
+
+      <div className="relative flex shrink-0 items-center border-b border-ink/5 px-3 py-2.5">
+        <Search className="pointer-events-none absolute left-6 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-500" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search history..."
+          className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-9 pr-3 text-[12.5px] text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-voice-500/40"
+        />
       </div>
 
       {/* List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {isEmpty && (
+          <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+            <Volume2 className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
+            <p className="text-xs text-ink-300">No voiceovers yet</p>
+            <p className="text-[11px] text-ink-500">Your generated voiceovers will land here.</p>
+          </div>
+        )}
         {/* Queue — in-flight voiceovers, above the finished ones. Not filtered by
             the search box: a pending row has no content to match on yet, and
             hiding the thing you just fired is the opposite of a queue. */}
         {pending.length > 0 && (
-          <div className="flex flex-col gap-2 px-3 pt-3">
+          <div className="flex flex-col gap-2 p-2">
             <DayPill label={pending.length === 1 ? 'In progress' : `In progress · ${pending.length}`} className="mb-0" />
             {pending.map((p) => (
-              <div key={p.id} className="rounded-3xl border border-ink/10 bg-ink/[0.02] p-3.5">
-                <div className="flex items-center gap-3">
-                  <span className="relative h-12 w-12 shrink-0">
+              <div key={p.id} className="rounded-2xl border border-ink/10 bg-ink/[0.02] p-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="relative h-10 w-10 shrink-0">
                     <span
                       className="block h-full w-full rounded-full opacity-60"
                       style={{ background: seedColor(p.voiceId) }}
@@ -255,24 +270,24 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
                     <GeneratingPulseRing family="voice" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-ink-200">{p.voiceName}</p>
+                    <p className="truncate text-[13px] font-semibold text-ink-200">{p.voiceName}</p>
                     <GeneratingChip family="voice" label="Generating…" />
                   </div>
                 </div>
-                <p className="mt-3 line-clamp-2 text-[13px] leading-snug text-ink-400">{p.scriptPreview}</p>
+                <p className="mt-2.5 line-clamp-2 text-[12px] leading-snug text-ink-400">{p.scriptPreview}</p>
               </div>
             ))}
           </div>
         )}
 
         {groups.length === 0 ? (
-          pending.length === 0 && (
+          pending.length === 0 && !isEmpty && (
             <div className="flex h-full items-center justify-center px-6 text-center">
               <span className="text-sm text-ink-500">No matches.</span>
             </div>
           )
         ) : (
-          <div className="flex flex-col gap-2 p-3">
+          <div className="flex flex-col gap-2 p-2">
             {groups.map(([dayTs, dayItems]) => (
               <div key={dayTs} className="flex flex-col gap-2">
                 <DayPill label={sectionLabel(dayTs)} className="mb-0 mt-1" />
@@ -292,30 +307,30 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
                     <div
                       key={item.id}
                       onClick={() => onSelect(item)}
-                      className={`group cursor-pointer rounded-3xl border p-3.5 transition-colors ${
+                      className={`group cursor-pointer rounded-2xl border p-3 transition-colors ${
                         isActive
                           ? 'border-voice-500/25 bg-voice-500/10'
                           : 'border-ink/10 bg-ink/[0.02] hover:border-ink/15 hover:bg-ink/[0.04]'
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
                         {/* Play button doubles as the voice's avatar — one big
                             target, and the colour still says which voice it is. */}
                         <button
                           onClick={(e) => { e.stopPropagation(); togglePlay(item) }}
-                          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-white shadow-sm ring-2 transition-transform hover:scale-105 ${
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white ring-2 transition-all hover:brightness-110 ${PLAY_DISC_RIM} ${
                             isPlayingThis ? 'ring-voice-400/60' : 'ring-transparent'
                           }`}
                           style={{ background: seedColor(item.voiceId) }}
                           title={isPlayingThis ? 'Pause' : 'Play'}
                         >
                           {isPlayingThis
-                            ? <Pause className="h-5 w-5 fill-current" />
-                            : <Play className="h-5 w-5 translate-x-px fill-current" />}
+                            ? <Pause className="h-3.5 w-3.5 fill-current" />
+                            : <Play className="h-3.5 w-3.5 translate-x-px fill-current" />}
                         </button>
 
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-ink-100">{item.voiceName}</p>
+                          <p className="truncate text-[13px] font-semibold text-ink-100">{item.voiceName}</p>
                           <p className="text-[11px] text-ink-500">
                             {formatRelative(item.createdAt)}
                             {clipDuration > 0 && ` · ${formatClock(clipDuration)}`}
@@ -345,29 +360,37 @@ export default function HistoryView({ items, pending, activeId, onSelect, onDele
                         </div>
                       </div>
 
-                      <p className="mt-3 line-clamp-2 text-[13px] leading-snug text-ink-200">
+                      <p className="mt-2.5 line-clamp-2 text-[12px] leading-snug text-ink-200">
                         {item.scriptPreview}
                       </p>
 
-                      {/* Waveform — the whole clip, filling left to right as it
-                          plays, and clickable to seek. Opens on play; the
-                          grid-rows trick animates it in and out without a fixed
-                          height to keep in step with the bar row. */}
+                      {/* The progress line, in the shape the player under this
+                          column already draws (`AudioScrubber`) rather than the
+                          waveform it used to. A waveform earns its space on a
+                          music track, where you scan it for the drop; on a
+                          six-second read it was decoration over the one thing a
+                          player has to say — where you are — and the same clip
+                          rendered two different ways on the card and in the
+                          footer read as two different controls.
+                          Opens on play; the grid-rows trick animates it in and
+                          out without a fixed height to keep in step with. */}
                       <div
                         className={`grid transition-all duration-300 ease-out ${
-                          showWave ? 'mt-3 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
+                          showWave ? 'mt-2.5 grid-rows-[1fr] opacity-100' : 'mt-0 grid-rows-[0fr] opacity-0'
                         }`}
                       >
                         <div className="overflow-hidden">
-                          <div className="flex items-center gap-2 rounded-2xl border border-ink/[0.07] bg-ink/[0.02] px-3 py-1.5">
-                            <Waveform
-                              peaks={isLoaded ? peaks : null}
+                          <div className="flex items-center gap-2 px-0.5 py-1">
+                            <span className="shrink-0 text-[10px] tabular-nums text-ink-500">
+                              {formatClock(position)}
+                            </span>
+                            <AudioScrubber
                               progress={clipDuration > 0 ? position / clipDuration : 0}
                               onSeek={isLoaded ? (f) => seekTo(f * clipDuration) : undefined}
                               className="min-w-0 flex-1"
                             />
-                            <span className="shrink-0 rounded-full bg-ink/[0.06] px-2 py-0.5 text-[10px] tabular-nums text-ink-400">
-                              {formatClock(position)}
+                            <span className="shrink-0 text-[10px] tabular-nums text-ink-500">
+                              {formatClock(clipDuration)}
                             </span>
                           </div>
                         </div>
