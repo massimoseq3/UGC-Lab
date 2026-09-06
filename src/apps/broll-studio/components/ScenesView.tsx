@@ -1682,6 +1682,7 @@ function SceneSection({
               >
                 <p
                   className="text-center text-lg font-normal not-italic leading-relaxed text-ink-400 transition-colors group-hover/line:text-ink-200"
+                  style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
                 >
                   &ldquo;{scene.scriptLine}&rdquo;
                 </p>
@@ -1690,6 +1691,7 @@ function SceneSection({
             ) : (
               <p
                 className="text-center text-lg font-normal not-italic leading-relaxed text-ink-400"
+                style={{ fontFamily: "'Instrument Serif', Georgia, 'Times New Roman', serif" }}
               >
                 &ldquo;{scene.scriptLine}&rdquo;
               </p>

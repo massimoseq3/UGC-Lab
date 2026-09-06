@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Search, Film, ArrowDownUp, Check, ChevronDown, AlertCircle, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Search, Film, AlertCircle, X } from 'lucide-react'
 import { GeneratingChip, GeneratingPulseRing } from '../../../components/GeneratingChip'
 import type { BrollHistoryItem } from '../../../stores/types'
 import {
@@ -18,6 +18,7 @@ import { getContinuousStyle } from '../services/generateContinuous'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
 import { TileActionStack, TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
+import Dropdown from '../../../components/Dropdown'
 import RailNewButton from '../../../components/RailNewButton'
 import { brollHistoryMode } from './brollHistoryRows'
 
@@ -229,18 +230,7 @@ export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew
   const [query, setQuery] = useState('')
   const [modeFilter, setModeFilter] = useState<ModeFilter>('all')
   const [sort, setSort] = usePersistedState<SortId>('broll-studio:historySort', 'newest')
-  const [sortOpen, setSortOpen] = useState(false)
-  const sortRef = useRef<HTMLDivElement>(null)
 
-  // Close the sort menu on an outside click.
-  useEffect(() => {
-    if (!sortOpen) return
-    const onDown = (e: MouseEvent) => {
-      if (sortRef.current && !sortRef.current.contains(e.target as Node)) setSortOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [sortOpen])
 
   // Which mode pills to show — only offer a filter when more than one mode is
   // actually present, so a Line-only history isn't cluttered with dead pills.
@@ -313,8 +303,6 @@ export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew
     return groupByDay(filtered, (it) => sortTs(it, sort), sort === 'oldest' ? 'asc' : 'desc')
   }, [items, query, activeModeFilter, sort, titles])
 
-  const sortLabel = SORTS.find((s) => s.id === sort)?.label ?? 'Newest first'
-
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       {/* New leads the rail, above the filters — the Ad Analyzer's shape, and
@@ -367,8 +355,15 @@ export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew
         {/* Mode filter pills, then the sort dropdown. Sort is always shown; the
             mode pills only when more than one mode is present. A live "N
             sessions rendering" chip leads them whenever anything is in flight,
-            so the queue is visible without scanning every row. */}
-          <div className="flex flex-wrap items-center gap-1.5">
+            so the queue is visible without scanning every row.
+
+            CENTRED, and one group with the sort (September 2026): in the rail
+            the search takes the whole first line and this is the whole second
+            one, where left-aligned it sat under the search field's left edge
+            with the rest of the row empty. `flex-1` means it still fills the
+            space beside the field at the widths where everything fits on one
+            line. */}
+          <div className="flex flex-1 flex-wrap items-center justify-center gap-1.5">
             {generatingRows > 0 && (
               <span className="flex items-center rounded-full border border-broll-500/30 bg-broll-500/10 px-2.5 py-1 text-[11px]">
                 <GeneratingChip
@@ -396,38 +391,19 @@ export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew
               })}
           </div>
 
-          <div ref={sortRef} className="relative shrink-0">
-            <button
-              type="button"
-              onClick={() => setSortOpen((o) => !o)}
-              className="flex items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3 py-1 text-[11px] font-medium text-ink-300 transition-colors hover:bg-ink/[0.06] hover:text-ink-100"
-              title="Sort history"
-            >
-              <ArrowDownUp className="h-3 w-3" />
-              <span>{sortLabel}</span>
-              <ChevronDown className={`h-3 w-3 transition-transform ${sortOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {sortOpen && (
-              <div className="absolute right-0 top-full z-20 mt-1.5 w-44 overflow-hidden rounded-xl border border-ink/10 bg-surface-2 p-1 shadow-lg shadow-black/20">
-                {SORTS.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => {
-                      setSort(s.id)
-                      setSortOpen(false)
-                    }}
-                    className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[12px] transition-colors ${
-                      sort === s.id ? 'bg-broll-500/15 text-broll-200' : 'text-ink-300 hover:bg-ink/[0.06] hover:text-ink-100'
-                    }`}
-                  >
-                    <span>{s.label}</span>
-                    {sort === s.id && <Check className="h-3.5 w-3.5 shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+            {/* A PORTALED dropdown (`Dropdown` → `AnchoredPopover`), not a
+                locally-positioned menu. This rail is a 280px `overflow-y-auto`
+                column, so an `absolute` menu is clipped by it — reported with
+                the options cut off down their left edge. `Dropdown` is the
+                app's only select for exactly this reason. */}
+            <Dropdown
+              value={sort}
+              options={SORTS.map((o) => ({ value: o.id, label: o.label }))}
+              onChange={(v) => setSort(v as SortId)}
+              accent="broll"
+              fitContent
+              dense
+            />
         </div>
       </div>
 

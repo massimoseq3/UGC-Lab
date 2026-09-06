@@ -142,7 +142,13 @@ export default function ScriptArchitect() {
   // first thing this pane should show is the thing you pressed Generate for,
   // not the list of what you pressed it for before. Only ever a default — the
   // stored answer, once there is one, is the member's.
-  const [historyOpen, setHistoryOpen] = usePersistedState<boolean>(`${baseKey}:historyOpen`, railIsColumn)
+  //
+  // The slot is `:historyRail`, not the `:historyOpen` this was built under:
+  // renaming it once made every browser that had shut the rail while it was
+  // being built re-default rather than carry a stale `false` into the finished
+  // thing. That is free only while a feature is unreleased — after that a
+  // default flip needs the one-shot reset marker `appVisibilityStore` uses.
+  const [historyOpen, setHistoryOpen] = usePersistedState<boolean>(`${baseKey}:historyRail`, railIsColumn)
   // "Clear the canvas" state. Holds a signature of the output that was cleared,
   // so the next generation (or a history restore) fills the panel again on its
   // own. Nothing is deleted — every take is already a History row; this exists

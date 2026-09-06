@@ -118,7 +118,7 @@ export default function RightPanel(props: RightPanelProps) {
   // app should land on the clips, not on the list of the ones you made before.
   // Its own slot: the old `:rightTab` held 'scenes' | 'history', so a stored
   // value there means nothing here.
-  const [historyOpen, setHistoryOpen] = usePersistedState<boolean>(`${baseKey}:historyOpen`, railIsColumn)
+  const [historyOpen, setHistoryOpen] = usePersistedState<boolean>(`${baseKey}:historyRail`, railIsColumn)
 
   const allHistory = useBankStore((s) => s.brollHistory)
   const deleteBrollHistory = useBankStore((s) => s.deleteBrollHistory)

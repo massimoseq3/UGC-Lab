@@ -121,7 +121,7 @@ export default function VoiceStudio() {
   // sit BESIDE the script and stays shut where it would cover it — on a phone
   // this pane's job is the script box. Only ever a default; the stored answer,
   // once there is one, is the member's.
-  const [historyOpen, setHistoryOpen] = usePersistedState<boolean>(`${baseKey}:historyOpen`, railIsColumn)
+  const [historyOpen, setHistoryOpen] = usePersistedState<boolean>(`${baseKey}:historyRail`, railIsColumn)
 
   const history = useBankStore((s) => s.voiceHistory)
   const activePlayerItem = useMemo<VoiceHistoryItem | null>(

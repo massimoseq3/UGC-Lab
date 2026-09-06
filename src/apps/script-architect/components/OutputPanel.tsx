@@ -1970,6 +1970,8 @@ function SceneBeatBlock({
 // `h-[53px]` and the scroller's `pt-[73px]` (this + the column's own 20px
 // inset) — a Tailwind class can't be built from a variable.
 const SWITCHER_H = 53
+// Below this the takes are just a column you scroll (see `showSwitcher`).
+const SWITCHER_MIN_TAKES = 5
 
 export default function OutputPanel({ variations, outputAngles, mode, liveMode, writeFormat, writeStyleLabel, hookCategoryLabel, hookCount = DEFAULT_HOOK_COUNT, linkedProductId, pendingRun, error, runId, onEditVariation, voiceProfile, onEditVoiceProfile }: OutputPanelProps) {
   // Resolve the linked product so saved scripts get a meaningful default title
@@ -2007,9 +2009,15 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
   }, [runId])
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  // The switcher only floats when it's rendered, so the scroll maths only owes
-  // it clearance then.
-  const switcherOffset = variations.length > 1 ? SWITCHER_H : 0
+  // The switcher earns its 53px only on a batch you'd actually lose your place
+  // in (September 2026, Massimo's call). At three takes it was a row of glass
+  // over the top of the first one for a column you can read straight down —
+  // the whole point of the scroll-jump shape is that the takes are one
+  // continuous column, and at that length scrolling IS the switcher.
+  const showSwitcher = variations.length >= SWITCHER_MIN_TAKES
+  // It only floats when it's rendered, so the scroll maths only owes it
+  // clearance then.
+  const switcherOffset = showSwitcher ? SWITCHER_H : 0
 
   const scrollToTake = (i: number) => {
     setActiveTake(i)
@@ -2118,7 +2126,7 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
           backdrop root spanning the pane is a wider invalidation than a
           switcher needs. The row it sits in is `pointer-events-none`, so the
           dead space either side of the pill still scrolls the takes under it. */}
-      {variations.length > 1 && (
+      {showSwitcher && (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex h-[53px] select-none items-center justify-center px-5">
           <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-ink/10 bg-surface-1/70 p-0.5 shadow-[0_6px_20px_-8px_rgba(0,0,0,0.45)] backdrop-blur-2xl backdrop-saturate-150 light:bg-white/70">
             {variations.map((_, i) => (
@@ -2142,7 +2150,7 @@ export default function OutputPanel({ variations, outputAngles, mode, liveMode, 
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className={`flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto p-5 ${variations.length > 1 ? 'pt-[73px]' : ''}`}
+        className={`flex flex-1 min-h-0 flex-col gap-4 overflow-y-auto p-5 ${showSwitcher ? 'pt-[73px]' : ''}`}
       >
         {/* Above the takes and inside the scroller: it's the first thing on the
             page but it isn't a header — it scrolls away with everything else,
