@@ -53,7 +53,9 @@ export default function BatchCountStepper({
   // Singular noun for the tooltip and the button labels ("image" → "2 images").
   noun: string
   // Optional dim word inside the pill, for a count whose number alone wouldn't
-  // say what it counts (a row that isn't obviously a generate bar).
+  // say what it counts (a row that isn't obviously a generate bar). Written in
+  // Title Case — it is a label the member reads, not a word in a sentence,
+  // which is what `noun` above is.
   label?: string
   // Stack the label UNDER the number instead of beside it. For a tall pill in
   // a generate bar, where the count is the thing being read and the word is

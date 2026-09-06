@@ -1230,7 +1230,11 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                 size="xl"
                 accent="playground"
                 noun={state.mode === 'video' ? 'clip' : 'image'}
-                label={state.mode === 'video' ? 'clips' : 'images'}
+                // Title Case, like every other label the member reads on a
+                // control (Massimo's call). `noun` stays lower case — it is
+                // written into sentences ("2 clips per press"), not shown as a
+                // label of its own.
+                label={state.mode === 'video' ? 'Clips' : 'Images'}
                 value={batchCount}
                 onChange={(n) => onChange({ ...state, batchCount: n })}
                 creditsFor={creditsForRun}
