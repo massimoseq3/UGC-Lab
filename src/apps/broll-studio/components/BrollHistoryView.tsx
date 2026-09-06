@@ -11,7 +11,7 @@ import {
   type ContinuousClipCardState,
   type BrollMode,
 } from '../types'
-import { useAssetUrl } from '../../../hooks/useAssetUrl'
+import { useAssetThumb, useAssetUrl, useAssetPoster } from '../../../hooks/useAssetUrl'
 import { useBankStore } from '../../../stores/bankStore'
 import { usePersistedState } from '../../../hooks/usePersistedState'
 import { getContinuousStyle } from '../services/generateContinuous'
@@ -448,15 +448,24 @@ export default function BrollHistoryView({ items, activeId, onSelect, onDelete }
 // One piece of the cover mosaic. Each tile resolves its own asset ref, so the
 // card can show several without a hook loop.
 function CoverTile({ media, className = '' }: { media: CoverMedia; className?: string }) {
-  const url = useAssetUrl(media.ref)
-  if (!url) return <span className={`${className} h-full w-full bg-ink/[0.05]`} />
+  // A still shows its grid-sized thumbnail (utils/mediaThumbs), never the
+  // original: this mosaic is a few dozen tiles of ~100px, and every one used
+  // to decode a full-size render. A clip shows its poster frame once one has
+  // been captured — that's a picture, where a <video> is a decoder — and only
+  // mounts the element to capture it the first time.
+  const still = useAssetThumb(media.kind === 'image' ? media.ref : null)
+  const poster = useAssetPoster(media.kind === 'video' ? media.ref : null)
+  const clip = useAssetUrl(media.kind === 'video' && !poster.url ? media.ref : null)
   if (media.kind === 'video') {
+    if (poster.url) return <img src={poster.url} alt="" loading="lazy" decoding="async" className={`${className} h-full w-full object-cover`} />
+    if (!clip) return <span className={`${className} h-full w-full bg-ink/[0.05]`} />
     // The <video> element paints its first frame as the poster; the `#t=0.1`
     // fragment nudges the browser to decode+show that frame instead of a blank
-    // element.
+    // element — and that decoded frame is what `capture` keeps as the poster.
     return (
       <video
-        src={`${url}#t=0.1`}
+        src={`${clip}#t=0.1`}
+        onLoadedData={(e) => poster.capture(e.currentTarget)}
         muted
         playsInline
         preload="metadata"
@@ -464,7 +473,8 @@ function CoverTile({ media, className = '' }: { media: CoverMedia; className?: s
       />
     )
   }
-  return <img src={url} alt="" loading="lazy" decoding="async" className={`${className} h-full w-full object-cover`} />
+  if (!still.url) return <span className={`${className} h-full w-full bg-ink/[0.05]`} />
+  return <img src={still.url} alt="" loading="lazy" decoding="async" className={`${className} h-full w-full object-cover`} />
 }
 
 // The cover: one still full-bleed, two side by side, three as a big left tile

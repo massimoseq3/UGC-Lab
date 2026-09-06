@@ -6,8 +6,8 @@ import type { BankType } from '../../utils/constants'
 import type { ModelFilter } from './Finder'
 import { useBankStore } from '../../stores/bankStore'
 import { useAppStore } from '../../stores/appStore'
-import { useAssetUrl } from '../../hooks/useAssetUrl'
-import { getAsBase64, isAssetRef } from '../../utils/assetStore'
+import { useAssetUrl, useAssetThumb } from '../../hooks/useAssetUrl'
+import { getAsBase64, getUrl, isAssetRef } from '../../utils/assetStore'
 import { downloadImage } from '../../utils/downloadImage'
 import { copyToClipboard } from '../../utils/clipboard'
 import GeneratingBackdrop from '../../components/GeneratingBackdrop'
@@ -336,15 +336,19 @@ function BRollCard({ item, onEdit, onDelete }: { item: BRoll; onEdit: () => void
   // first video and let the browser show its first frame as the thumbnail.
   const hasImage = !!item.imageUrl
   const firstVideoUrl = item.videos?.[0]?.url ?? item.videoUrl
-  const resolvedImage = useAssetUrl(hasImage ? item.imageUrl : undefined)
+  // The card shows the still's grid-sized thumbnail (utils/mediaThumbs); the
+  // download below re-resolves the original.
+  const resolvedImage = useAssetThumb(hasImage ? item.imageUrl : undefined).url
   const resolvedVideo = useAssetUrl(!hasImage ? firstVideoUrl : undefined)
   const isVideoOnly = !hasImage && !!resolvedVideo
 
-  const handleDownload = (e: React.MouseEvent) => {
+  const handleDownload = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    const target = resolvedImage ?? resolvedVideo
+    const target = hasImage
+      ? (isAssetRef(item.imageUrl) ? await getUrl(item.imageUrl) : item.imageUrl)
+      : resolvedVideo
     if (!target) return
-    downloadImage(target, `broll-${item.id.slice(0, 8)}`, resolvedImage ? 'png' : 'mp4')
+    downloadImage(target, `broll-${item.id.slice(0, 8)}`, hasImage ? 'png' : 'mp4')
   }
 
   // Copies the FULL prompt, not the truncated card preview.

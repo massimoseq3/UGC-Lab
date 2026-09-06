@@ -4,7 +4,7 @@ import { ArrowLeft,
 } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import { useBankStore } from '../../../stores/bankStore'
-import { useAssetUrlState, useAssetUrl } from '../../../hooks/useAssetUrl'
+import { useAssetUrlState, useAssetUrl, useAssetThumb, useAssetPoster } from '../../../hooks/useAssetUrl'
 import { useInlineVideo, useExclusiveVideo } from '../../../hooks/useInlineVideo'
 import { useAppStore } from '../../../stores/appStore'
 import { getUrl } from '../../../utils/assetStore'
@@ -473,9 +473,15 @@ function HistoryListRow({
   // Only a CLIP releases: the media frame here is a fixed aspect, so a clip
   // coming and going moves nothing, while a still that released would resize
   // this row from above the viewport. See useNearViewport.
-  const { ref: rowRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: entry.kind === 'video' })
+  const { ref: rowRef, near, seen } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: entry.kind === 'video' })
   const mediaRef = entry.kind === 'image' ? entry.data.imageUrl : entry.kind === 'video' ? entry.data.videoUrl : null
-  const { url, status } = useAssetUrlState(near ? mediaRef : null)
+  // A still renders its grid-sized copy, never the original (see
+  // utils/mediaThumbs); a clip renders the original, with its poster frame
+  // standing in while it loads and after it's released.
+  const still = useAssetThumb(near && entry.kind === 'image' ? mediaRef : null)
+  const clip = useAssetUrlState(near && entry.kind === 'video' ? mediaRef : null)
+  const { url, status } = entry.kind === 'video' ? clip : still
+  const poster = useAssetPoster(seen && entry.kind === 'video' ? mediaRef : null)
   // Music rows play from their own artwork, with the waveform under the prompt
   // — the same transport the grid tile and Voiceovers' history cards use.
   const coverUrl = useAssetUrl(entry.kind === 'music' ? entry.data.coverImageRef ?? null : null)
@@ -531,7 +537,16 @@ function HistoryListRow({
             // autoplay muted on hover) looked fine. The media fragment makes it
             // seek to 0.1s, which forces that frame to decode and show. Same fix
             // as B-Roll's history CoverTile.
-            <video {...rowVideo} src={`${url}#t=0.1`} controls playsInline preload="metadata" className="absolute inset-0 h-full w-full object-contain" />
+            <video
+              {...rowVideo}
+              src={`${url}#t=0.1`}
+              poster={poster.url}
+              onLoadedData={(e) => poster.capture(e.currentTarget)}
+              controls
+              playsInline
+              preload="metadata"
+              className="absolute inset-0 h-full w-full object-contain"
+            />
           ) : (
             <img
               src={url}
@@ -542,6 +557,10 @@ function HistoryListRow({
               className={`absolute inset-0 h-full w-full object-contain ${onClickImage ? 'cursor-zoom-in' : ''}`}
             />
           )
+        ) : poster.url ? (
+          // The clip is released (or still loading): its poster holds the frame,
+          // so a row scrolled back to never shows a black box.
+          <img src={poster.url} alt="" decoding="async" className="absolute inset-0 h-full w-full object-contain" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
             {status === 'loading'
@@ -698,9 +717,12 @@ function ImageTile({
   onAnimate?: () => void
 }) {
   // `loading="lazy"` only defers the <img> — the blob behind it still came out
-  // of IndexedDB for every tile in the list. This defers the read itself.
+  // of IndexedDB for every tile in the list. This defers the read itself, and
+  // what it reads is the grid-sized thumbnail, not the original: a 4K still
+  // drawn into a 150px cell is a decode the browser throws away off screen and
+  // redoes on the way back, which is the tile going black on the way up.
   const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot)
-  const { url, status } = useAssetUrlState(near ? item.imageUrl : null)
+  const { url, status } = useAssetThumb(near ? item.imageUrl : null)
   const isSaved = !!item.linkedBRollId
 
   return (
@@ -800,8 +822,12 @@ function VideoTile({
   // Off-window tiles hold no clip: a <video> each is a blob in memory and a
   // decoder, and the browser runs out of the second long before this list does.
   // Safe to release because the tile's height is `ratio`, not the clip's.
-  const { ref: tileRef, near } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: true })
+  const { ref: tileRef, near, seen } = useNearViewport<HTMLDivElement>(scrollRoot, undefined, { release: true })
   const { url, status } = useAssetUrlState(near ? item.videoUrl : null)
+  // The poster is keyed on SEEN, not near: it's the picture the tile keeps once
+  // the clip is released, and the one the <video> wears until its first frame
+  // decodes when the clip comes back — so releasing is invisible.
+  const poster = useAssetPoster(seen ? item.videoUrl : null)
   // Hover-autoplay must stay muted (browsers block unmuted autoplay), but an
   // explicit Play click is a user gesture and plays in place with sound — and
   // stops whatever clip was playing elsewhere in the app.
@@ -826,6 +852,17 @@ function VideoTile({
           <video
             {...inline.videoProps}
             src={url}
+            poster={poster.url}
+            onLoadedData={(e) => poster.capture(e.currentTarget)}
+            className={`h-full w-full object-cover transition-opacity ${
+              selecting && !selected ? 'opacity-60 group-hover:opacity-100' : ''
+            }`}
+          />
+        ) : poster.url ? (
+          <img
+            src={poster.url}
+            alt=""
+            decoding="async"
             className={`h-full w-full object-cover transition-opacity ${
               selecting && !selected ? 'opacity-60 group-hover:opacity-100' : ''
             }`}

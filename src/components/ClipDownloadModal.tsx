@@ -16,7 +16,7 @@ import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Download, Check, Star, Film } from 'lucide-react'
 import Spinner from './Spinner'
-import { useAssetUrl } from '../hooks/useAssetUrl'
+import { useAssetUrl, useAssetPoster } from '../hooks/useAssetUrl'
 import useNearViewport from '../hooks/useNearViewport'
 import { useAppStore } from '../stores/appStore'
 import { downloadAssetsZip } from '../utils/downloadZip'
@@ -202,8 +202,11 @@ function ClipTile({
   // Only tiles near the scroll window hold a clip — this list runs to every
   // video the member has ever made, and mounting all of them at once left the
   // grid black while the tab stalled. See hooks/useNearViewport.
-  const { ref: tileRef, near } = useNearViewport<HTMLButtonElement>(scrollRoot, undefined, { release: true })
+  const { ref: tileRef, near, seen } = useNearViewport<HTMLButtonElement>(scrollRoot, undefined, { release: true })
   const url = useAssetUrl(near ? entry.ref : null)
+  // Keyed on SEEN: the poster is what a released tile keeps showing, and what
+  // the <video> wears until its first frame decodes when the clip comes back.
+  const poster = useAssetPoster(seen ? entry.ref : null)
   return (
     <div className="flex flex-col gap-1.5">
       <button
@@ -219,6 +222,8 @@ function ClipTile({
         {url ? (
           <video
             src={url}
+            poster={poster.url}
+            onLoadedData={(e) => poster.capture(e.currentTarget)}
             muted
             loop
             playsInline
@@ -227,6 +232,8 @@ function ClipTile({
             onMouseEnter={(e) => { (e.currentTarget as HTMLVideoElement).play().catch(() => {}) }}
             onMouseLeave={(e) => { const v = e.currentTarget as HTMLVideoElement; v.pause(); v.currentTime = 0 }}
           />
+        ) : poster.url ? (
+          <img src={poster.url} alt="" decoding="async" className={`h-full w-full object-cover transition-opacity ${picked ? '' : 'opacity-45'}`} />
         ) : (
           // A tile that hasn't reached the window yet gets a still glyph, not a
           // spinner: forty spinning icons off screen is forty animations the

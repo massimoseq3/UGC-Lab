@@ -566,24 +566,6 @@ export async function fetchGeneratedAsset(
   }
 }
 
-// Download a generated URL and return base64 + mimeType for local persistence.
-export async function downloadAsBase64(url: string): Promise<{ base64: string; mimeType: string }> {
-  const res = await fetchGeneratedAsset(url)
-  if (!res.ok) throw new Error(`Failed to download generated asset (${res.status}).`)
-  const blob = await res.blob()
-  const mimeType = blob.type || 'image/png'
-  const buffer = await blob.arrayBuffer()
-  // Avoid `String.fromCharCode(...new Uint8Array(...))` which blows the call
-  // stack on large buffers — chunk it.
-  const bytes = new Uint8Array(buffer)
-  let binary = ''
-  const CHUNK = 32_768
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
-  }
-  return { base64: btoa(binary), mimeType }
-}
-
 // ── Chat completions (three transports) ────────────────────────
 //
 // kie.ai serves chat models at three different endpoint families, each with
