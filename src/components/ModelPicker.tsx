@@ -15,6 +15,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { APP_REGISTRY } from '../utils/constants'
 import ProviderLogo from './ProviderLogo'
 import SavingsPill from './SavingsPill'
+import { MenuSurface } from './Menu'
 
 // Append 8-digit alpha to a 6-digit hex accent for the selected-row tint.
 function hexAlpha(hex: string, alpha: string): string {
@@ -196,12 +197,10 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
       </button>
 
       {open && (
-        <div
-          className={`absolute left-0 right-0 z-50 overflow-hidden rounded-[30px] border border-ink/10 bg-surface-2/95 shadow-2xl backdrop-blur-xl ${
-            openUpward ? 'bottom-full mb-1.5' : 'top-full mt-1.5'
-          }`}
+        <MenuSurface
+          className={`absolute left-0 right-0 z-50 ${openUpward ? 'bottom-full mb-1.5' : 'top-full mt-1.5'}`}
         >
-          <div className="max-h-[min(360px,60vh)] overflow-y-auto p-1">
+          <div className="max-h-[min(360px,60vh)] overflow-y-auto">
             {/* Recommended (starred) models pinned to the top for quick access,
                 then a hairline, then the full list below (the starred ones
                 appear in both places). */}
@@ -220,7 +219,7 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
                 />
               )
             })}
-            {recommended.length > 0 && <div className="my-1 border-t border-ink/10" />}
+            {recommended.length > 0 && <div className="h-px bg-ink/10" />}
             {models.map((m) => {
               const muted = isMuted(m)
               return (
@@ -238,11 +237,11 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
             })}
           </div>
           {requireModeNote && models.some(isMuted) && (
-            <p className="border-t border-ink/5 px-3 py-2 text-[11px] leading-relaxed text-ink-500">
+            <p className="border-t border-ink/10 px-4 py-2.5 text-[11px] leading-relaxed text-ink-500">
               {requireModeNote}
             </p>
           )}
-        </div>
+        </MenuSurface>
       )}
     </div>
   )
@@ -307,8 +306,12 @@ function ModelRow({ model, active, muted, accent, costParams, noCredits, onClick
       disabled={muted}
       aria-disabled={muted}
       style={active && !muted ? { backgroundColor: hexAlpha(accent, '1a') } : undefined}
-      className={`flex w-full items-center gap-3 rounded-full px-2.5 py-2.5 text-left transition-colors ${
-        muted ? 'cursor-not-allowed opacity-30 grayscale' : active ? '' : 'hover:bg-ink/[0.04]'
+      /* The house menu row (see components/Menu.tsx): full-bleed at the same
+         16px inset, no pill of its own. A two-line row with a provider logo is
+         too much content for `MenuItem`'s single label slot, so it borrows the
+         geometry rather than the component. */
+      className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+        muted ? 'cursor-not-allowed opacity-30 grayscale' : active ? '' : 'hover:bg-ink/[0.06]'
       }`}
     >
       <ProviderLogo provider={model.provider} />
@@ -319,9 +322,17 @@ function ModelRow({ model, active, muted, accent, costParams, noCredits, onClick
           {isRecommended && (
             <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
           )}
-          {savings != null && <SavingsPill pct={savings} />}
         </div>
-        {meta && <p className="mt-px truncate text-[11px] leading-tight text-ink-500">{meta}</p>}
+        {/* The "% off" chip rides the META line, beside the credits it is a
+            discount ON (Massimo's call, September 2026). On the name line it
+            was a green block interrupting the one thing the row is scanned for
+            — and it sat two lines above the number it refers to. */}
+        {(meta || savings != null) && (
+          <div className="mt-px flex min-w-0 items-center gap-1.5">
+            {meta && <p className="truncate text-[11px] leading-tight text-ink-500">{meta}</p>}
+            {savings != null && <SavingsPill pct={savings} />}
+          </div>
+        )}
       </div>
 
       {active && <Check className="h-4 w-4 shrink-0" style={{ color: accent }} />}

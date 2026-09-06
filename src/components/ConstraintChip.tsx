@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { MenuSurface, MenuItem } from './Menu'
 
 // Compact chip-styled picker used for video/image constraint pickers
 // (aspect ratio, duration, resolution, audio). The options reveal on CLICK —
@@ -88,24 +89,22 @@ export default function ConstraintChip({
             openDirection === 'up' ? 'bottom-full pb-1' : 'top-full pt-1'
           } ${align === 'right' ? 'right-0' : 'left-0'}`}
         >
-          {/* Option rows are a real tap target: 36px tall at the trigger's own
-              13px, not the 11px/24px they used to be. These are the resolution
-              and aspect menus on every generate bar in the app — the pills
-              were fiddly to hit with a mouse and worse on a trackpad. */}
-          <div className="min-w-[160px] overflow-hidden rounded-2xl border border-ink/10 bg-surface-2/95 p-1.5 shadow-xl backdrop-blur-xl">
+          {/* Option rows are a real tap target — the house menu row, 42px at
+              the trigger's own 13px, not the 11px/24px pills they used to be.
+              These are the resolution and aspect menus on every generate bar in
+              the app, and they were fiddly to hit with a mouse and worse on a
+              trackpad. */}
+          <MenuSurface className="whitespace-nowrap">
             {options.map((opt) => (
-              <button
+              <MenuItem
                 key={opt}
-                type="button"
+                selected={opt === value}
                 onClick={() => { onChange(opt); setOpen(false) }}
-                className={`flex min-h-9 w-full items-center whitespace-nowrap rounded-full px-3.5 py-2 text-left text-[13px] transition-colors ${
-                  opt === value ? 'bg-ink/[0.08] text-ink-100' : 'text-ink-300 hover:bg-ink/[0.05]'
-                }`}
               >
                 {renderOption ? renderOption(opt) : render ? render(opt) : opt}
-              </button>
+              </MenuItem>
             ))}
-          </div>
+          </MenuSurface>
         </div>
       )}
     </div>

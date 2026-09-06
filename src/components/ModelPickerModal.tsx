@@ -441,9 +441,11 @@ function ModelRow({ model, active, muted, credits, accent, onClick }: ModelRowPr
               {TAG_STYLES[t].label}
             </span>
           ))}
-          {savings != null && <SavingsPill pct={savings} />}
         </div>
-        {metaPills.length > 0 && (
+        {/* The "% off" chip rides the META row, beside the credits pill it is a
+            discount ON — the same move `ModelPicker`'s own rows made, so the
+            dropdown and this panel still read as one family. */}
+        {(metaPills.length > 0 || savings != null) && (
           <div className="mt-1 flex flex-wrap items-center gap-1">
             {metaPills.map((m) => (
               <span
@@ -453,6 +455,7 @@ function ModelRow({ model, active, muted, credits, accent, onClick }: ModelRowPr
                 {m}
               </span>
             ))}
+            {savings != null && <SavingsPill pct={savings} />}
           </div>
         )}
       </div>

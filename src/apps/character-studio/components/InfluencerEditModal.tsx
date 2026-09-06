@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Download, Bookmark, Check, Wand2, LayoutGrid, Pencil, Upload, FolderOpen, Copy, Maximize2, Coins, Palette, ChevronRight, Layers, Eraser } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
+import { MenuSurface, MenuItem } from '../../../components/Menu'
 import DayPill from '../../../components/DayPill'
 import { sectionLabel, groupByDay } from '../../../utils/history'
 import SectionCard, { SectionLabel } from '../../../components/SectionCard'
@@ -623,26 +624,24 @@ export default function InfluencerEditModal({
                             <AddTile onClick={() => setRefMenuOpen((v) => !v)} />
                             {refMenuOpen && (
                               <div
-                                className="absolute left-0 top-full z-[62] mt-1 w-40 overflow-hidden rounded-xl border border-ink/10 bg-surface-2/95 p-1 shadow-xl backdrop-blur-xl"
+                                className="absolute left-0 top-full z-[62] mt-1"
                                 onMouseEnter={openRefMenu}
                                 onMouseLeave={closeRefMenuSoon}
                               >
-                                <button
-                                  type="button"
-                                  onClick={() => { setRefMenuOpen(false); fileInputRef.current?.click() }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] text-ink-300 transition-colors hover:bg-ink/[0.06]"
-                                >
-                                  <Upload className="h-3.5 w-3.5" />
-                                  Upload Image
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => { setRefMenuOpen(false); setBankPickerOpen(true) }}
-                                  className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12px] text-ink-300 transition-colors hover:bg-ink/[0.06]"
-                                >
-                                  <FolderOpen className="h-3.5 w-3.5" />
-                                  Pick from Bank
-                                </button>
+                                <MenuSurface className="whitespace-nowrap">
+                                  <MenuItem
+                                    icon={Upload}
+                                    onClick={() => { setRefMenuOpen(false); fileInputRef.current?.click() }}
+                                  >
+                                    Upload image
+                                  </MenuItem>
+                                  <MenuItem
+                                    icon={FolderOpen}
+                                    onClick={() => { setRefMenuOpen(false); setBankPickerOpen(true) }}
+                                  >
+                                    Pick from Bank
+                                  </MenuItem>
+                                </MenuSurface>
                               </div>
                             )}
                           </div>

@@ -4,6 +4,7 @@ import Spinner from '../../../components/Spinner'
 import BankPicker from '../../../components/BankPicker'
 import SlotActionMenu from '../../../components/video/SlotActionMenu'
 import AnchoredPopover from '../../../components/video/AnchoredPopover'
+import { MenuSurface, MenuItem, MenuSeparator, MENU_ROW_HEIGHT } from '../../../components/Menu'
 import { RefGroup, MediaCard, MediaAddCard } from '../../../components/video/refInputParts'
 import { readMediaDuration } from '../../../utils/media'
 import { fileToDataUri } from '../../../utils/kie'
@@ -328,39 +329,45 @@ export default function OmniInputsSection({ refs, onChangeRefs }: OmniInputsSect
           anchorRef={voiceTriggerRef}
           open={voiceMenuOpen}
           onClose={() => setVoiceMenuOpen(false)}
-          width={240}
-          estimatedHeight={voices.length > 0 ? Math.min(voices.length, 4) * 36 + 44 : 44}
-          className="rounded-2xl border border-ink/10 bg-surface-2 p-1.5 shadow-xl"
+          width={248}
+          estimatedHeight={(Math.min(voices.length, 4) + 1) * MENU_ROW_HEIGHT + 2}
         >
-          {voices.length > 0 && (
-            <div className="max-h-44 overflow-y-auto">
-              {voices.map((v) => (
-                <div key={v.kieAudioId} className="group flex items-center gap-1">
-                  <button
-                    onClick={() => { attachVoice(v); setVoiceMenuOpen(false) }}
-                    className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12px] text-ink-300 transition-colors hover:bg-ink/5 hover:text-ink-100"
-                  >
-                    <Mic className="h-3.5 w-3.5 shrink-0 text-ink-500" />
-                    <span className="truncate">{v.name}</span>
-                  </button>
-                  <button
-                    onClick={() => removeVoice(v.kieAudioId)}
-                    title="Delete voice"
-                    className="hidden h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink/10 hover:text-ink-300 group-hover:flex"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <button
-            onClick={() => { setDesignerOpen(true); setVoiceMenuOpen(false) }}
-            className="mt-0.5 flex w-full items-center gap-2 rounded-full border-t border-ink/5 px-2.5 py-2 text-left text-[12px] font-medium text-playground-300 transition-colors hover:bg-ink/5"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Design new voice…</span>
-          </button>
+          <MenuSurface>
+            {voices.length > 0 && (
+              <div className="max-h-[168px] overflow-y-auto">
+                {/* The delete button rides ON the row rather than beside it:
+                    the rows are full-bleed now, so a sibling button outside one
+                    would sit in a gutter the menu no longer has. */}
+                {voices.map((v) => (
+                  <div key={v.kieAudioId} className="group relative">
+                    <MenuItem
+                      icon={Mic}
+                      onClick={() => { attachVoice(v); setVoiceMenuOpen(false) }}
+                      className="pr-11"
+                    >
+                      {v.name}
+                    </MenuItem>
+                    <button
+                      onClick={() => removeVoice(v.kieAudioId)}
+                      title="Delete voice"
+                      className="absolute right-2.5 top-1/2 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-ink-600 transition-colors hover:bg-ink/10 hover:text-ink-300 group-hover:flex"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {voices.length > 0 && <MenuSeparator />}
+            <MenuItem
+              icon={Plus}
+              iconClassName="text-playground-300"
+              toneClassName="text-playground-300 hover:bg-ink/[0.06] hover:text-playground-200"
+              onClick={() => { setDesignerOpen(true); setVoiceMenuOpen(false) }}
+            >
+              Design new voice…
+            </MenuItem>
+          </MenuSurface>
         </AnchoredPopover>
       )}
       <input
