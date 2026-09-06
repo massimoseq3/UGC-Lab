@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  Box, AlertCircle, Sparkles, Image as ImageIcon, Video as VideoIcon, Play, Pause, Volume2, VolumeX, Plus, Coins, Check, X, ArrowRight, Download, Copy, Bookmark, Film, ChevronRight, Star, Link2, Link2Off, RefreshCw, Pencil, SplitSquareVertical, Merge, Trash2, Palette,
+  Box, AlertCircle, Sparkle, Image as ImageIcon, Video as VideoIcon, Play, Pause, Volume2, VolumeX, Plus, Coins, Check, X, ArrowRight, Download, Copy, Bookmark, Film, ChevronRight, Star, Link2, Link2Off, RefreshCw, Pencil, SplitSquareVertical, Merge, Trash2, Palette,
 } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import GenerationProgress from '../../../components/GenerationProgress'
@@ -1311,7 +1311,7 @@ export default function ContinuousView({
       </div>
       {result.demo && (
         <div className="mb-4 mt-4 flex items-start gap-2 rounded-2xl border border-broll-500/25 bg-broll-500/10 px-4 py-3">
-          <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-broll-300" />
+          <Sparkle className="mt-0.5 h-4 w-4 shrink-0 text-broll-300" />
           <p className="text-xs leading-relaxed text-ink-300">
             <span className="font-semibold text-broll-300">Sample storyboard.</span>{' '}
             This is a preview of what Continuous mode produces. Add your kie.ai key in Settings to storyboard your own script and generate the keyframes and clips.

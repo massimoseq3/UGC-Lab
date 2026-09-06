@@ -1,4 +1,4 @@
-import { FileText, RefreshCw, X, ChevronRight, Sparkles } from 'lucide-react'
+import { FileText, RefreshCw, X, ChevronRight, Sparkle } from 'lucide-react'
 import Spinner from '../../../components/Spinner'
 import type { Script } from '../../../stores/types'
 import ClearAllButton from '../../../components/ClearAllButton'
@@ -132,7 +132,7 @@ export default function EditorArea({
               title="Add expression tags (e.g. [warmly], [excited]) for a more emotive read"
               className="flex items-center gap-1.5 rounded-full border border-voice-500/30 bg-voice-500/10 px-3 py-1.5 text-xs font-semibold text-voice-300 transition-colors hover:bg-voice-500/20 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isEnhancing ? <Spinner className="h-3.5 w-3.5" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {isEnhancing ? <Spinner className="h-3.5 w-3.5" /> : <Sparkle className="h-3.5 w-3.5" />}
               {isEnhancing ? 'Enhancing…' : 'Enhance'}
             </button>
           )}

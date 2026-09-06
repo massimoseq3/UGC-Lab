@@ -1,4 +1,4 @@
-import { Sparkles, Star } from 'lucide-react'
+import { Sparkle, Star } from 'lucide-react'
 import ProviderLogo from './ProviderLogo'
 
 // The shared chrome of every "pick a model" panel: a provider rail down the
@@ -67,7 +67,7 @@ export function ProviderRail({ providers, value, onChange, activeClass, starred,
             strokeWidth={1.75}
           />
         ) : (
-          <Sparkles className="h-4 w-4" strokeWidth={1.75} />
+          <Sparkle className="h-4 w-4" strokeWidth={1.75} />
         )}
       </button>
       <span className="my-1 h-px w-5 bg-ink/10" />
