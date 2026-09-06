@@ -1793,57 +1793,68 @@ function SceneSection({
         </div>
       </div>
 
-      {/* The scene's variations plus the Add-option card across one row at xl —
-          the Add card is just another cell in the grid. Both deliveries are three
-          variations (a four-column row); a scene that carries four — an added
-          option, or a session generated back when Dialogue Clips emitted a fourth
-          card — runs five wide rather than wrapping the Add card onto a line of
-          its own.
+      {/* The scene's variations plus the Add-option card across one row when
+          there is room — the Add card is just another cell in the grid. Both
+          deliveries are three variations (a four-column row); a scene that
+          carries four — an added option, or a session generated back when
+          Dialogue Clips emitted a fourth card — runs five wide rather than
+          wrapping the Add card onto a line of its own.
+
+          The column count is a CONTAINER query, never a viewport one: what
+          squeezes this grid is the OUTPUT COLUMN, which loses ~340px the moment
+          the History rail opens. On `xl:` the four cells stayed four on a 2000px
+          screen with the rail out, dropping every card to ~170px — so the tiles
+          a member is actually judging got small to keep an empty Add card on
+          their line. Below the four-up threshold the row narrows to three and
+          the Add card wraps onto a line of its own, which is the cell we can
+          afford to lose.
 
           The Add card is a FULL cell, not a half one. It was halved for a day
           (doubled tracks, each variation spanning two) to hand its width back to
           the stills, and reverted the same day — Massimo's call. */}
-      <div className={`grid grid-cols-2 gap-3 md:grid-cols-3 ${scene.variations.length >= 4 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
-        {scene.variations.map((variation, i) => {
-          const key = `${scene.number}-${i}`
-          const state = cardStates[key] ?? createDefaultCardState(variation, scene.scriptLine)
-          return (
-            <VariationCardRow
-              key={variation.id}
-              cardKey={key}
-              sceneNumber={scene.number}
-              scriptLine={scene.scriptLine}
-              variation={variation}
-              cardState={state}
-              onUpdateCardState={onUpdateCardState}
-              onUpdateCardStateFn={onUpdateCardStateFn}
-              onDeleteVariation={onDeleteVariation}
-              characterRef={characterRef}
-              productRef={productRef}
-              productPhotos={productPhotos}
-              onChangeStyle={onChangeStyle}
-              selectedProduct={selectedProduct}
-              selectedModel={selectedModel}
-              selectedProductId={selectedProductId}
-              selectedModelId={selectedModelId}
-              selectedScriptId={selectedScriptId}
-              productContext={productContext}
-              modelContext={modelContext}
-              onOpenCharacterPicker={onOpenCharacterPicker}
-              onOpenProductPicker={onOpenProductPicker}
-              generateImageToken={batchTokens[key]}
-              batchImageOverride={batchImageOverride}
-              generateVideoToken={videoTokens[key]}
-              batchVideoOverride={batchVideoOverride}
-              chainImageRef={dialogueChainRefs[key]}
-              resultStyle={resultStyle}
-              resultRealism={resultRealism}
-              resultVoiceProfile={resultVoiceProfile}
-              onUpdateVoiceProfile={onUpdateVoiceProfile}
-            />
-          )
-        })}
-        <AddNewCard onAdd={(variation) => onAddVariation(scene.number, variation)} productVisible={scene.productVisible} />
+      <div className="@container">
+        <div className={`grid grid-cols-2 gap-3 @[560px]:grid-cols-3 @[840px]:grid-cols-4 ${scene.variations.length >= 4 ? '@[1040px]:grid-cols-5' : ''}`}>
+          {scene.variations.map((variation, i) => {
+            const key = `${scene.number}-${i}`
+            const state = cardStates[key] ?? createDefaultCardState(variation, scene.scriptLine)
+            return (
+              <VariationCardRow
+                key={variation.id}
+                cardKey={key}
+                sceneNumber={scene.number}
+                scriptLine={scene.scriptLine}
+                variation={variation}
+                cardState={state}
+                onUpdateCardState={onUpdateCardState}
+                onUpdateCardStateFn={onUpdateCardStateFn}
+                onDeleteVariation={onDeleteVariation}
+                characterRef={characterRef}
+                productRef={productRef}
+                productPhotos={productPhotos}
+                onChangeStyle={onChangeStyle}
+                selectedProduct={selectedProduct}
+                selectedModel={selectedModel}
+                selectedProductId={selectedProductId}
+                selectedModelId={selectedModelId}
+                selectedScriptId={selectedScriptId}
+                productContext={productContext}
+                modelContext={modelContext}
+                onOpenCharacterPicker={onOpenCharacterPicker}
+                onOpenProductPicker={onOpenProductPicker}
+                generateImageToken={batchTokens[key]}
+                batchImageOverride={batchImageOverride}
+                generateVideoToken={videoTokens[key]}
+                batchVideoOverride={batchVideoOverride}
+                chainImageRef={dialogueChainRefs[key]}
+                resultStyle={resultStyle}
+                resultRealism={resultRealism}
+                resultVoiceProfile={resultVoiceProfile}
+                onUpdateVoiceProfile={onUpdateVoiceProfile}
+              />
+            )
+          })}
+          <AddNewCard onAdd={(variation) => onAddVariation(scene.number, variation)} productVisible={scene.productVisible} />
+        </div>
       </div>
 
       {lineEditorOpen && onEditSceneLine && (
@@ -1905,10 +1916,12 @@ function SkeletonScene() {
           <div className="skeleton h-3 w-48" />
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="skeleton skeleton-card aspect-[9/16]" />
-        ))}
+      <div className="@container">
+        <div className="grid grid-cols-2 gap-3 @[560px]:grid-cols-3 @[840px]:grid-cols-4">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="skeleton skeleton-card aspect-[9/16]" />
+          ))}
+        </div>
       </div>
     </div>
   )

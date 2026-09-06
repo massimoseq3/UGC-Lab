@@ -487,9 +487,12 @@ export default function InputPanel({
               // The same two glyphs the Generate button below swaps between for
               // these deliveries, so the button reads as an echo of what's
               // picked here rather than as a third piece of vocabulary.
+              // The labels are the two deliveries, not "… Clips": both segments
+              // said Clips, so the word carried no difference between them and
+              // only ate the width the names needed on a narrow column.
               options={[
-                { value: 'silent', label: 'B-Roll Clips', icon: Film },
-                { value: 'dialogue', label: 'Dialogue Clips', icon: MessageSquareQuote },
+                { value: 'silent', label: 'B-Roll', icon: Film },
+                { value: 'dialogue', label: 'Dialogue', icon: MessageSquareQuote },
               ]}
             />
           )}
