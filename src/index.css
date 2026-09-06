@@ -812,11 +812,14 @@ textarea,
    exactly as `.app-backdrop-fill` and the canvas are. At rest the bar is
    pixel-identical to what surrounds it and the divider reads the same above,
    inside and below the band; the remaining 28% is the blurred storyboard, which
-   is the whole point of the overlay — 18% of it at the alpha this settled on,
+   is the whole point of the overlay — 10% of it at the alpha this settled on,
    which is enough for a card passing underneath to TINT the bar while the bar
    stays firmly a dark pane rather than turning into the card. It was walked
-   down to 45% and back up through 68% to get here: the tint is meant to be
-   felt, not read. Alpha is free to move:
+   down to 45% and back up through 68% and 82% to get here: the tint is meant
+   to be felt, not read. Don't push it much further — past ~0.95 the bar is
+   opaque for all practical purposes and the overlay stops earning the blur it
+   costs; if it ever needs to go there, make it `.app-backdrop-fill` and drop
+   the pseudo-element with it. Alpha is free to move:
    at rest the tint IS the backdrop, so every value paints exactly the same
    colour and only the scrolled case changes — there is no seam to reintroduce
    by tuning it. No `saturate` anywhere: saturating whatever card is
@@ -856,9 +859,9 @@ textarea,
     background-color: transparent;
     background-image: radial-gradient(
       circle farthest-corner at 0% 0%,
-      rgb(31 31 34 / 0.82) 0%,
-      rgb(9 9 11 / 0.82) 45%,
-      rgb(0 0 0 / 0.82) 100%
+      rgb(31 31 34 / 0.9) 0%,
+      rgb(9 9 11 / 0.9) 45%,
+      rgb(0 0 0 / 0.9) 100%
     );
   }
   .app-backdrop-frost::before {
@@ -877,9 +880,9 @@ textarea,
   [data-theme="light"] .app-backdrop-frost {
     background-image: radial-gradient(
       circle farthest-corner at 0% 0%,
-      rgb(255 255 255 / 0.82) 0%,
-      rgb(246 246 247 / 0.82) 45%,
-      rgb(233 233 235 / 0.82) 100%
+      rgb(255 255 255 / 0.9) 0%,
+      rgb(246 246 247 / 0.9) 45%,
+      rgb(233 233 235 / 0.9) 100%
     );
   }
 }
