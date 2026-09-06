@@ -186,7 +186,7 @@ export interface ModelEntry {
   market?: OfficialPricing
   defaultFor?: string[]
   // Chat-only: endpoint path on api.kie.ai.
-  // e.g. '/gemini-3-flash/v1/chat/completions'
+  // e.g. '/gemini-3-8-flash-openai/v1/chat/completions'
   chatEndpoint?: string
   // Chat-only: request/response shape at that endpoint. Defaults to
   // 'openai-chat' when omitted.
@@ -242,21 +242,33 @@ export const TTS_MODEL_SLOT = 'voice-studio:tts'
 //   DEFAULT — the app-wide workhorse. Prompt-shaping, storyboards, shot logs:
 //             structured output against heavily-tuned prompts, read by another
 //             model rather than by a person.
-//   STRONG  — ~1.3x the credits. The tier for output a person reads and acts
-//             on, where a misread style family or a hedged scene prompt costs
-//             a re-shoot rather than a retry. Two consumers: the Ad Analyzer
-//             and the Bank's product auto-fill. Scripts and B-Roll used to
-//             reach this tier's model through its registry default and now
-//             default to GPT 5.6 Terra instead.
-//             It pointed at Gemini 3.6 Flash until September 2026, when Gemini
-//             3.8 Flash took the tier at half the rate — which is why the gap
-//             to DEFAULT is now 1.3x rather than 2.6x.
+//   STRONG  — the tier for output a person reads and acts on, where a misread
+//             style family or a hedged scene prompt costs a re-shoot rather
+//             than a retry. Two consumers: the Ad Analyzer and the Bank's
+//             product auto-fill. Scripts and B-Roll used to reach this tier's
+//             model through its registry default and now default to GPT 5.6
+//             Terra instead.
+//
+// BOTH CONSTANTS POINT AT THE SAME MODEL TODAY, and that is a lineup fact, not
+// a mistake to tidy away by collapsing them. Gemini 3 Flash held DEFAULT until
+// September 2026 and was removed at the operator's call; Gemini 3.8 Flash — the
+// nearest row in its own family, on the same transport, and already STRONG —
+// took the slot. So the tiers currently name one model and the ratio between
+// them is 1x.
+//
+// Keep them as two names anyway: every service in the app resolves a ROLE, so
+// re-splitting the tiers later (a cheaper workhorse under 3.8, or a stronger
+// row above it) stays the one-line edit it has always been. Collapsing them
+// into one constant would mean touching every call site to get back. The one
+// thing to watch while they agree: nothing in the app is exercising the
+// cheap/expensive distinction, so a price move on this single row moves the
+// cost of literally every chat call at once.
 //
 // Neither constant is what Scripts or B-Roll call any more: those two read the
 // member's own pick (see resolveScriptModel in stores/settingsStore.ts), which
 // falls back to that pair's own registry default when nothing is chosen. Every
 // OTHER chat surface still resolves through these two.
-export const CHAT_MODEL_DEFAULT = 'gemini-3-flash'
+export const CHAT_MODEL_DEFAULT = 'gemini-3-8-flash'
 export const CHAT_MODEL_STRONG = 'gemini-3-8-flash'
 
 // Both Gemini TTS models bill by tokens, not characters, on one rate card:
@@ -307,7 +319,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // direction — it is pinned to STRONG, because it writes for a reader too and
   // is acted on rather than passed along.
   //
-  // Order matters: Gemini 3 Flash is FIRST so it stays getDefaultModel's
+  // Order matters: Gemini 3.8 Flash is FIRST so it stays getDefaultModel's
   // candidates[0] fallback for any chat consumer without an explicit defaultFor.
   // The two PICKER apps hold INDEPENDENT slots and both currently default to
   // GPT 5.6 Terra (August 2026) — see that entry. They have diverged before and
@@ -322,10 +334,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // is live where you are.
   //
   // Every prompt in this app was written and tuned against Gemini 3 Flash, and
-  // the storyboard parsers expect its tag discipline. A stronger model writes
-  // better prose; it does not automatically parse better. Keep the tolerant
-  // parsers (services/xmlBlocks.ts) tolerant — that matters more now that the
-  // two apps with the strictest output contracts run on a different model.
+  // the storyboard parsers expect its tag discipline. That model was removed in
+  // September 2026 and DEFAULT moved to Gemini 3.8 Flash — the same family on
+  // the same transport, which is the reason that swap was the safe one, but the
+  // prompts are still tuned to a model no longer in the list. A stronger model
+  // writes better prose; it does not automatically parse better. Keep the
+  // tolerant parsers (services/xmlBlocks.ts) tolerant — that now matters on
+  // EVERY chat surface, not just the two apps with a picker.
   //
   // PRICING — verified against kie.ai/pricing on 2026-07-31 (Grok 4.6 on
   // 2026-08-15), which
@@ -340,10 +355,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //
   //   model            in cr/M   out cr/M   blended cr/1k
   //   GPT 5.6 Luna        11.2       67.2      0.0392
-  //   Gemini 3 Flash        30        180      0.105
   //   Gemini 3.8 Flash      45        225      0.135   (promo, see the entry)
   //   Gemini 3.6 Flash      90        450      0.27
-  //   Grok 4.5             160        480      0.32
   //   Grok 4.6             160        480      0.32
   //   GPT 5.6 Terra        112        672      0.392
   //   Claude Sonnet 5      170        855      0.5125
@@ -351,33 +364,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   //   Claude Opus 5        400       2000      1.20
   //
   // `official` is kie's own "Official / Fal Price" column, blended the same way
-  // — which is what makes the picker's "% off" chip real (Gemini −70%, and
-  // −85% on the 3.8 row while its launch promo runs, Claude −57.5/−60%,
-  // GPT −72%, Grok −60%).
+  // — which is what makes the picker's "% off" chip real (−85% on the 3.8 row
+  // while its launch promo runs and −70% on 3.6, Claude −57.5/−60%, GPT −72%,
+  // Grok −60%).
   //
   // Cached-input and cache-write tiers exist on the OpenAI and Anthropic
   // entries and are deliberately ignored: nothing in this app reuses a prompt
   // prefix across calls, so we'd be quoting a discount no member ever gets.
-  {
-    id: 'gemini-3-flash',
-    displayName: 'Gemini 3 Flash',
-    provider: 'Google',
-    task: 'chat',
-    tags: ['recommended', 'fast', 'cheap'],
-    pricing: { unit: 'per-1k-tokens', credits: 0.105 },
-    official: chatOfficial(0.5, 3, KIE_PRICING),
-    // The default on every surface that ISN'T one of the two pickers or the Ad
-    // Analyzer: those calls feed another model rather than a reader, and the
-    // prompts were all written and tuned against this one.
-    defaultFor: ['character-studio'],
-    chatEndpoint: '/gemini-3-flash/v1/chat/completions',
-    chatRating: {
-      intelligence: 2,
-      blurb:
-        'Quick and cheap to run. The plainest writer here.',
-    },
-  },
-
   {
     id: 'gemini-3-8-flash',
     displayName: 'Gemini 3.8 Flash',
@@ -406,7 +399,13 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     // (verified live 2026-09-06, alongside 'high', inline-image vision and a
     // tagged output contract). If it ever starts rejecting the value rather
     // than ignoring it, those two surfaces are where it shows up, as a 400.
-    defaultFor: ['ad-anatomy'],
+    // CHAT_MODEL_DEFAULT as well, since September 2026: Gemini 3 Flash held
+    // that slot and was removed, and this is the nearest row in its family on
+    // the same transport. So this entry is now BOTH chat roles and, being
+    // first, getDefaultModel's candidates[0] — which is three ways of saying
+    // that a change to this row is a change to every chat call in the app.
+    // `character-studio` is here because Gemini 3 Flash carried it.
+    defaultFor: ['ad-anatomy', 'character-studio'],
     // OpenAI-compatible variant slug on kie.ai. The native 3.8 route speaks
     // Google's own streamGenerateContent shape, which our transport doesn't.
     chatEndpoint: '/gemini-3-8-flash-openai/v1/chat/completions',
@@ -451,7 +450,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     chatRating: {
       intelligence: 4,
       blurb:
-        'A clear step up on Gemini 3 Flash. Steady on long, detailed prompts.',
+        'Steady on long, detailed prompts. A dependable middle option.',
     },
   },
 
@@ -544,8 +543,8 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     official: chatOfficial(0.2, 1.2, KIE_PRICING),
     // Held the unpicked default in Scripts and B-Roll for a stint (August 2026)
     // and handed it back to Gemini 3.6 Flash. Still the cheapest run in the
-    // list by a wide margin — it undercuts even Gemini 3 Flash — so it's the
-    // row to reach for when a member wants volume over polish.
+    // list by a wide margin — a third of the row above it — so it's the row
+    // to reach for when a member wants volume over polish.
     //
     // The Bank's product auto-fill ran here for a stint (August 2026) and went
     // back to CHAT_MODEL_STRONG in September, when that read became a
@@ -567,10 +566,10 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     provider: 'xAI',
     task: 'chat',
     tags: ['recommended', 'new'],
-    // Identical rate card to Grok 4.5 — 160 in / 480 out credits per million,
-    // against xAI's own $2 / $6 (kie.ai/pricing, verified 2026-08-15). Same
-    // blend, so it lands on the same cost tier as the model it replaces at
-    // the top of the two pickers: no member pays more for the default moving.
+    // 160 in / 480 out credits per million, against xAI's own $2 / $6
+    // (kie.ai/pricing, verified 2026-08-15). Grok 4.5 sat on the identical
+    // rate card one row below and was removed in September 2026 — two xAI
+    // rows at the same price, and this one writes better.
     pricing: { unit: 'per-1k-tokens', credits: 0.32 },
     official: chatOfficial(2, 6, KIE_PRICING),
     // The strongest writer here that isn't priced like Opus, and the row to
@@ -587,24 +586,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       intelligence: 5,
       blurb:
         'Top-tier writing without the top-tier price. Best all-round pick.',
-    },
-  },
-
-  {
-    id: 'grok-4-5',
-    displayName: 'Grok 4.5',
-    provider: 'xAI',
-    task: 'chat',
-    tags: [],
-    pricing: { unit: 'per-1k-tokens', credits: 0.32 },
-    official: chatOfficial(2, 6, KIE_PRICING),
-    chatEndpoint: '/grok/v1/responses',
-    chatTransport: 'openai-responses',
-    chatSlug: 'grok-4-5',
-    chatRating: {
-      intelligence: 4,
-      blurb:
-        'Punchy and willing to be funny. Good for hooks.',
     },
   },
 
@@ -1172,83 +1153,27 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // because history rows written while Veo was live still carry it, and the
   // refresh-resume path reads that field to know which poller to use. Deleting
   // the transport would strand those clips mid-flight.
-  // Gemini Omni Video — Google's multimodal AV generator. Standard
-  // createTask transport, but its inputs are unique: alongside up to 7
-  // reference images it accepts persistent character ids (from
-  // /omni/character/create), designed voice ids (from /omni/audio/create),
-  // and 1 trimmed source video clip — all sharing a 7-slot quota
-  // (images×1 + video×2 + characters×1 ≤ 7). Audio is always baked into the
-  // output (no generate_audio toggle). Docs: https://docs.kie.ai/market/gemini-omni-video
-  // Pricing (from kie docs, 2026-07-01): per-call, duration-tiered —
-  // 720p/1080p: 4s=63 / 6s=84 / 8s=105 / 10s=126; 4k adds +84. With a video
-  // input, duration is model-decided and billing is flat: 168 (720p/1080p) or
-  // 252 (4k).
-  {
-    id: 'gemini-omni-video',
-    displayName: 'Gemini Omni',
-    provider: 'Google',
-    task: 'video',
-    modes: ['text-to-video', 'reference-to-video'],
-    tags: ['recommended', 'new'],
-    supportsReferenceImages: true,
-    mixedImageInputs: 'merged',
-    // Images cost one slot each out of the shared 7-slot input quota, so 7 is
-    // the ceiling when no characters or source clip are attached. Playground,
-    // which can attach those, subtracts their slots on top of this.
-    maxReferenceImages: 7,
-    omniInputs: true,
-    pricing: {
-      unit: 'per-call',
-      credits: 105,
-      priceFor: ({ durationSeconds = 8, resolution = '720p', videoInput = false }) => {
-        const is4k = resolution === '4k'
-        if (videoInput) return is4k ? 252 : 168
-        const base =
-          durationSeconds >= 10 ? 126 :
-          durationSeconds >= 8 ? 105 :
-          durationSeconds >= 6 ? 84 : 63
-        return is4k ? base + 84 : base
-      },
-    },
-    // Gemini API bills Omni per token; ≈$0.10/s is the estimate from Google's
-    // published rates. Video-input and 4K calls have no clean per-second
-    // equivalent → null.
-    official: {
-      usdFor: ({ durationSeconds = 8, resolution = '720p', videoInput = false }) =>
-        videoInput || resolution === '4k' ? null : 0.10 * durationSeconds,
-      source: 'https://ai.google.dev/gemini-api/docs/pricing',
-    },
-    videoEndpoint: 'createTask',
-    videoConstraints: {
-      durations: [4, 6, 8, 10],
-      resolutions: ['720p', '1080p', '4k'],
-      // 720p is the floor tier and what a member expects to land on. 1080p held
-      // this slot because it costs the same credits (see priceFor), but "free"
-      // isn't the same as "wanted" — a heavier file and a slower render on every
-      // pick nobody asked for. 1080p is one click away.
-      default: '720p',
-      aspectRatios: ['16:9', '9:16'],
-    },
-    // Ref-capable, but no 'image-to-video' mode — it takes every image as a
-    // generic reference, not as frame one — so B-Roll's Animate tab greys it
-    // out and asks for Veo / Seedance instead. It's still the recommended Omni
-    // pick, but the *default* video model is Grok Imagine 1.5 (below), which
-    // does image-to-video and so works everywhere including Animate.
-  },
-  // Gemini Omni Flash 1.1 — the same Omni ecosystem one version on, and the
-  // first of the family with FRAME CONTROL. Everything Omni 1.0 takes it takes
-  // (up to 7 reference images, persistent character ids, designed voice ids, a
-  // trimmed source clip, all on the same shared 7-slot quota), plus:
+  // Gemini Omni Flash 1.1 — Google's multimodal AV generator, and since
+  // September 2026 the ONLY Omni row: Gemini Omni 1.0 sat above it and was
+  // removed, which cost nothing, because 1.1 takes everything 1.0 did and
+  // then some. Standard createTask transport, but its inputs are unique:
+  // alongside up to 7 reference images it accepts persistent character ids
+  // (from /omni/character/create), designed voice ids (from
+  // /omni/audio/create), and 1 trimmed source video clip — all sharing a
+  // 7-slot quota (images×1 + video×2 + characters×1 ≤ 7). Audio is always
+  // baked into the output (no generate_audio toggle).
+  //
+  // What made it the survivor is FRAME CONTROL:
   //   • first_frame_url / last_frame_url — real frame-one/frame-last fields,
-  //     which is what makes this the Omni entry B-Roll's Animate tab and
-  //     Continuous' keyframe chain can actually use. 1.0 has neither and folds
-  //     every image into `image_urls`, which is why it lands greyed there.
+  //     which is what makes this an Omni entry B-Roll's Animate tab and
+  //     Continuous' keyframe chain can actually use. 1.0 had neither and
+  //     folded every image into `image_urls`, so it landed greyed out in both.
   //   • a 360p draft tier, priced identically to 720p/1080p — cheap in time,
   //     not in credits.
-  // Frames and reference images live in SEPARATE fields here rather than 1.0's
-  // one flat array, but the question `mixedImageInputs` asks is "what happens
-  // when both arrive", and the answer is still that both reach the model — so
-  // 'merged' is the right policy and Playground sends the pair unchallenged.
+  // Frames and reference images live in SEPARATE fields, but the question
+  // `mixedImageInputs` asks is "what happens when both arrive", and the answer
+  // is that both reach the model — so 'merged' is the right policy and
+  // Playground sends the pair unchallenged.
   // Docs: https://docs.kie.ai/market/google/gemini-omni-flash-1-1
   //
   // Pricing (kie, user-supplied 2026-08-28, matching kie.ai/pricing) — the same
@@ -1320,10 +1245,11 @@ export const MODEL_REGISTRY: ModelEntry[] = [
   // renderer by name everywhere else in this app and a hidden speed switch
   // inside one row would be the only exception.
   //
-  // Unlike Wan 2.7 (two mode-specific slugs behind one virtual id), 3.0 is a
-  // single slug that takes everything: first/last frame, up to 10 reference
-  // images, 5 reference clips, 5 reference audio tracks, and up to 30 seconds
-  // of output with native audio.
+  // 3.0 is a single slug that takes everything: first/last frame, up to 10
+  // reference images, 5 reference clips, 5 reference audio tracks, and up to 30
+  // seconds of output with native audio. (Wan 2.7 sat below these two as a
+  // third Alibaba row, split across two mode-specific slugs behind one virtual
+  // id, and was removed in September 2026 — 3.0 supersedes it on every axis.)
   //
   // Frames and reference IMAGES are mutually exclusive here — the docs say
   // reference_image_urls "cannot be used together with first frame / last
@@ -1438,35 +1364,6 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       supportsAudio: true,
     },
   },
-  // Wan 2.7 — Alibaba Tongyi's video suite. kie exposes T2V and I2V as
-  // separate slugs; we register one virtual id and resolve to the real slug
-  // at generate time via `resolveVideoModelSlug`.
-  // Docs: https://docs.kie.ai/market/wan/2-7-text-to-video
-  //       https://docs.kie.ai/market/wan/2-7-image-to-video
-  {
-    id: 'wan/2-7',
-    displayName: 'Wan 2.7',
-    provider: 'Alibaba Tongyi',
-    task: 'video',
-    modes: ['text-to-video', 'image-to-video', 'frames-to-video'],
-    tags: ['new'],
-    pricing: {
-      unit: 'per-second',
-      credits: 16,
-      priceFor: ({ durationSeconds = 5, resolution = '720p' }) => {
-        const perSec = resolution === '1080p' ? 24 : 16  // 720p
-        return perSec * durationSeconds
-      },
-    },
-    videoEndpoint: 'createTask',
-    videoConstraints: {
-      durations: [3, 5, 8, 10, 12, 15],
-      resolutions: ['720p', '1080p'],
-      aspectRatios: ['16:9', '9:16', '1:1', '4:3', '3:4'],
-      supportsAudio: false,
-    },
-  },
-
   // Grok Imagine Video 1.5 (preview) — xAI's video generator. Optional prompt +
   // optional image_urls[] (identity/reference), so it runs both text-to-video
   // and image-to-video. aspect_ratio + resolution (480p/720p/1080p) + duration
@@ -1822,8 +1719,8 @@ export function listScriptModels(): ModelEntry[] {
 // 1k tokens and are chosen to separate the models we actually list rather than
 // to be a general-purpose scale:
 //   1  ≤0.05   Luna
-//   2  ≤0.15   Gemini 3 Flash
-//   3  ≤0.45   Gemini 3.6, Grok 4.5, Grok 4.6, Terra
+//   2  ≤0.15   Gemini 3.8 Flash (while its promo runs)
+//   3  ≤0.45   Gemini 3.6, Grok 4.6, Terra
 //   4  ≤1.00   Sonnet 5, Sol
 //   5  >1.00   Opus 5
 // Null when the model has no pricing — the picker then shows no glyphs rather
@@ -1872,8 +1769,8 @@ export function estimateCredits(modelId: string, params: CostEstimateParams = {}
 }
 
 // kie.ai's credit exchange rate: $1 buys 200 credits (1 credit = $0.005) at
-// the base tier. Derived from kie's own per-model pricing pages (e.g.
-// Gemini 3 Flash: $0.15/M tokens = 30 credits/M). Used only for the
+// the base tier. Derived from kie's own per-model pricing pages (e.g. Gemini
+// 3.6 Flash: $0.45/M tokens = 90 credits/M). Used only for the
 // Dashboard's savings math — the UI everywhere else stays credits-only.
 export const CREDITS_PER_USD = 200
 
@@ -2090,13 +1987,11 @@ export interface VideoGenOptions {
 }
 
 // Resolves a registry model id to the actual kie.ai slug to send in the
-// createTask body. Some families (Wan 2.7) ship as
-// multiple kie slugs that differ only by mode (T2V vs I2V); we expose one
-// virtual id in the picker and pick the real slug here based on inputs.
+// createTask body. Some families (MiniMax H3, Kling 3.0 Omni) ship as multiple
+// kie slugs that differ only by which inputs they take; we expose one virtual
+// id in the picker and pick the real slug here based on inputs.
 // For every other model the registry id IS the kie slug — passes through.
 export function resolveVideoModelSlug(modelId: string, opts: VideoGenOptions): string {
-  const hasFrame = !!(opts.firstFrameUrl || opts.lastFrameUrl || opts.imageUrl)
-  if (modelId === 'wan/2-7') return hasFrame ? 'wan/2-7-image-to-video' : 'wan/2-7-text-to-video'
   if (modelId === 'minimax-h3') return `minimax-h3/${minimaxH3Route(opts)}-to-video`
   if (modelId === 'kling-3.0-omni') return `kling-3.0-omni/${klingOmniRoute(opts)}-to-video`
   return modelId
@@ -2300,35 +2195,13 @@ export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<
     }
   }
 
-  // ── Gemini Omni Video ──
-  // Every image input is a generic reference (no first/last-frame semantics);
-  // characters / voices / the source clip ride alongside. `duration` is a
-  // required string enum and is ignored by kie when a video clip is present.
-  if (modelId === 'gemini-omni-video') {
-    const imageUrls: string[] = []
-    if (opts.imageUrl) imageUrls.push(opts.imageUrl)
-    if (opts.firstFrameUrl) imageUrls.push(opts.firstFrameUrl)
-    if (opts.lastFrameUrl) imageUrls.push(opts.lastFrameUrl)
-    if (opts.referenceImageUrls?.length) imageUrls.push(...opts.referenceImageUrls)
-    const allowedDurations = [4, 6, 8, 10]
-    return {
-      prompt: opts.prompt,
-      ...(imageUrls.length > 0 ? { image_urls: imageUrls } : {}),
-      ...(opts.omniAudioIds?.length ? { audio_ids: opts.omniAudioIds } : {}),
-      ...(opts.omniCharacterIds?.length ? { character_ids: opts.omniCharacterIds } : {}),
-      ...(opts.videoClip ? { video_list: [opts.videoClip] } : {}),
-      duration: String(allowedDurations.includes(duration) ? duration : 8),
-      aspect_ratio: ar === '9:16' ? '9:16' : '16:9',
-      resolution,
-    }
-  }
-
   // ── Gemini Omni Flash 1.1 ──
-  // Same family as the branch above, one version on, and the difference is
-  // that this one has REAL frame fields: `first_frame_url` / `last_frame_url`
+  // The Omni family's only remaining row (1.0 was removed in September 2026),
+  // and the one with REAL frame fields: `first_frame_url` / `last_frame_url`
   // sit beside `image_urls` rather than everything being folded into one flat
-  // array. So a start frame stays frame one here instead of degrading into a
-  // generic reference, and references ride along in the same request
+  // array, as 1.0 did. So a start frame stays frame one here instead of
+  // degrading into a generic reference, and references ride along in the same
+  // request
   // (mixedImageInputs: 'merged' — the pair is legal, just carried in two
   // fields). Characters / designed voices / the source clip are unchanged, and
   // `duration` is still a required string enum that kie ignores once a video
@@ -2386,29 +2259,6 @@ export function buildVideoInput(modelId: string, opts: VideoGenOptions): Record<
       duration: Math.min(30, Math.max(2, Math.round(duration))),
       resolution: resolution === '480p' ? '480P' : resolution === '1080p' ? '1080P' : '720P',
       audio: opts.audio ?? true,
-    }
-  }
-
-  // ── Wan 2.7 ──
-  // T2V uses `ratio` (not `aspect_ratio`); I2V infers aspect from the input
-  // image and accepts both first_frame_url and last_frame_url.
-  if (modelId === 'wan/2-7') {
-    const startFrame = opts.firstFrameUrl ?? (opts.mode === 'image-to-video' ? opts.imageUrl : undefined)
-    const hasFrame = !!(startFrame || opts.lastFrameUrl)
-    if (hasFrame) {
-      return {
-        prompt: opts.prompt,
-        ...(startFrame ? { first_frame_url: startFrame } : {}),
-        ...(opts.lastFrameUrl ? { last_frame_url: opts.lastFrameUrl } : {}),
-        resolution,
-        duration,
-      }
-    }
-    return {
-      prompt: opts.prompt,
-      resolution,
-      ratio: ar,
-      duration,
     }
   }
 

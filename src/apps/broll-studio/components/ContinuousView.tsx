@@ -172,7 +172,12 @@ export default function ContinuousView({
   // reference-to-video). Defaults to the clip model, Seedance 1.5 Pro: it does
   // image-to-video (not reference-to-video), which is the branch runFrameAnimate
   // prefers anyway, so one still animates from the chosen keyframe directly.
-  const continuousAnimateModelId = useSettingsStore((s) => s.perAppModel['broll-studio:continuous:animate']) ?? CONTINUOUS_DEFAULT_MODEL_ID
+  // Same registry check the clip slot takes in BrollStudio.tsx, and for the
+  // same reason: this slot is read raw, so a retired pick would survive its
+  // model's removal and reach generate as "Unknown video model".
+  const animateModelPick = useSettingsStore((s) => s.perAppModel['broll-studio:continuous:animate'])
+  const continuousAnimateModelId =
+    (animateModelPick && getModel(animateModelPick) ? animateModelPick : null) ?? CONTINUOUS_DEFAULT_MODEL_ID
 
   // Fresh reads inside async chains (the sequential frame walk sets a
   // selection, then the next iteration must see it).

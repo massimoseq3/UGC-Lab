@@ -1283,7 +1283,7 @@ export async function pollMusicTask(
 //   POST /omni/audio/create     -> { kieAudioId }   designed voice
 //   POST /omni/character/create -> { characterId }  reusable character
 // The ids are scoped to the member's kie.ai account and are later passed to
-// gemini-omni-video createTask bodies as audio_ids / character_ids.
+// Gemini Omni Flash 1.1 createTask bodies as audio_ids / character_ids.
 // kie's docs show success as code 0 in one example and 200 in another, so
 // accept both.
 
