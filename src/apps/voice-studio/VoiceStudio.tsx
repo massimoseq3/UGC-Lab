@@ -17,7 +17,7 @@ import { VOICE_BATCH_MAX } from './components/GenerateBar'
 import HistoryRail from './components/HistoryRail'
 import HistoryRailHandle from '../../components/HistoryRailHandle'
 import { HistoryRailClosed } from '../../components/HistoryRailToggle'
-import HistoryDetailsView from './components/HistoryDetailsView'
+import HistoryDetailsModal from './components/HistoryDetailsModal'
 import { clampBatchCount } from '../../utils/batchCount'
 import SidePanel from './components/SidePanel'
 import BottomPlayer from './components/BottomPlayer'
@@ -290,18 +290,6 @@ export default function VoiceStudio() {
     [inFlightVoices],
   )
 
-  // Opening a details view (from a History card, or from the player) has to
-  // put the pane that holds it on screen. Done during render as a prop-change
-  // sync rather than in an effect, the same shape the side panel used when it
-  // owned this view.
-  const [prevDetails, setPrevDetails] = useState(detailsItem)
-  if (detailsItem !== prevDetails) {
-    setPrevDetails(detailsItem)
-    // The details view rides over the script column, so the rail only has to
-    // stand down where it is covering that column rather than sitting beside it.
-    if (detailsItem) { setPane('editor'); if (!railIsColumn) setHistoryOpen(false) }
-  }
-
   const handleDeleteHistoryItem = (id: string) => {
     deleteVoiceHistory(id)
     if (activePlayerItem?.id === id) setActivePlayerItem(null)
@@ -375,10 +363,8 @@ export default function VoiceStudio() {
               {/* From 980px the rail is a column beside the script; below it
                   there is no room for three columns next to a fixed 460px
                   settings panel, so it stands in FRONT of the script — the
-                  shape the tab had, and opening a read's details hands the pane
-                  back.
-                  The details view rides over this column, opaque, the same
-                  shape the settings column used when it owned History. */}
+                  shape the tab had. A read's details open in a centred modal
+                  over both, so nothing here has to stand down to show them. */}
               <div
                 className={`relative min-h-0 min-w-0 flex-1 overflow-hidden ${
                   historyOpen ? 'hidden min-[980px]:block' : 'block'
@@ -400,17 +386,6 @@ export default function VoiceStudio() {
                   isEnhancing={isEnhancing}
                   highlightField={highlightField}
                 />
-
-                {detailsItem && (
-                  <div className="absolute inset-0 bg-surface-1">
-                    <HistoryDetailsView
-                      item={detailsItem}
-                      onClose={() => setDetailsItem(null)}
-                      onRestoreText={handleRestoreText}
-                      onRestoreSettings={handleRestoreSettings}
-                    />
-                  </div>
-                )}
               </div>
 
               {historyOpen ? (
@@ -446,6 +421,16 @@ export default function VoiceStudio() {
           </div>
         </div>
       </div>
+
+      {/* A read's full detail, in the app's centred Modal. Mounted whether or
+          not one is open, so the panel plays its own arrival rather than
+          appearing at full size. */}
+      <HistoryDetailsModal
+        item={detailsItem}
+        onClose={() => setDetailsItem(null)}
+        onRestoreText={handleRestoreText}
+        onRestoreSettings={handleRestoreSettings}
+      />
 
       {/* Script picker */}
       <BankPicker
