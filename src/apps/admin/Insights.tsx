@@ -295,7 +295,7 @@ function GrowthStrip({ growth }: { growth: { newThisWeek: number; newLastWeek: n
         <div className="mt-1 text-xl font-semibold tracking-tight text-ink-100 sm:text-2xl">{growth.lostThisWeek}</div>
       </div>
       <div>
-        <div className="flex items-center gap-1.5 text-[11px] text-ink-500">Net change</div>
+        <div className="flex items-center gap-1.5 text-[11px] text-ink-500">Net Change</div>
         <div className={`mt-1 text-xl font-semibold tracking-tight sm:text-2xl ${growth.net > 0 ? 'text-emerald-400 light:text-emerald-600' : growth.net < 0 ? 'text-red-400 light:text-red-600' : 'text-ink-100'}`}>
           {growth.net > 0 ? '+' : ''}{growth.net}
         </div>
@@ -530,7 +530,7 @@ function SignupsChart({ data }: { data: Array<{ month: string; total: number; ad
   }
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none" role="img" aria-label="Cumulative signups by month">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" preserveAspectRatio="none" role="img" aria-label="Cumulative Signups by Month">
         <polygon points={area} fill="currentColor" className="text-emerald-500/10" />
         <polyline points={pts.join(' ')} fill="none" stroke="currentColor" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" className="text-emerald-400 light:text-emerald-600" />
         {data.map((d, i) => (

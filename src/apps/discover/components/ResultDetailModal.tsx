@@ -109,7 +109,7 @@ export default function ResultDetailModal({
               className="max-h-[80dvh] w-full object-contain"
             />
           ) : (
-            <div className="flex h-64 items-center justify-center text-sm text-ink-600">No preview</div>
+            <div className="flex h-64 items-center justify-center text-sm text-ink-600">No Preview</div>
           )}
           {mediaOverlay}
         </div>

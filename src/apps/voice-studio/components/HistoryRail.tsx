@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { Search, Volume2, Bookmark, Check, Trash2, Play, Pause, AlignLeft, Download } from 'lucide-react'
 import RailNewButton from '../../../components/RailNewButton'
-import HistoryRailToggle from '../../../components/HistoryRailToggle'
+import { RailCloseButton } from '../../../components/HistoryRailHandle'
 import { useBankStore } from '../../../stores/bankStore'
 import type { VoiceHistoryItem } from '../../../stores/types'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
@@ -218,13 +218,13 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onDele
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {/* New leads the rail; the open/shut toggle sits to its LEFT, at the
-          band's own edge (September 2026, Massimo's call — the pull tab it
-          replaced was clipping the bar across the top of the column beside
-          it). The band takes the app-wide h-[57px] so the hairline lines up
-          with the input column's header. */}
+      {/* New leads the rail and gets the whole band: the rail is SHUT from the
+          lip on the seam (`HistoryRailHandle`), a tab on the rail's own edge,
+          so no close needs a slot in here. Below 980px the rail covers the
+          script and that lip goes with it, so a Close does sit here — it is
+          the only way back. The band takes the app-wide h-[57px] so the
+          hairline lines up with the input column's header. */}
       <div className="flex h-[57px] shrink-0 items-center gap-1.5 border-b border-ink/5 px-3">
-        <HistoryRailToggle open onToggle={onCollapse} />
         <RailNewButton
           label="New Voiceover"
           accentClass="bg-voice-500"
@@ -232,6 +232,7 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onDele
           onClick={onNew}
           className="flex-1"
         />
+        <RailCloseButton onCollapse={onCollapse} />
       </div>
 
       <div className="relative flex shrink-0 items-center border-b border-ink/5 px-3 py-2.5">
@@ -249,7 +250,7 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onDele
         {isEmpty && (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
             <Volume2 className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
-            <p className="text-xs text-ink-300">No voiceovers yet</p>
+            <p className="text-xs text-ink-300">No Voiceovers Yet</p>
             <p className="text-[11px] text-ink-500">Your generated voiceovers will land here.</p>
           </div>
         )}

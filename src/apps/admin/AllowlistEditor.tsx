@@ -440,7 +440,7 @@ export default function AllowlistEditor() {
       <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-4 max-sm:p-3">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-[13px] font-medium text-ink-100">Allowlist enforcement</div>
+            <div className="text-[13px] font-medium text-ink-100">Allowlist Enforcement</div>
             <p className="mt-0.5 text-[12px] text-ink-500">
               {enforced === false
                 ? 'OFF. Anyone with the link can create an account.'
@@ -478,7 +478,7 @@ export default function AllowlistEditor() {
       {/* Shared signup access code. Never shipped to the browser — the signup
           form posts what the member typed and the trigger compares. */}
       <div className="rounded-xl border border-ink/10 bg-ink/[0.02] p-4 max-sm:p-3">
-        <div className="text-[13px] font-medium text-ink-100">Signup access code</div>
+        <div className="text-[13px] font-medium text-ink-100">Signup Access Code</div>
         <p className="mt-0.5 text-[12px] text-ink-500">
           {!codeSupported
             ? "Not available. Run migration 0021, then refresh."
@@ -688,7 +688,7 @@ function ImportPreviewModal({
       <div className="w-full max-w-md rounded-2xl border border-ink/10 bg-surface-2 p-5 shadow-2xl">
         <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-ink-100">Import preview</h3>
+            <h3 className="text-sm font-semibold text-ink-100">Import Preview</h3>
             <p className="mt-0.5 text-[11px] text-ink-500">From <span className="text-ink-300">{preview.fileName}</span></p>
           </div>
           <button onClick={onCancel} className="rounded-md p-1 text-ink-500 transition-colors hover:bg-ink/[0.05] hover:text-ink-200">
@@ -697,16 +697,16 @@ function ImportPreviewModal({
         </div>
 
         <div className="mt-4 space-y-2">
-          <Stat color="emerald" label="New emails to add" value={preview.newEntries.length} />
+          <Stat color="emerald" label="New Emails to Add" value={preview.newEntries.length} />
           {preview.nameUpdates.length > 0 && (
             <Stat color="sky" label="Existing · name update" value={preview.nameUpdates.length} />
           )}
-          <Stat color="zinc" label="Already on allowlist" value={preview.duplicates.length} />
+          <Stat color="zinc" label="Already on Allowlist" value={preview.duplicates.length} />
           {preview.invalid.length > 0 && (
             <Stat color="amber" label="Invalid (skipped)" value={preview.invalid.length} />
           )}
           {preview.removable.length > 0 && (
-            <Stat color="red" label="On list but not in CSV" value={preview.removable.length} dim={!syncMode} />
+            <Stat color="red" label="On List but Not in CSV" value={preview.removable.length} dim={!syncMode} />
           )}
         </div>
 

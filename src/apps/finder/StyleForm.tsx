@@ -66,7 +66,7 @@ export default function StyleForm({ item, onSave, onCancel }: StyleFormProps) {
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
         {/* Left — the style paragraph itself. A lone control, so no card. */}
         <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <SectionLabel label="Style brief" filled={!!brief.trim()} required />
+          <SectionLabel label="Style Brief" filled={!!brief.trim()} required />
           <textarea
             value={brief}
             onChange={(e) => setBrief(e.target.value)}
@@ -98,7 +98,7 @@ export default function StyleForm({ item, onSave, onCancel }: StyleFormProps) {
               <div className="flex flex-col gap-1.5">
                 {/* No dot: these are read-only thumbnails of what the brief was
                     distilled from, not an input anything waits on. */}
-                <SectionLabel label="Read from" />
+                <SectionLabel label="Read From" />
                 <div className="flex flex-wrap gap-2">
                   {item.thumbRefs.map((ref) => (
                     <ReferenceThumb key={ref} refId={ref} />

@@ -200,7 +200,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
       <div className="flex h-full flex-col">
         <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
           <ImagePlay className="h-9 w-9 text-ink-800" strokeWidth={1.5} />
-          <p className="text-sm text-ink-500">No generations yet</p>
+          <p className="text-sm text-ink-500">No Generations Yet</p>
           <p className="max-w-[300px] text-xs leading-relaxed text-ink-600">
             Pick a preset or type a prompt below and hit Generate.
             Everything you make lands here, sorted by day.
@@ -211,11 +211,22 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       {/* Header — card-size slider (list view only) + view switch (Grid / List).
           Matches the prompt panel's h-[57px] mode-toggle bar so the left/right
-          tabs sit on the same line. */}
-      <div className="flex h-[57px] shrink-0 items-center justify-end gap-3 border-b border-ink/5 px-4">
+          tabs sit on the same line.
+
+          It is PINNED OVER the scroller and frosted, the shape B-Roll's
+          storyboard bar already has (Massimo's call, September 2026): the grid
+          passes under it instead of stopping at it, so the wall of stills reads
+          as one surface running the height of the pane rather than as a panel
+          bolted under a strip. `app-backdrop-frost` is the one definition of
+          that material — it carries the page's own gradient at 90% plus the
+          blur on a pseudo-element, which is what keeps the tint anchored to the
+          viewport (see the note beside it in index.css). `absolute` rather than
+          `sticky`: this bar never scrolls away, and the app-wide rule is that
+          chrome which doesn't move shouldn't be sticky. */}
+      <div className="absolute inset-x-0 top-0 z-20 flex h-[57px] items-center justify-end gap-3 border-b border-ink/5 app-backdrop-frost px-4">
         {/* Selecting takes over the header rather than raising a band under the
             scroll port: the bar is already there, already pinned, and already
             where the gesture was started from — a second strip at the other end
@@ -259,7 +270,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
                 ['--slider-pct' as string]: `${cardPct}%`,
                 ['--slider-fill' as string]: 'var(--color-playground-500)',
               }}
-              aria-label="List card size"
+              aria-label="List Card Size"
             />
           </div>
         )}
@@ -278,7 +289,7 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
             }`}
           >
             {selecting ? <X className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
-            {selecting ? 'Cancel' : 'Download clips'}
+            {selecting ? 'Cancel' : 'Download Clips'}
           </button>
         )}
         {/* Neither control has anything to do in the Music tab: a track has no
@@ -288,10 +299,14 @@ export default memo(function PlaygroundHistoryGrid({ inFlight, filterMode, onAni
         {!musicOnly && <ViewToggle value={viewMode} onChange={setViewMode} />}
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3">
+      {/* The scroll port runs the FULL height of the pane, behind the absolute
+          bar, which is what lets tiles pass under it blurred. `pt-[69px]` is
+          the bar's own 57px plus the 12px the content already stood off by —
+          change the bar's height and change this with it. */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-3 pt-[69px]">
         {visibleInFlight.length > 0 && (
           <>
-            <DayPill label="In progress" className="my-5" />
+            <DayPill label="In Progress" className="my-5" />
             {viewMode === 'grid' ? (
               <div className="grid grid-cols-2 items-start gap-2.5 [grid-auto-flow:dense] lg:grid-cols-3 xl:grid-cols-4">
                 {visibleInFlight.map((gen) => {

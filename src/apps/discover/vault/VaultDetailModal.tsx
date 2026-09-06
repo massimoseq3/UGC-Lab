@@ -175,7 +175,7 @@ export default function VaultDetailModal({
                 the shape you can say something else in, which is the whole
                 reason a hook library beats a folder of links. */}
             {item.template && (
-              <Section label="Reusable template">
+              <Section label="Reusable Template">
                 <p className="rounded-xl bg-ink/[0.03] px-3 py-2.5 text-[13px] leading-relaxed text-ink-300">
                   {item.template}
                 </p>

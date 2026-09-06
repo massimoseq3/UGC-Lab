@@ -1,21 +1,25 @@
 import { PanelRightClose, PanelRightOpen } from 'lucide-react'
 
-// The one control that opens and shuts a history rail.
+// The control that OPENS a shut history rail — a 38px circle in the app's own
+// icon-button material, laid out rather than overlaid, and WHERE it sits is the
+// caller's business: B-Roll's rides inside the storyboard bar, Scripts' and
+// Voiceovers' stand in a narrow column where the rail was
+// (`HistoryRailClosed`, below).
 //
-// It is a 38px circle in the app's own icon-button material, and WHERE it sits
-// is the caller's business:
-// open, it leads the rail's own 57px band, immediately left of that rail's New
-// button; shut, the caller keeps a narrow column in the rail's place holding
-// nothing but this. Either way it is a laid-out element, not an overlay.
+// It only handles the SHUT state (Massimo's call, September 2026). Shutting an
+// open rail is `HistoryRailHandle`, the lip on the seam — a tab on the rail's
+// own edge, which costs the rail's band nothing and leaves it to its New
+// button. The two are split because the seam only exists in one of the two
+// states: with the rail gone there is nothing for a lip to be a tab of, and a
+// tab on the bare edge of an output column is a mystery button. Shut, this
+// says the word.
 //
-// It was a pull tab on the seam between the two columns for a day (September
-// 2026) and came off: costing no layout is worth nothing if the thing it
-// overlaps is chrome. Every one of these output columns puts a full-width bar
-// across its own top — B-Roll's batch strip, Voiceovers' script picker row —
-// and a tab pinned to the top-right corner landed on it. The one before that
-// was a 40px strip with a border, which read as a second panel. What is left is
-// the plainest version: a button that lives in a band when there is a band, and
-// keeps a button's worth of room when there isn't.
+// A pull tab tried to do BOTH jobs for a day and that is what failed: costing
+// no layout is worth nothing if the thing it overlaps is chrome, and every one
+// of these output columns puts a full-width bar across its own top — B-Roll's
+// batch strip, Voiceovers' script picker row — which a shut-state tab pinned to
+// the corner landed on. The version before that was a 40px bordered strip,
+// which read as a second panel.
 export default function HistoryRailToggle({
   open,
   onToggle,

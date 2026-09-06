@@ -2,6 +2,7 @@ import { Package, UserRound, Mic, Film, Star, Palette } from 'lucide-react'
 import type { Product, Model, Script, VoicePreset, BRoll, StylePreset, AnyBankItem } from '../stores/types'
 import type { BankType } from '../utils/constants'
 import { useAssetUrl } from '../hooks/useAssetUrl'
+import { SCRIPT_BADGE, SCRIPT_BADGE_SHAPE } from '../utils/scriptBadge'
 
 type BankItem = AnyBankItem
 
@@ -120,9 +121,11 @@ export default function BankItemCard({ bankType, item, onClick, selected, accent
 // the same view: SCRIPT/SCENES pill, title, and a full preview that fades out.
 function ScriptCard({ item, onClick, selected, accentColor }: { item: Script; onClick: () => void; selected?: boolean; accentColor?: string }) {
   const isPrompt = item.kind === 'reverse-engineer'
+  // Same pill the Bank browser and Scripts' history rail draw — see
+  // `utils/scriptBadge.ts`.
   const badge = isPrompt
-    ? { label: 'SCENES', className: 'bg-fuchsia-500/15 text-fuchsia-300 light:text-fuchsia-700 border-fuchsia-500/20' }
-    : { label: 'SCRIPT', className: 'bg-scripts-500/15 text-scripts-300 border-scripts-500/20' }
+    ? { label: 'SCENES', className: SCRIPT_BADGE.scenes }
+    : { label: 'SCRIPT', className: SCRIPT_BADGE.script }
   return (
     <button
       onClick={onClick}
@@ -139,7 +142,7 @@ function ScriptCard({ item, onClick, selected, accentColor }: { item: Script; on
     >
       {item.starred && <StarBadge className="right-2 top-2" />}
       <div className="flex flex-col gap-1.5">
-        <span className={`w-fit rounded-full border px-2 py-0.5 text-[8px] font-semibold tracking-widest ${badge.className}`}>
+        <span className={`${SCRIPT_BADGE_SHAPE} ${badge.className}`}>
           {badge.label}
         </span>
         <span className="line-clamp-2 text-[12px] font-semibold leading-snug tracking-tight text-ink-100">

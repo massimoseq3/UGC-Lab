@@ -395,7 +395,7 @@ function PresetRow({
             <span className="shrink-0 text-[11px] text-ink-500">{preset.speaker}</span>
             {inUse && (
               <span className="ml-auto shrink-0 text-[10px] font-medium uppercase tracking-tight text-playground-300">
-                In use
+                In Use
               </span>
             )}
           </span>
@@ -422,7 +422,7 @@ function PresetRow({
             onClick={onPick}
             className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-full bg-playground-500/15 px-4 py-2 text-[12px] font-medium tracking-tight text-playground-300 transition-colors hover:bg-playground-500/25"
           >
-            {inUse ? <><Check className="h-3.5 w-3.5" /> In use</> : 'Use this voice'}
+            {inUse ? <><Check className="h-3.5 w-3.5" /> In Use</> : 'Use This Voice'}
           </button>
         </div>
       )}

@@ -436,10 +436,10 @@ export default function MembersTable() {
               <SortableTh label="Name" k="name" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <SortableTh label="Email" k="email" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <SortableTh label="Joined" k="created_at" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-              <SortableTh label="Last active" k="last_active_at" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <SortableTh label="Last Active" k="last_active_at" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <SortableTh label="Storage" k="total_bytes" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <SortableTh label="7-day activity" k="assets_last_7d" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-              <SortableTh label="Top app / 30d" k="time_30d" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <SortableTh label="Top App / 30d" k="time_30d" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
               <th className="px-3 py-2 text-left font-medium">Status</th>
               <th className="px-3 py-2 text-right font-medium"></th>
             </tr>
@@ -713,13 +713,13 @@ function MemberCard({
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
         <Meta label="Joined" value={formatDate(row.created_at)} />
         <Meta
-          label="Last active"
+          label="Last Active"
           value={formatRelative(row.last_active_at)}
           accent={status === 'inactive' ? 'text-amber-400 light:text-amber-600' : undefined}
         />
         <Meta label="Storage" value={`${formatBytes(row.total_bytes)} (${row.asset_count})`} />
         <Meta label="7-day activity" value={String(row.assets_last_7d)} />
-        <Meta label="Top app / 30d" value={appLabel(top?.appId)} glyph={top?.appId} />
+        <Meta label="Top App / 30d" value={appLabel(top?.appId)} glyph={top?.appId} />
         <Meta label="Time / 30d" value={top ? formatDuration(totalSeconds(row, '30d')) : '—'} />
       </dl>
 

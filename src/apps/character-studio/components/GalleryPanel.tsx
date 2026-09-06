@@ -203,13 +203,34 @@ export default memo(function GalleryPanel({
     setPreviewId(id)
   }
 
+  // The bar is PINNED OVER the body and frosted only where something scrolls
+  // under it — the Grid and List galleries (Massimo's call, September 2026: the
+  // shape B-Roll's storyboard bar already has, so the wall of stills reads as
+  // one surface running the height of the pane rather than as a panel bolted
+  // under a strip). Single view is a fixed stage and the empty state is a
+  // centred canvas: neither scrolls, so there is nothing for the bar to be in
+  // front OF, and floating it there would only push its hairline down over
+  // artwork. Those two keep the plain laid-out band.
+  const bodyScrolls = !isEmpty && viewMode !== 'single'
+
   return (
-    <div className="flex h-full min-w-0 flex-col">
+    <div className="relative flex h-full min-w-0 flex-col">
       {/* Header — card-size slider (list view only) + view switch (Grid / List).
           Renders even when the gallery is empty: every other app keeps a
           h-[57px] bar on BOTH panes, so hiding it here left the two columns'
-          divider lines out of alignment on a fresh visit. */}
-      <div className="flex h-[57px] shrink-0 items-center justify-end gap-3 border-b border-ink/5 px-4">
+          divider lines out of alignment on a fresh visit.
+
+          `app-backdrop-frost` is the one definition of that material — the
+          page's own gradient at 90% plus the blur on a pseudo-element, which is
+          what keeps the tint anchored to the viewport (see the note beside it
+          in index.css). `absolute` rather than `sticky`: this bar never scrolls
+          away, and the app-wide rule is that chrome which doesn't move
+          shouldn't be sticky. */}
+      <div
+        className={`flex h-[57px] items-center justify-end gap-3 border-b border-ink/5 px-4 ${
+          bodyScrolls ? 'absolute inset-x-0 top-0 z-20 app-backdrop-frost' : 'shrink-0'
+        }`}
+      >
         {!isEmpty && (
           <>
             {/* Single view only: empty the frame back to "Awaiting generation".
@@ -254,7 +275,7 @@ export default memo(function GalleryPanel({
                     ['--slider-pct' as string]: `${cardPct}%`,
                     ['--slider-fill' as string]: 'var(--color-influencers-500)',
                   }}
-                  aria-label="List card size"
+                  aria-label="List Card Size"
                 />
               </div>
             )}
@@ -269,7 +290,7 @@ export default memo(function GalleryPanel({
         // waiting stage rather than a dead panel.
         <AwaitingCanvas
           icon={UserRound}
-          title="No generations yet"
+          title="No Generations Yet"
           // No "on the left" — on a phone the controls are the other tab, not a
           // column beside this one.
           hint="Fill in the Controls and hit Generate. Every character you make lands here, sorted by day."
@@ -297,7 +318,12 @@ export default memo(function GalleryPanel({
               `rootMargin`, so an observer left on the viewport would only fire
               once a tile was already on screen and the picture would pop in
               under the pointer. */}
-          <div ref={galleryScrollRef} className="min-w-0 flex-1 overflow-y-auto px-4 py-3">
+          {/* The scroll port runs the FULL height of the pane, behind the
+              absolute bar, which is what lets tiles pass under it blurred.
+              `pt-[69px]` is the bar's own 57px plus the 12px the content
+              already stood off by — change the bar's height and change this
+              with it. */}
+          <div ref={galleryScrollRef} className="min-w-0 flex-1 overflow-y-auto px-4 pb-3 pt-[69px]">
             {inFlight.length > 0 && (
               <>
                 <DayPill label={inFlight.length === 1 ? 'In progress' : `In progress · ${inFlight.length}`} />
@@ -944,7 +970,7 @@ function AwaitingFrame() {
       {() => (
         <div className="flex flex-col items-center justify-center gap-2">
           <UserRound className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
-          <p className="text-sm text-ink-500">Awaiting generation</p>
+          <p className="text-sm text-ink-500">Awaiting Generation</p>
           <p className="max-w-[280px] text-center text-xs leading-relaxed text-ink-600">
             The next character lands here. Nothing was deleted. Switch to List
             or Grid for the full history.
@@ -1087,14 +1113,14 @@ function SingleCard({
               this view the image reads as a still rather than a button. */}
           <ActionPill
             icon={Pencil}
-            label="Edit character"
+            label="Edit Character"
             title="Edit this character"
             onClick={onClick}
           />
           {!a.isSheet && (
             <ActionPill
               icon={LayoutGrid}
-              label="Character sheet"
+              label="Character Sheet"
               title="Make a character sheet from this portrait"
               onClick={onMakeSheet}
             />
@@ -1166,7 +1192,7 @@ function PromptData({ profile }: { profile: CharacterProfile | undefined }) {
           className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-ink/10 bg-ink/[0.03] px-3 text-[12px] font-medium tracking-tight text-ink-300 transition-colors hover:bg-ink/[0.08] hover:text-ink-100"
         >
           <Braces className="h-3.5 w-3.5 shrink-0 text-ink-500" />
-          <span className="truncate">Prompt data</span>
+          <span className="truncate">Prompt Data</span>
           <ChevronDown className={`ml-auto h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
         </button>
         {open && <ActionPill icon={Copy} label="Copy JSON" onClick={copyJson} />}

@@ -22,6 +22,7 @@ import SwipeDetail from './SwipeDetail'
 import { groupByDay, sectionLabel } from '../../utils/history'
 import DayPill from '../../components/DayPill'
 import DropOverlay from '../../components/DropOverlay'
+import { SCRIPT_BADGE, SCRIPT_BADGE_SHAPE } from '../../utils/scriptBadge'
 
 // Custom sort dropdown — replaces the native <select> so the menu is themed
 // (not the stock OS popup) and the trigger font matches the bank toggle.
@@ -272,11 +273,14 @@ function ScriptCard({ item, onEdit, onDelete, showDate = true }: { item: Script;
   const getProductById = useBankStore((s) => s.getProductById)
   const linked = item.linkedProductId ? getProductById(item.linkedProductId) : null
   // Legacy items predate `kind` — treat them as scripts.
+  // Same pill Scripts' history rail draws — see `utils/scriptBadge.ts`. It was
+  // a tinted wash with a border here and a solid fill there, which made one
+  // run read as two different things depending on where you met it.
   const badge = item.kind === 'reverse-engineer'
-    ? { label: 'SCENES', className: 'bg-fuchsia-500/15 text-fuchsia-300 light:text-fuchsia-700 border-fuchsia-500/20' }
+    ? { label: 'SCENES', className: SCRIPT_BADGE.scenes }
     : item.kind === 'style'
-      ? { label: 'STYLE', className: 'bg-sky-500/15 text-sky-300 light:text-sky-700 border-sky-500/20' }
-      : { label: 'SCRIPT', className: 'bg-scripts-500/15 text-scripts-300 border-scripts-500/20' }
+      ? { label: 'STYLE', className: SCRIPT_BADGE.style }
+      : { label: 'SCRIPT', className: SCRIPT_BADGE.script }
   return (
     <div
       onClick={onEdit}
@@ -284,7 +288,7 @@ function ScriptCard({ item, onEdit, onDelete, showDate = true }: { item: Script;
     >
       {/* Header: badge + title */}
       <div className="flex flex-col gap-2">
-        <span className={`w-fit shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold tracking-widest ${badge.className}`}>
+        <span className={`shrink-0 ${SCRIPT_BADGE_SHAPE} ${badge.className}`}>
           {badge.label}
         </span>
         <span className="line-clamp-2 text-sm font-semibold leading-snug tracking-tight text-ink-100">{item.title}</span>
@@ -796,7 +800,7 @@ export default function BankList({ bankType, onEdit, onAdd, sort, query, modelFi
       return (
         <div className="flex flex-1 flex-col items-center justify-center gap-2 py-16 text-center">
           <Bookmark className="h-8 w-8 text-ink-700" strokeWidth={1.5} />
-          <p className="text-sm text-ink-500">No saved ads yet</p>
+          <p className="text-sm text-ink-500">No Saved Ads Yet</p>
           <p className="max-w-[300px] text-xs leading-relaxed text-ink-600">
             Save an ad from Outliers and it lands here: thumbnail, numbers and
             transcript kept, so it's still readable long after the links expire.

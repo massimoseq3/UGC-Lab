@@ -457,10 +457,20 @@ export default function ScriptArchitect() {
     if (activeHistoryId === id) setActiveHistoryId(null)
   }
 
-  // "New": clear the inputs only (source text + selected product + context). The generated variations stay on screen — they're the user's
-  // working output / history, never wiped by starting a new draft. (Output
-  // labels are pinned to outputMode/outputStyle snapshots, so leaving the
-  // shown cards untouched is safe even as the live left-panel toggles reset.)
+  // "New Script" in the history rail — the whole app back to a blank sheet:
+  // the takes panel empties AND the setup column beside it resets (September
+  // 2026, Massimo's call; it cleared the canvas alone before, which left the
+  // last run's transcript, brief and product sitting in the inputs of a
+  // "new" script). Nothing is deleted — every take is a row in the rail
+  // underneath — but the inputs are the half no row holds a copy of, which is
+  // why the button arms first. Output labels are pinned to
+  // outputMode/outputStyle snapshots, so any cards still on screen keep their
+  // wording as the live selectors reset.
+  const handleNewScript = () => {
+    setClearedSig(outputSig)
+    handleClearInputs()
+  }
+
   return (
     <div className="relative flex h-full flex-col md:flex-row">
       <MobilePaneTabs
@@ -528,7 +538,7 @@ export default function ScriptArchitect() {
           voiceProfile={outputVoiceProfile}
           onEditVoiceProfile={setOutputVoiceProfile}
           cleared={cleared}
-          onClearCanvas={() => setClearedSig(outputSig)}
+          onClearCanvas={handleNewScript}
           history={scriptHistory}
           pendingRuns={pendingRuns}
           onSelectHistory={handleSelectHistory}

@@ -1096,7 +1096,7 @@ export default function ScenesView({
             {/* Same shape as the video dialog below — the two open from
                 buttons sitting side by side and must read as a pair. */}
             <h3 className="text-sm font-medium text-ink-100">
-              {batchTargets.length === 0 ? 'Nothing to generate' : 'Generate images'}
+              {batchTargets.length === 0 ? 'Nothing to Generate' : 'Generate Images'}
             </h3>
             <p className="mt-1 text-xs text-ink-500">
               {[batchConfirm.scope, batchColumn !== 'all' ? `Option ${batchColumn + 1}` : null]
@@ -1231,7 +1231,7 @@ export default function ScenesView({
             <h3 className="text-sm font-medium text-ink-100">
               {videoTargets.length === 0
                 ? (videoConfirm.stillsOnly ? 'Nothing to animate' : 'Nothing to generate')
-                : (videoConfirm.stillsOnly ? 'Animate stills' : 'Generate videos')}
+                : (videoConfirm.stillsOnly ? 'Animate Stills' : 'Generate Videos')}
             </h3>
             <p className="mt-1 text-xs text-ink-500">
               {[
@@ -1798,7 +1798,11 @@ function SceneSection({
           variations (a four-column row); a scene that carries four — an added
           option, or a session generated back when Dialogue Clips emitted a fourth
           card — runs five wide rather than wrapping the Add card onto a line of
-          its own. */}
+          its own.
+
+          The Add card is a FULL cell, not a half one. It was halved for a day
+          (doubled tracks, each variation spanning two) to hand its width back to
+          the stills, and reverted the same day — Massimo's call. */}
       <div className={`grid grid-cols-2 gap-3 md:grid-cols-3 ${scene.variations.length >= 4 ? 'xl:grid-cols-5' : 'xl:grid-cols-4'}`}>
         {scene.variations.map((variation, i) => {
           const key = `${scene.number}-${i}`
@@ -1885,7 +1889,7 @@ function AddNewCard({
     >
       <Plus className="h-5 w-5 shrink-0 text-ink-400 transition-colors group-hover/add:text-broll-300" />
       <span className="text-[10px] font-medium text-ink-300 transition-colors group-hover/add:text-broll-300">
-        Add option
+        Add Option
       </span>
     </button>
   )

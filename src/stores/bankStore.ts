@@ -280,6 +280,41 @@ export function resetBankStore(): void {
   useBankStore.setState(EMPTY_BANKS)
 }
 
+// Two rows with the same id in one bank is a React KEY COLLISION, and what it
+// looks like is not a duplicate row — it is a list that stops emptying. React
+// warns, then duplicates and omits children at will: Playground's history grid
+// kept the previous tab's tiles when you switched to another mode, so music
+// sat under the Video and Image tabs and the grid grew a little every switch
+// (Massimo's report, September 2026). The grid's own mode filter was correct
+// the whole time; the ids were not.
+//
+// So a duplicate id can never enter a bank (`prependRow` below) and can never
+// survive a load (here). The FIRST occurrence wins because these lists are
+// newest-first and `prependRow` puts the new copy at the head — keeping the
+// head keeps the newest.
+function dedupeById<T>(rows: T[]): T[] {
+  const seen = new Set<unknown>()
+  const out: T[] = []
+  for (const row of rows) {
+    const id = (row as { id?: unknown } | null)?.id
+    // A row with no id can't collide and can't be de-duped — keep it.
+    if (id !== undefined && id !== null) {
+      if (seen.has(id)) continue
+      seen.add(id)
+    }
+    out.push(row)
+  }
+  return out
+}
+
+// The one way a history bank takes a new row: replace any row already holding
+// this id, then lead with the new one. Never a bare `[item, ...list]` — that is
+// what let the demo seeder (and any re-run of a resumed generation) put the
+// same id in a bank twice.
+function prependRow<T extends { id: string }>(item: T, rows: T[]): T[] {
+  return [item, ...rows.filter((r) => r.id !== item.id)]
+}
+
 // Normalise whatever came back from the cache — the IndexedDB record, or the
 // legacy localStorage blob on the one load that migrates it. Both are untrusted
 // shapes (an older app version wrote them), so every field is defaulted.
@@ -288,23 +323,23 @@ function normalizeBanks(source: unknown): BankData {
     if (source && typeof source === 'object') {
       const parsed = source as Record<string, never>
       return {
-        products: parsed.products ?? [],
-        models: parsed.models ?? [],
-        scripts: parsed.scripts ?? [],
-        voices: migrateVoiceShape<VoicePreset>(parsed.voices),
-        brolls: parsed.brolls ?? [],
-        styles: Array.isArray(parsed.styles) ? parsed.styles : [],
-        swipes: Array.isArray(parsed.swipes) ? parsed.swipes : [],
-        trackedAccounts: Array.isArray(parsed.trackedAccounts) ? parsed.trackedAccounts : [],
-        voiceHistory: migrateVoiceShape<VoiceHistoryItem>(parsed.voiceHistory),
-        videoHistory: Array.isArray(parsed.videoHistory) ? parsed.videoHistory : [],
-        imageHistory: Array.isArray(parsed.imageHistory) ? parsed.imageHistory : [],
-        musicHistory: Array.isArray(parsed.musicHistory) ? parsed.musicHistory : [],
-        scriptHistory: Array.isArray(parsed.scriptHistory) ? parsed.scriptHistory : [],
-        brollHistory: Array.isArray(parsed.brollHistory) ? parsed.brollHistory : [],
-        characterHistory: Array.isArray(parsed.characterHistory) ? parsed.characterHistory : [],
-        adAnatomyHistory: Array.isArray(parsed.adAnatomyHistory) ? parsed.adAnatomyHistory : [],
-        usageDays: Array.isArray(parsed.usageDays) ? parsed.usageDays : [],
+        products: dedupeById(parsed.products ?? []),
+        models: dedupeById(parsed.models ?? []),
+        scripts: dedupeById(parsed.scripts ?? []),
+        voices: dedupeById(migrateVoiceShape<VoicePreset>(parsed.voices)),
+        brolls: dedupeById(parsed.brolls ?? []),
+        styles: dedupeById(Array.isArray(parsed.styles) ? parsed.styles : []),
+        swipes: dedupeById(Array.isArray(parsed.swipes) ? parsed.swipes : []),
+        trackedAccounts: dedupeById(Array.isArray(parsed.trackedAccounts) ? parsed.trackedAccounts : []),
+        voiceHistory: dedupeById(migrateVoiceShape<VoiceHistoryItem>(parsed.voiceHistory)),
+        videoHistory: dedupeById(Array.isArray(parsed.videoHistory) ? parsed.videoHistory : []),
+        imageHistory: dedupeById(Array.isArray(parsed.imageHistory) ? parsed.imageHistory : []),
+        musicHistory: dedupeById(Array.isArray(parsed.musicHistory) ? parsed.musicHistory : []),
+        scriptHistory: dedupeById(Array.isArray(parsed.scriptHistory) ? parsed.scriptHistory : []),
+        brollHistory: dedupeById(Array.isArray(parsed.brollHistory) ? parsed.brollHistory : []),
+        characterHistory: dedupeById(Array.isArray(parsed.characterHistory) ? parsed.characterHistory : []),
+        adAnatomyHistory: dedupeById(Array.isArray(parsed.adAnatomyHistory) ? parsed.adAnatomyHistory : []),
+        usageDays: dedupeById(Array.isArray(parsed.usageDays) ? parsed.usageDays : []),
       }
     }
   } catch {
@@ -1013,7 +1048,7 @@ export const useBankStore = create<BankState>((set, get) => ({
   // hydrateFromCloud replaces local state with what's on the server.
   addVoiceHistory: async (item) => {
     set((state) => {
-      const next = { voiceHistory: [item, ...state.voiceHistory] }
+      const next = { voiceHistory: prependRow(item, state.voiceHistory) }
       saveToStorage({ ...state, ...next })
       return next
     })
@@ -1054,7 +1089,7 @@ export const useBankStore = create<BankState>((set, get) => ({
   // ── Video History ────────────────────────────────────────────────
   addVideoHistory: async (item) => {
     set((state) => {
-      const next = { videoHistory: [item, ...state.videoHistory] }
+      const next = { videoHistory: prependRow(item, state.videoHistory) }
       saveToStorage({ ...state, ...next })
       return next
     })
@@ -1108,7 +1143,7 @@ export const useBankStore = create<BankState>((set, get) => ({
   // ── Image History (Playground) ──────────────────────────────────
   addImageHistory: async (item) => {
     set((state) => {
-      const next = { imageHistory: [item, ...state.imageHistory] }
+      const next = { imageHistory: prependRow(item, state.imageHistory) }
       saveToStorage({ ...state, ...next })
       return next
     })
@@ -1160,7 +1195,7 @@ export const useBankStore = create<BankState>((set, get) => ({
   // ── Music History (Playground) ──────────────────────────────────
   addMusicHistory: async (item) => {
     set((state) => {
-      const next = { musicHistory: [item, ...state.musicHistory] }
+      const next = { musicHistory: prependRow(item, state.musicHistory) }
       saveToStorage({ ...state, ...next })
       return next
     })
@@ -1212,7 +1247,7 @@ export const useBankStore = create<BankState>((set, get) => ({
   // storage eviction (Safari ITP's 7-day sweep, "clear site data", etc.).
   addScriptHistory: async (item) => {
     set((state) => {
-      const next = { scriptHistory: [item, ...state.scriptHistory] }
+      const next = { scriptHistory: prependRow(item, state.scriptHistory) }
       saveToStorage({ ...state, ...next })
       return next
     })
@@ -1320,7 +1355,7 @@ export const useBankStore = create<BankState>((set, get) => ({
   // ── Character History (Characters tab) ──────────────────────────
   addCharacterHistory: async (item) => {
     set((state) => {
-      const next = { characterHistory: [item, ...state.characterHistory] }
+      const next = { characterHistory: prependRow(item, state.characterHistory) }
       saveToStorage({ ...state, ...next })
       return next
     })
@@ -1372,7 +1407,7 @@ export const useBankStore = create<BankState>((set, get) => ({
   // ── Ad Anatomy History (Ad Analyzer) ────────────────────────────
   addAdAnatomyHistory: async (item) => {
     set((state) => {
-      const next = { adAnatomyHistory: [item, ...state.adAnatomyHistory] }
+      const next = { adAnatomyHistory: prependRow(item, state.adAnatomyHistory) }
       saveToStorage({ ...state, ...next })
       return next
     })

@@ -472,7 +472,7 @@ export default function VaultBrowser({
         <GridCanvas>
           <AwaitingBody
             icon={Library}
-            title="Nothing matches"
+            title="Nothing Matches"
             hint={
               filters.starredOnly && starIds.length === 0
                 ? 'You haven’t starred anything yet. Star a hook from its card and it lands here.'

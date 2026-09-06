@@ -86,7 +86,7 @@ export default function BankSidebar({ banks, active, counts, onSelect, showFrom 
       </div>
       {fromApps.length > 0 && (
         <div className="flex flex-col gap-0.5">
-          <SectionLabel label="From apps" className="px-3 pb-1.5" />
+          <SectionLabel label="From Apps" className="px-3 pb-1.5" />
           {fromApps.map(row)}
         </div>
       )}

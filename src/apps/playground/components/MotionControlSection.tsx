@@ -84,7 +84,7 @@ export default function MotionControlSection({
        is true: the run refuses without both (see Playground.tsx), so an empty
        slot here really is why nothing generates. */
     <div className="flex flex-col gap-3">
-      <RefGroup label="Character image" filled={!!imageRef} required>
+      <RefGroup label="Character Image" filled={!!imageRef} required>
         <VideoInputSlot
           label="Character Image"
           value={imageRef ? { dataUri: imageRef.url } : null}
@@ -95,7 +95,7 @@ export default function MotionControlSection({
       </RefGroup>
 
       <RefGroup
-        label="Driving video"
+        label="Driving Video"
         filled={!!videoRef}
         required
         note={`≤ ${orientation === 'video' ? MAX_DRIVING_SECONDS : 10}s`}
@@ -108,7 +108,7 @@ export default function MotionControlSection({
             onRemove={() => onChangeRefs(refs.filter((r) => r.slot !== 'motion-video'))}
           />
         ) : (
-          <RefSlotPill icon={Film} label="Upload a clip" onClick={() => videoInputRef.current?.click()} />
+          <RefSlotPill icon={Film} label="Upload a Clip" onClick={() => videoInputRef.current?.click()} />
         )}
         <input
           ref={videoInputRef}

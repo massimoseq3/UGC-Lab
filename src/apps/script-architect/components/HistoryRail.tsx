@@ -6,9 +6,9 @@ import { WRITE_STYLE_META, HOOK_CATEGORY_META, isHookCategoryChoice, parseHooks,
 import { TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
 import RailNewButton from '../../../components/RailNewButton'
-import HistoryRailToggle from '../../../components/HistoryRailToggle'
+import { RailCloseButton } from '../../../components/HistoryRailHandle'
 import { GeneratingChip } from '../../../components/GeneratingChip'
-import { WARM_METALS, COOL_METALS, metalPlate, METAL_PLATE_INK, METAL_PLATE_RIM, type MetalRamp } from '../../../utils/metal'
+import { SCRIPT_BADGE, SCRIPT_BADGE_SHAPE } from '../../../utils/scriptBadge'
 
 const isHooksItem = (item: ScriptHistoryItem) => item.mode === 'write' && item.writeFormat === 'hooks'
 
@@ -17,52 +17,35 @@ const isHooksItem = (item: ScriptHistoryItem) => item.mode === 'write' && item.w
 // in their title, moved onto the row's own label so the title can be the
 // product.
 //
-// The pills are METAL (September 2026, Massimo's call), the same material
-// Voiceovers' voice discs are cut from — a light-to-mid ramp under a diffuse
-// bloom, a lit rim, and the label engraved into it in dark ink. They were
-// solid fuchsia / blue / amber / emerald / sky, which is four saturated
-// rectangles down a column of grey chrome: the loudest thing in the rail was
-// a category label nobody is looking for.
+// The badge each row leads with — the kind of thing this run produced, plus
+// (for Write New) which style wrote it.
 //
-// The fill is still OPAQUE, which is the half of the previous pass worth
-// keeping: the pills before that were 15%-alpha washes, and a 9px label over
-// one takes its colour from whatever is behind it, so the same badge read
-// differently on a hovered row, a selected one and a plain one. Metal is a
-// fixed material in both themes, so its ink is a literal too.
-//
-// One metal per kind, fixed rather than seeded — the pill has to say the same
-// thing every time it appears. They stay distinguishable at a glance (gold /
-// copper / steel / silver) without a saturated hue between them.
-const BADGE_METALS = {
-  hooks: WARM_METALS[3],     // antique gold
-  remix: WARM_METALS[1],     // copper
-  scenes: COOL_METALS[1],    // steel
-  cinematic: WARM_METALS[2], // champagne
-  script: COOL_METALS[0],    // silver
-} as const
-
-function historyBadge(item: ScriptHistoryItem): { label: string; metal: MetalRamp } {
+// The palette and the pill's shape live in `utils/scriptBadge.ts`, because the
+// Bank's Scripts tab and the Select Script picker draw the same badge and the
+// three had already drifted into two different materials. The reasoning for
+// the solid fill — and for fuchsia Scenes in particular — is there.
+function historyBadge(item: ScriptHistoryItem): { label: string; className: string } {
   if (isHooksItem(item)) {
     const family = isHookCategoryChoice(item.hookCategory) && item.hookCategory !== 'auto'
       ? `${HOOK_CATEGORY_META[item.hookCategory].label} Hooks`
       : 'Hooks'
-    return { label: family, metal: BADGE_METALS.hooks }
+    return { label: family, className: SCRIPT_BADGE.hooks }
   }
   if (item.mode === 'remix') {
-    return { label: 'Remix', metal: BADGE_METALS.remix }
+    return { label: 'Remix', className: SCRIPT_BADGE.remix }
   }
   if (item.mode === 'reverse-engineer' || (item.mode === 'write' && item.writeFormat === 'scenes')) {
-    return { label: 'Scenes', metal: BADGE_METALS.scenes }
+    return { label: 'Scenes', className: SCRIPT_BADGE.scenes }
   }
   // Rows from the retired Cinematic format keep their own badge — the run
   // really was a cinematic concept, and the label shouldn't lie about it.
   if (item.mode === 'write' && item.writeFormat === 'prompt') {
-    return { label: 'Cinematic', metal: BADGE_METALS.cinematic }
+    return { label: 'Cinematic', className: SCRIPT_BADGE.cinematic }
   }
   const style = item.writeStyle && item.writeStyle in WRITE_STYLE_META
     ? WRITE_STYLE_META[item.writeStyle as keyof typeof WRITE_STYLE_META].label
     : 'Script'
-  return { label: style, metal: BADGE_METALS.script }
+  return { label: style, className: SCRIPT_BADGE.script }
 }
 
 // The row's preview text — the opening of the first take. Hooks strip their
@@ -121,10 +104,11 @@ interface HistoryRailProps {
   onSelect: (item: ScriptHistoryItem) => void
   onSelectPending: (run: PendingScriptRun) => void
   onDelete: (id: string) => void
-  // Empties the takes panel back to its blank canvas. Nothing is deleted — the
-  // run it clears is a row in the list directly underneath, which is the whole
-  // reason this button can be a single click where the other rails' "New" is
-  // armed: the thing it clears is on screen the moment it happens.
+  // Empties the takes panel back to its blank canvas AND resets the setup
+  // column beside it — a new script starts from a clean brief, not from the
+  // last one's source and product (September 2026, Massimo's call). Nothing is
+  // deleted: every take is a row in the list directly underneath. The inputs
+  // are the half no row holds a copy of, which is why this one arms.
   onNew: () => void
   onCollapse: () => void
 }
@@ -154,20 +138,22 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onSele
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      {/* New leads the rail; the open/shut toggle sits to its LEFT, at the
-          band's own edge (September 2026, Massimo's call — the pull tab it
-          replaced was clipping the bar across the top of the column beside
-          it). The band takes the app-wide h-[57px] so the hairline lines up
-          with the input column's header. */}
+      {/* New leads the rail and gets the whole band: the rail is SHUT from the
+          lip on the seam (`HistoryRailHandle`), a tab on the rail's own edge,
+          so no close needs a slot in here. Below 980px the rail covers the
+          takes and that lip goes with it, so a Close does sit here — it is
+          the only way back. The band takes the app-wide h-[57px] so the
+          hairline lines up with the input column's header. */}
       <div className="flex h-[57px] shrink-0 items-center gap-1.5 border-b border-ink/5 px-3">
-        <HistoryRailToggle open onToggle={onCollapse} />
         <RailNewButton
+          confirm
           label="New Script"
           accentClass="bg-scripts-500"
-          title="Clear the takes panel. Every take stays here in History"
+          title="Clear the takes panel and the setup column. Every take stays here in History"
           onClick={onNew}
           className="flex-1"
         />
+        <RailCloseButton onCollapse={onCollapse} />
       </div>
 
       <div className="relative flex shrink-0 items-center border-b border-ink/5 px-3 py-2.5">
@@ -184,7 +170,7 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onSele
         {items.length === 0 && pending.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
             <FileText className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
-            <p className="text-xs text-ink-300">No scripts yet</p>
+            <p className="text-xs text-ink-300">No Scripts Yet</p>
             <p className="text-[11px] text-ink-500">Your generated scripts will land here.</p>
           </div>
         ) : (
@@ -284,8 +270,7 @@ function HistoryRow({
       )}
 
       <span
-        className={`block w-fit max-w-full truncate rounded-full px-2 py-[3px] text-[9.5px] font-bold uppercase leading-none tracking-[0.04em] ${METAL_PLATE_RIM}`}
-        style={{ background: metalPlate(badge.metal), color: METAL_PLATE_INK }}
+        className={`block ${SCRIPT_BADGE_SHAPE} ${badge.className}`}
       >
         {badge.label}
       </span>

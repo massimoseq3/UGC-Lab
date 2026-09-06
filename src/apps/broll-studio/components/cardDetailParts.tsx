@@ -193,7 +193,7 @@ export function ModalGallery({
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
         <ImageIcon className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
-        <p className="text-sm text-ink-500">No generations yet</p>
+        <p className="text-sm text-ink-500">No Generations Yet</p>
         <p className="max-w-[220px] text-xs leading-relaxed text-ink-600">
           Pick a model and hit Generate. Outputs land here. Click any to set
           it as the cover.
@@ -220,7 +220,7 @@ export function ModalGallery({
           stretching the shorter of a pair to its row. */}
       {inFlightActive.length > 0 && (
         <>
-          <DayPill label="In progress" />
+          <DayPill label="In Progress" />
           <div className="grid grid-cols-2 items-start gap-2">
             {inFlightActive.map((entry) => (
               <div key={entry.kind === 'in-flight-image' || entry.kind === 'in-flight-video' ? entry.id : ''}>
@@ -966,7 +966,7 @@ export function ProductPhotoRow({
           title. No dot: the picked photo is lit and the others are dimmed, which
           says "filled" far louder than 6px could. */}
       <SectionLabel
-        label="Product photo"
+        label="Product Photo"
         right={(
           <span className="text-[10px] tracking-tight text-ink-600">
             {selection.length === 1 ? 'One state per shot' : `${selection.length} attached`}
@@ -1079,7 +1079,7 @@ export function ExtraRefsRow({
           card there's a header row to carry them, which is the whole point of
           the card. No dot: extra refs never gate a generation. */}
       <SectionLabel
-        label="Extra references"
+        label="Extra References"
         right={(
           <span className="text-[10px] tabular-nums tracking-tight text-ink-600">
             {refs.length}/{max}

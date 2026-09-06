@@ -857,7 +857,7 @@ export default function Discover() {
                 onChange={(datePosted) => setFilters((f) => ({ ...f, datePosted }))}
               />
               <FilterSelect
-                label="Min views"
+                label="Min Views"
                 value={String(filters.minViews)}
                 options={MIN_VIEW_OPTIONS.map((v) => ({
                   value: String(v),
@@ -974,7 +974,7 @@ export default function Discover() {
         <GridCanvas>
           <AwaitingBody
             icon={Radar}
-            title={searched ? 'No results' : 'Awaiting search'}
+            title={searched ? 'No Results' : 'Awaiting Search'}
             hint={
               searched
                 ? hiddenByMinViews > 0

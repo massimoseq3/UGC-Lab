@@ -32,6 +32,16 @@ import { rollTypeForTag, tagLabel, tagChipStyle } from './variationTags'
 import { downloadImage } from '../../../utils/downloadImage'
 import { copyToClipboard } from '../../../utils/clipboard'
 
+// The three tabs the card's own hover row can open the detail modal on, in the
+// order the work happens: the still first, then the clip, then animating that
+// still. Module scope so the row below is one map rather than three
+// near-identical buttons that had already drifted once.
+const DETAIL_SHORTCUTS: Array<{ tab: DetailTab; label: string; icon: typeof ImageIcon }> = [
+  { tab: 'image', label: 'Image', icon: ImageIcon },
+  { tab: 'video', label: 'Video', icon: VideoIcon },
+  { tab: 'animate', label: 'Animate', icon: Film },
+]
+
 interface VariationCardProps {
   sceneNumber: number
   scriptLine: string
@@ -1235,37 +1245,47 @@ export default function VariationCard(props: VariationCardProps) {
               Every chip on this face that fades (the tag, the status badges)
               dropped its blur for the same reason. */}
           <div
-            className={`absolute inset-x-2 z-10 flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100 ${
+            className={`absolute inset-x-2 z-10 flex h-9 items-stretch overflow-hidden rounded-full border border-white/25 bg-black/60 opacity-0 transition-opacity group-hover:opacity-100 ${
               showImageError ? 'bottom-14' : 'bottom-2'
             }`}
           >
-            <button
-              type="button"
-              title="Open this card on the Image tab"
-              onClick={(e) => { e.stopPropagation(); openDetail('image') }}
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white transition-colors hover:border-broll-300/70 hover:bg-broll-500"
-            >
-              <ImageIcon className="h-3.5 w-3.5" />
-              Image
-            </button>
-            <button
-              type="button"
-              title="Open this card on the Video tab"
-              onClick={(e) => { e.stopPropagation(); openDetail('video') }}
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white transition-colors hover:border-broll-300/70 hover:bg-broll-500"
-            >
-              <VideoIcon className="h-3.5 w-3.5" />
-              Video
-            </button>
-            <button
-              type="button"
-              title="Open this card on the Animate tab"
-              onClick={(e) => { e.stopPropagation(); openDetail('animate') }}
-              className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-full border border-white/25 bg-black/60 text-[11px] font-semibold text-white transition-colors hover:border-broll-300/70 hover:bg-broll-500"
-            >
-              <Film className="h-3.5 w-3.5" />
-              Animate
-            </button>
+            {/* ONE pill, three segments, split by DASHED hairlines (Massimo's
+                call, September 2026). Three separate pills each carried their
+                own rim and their own 6px of gap, which on a 110px card is more
+                chrome than label — this is the same row with one rim around
+                the lot and the gaps spent on the words instead. The dashed
+                divider is what keeps it reading as three targets rather than
+                as one long button: a solid rule would read as a seam between
+                two controls, a dash reads as a perforation in one.
+
+                Each segment lights on ITS OWN hover, so the side you are over
+                is the side that will open — the control answers "which tab am I
+                about to land on?" before the click, which is the whole reason
+                the three labels are here rather than one "Open" button.
+
+                That hover is the HOUSE MENU ROW's, not an accent fill: a dim
+                label going bright over a faint wash, the same move `MenuItem`
+                makes (Massimo's call, September 2026 — it was a solid
+                `bg-broll-500`, which lit a third of the pill up like a picked
+                state rather than a pointed-at one, and put a saturated block on
+                top of the still the row is sitting on). The tokens are literal
+                white here because this is over generated media, which is the
+                documented exception to the semantic-token rule — `bg-white/15`
+                is `bg-ink/[0.06]`'s job done in a place ink can't go. */}
+            {DETAIL_SHORTCUTS.map(({ tab, label, icon: Icon }, i) => (
+              <button
+                key={tab}
+                type="button"
+                title={`Open this card on the ${label} tab`}
+                onClick={(e) => { e.stopPropagation(); openDetail(tab) }}
+                className={`flex flex-1 items-center justify-center gap-1 self-stretch text-[11px] font-semibold text-white/85 transition-colors hover:bg-white/15 hover:text-white ${
+                  i > 0 ? 'border-l border-dashed border-white/30' : ''
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 

@@ -15,6 +15,7 @@ import { humanizeError } from '../../utils/friendlyError'
 import EditorArea from './components/EditorArea'
 import { VOICE_BATCH_MAX } from './components/GenerateBar'
 import HistoryRail from './components/HistoryRail'
+import HistoryRailHandle from '../../components/HistoryRailHandle'
 import { HistoryRailClosed } from '../../components/HistoryRailToggle'
 import HistoryDetailsView from './components/HistoryDetailsView'
 import { clampBatchCount } from '../../utils/batchCount'
@@ -383,6 +384,11 @@ export default function VoiceStudio() {
                   historyOpen ? 'hidden min-[980px]:block' : 'block'
                 }`}
               >
+                {/* Open, the rail is shut from the LIP on the seam this
+                    column's right edge makes with it. Shut, the way back in is
+                    the labelled History button below. */}
+                {historyOpen && <HistoryRailHandle onCollapse={() => setHistoryOpen(false)} />}
+
                 <EditorArea
                   scriptText={scriptText}
                   onScriptChange={(v) => { setScriptText(v); setSelectedScript(null) }}
@@ -421,9 +427,9 @@ export default function VoiceStudio() {
                   />
                 </div>
               ) : (
-        // Shut, the rail leaves a button's worth of room in its place rather
-        // than nothing: the toggle is a laid-out element in both states, so it
-        // can never land on the bar this column runs across its own top.
+                // Shut, the rail leaves a button's worth of room in its place
+                // rather than nothing — and that button says the word, because
+                // with the rail gone there is no seam for a lip to hang on.
                 <HistoryRailClosed onExpand={() => setHistoryOpen(true)} count={history.length + pendingVoices.length} />
               )}
             </div>

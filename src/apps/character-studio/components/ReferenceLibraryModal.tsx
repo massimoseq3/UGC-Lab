@@ -136,7 +136,7 @@ export default function ReferenceLibraryModal({
       {items.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
           <ScanFace className="h-8 w-8 text-ink-800" strokeWidth={1.5} />
-          <p className="text-xs text-ink-500">No reference photos yet</p>
+          <p className="text-xs text-ink-500">No Reference Photos Yet</p>
         </div>
       ) : groups.length === 0 ? (
         <div className="px-6 py-10 text-center text-xs text-ink-500">No matches.</div>

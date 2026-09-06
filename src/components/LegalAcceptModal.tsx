@@ -35,7 +35,7 @@ export default function LegalAcceptModal() {
           </div>
           <div>
             <h2 className="text-base font-semibold tracking-tight text-ink-100">
-              Updated terms
+              Updated Terms
             </h2>
             <p className="text-[12px] text-ink-500">
               Our policies have been updated. Please review and accept to continue.

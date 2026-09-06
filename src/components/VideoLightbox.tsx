@@ -302,8 +302,8 @@ export function VideoFrameActions({
     <div className="flex w-full flex-col items-center gap-2">
       <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">Frames</span>
       <div className="grid w-full grid-cols-2 items-start gap-2.5">
-        <FrameCard label="First frame" position="first" videoUrl={videoUrl} prompt={prompt} fileStem={fileStem} aspectRatio={aspectRatio} sourceApp={sourceApp} />
-        <FrameCard label="Last frame" position="last" videoUrl={videoUrl} prompt={prompt} fileStem={fileStem} aspectRatio={aspectRatio} sourceApp={sourceApp} />
+        <FrameCard label="First Frame" position="first" videoUrl={videoUrl} prompt={prompt} fileStem={fileStem} aspectRatio={aspectRatio} sourceApp={sourceApp} />
+        <FrameCard label="Last Frame" position="last" videoUrl={videoUrl} prompt={prompt} fileStem={fileStem} aspectRatio={aspectRatio} sourceApp={sourceApp} />
       </div>
     </div>
   )

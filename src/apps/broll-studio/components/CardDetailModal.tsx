@@ -548,7 +548,7 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                     {/* Required, and the dot is honest: no still means Animate is
                         disabled, which is exactly what red is reserved for. Not
                         carded — a border around one control says nothing. */}
-                    <SectionLabel label="Start frame" filled={!!effectiveAnimateFrame} required />
+                    <SectionLabel label="Start Frame" filled={!!effectiveAnimateFrame} required />
                     <div>
                       {effectiveAnimateFrame && animateFrameUrl ? (
                         <div

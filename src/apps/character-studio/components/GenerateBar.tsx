@@ -183,9 +183,20 @@ export default function GenerateBar({
               settings rather than behind the button. */}
           <BatchCountStepper
             grow
+            stacked
             size="lg"
             accent="influencers"
             noun={sheetMode ? 'sheet' : 'character'}
+            // Title Case, like every other label the member reads on a control
+            // (Massimo's call). `noun` stays lower case — it is written into
+            // sentences ("2 characters per press"), not shown as a label.
+            // "Images" rather than the noun: a bare number between a − and a
+            // + reads as a nudge on the chip beside it, and what this row of
+            // chips is nudging is how many pictures come back. It said
+            // "Variations" for a day and lost (Massimo's call, September
+            // 2026) — Playground's stepper next door says Images/Clips, and
+            // the same count on two surfaces has to be called the same thing.
+            label="Images"
             value={count}
             onChange={onBatchCountChange}
             creditsFor={creditsFor}

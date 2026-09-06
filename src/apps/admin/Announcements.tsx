@@ -435,7 +435,7 @@ function Editor({
           />
         </Field>
 
-        <Field label="Video link" hint="A YouTube link renders its thumbnail on the card, no image needed.">
+        <Field label="Video Link" hint="A YouTube link renders its thumbnail on the card, no image needed.">
           <input
             className={FIELD}
             value={draft.videoUrl}
@@ -515,7 +515,7 @@ function Editor({
             </label>
           </div>
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            <span className="text-[12px] text-ink-500">Hide after</span>
+            <span className="text-[12px] text-ink-500">Hide After</span>
             <input
               type="datetime-local"
               className={`${FIELD} w-auto`}
@@ -583,8 +583,8 @@ function Editor({
             <div className="rounded-2xl border border-ink/10 bg-surface-1 p-2">
               <AnnouncementCard announcement={draftToAnnouncement(draft)} image={draft.image} unread preview chrome="bare" />
               <div className="flex items-center gap-2 border-t border-ink/5 p-2 pt-2.5">
-                <span className="rounded-full px-2 text-[12px] text-ink-400">See all</span>
-                <span className="ml-auto rounded-full bg-ink px-4 py-1.5 text-[12px] font-semibold text-paper">Got it</span>
+                <span className="rounded-full px-2 text-[12px] text-ink-400">See All</span>
+                <span className="ml-auto rounded-full bg-ink px-4 py-1.5 text-[12px] font-semibold text-paper">Got It</span>
               </div>
             </div>
           ) : (

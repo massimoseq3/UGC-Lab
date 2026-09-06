@@ -122,7 +122,7 @@ export default function OmniVoiceDesigner({ open, onClose, onCreated }: OmniVoic
               <Mic className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold tracking-tight text-ink-100">Design an Omni voice</h2>
+              <h2 className="text-sm font-semibold tracking-tight text-ink-100">Design an Omni Voice</h2>
               <p className="text-[11px] text-ink-500">Reusable across every Gemini Omni generation</p>
             </div>
           </div>
