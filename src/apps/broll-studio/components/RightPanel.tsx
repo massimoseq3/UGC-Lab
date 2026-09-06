@@ -9,7 +9,7 @@ import { useMinWidth } from '../../../hooks/useBreakpoint'
 import ScenesView from './ScenesView'
 import ContinuousView from './ContinuousView'
 import HistoryRail from './HistoryRail'
-import { HistoryRailClosed } from '../../../components/HistoryRailToggle'
+import HistoryRailToggle, { HistoryRailClosed } from '../../../components/HistoryRailToggle'
 import { brollHistoryMode, isRetiredOneShotRow } from './brollHistoryRows'
 import GridCanvas, { AwaitingBody } from '../../../components/GridCanvas'
 
@@ -147,6 +147,28 @@ export default function RightPanel(props: RightPanelProps) {
   // renders, it goes — behind a wall of cards it's just noise.
   const showCanvas = cleared || !!isGenerating || sceneCount === 0
 
+  // Shut, the toggle rides INSIDE the storyboard's own bar rather than in a
+  // column of its own (September 2026, Massimo's call): a column narrowed the
+  // storyboard by ~135px and left the button standing on bare panel beside a
+  // frosted bar. In the bar, that glass runs under it and the storyboard keeps
+  // its width.
+  //
+  // Two widths it can't go there, and both fall back to the column below: with
+  // no storyboard there is no bar at all, and under `md` the Continuous strip's
+  // pills wrap, so neither strip is the pinned single row this sits in. The
+  // choice is made in CSS — `hidden md:block` here against `md:hidden` on the
+  // column — so nothing has to read a breakpoint in JS.
+  const railToggle = historyOpen ? undefined : (
+    <div className="hidden md:block">
+      <HistoryRailToggle
+        open={false}
+        onToggle={() => setHistoryOpen(true)}
+        showLabel
+        count={brollHistory.length}
+      />
+    </div>
+  )
+
   return (
     // NO header band on this pane. It held a Storyboard / History
     // `SegmentedToggle` and the canvas reset; History is a rail beside the
@@ -193,6 +215,7 @@ export default function RightPanel(props: RightPanelProps) {
             setSelections={setContinuousSelections}
             onAddConcept={onAddContinuousConcept}
             onEditStoryboard={onEditContinuousStoryboard}
+            railToggle={railToggle}
           />
         ) : (
           <ScenesView
@@ -218,6 +241,7 @@ export default function RightPanel(props: RightPanelProps) {
             onOpenProductPicker={onOpenProductPicker}
             cardStates={cardStates}
             setCardStates={setCardStates}
+            railToggle={railToggle}
           />
         )}
         </CanvasFrame>
@@ -240,17 +264,12 @@ export default function RightPanel(props: RightPanelProps) {
           />
         </div>
       ) : (
-        // Shut, the rail leaves a button's worth of room in its place rather
-        // than nothing: the toggle is a laid-out element in both states, so it
-        // can never land on the bar this column runs across its own top.
-        <HistoryRailClosed
-          onExpand={() => setHistoryOpen(true)}
-          count={brollHistory.length}
-          // The one caller that draws the hairline, because it is the one
-          // with a bar to continue: `!showCanvas` is exactly when a
-          // storyboard — and so its `border-b` strip — is on screen.
-          divider={!showCanvas}
-        />
+        // The fallback for the two cases the bar can't take it — see the note
+        // on `railToggle`. With a storyboard up it is a phone-only column; with
+        // none it is the only place the toggle has, at every width.
+        <div className={showCanvas ? 'flex' : 'flex md:hidden'}>
+          <HistoryRailClosed onExpand={() => setHistoryOpen(true)} count={brollHistory.length} />
+        </div>
       )}
     </div>
   )

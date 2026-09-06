@@ -86,29 +86,26 @@ export default function HistoryRailToggle({
 // 40px version of this was told off for.
 //
 // The 57px band at the top is what puts the button level with whatever the
-// output column runs across ITS top, and `divider` decides whether that band
-// draws a hairline. It is opt-in and only B-Roll takes it, only while the
-// storyboard is up (September 2026, Massimo's call): there the strip's own
-// `border-b` used to stop 48px short of the window and this continues it to the
-// edge. In Scripts and Voiceovers there is no bar to continue — those output
-// panes carry no header — so the same hairline was a stub floating over
-// nothing.
+// output column runs across ITS top. It draws NO hairline of its own: Scripts'
+// and Voiceovers' output panes carry no bar for one to continue, so a line here
+// was a stub floating over nothing, and B-Roll — the one pane with a bar —
+// doesn't use this column at those widths any more. Its toggle rides inside
+// that bar instead, so the bar's own glass runs under it and the storyboard
+// isn't narrowed by a column (September 2026, Massimo's call). See
+// `broll-studio/components/RightPanel.tsx`, which keeps this for the two cases
+// the bar can't take it.
 export function HistoryRailClosed({
   onExpand,
   label,
   count,
-  divider = false,
 }: {
   onExpand: () => void
   label?: string
   count?: number
-  // Only pass this where the column beside it really does draw a hairline
-  // across its top, and only while it is drawing one.
-  divider?: boolean
 }) {
   return (
     <div className="flex min-h-0 shrink-0 flex-col">
-      <div className={`flex h-[57px] shrink-0 items-center px-2.5 ${divider ? 'border-b border-ink/5' : ''}`}>
+      <div className="flex h-[57px] shrink-0 items-center px-2.5">
         <HistoryRailToggle open={false} onToggle={onExpand} label={label} showLabel count={count} />
       </div>
     </div>

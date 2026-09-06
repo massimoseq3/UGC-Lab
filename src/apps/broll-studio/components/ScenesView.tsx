@@ -60,6 +60,13 @@ interface ScenesViewProps {
   // while Scenes is hidden.
   cardStates: Record<string, CardState>
   setCardStates: React.Dispatch<React.SetStateAction<Record<string, CardState>>>
+  // The shut History rail's toggle, when there is one. It rides at the RIGHT
+  // END OF THIS STRIP rather than in a column of its own (September 2026,
+  // Massimo's call): a laid-out column beside the storyboard narrowed it by
+  // ~135px and left the button standing on bare panel next to a frosted bar.
+  // In here the bar's own glass runs under it and the storyboard keeps its
+  // full width. Outside the scroll port, so it can't be swiped away.
+  railToggle?: React.ReactNode
 }
 
 // Defaults for a bulk video run — deliberately the cheap tier. A batch here is
@@ -154,6 +161,7 @@ export default function ScenesView({
   onOpenProductPicker,
   cardStates,
   setCardStates,
+  railToggle,
 }: ScenesViewProps) {
   const handleUpdateCardState = useCallback((key: string, updates: Partial<CardState>) => {
     setCardStates((prev) => {
@@ -874,7 +882,9 @@ export default function ScenesView({
             port spans the strip and `px-5` puts both ends back on the panel's
             own inset. Invisible while the row was centred (it just shifted the
             centre 20px left); it shows the moment anything is right-aligned. */}
-        <div className="-mx-5 min-w-0 flex-1 overflow-x-auto scrollbar-hide px-5">
+        {/* With the rail toggle after it the port keeps its LEFT bleed only:
+            `-mr-5` would run the scrolled row 20px under the button. */}
+        <div className={`-ml-5 min-w-0 flex-1 overflow-x-auto scrollbar-hide pl-5 ${railToggle ? '' : '-mr-5 pr-5'}`}>
         <div className="flex w-max min-w-full flex-nowrap items-center gap-2 whitespace-nowrap">
           {/* The look every clip in this storyboard renders in — the one piece
               of meta left on the line. It is CUT TO THE BATCH PILLS' OWN SIZE
@@ -1015,6 +1025,7 @@ export default function ScenesView({
           )}
         </div>
         </div>
+        {railToggle && <div className="shrink-0 pl-2">{railToggle}</div>}
       </div>
       {/* The scroll port runs the FULL height of the panel, behind the
           absolute bar, which is what lets cards pass under it blurred. Its

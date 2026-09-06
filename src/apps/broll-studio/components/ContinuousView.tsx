@@ -102,6 +102,9 @@ interface ContinuousViewProps {
   // Applied in BrollStudio because they reindex the frame, clip and selection
   // maps together.
   onEditStoryboard: (op: ContinuousStoryboardOp) => void
+  // The shut History rail's toggle. Rides at the right end of this strip, for
+  // the reason written on its Line-by-Line twin.
+  railToggle?: React.ReactNode
 }
 
 // Right-panel view for Continuous mode: one row per scene (its keyframe's
@@ -130,6 +133,7 @@ export default function ContinuousView({
   setSelections,
   onAddConcept,
   onEditStoryboard,
+  railToggle,
 }: ContinuousViewProps) {
   // Open modal: a frame concept ("3:cont-xxx") or a clip ("c2").
   const [openFrameKey, setOpenFrameKey] = useState<string | null>(null)
@@ -1226,7 +1230,7 @@ export default function ContinuousView({
           This strip was left as it was because its actions are a different set;
           bringing it across is the obvious follow-up, and until then the two
           tabs of one panel do dress the same job two ways. */}
-      <div className="relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 bg-surface-0 px-5 py-3.5 supports-[backdrop-filter]:bg-surface-0/72 supports-[backdrop-filter]:backdrop-blur-2xl md:absolute md:inset-x-0 md:top-0 md:h-[57px] md:py-0">
+      <div className="relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 bg-surface-0 px-5 py-3.5 supports-[backdrop-filter]:bg-surface-0/72 supports-[backdrop-filter]:backdrop-blur-2xl md:absolute md:inset-x-0 md:top-0 md:h-[57px] md:flex-row md:py-0">
         {/* One CENTRED line that scrolls when the pills outrun the panel. The
             `w-max min-w-full` shape is what allows both: at `min-w-full` the row
             is exactly the port when it fits (so centring does the work) and
@@ -1243,7 +1247,11 @@ export default function ContinuousView({
             port spans the strip and `px-5` puts both ends back on the panel's
             own inset. Invisible while the row was centred (it just shifted the
             centre 20px left); it shows the moment anything is right-aligned. */}
-        <div className="-mx-5 overflow-x-auto scrollbar-hide px-5">
+        {/* `md:flex-1 md:min-w-0` so the toggle beside it is laid out rather
+            than overlapping; the pills still centre, now within the port.
+            The right bleed goes with the toggle, or the scrolled row runs
+            20px under the button. */}
+        <div className={`-mx-5 overflow-x-auto scrollbar-hide px-5 md:min-w-0 md:flex-1 ${railToggle ? 'md:-mr-0 md:pr-0' : ''}`}>
         {/* The generate steps are ONE tinted family in graded depths, lightest
             first — the same ramp as the Line-by-Line strip, so the two tabs of
             one panel don't dress the same job two ways. Download clips stays
@@ -1294,6 +1302,7 @@ export default function ContinuousView({
           )}
         </div>
         </div>
+        {railToggle && <div className="hidden shrink-0 pl-2 md:block">{railToggle}</div>}
       </div>
       <div className="flex-1 overflow-y-auto px-5 pb-4 pt-5 md:pt-[77px]">
       {/* The storyboard's caption — scene count, look, running time, and how
