@@ -791,36 +791,48 @@ export default function ScenesView({
   )
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* The strip is a STATIC row above the scroll port, not a `sticky` child
-          inside it (August 2026). It was sticky and glass, and it visibly came
-          loose from the top edge on the way back up a long storyboard: a
-          backdrop-filter element re-samples its backdrop on the main thread
-          while the scroller itself is scrolled by the compositor, so the bar
-          lagged its own container by a frame or two and then snapped back.
-          Outside the scroller it cannot lag by construction — it is a sibling
-          of the scrolling box, exactly like the panel header above it, and
-          nothing about a scroll moves it. It never scrolled away anyway (it was
-          pinned at `top-0` from the first pixel), so the only thing given up is
-          cards passing under it blurred. `relative z-20` so a card's own
-          positioned hover chrome can't paint over it. */}
-      {/* It is GLASS, and the glass is the app's own (September 2026, Massimo's
-          call): a faint `bg-ink/[0.04]` wash under `.glass-fill
-          .glass-fill-soft`, the broad-surface tuning of the same two layers the
-          dock tiles and every Generate CTA wear. The strip painted NO fill at
-          all before this — the band you saw was the page gradient showing
-          through the panel — so a bar carrying the panel's whole batch row was
-          the one piece of chrome here with no surface of its own.
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* The strip is an OVERLAY pinned to the panel's top edge, and the
+          storyboard scrolls UNDER it, blurred (September 2026, Massimo's call).
+          Getting here took three shapes and the difference between them is the
+          whole note.
 
-          The `backdrop-blur-xl backdrop-saturate-150` is honest about what it
-          samples: nothing scrolls under this row (it is a sibling ABOVE the
-          scroll port, which is the whole point of the note above), so today it
-          only re-blurs a static gradient and the look comes from the wash and
-          the two glass layers. It is kept because this is exactly the case the
-          backdrop-filter rule allows — small, static chrome — and because a
-          backdrop that never changes is a backdrop root that never re-runs.
-          Don't promote it to a bigger surface, and don't put it back on a
-          `sticky` bar. See docs/performance.md. */}
+          It was `sticky top-0` INSIDE the scroll port until August 2026, and it
+          visibly came loose from the top edge on the way back up a long
+          storyboard: a backdrop-filter element re-samples its backdrop on the
+          main thread while the scroller itself is scrolled by the compositor,
+          so the bar lagged its own container by a frame or two and snapped
+          back. The fix then was to lift it OUT of the scroller as a plain
+          static sibling — which cured the lag, and cost the picture: nothing
+          passed under it any more. That is why the glass tried in between was
+          reverted on sight. A wash over a panel that never moves has nothing to
+          frost; it just lifts a 57px band a shade off the panel it belongs to
+          and reads as a seam.
+
+          Absolute is both halves at once. The bar is NOT in the scroller, so it
+          cannot lag it by construction — it is laid out against this panel and
+          nothing about a scroll moves it — and the scroller now runs the full
+          height of the panel behind it, so cards really do pass underneath. The
+          scroll port pays for it with `pt-[77px]` (the bar's 57px plus the 20px
+          the content already stood off by), which is what keeps scene one clear
+          of the bar at scroll-top. Those two numbers move together.
+
+          `bg-surface-0/72` + `backdrop-blur-2xl`, and NO `backdrop-saturate`.
+          Translucent enough to read the storyboard through, blurred hard enough
+          to read as frosted rather than as a dirty window. The saturate was in
+          here for a build and came straight out (Massimo's report): the panel's
+          own left divider is a neutral `border-ink/5` hairline and the bar runs
+          right up against it, so a saturated wash of whatever card is passing
+          underneath put a maroon band against that line and read as the LINE
+          changing colour. Nothing is drawn over the divider — it belongs to the
+          input column and ends one pixel before this bar starts — so the fix is
+          the cast, not the line: a frost that stays neutral leaves the hairline
+          reading as the hairline at every scroll position. The same report
+          asked for less see-through, hence 72% rather than the 55% it shipped
+          at. The opaque `bg-surface-0` under the `supports-` guard is not
+          decoration — with no blur, a translucent band over moving stills is
+          unreadable, so a browser without backdrop-filter gets the solid band.
+          `z-20` so a card's own positioned hover chrome can't paint over it. */}
       {/* ONE line, at EVERY width: what the storyboard IS on the left, what you
           can do to it on the right (August 2026, Massimo's call).
 
@@ -851,7 +863,7 @@ export default function ScenesView({
           than a width — see the note below, which the flex parent doesn't
           change: with both margins negative the row still resolves to exactly
           the strip's padding box. */}
-      <div className="glass-fill glass-fill-soft relative z-20 flex h-[57px] shrink-0 items-center border-b border-ink/5 bg-ink/[0.04] px-5 backdrop-blur-xl backdrop-saturate-150">
+      <div className="absolute inset-x-0 top-0 z-20 flex h-[57px] items-center border-b border-ink/5 bg-surface-0 px-5 supports-[backdrop-filter]:bg-surface-0/72 supports-[backdrop-filter]:backdrop-blur-2xl">
         {/* NOT `w-full` alongside `-mx-5`: `width: 100%` resolves against the
             strip's CONTENT box, so the port came out 40px narrower than the
             strip and the negative margin then spent all of it on the left —
@@ -878,7 +890,7 @@ export default function ScenesView({
             type="button"
             onClick={onChangeStyle}
             title="Change the visual style every clip renders in"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 py-1.5 text-[12px] font-semibold tracking-tight text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
+            className="inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-broll-500/25 bg-broll-500/10 px-3.5 text-[12px] font-semibold tracking-tight text-broll-300 transition-colors hover:border-broll-500/45 hover:bg-broll-500/[0.18]"
           >
             <Palette className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
             <span className="max-w-[180px] truncate">{result.styleBrief ? (result.styleName?.trim() || 'Custom style') : getContinuousStyle(result.styleId ?? 'ugc').label}</span>
@@ -906,7 +918,7 @@ export default function ScenesView({
             type="button"
             onClick={() => setGenerateAllOpen((v) => !v)}
             title="Run a generation pass across every scene"
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/50 bg-broll-500/[0.24] px-3.5 py-1.5 text-[11px] font-medium text-broll-200 transition-colors hover:border-broll-500/65 hover:bg-broll-500/[0.32]"
+            className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-broll-500/50 bg-broll-500/[0.24] px-3.5 text-[11px] font-medium text-broll-200 transition-colors hover:border-broll-500/65 hover:bg-broll-500/[0.32]"
           >
             <Sparkle className="h-3.5 w-3.5" />
             <span>Generate All</span>
@@ -970,7 +982,7 @@ export default function ScenesView({
               type="button"
               onClick={() => setDownloadOpen(true)}
               title="Pick which clips to download as a zip"
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
+              className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/[0.18] px-3.5 text-[11px] font-medium text-emerald-200 transition-colors light:text-emerald-700 hover:border-emerald-500/60 hover:bg-emerald-500/[0.26] hover:text-emerald-100 light:hover:text-emerald-800"
             >
               <Download className="h-3.5 w-3.5" />
               {/* One label at every width now. It carried a short `lg:hidden`
@@ -986,8 +998,18 @@ export default function ScenesView({
                   verb, the way every other tally in the app is written. Same
                   `rounded-full` as the button around it — `tabular-nums` so the
                   pill holds its width as clips land rather than twitching the
-                  row's right edge on every completion. */}
-              <span className="rounded-full bg-ink/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-ink-200">
+                  row's right edge on every completion.
+
+                  The whole pill is GREEN and the chip is a deeper step of the
+                  same emerald, so it still reads as a chip on it (Massimo's
+                  call). Green rather than the app accent on purpose: the two
+                  pills beside it GENERATE, and this one exports what is already
+                  rendered — a second broll-tinted button read as a third
+                  generate pass. It is the app's `recommended` emerald, saying
+                  the same thing it says everywhere else — there is finished
+                  work here. `light:` darker in both layers, as every status
+                  tint in the app takes. */}
+              <span className="rounded-full bg-emerald-500/25 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-emerald-100 light:text-emerald-800">
                 {allClipEntries.length}
               </span>
             </button>
@@ -995,10 +1017,12 @@ export default function ScenesView({
         </div>
         </div>
       </div>
-      {/* The scroll port. `pt-5` replaces the strip's old `mb-5` — the gap
-          between the bar and the first scene now belongs to the scrolling
-          content, which is where it was already being drawn. */}
-      <div className="flex-1 overflow-y-auto px-5 pb-4 pt-5">
+      {/* The scroll port runs the FULL height of the panel, behind the
+          absolute bar, which is what lets cards pass under it blurred. Its
+          `pt-[77px]` is the bar's own 57px plus the 20px the content already
+          stood off by, and it is the only thing holding scene one clear of the
+          bar at scroll-top — change the bar's height and change this with it. */}
+      <div className="flex-1 overflow-y-auto px-5 pb-4 pt-[77px]">
       <div className="flex flex-col gap-10">
         {result.scenes.map((scene) => (
           <SceneSection

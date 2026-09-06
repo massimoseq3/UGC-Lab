@@ -1195,18 +1195,25 @@ export default function ContinuousView({
   const openClipCard = openClipKey ? clipStates[openClipKey] : undefined
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       {/* Top strip — storyboard meta + the batch actions. A STATIC row above
           the scroll port, not a `sticky` child inside it: see the note on the
           Line-by-Line strip for why (a glass sticky bar lagged its own
           scroller on the way back up and read as coming loose). It never
-          scrolled away, so nothing is lost but the blur-under.
+          scrolled away. It is an ABSOLUTE overlay now, like its Line-by-Line
+          twin — read that strip's note for the three shapes this went through
+          and why absolute is the one that gets both halves (no lag, and the
+          storyboard actually passing under it blurred).
 
-          It wears the same glass as its Line-by-Line twin (September 2026) — a
-          faint `bg-ink/[0.04]` under `.glass-fill .glass-fill-soft` — so the
-          two tabs of one panel don't dress the same band two ways. The blur
-          samples nothing here either; see the note on that strip for why it
-          stays anyway and where it must not go. */}
+          `md:h-[57px]` is the twin's height, so the two tabs of one panel dress
+          the same band the same way and both line up with the History rail's
+          own 57px across the seam. It is only pinned from `md`, because below
+          that this strip's pills WRAP — it is the wider of the two rows, four
+          pills against the other's three — and a stated height would clip the
+          second line. That is also why the scroll port's top inset is
+          breakpoint-matched: `pt-5` below `md`, where the strip is back in
+          normal flow, and `md:pt-[77px]` above it. Those numbers move with the
+          height. */}
       {/* The strip is the BATCH BUTTONS and nothing else, centred. The meta
           pills used to share the line and lost the squeeze to buttons that
           can't shrink, painting over the first of them on a narrow window; they
@@ -1221,14 +1228,7 @@ export default function ContinuousView({
           This strip was left as it was because its actions are a different set;
           bringing it across is the obvious follow-up, and until then the two
           tabs of one panel do dress the same job two ways. */}
-      {/* `md:h-[57px]`, the app-wide panel-header height, from the width at
-          which the row below stops wrapping — the same stated height its
-          Line-by-Line twin takes, and for the same reason: the History rail's
-          band next door is 57px, and `py-3.5` made this strip 59.5px, so the
-          two hairlines missed each other by 2.5px across the seam. Below `md`
-          the pills wrap to two rows and the padding has to keep setting the
-          height. */}
-      <div className="glass-fill glass-fill-soft relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 bg-ink/[0.04] px-5 py-3.5 backdrop-blur-xl backdrop-saturate-150 md:h-[57px] md:py-0">
+      <div className="relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 bg-surface-0 px-5 py-3.5 supports-[backdrop-filter]:bg-surface-0/72 supports-[backdrop-filter]:backdrop-blur-2xl md:absolute md:inset-x-0 md:top-0 md:h-[57px] md:py-0">
         {/* One CENTRED line that scrolls when the pills outrun the panel. The
             `w-max min-w-full` shape is what allows both: at `min-w-full` the row
             is exactly the port when it fits (so centring does the work) and
@@ -1259,7 +1259,7 @@ export default function ContinuousView({
             // card rendering on its own doesn't, so the two can overlap.
             disabled={chainRunning}
             title="Generate a keyframe image for every frame that doesn't have one yet"
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/15 bg-broll-500/[0.05] px-3.5 py-1.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/30 hover:bg-broll-500/[0.12] disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-broll-500/15 bg-broll-500/[0.05] px-3.5 text-[11px] font-medium text-broll-300 transition-colors hover:border-broll-500/30 hover:bg-broll-500/[0.12] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {chainRunning ? <Spinner className="h-3.5 w-3.5" /> : <ImageIcon className="h-3.5 w-3.5" />}
             {chainRunning
@@ -1273,7 +1273,7 @@ export default function ContinuousView({
             // stop the member firing the rest.
             disabled={readyClipIndices.length === 0}
             title="Generate every clip whose two keyframes are picked"
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-broll-500/50 bg-broll-500/[0.24] px-3.5 py-1.5 text-[11px] font-medium text-broll-200 transition-colors hover:border-broll-500/65 hover:bg-broll-500/[0.32] disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-broll-500/50 bg-broll-500/[0.24] px-3.5 text-[11px] font-medium text-broll-200 transition-colors hover:border-broll-500/65 hover:bg-broll-500/[0.32] disabled:cursor-not-allowed disabled:opacity-40"
           >
             <VideoIcon className="h-3.5 w-3.5" />
             Generate All Videos
@@ -1283,13 +1283,13 @@ export default function ContinuousView({
               type="button"
               onClick={() => setDownloadOpen(true)}
               title="Pick which clips to download as a zip"
-              className="flex shrink-0 items-center gap-1.5 rounded-full border border-ink/10 bg-ink/[0.03] px-3.5 py-1.5 text-[11px] font-medium text-ink-300 transition-colors hover:border-ink/20 hover:bg-ink/[0.06] hover:text-ink-100"
+              className="flex h-[38px] shrink-0 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/[0.18] px-3.5 text-[11px] font-medium text-emerald-200 transition-colors light:text-emerald-700 hover:border-emerald-500/60 hover:bg-emerald-500/[0.26] hover:text-emerald-100 light:hover:text-emerald-800"
             >
               <Download className="h-3.5 w-3.5" />
-              {/* Count in its own pill, matching the Line-by-Line strip's
-                  button — see the note there. */}
+              {/* Count in its own green pill, matching the Line-by-Line
+                  strip's button — see the note there. */}
               <span>Download Clips</span>
-              <span className="rounded-full bg-ink/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-ink-200">
+              <span className="rounded-full bg-emerald-500/25 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-emerald-100 light:text-emerald-800">
                 {allClipEntries.length}
               </span>
             </button>
@@ -1297,7 +1297,7 @@ export default function ContinuousView({
         </div>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-5 pb-4 pt-5">
+      <div className="flex-1 overflow-y-auto px-5 pb-4 pt-5 md:pt-[77px]">
       {/* The storyboard's caption — scene count, look, running time, and how
           many keyframes are picked. Below the separator rather than in the bar
           above it: up there it was what squeezed the batch buttons off their own
