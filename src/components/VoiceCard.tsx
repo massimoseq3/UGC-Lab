@@ -57,11 +57,22 @@ import { VOICE_GROUPS, VOICE_PRESETS, type VoicePreset } from '../utils/voicePre
 // misclick from re-pasting a paragraph. The References card's Clear exists
 // because attachments can't be deleted by typing.
 
-// Where the box stops growing and starts scrolling. `AutoGrowTextarea` caps only
-// a paste box with no natural ceiling, which is what this is — it sits directly
-// under the prompt box and takes its height out of it, so a pasted essay must
-// not push the thing you actually write in off the column.
-const MAX_FIELD_HEIGHT = 120
+// Where the box stops growing and starts scrolling: THREE lines, and then the
+// field scrolls itself. `AutoGrowTextarea` caps only a paste box with no natural
+// ceiling, which is what this is — it sits directly under the prompt box and
+// takes its height out of it, so a profile typed out long must not push the
+// thing you actually write in off the column.
+//
+// It was 120px (~six lines) until September 2026 (Massimo's call): a profile is
+// two or three sentences and a set-once field growing to half the column as you
+// type it reads as the box running away with the panel. Three lines is enough to
+// see the whole of a normal one, and the fold is what puts a long one away.
+//
+// The number is generous by a few px on purpose. A phone floors every field at
+// 13px (`index.css`), and the `plain` shell adds its own bottom inset — so the
+// cap has to clear 3 × 19.5 + 2 or the third line is clipped into a scroll on
+// exactly the width where it should fit. Four lines is over it in every case.
+const MAX_FIELD_HEIGHT = 62
 
 // ACCENT is what the list is sectioned by, so accent is what the rail
 // navigates: three groups, each worth scrolling to. GENDER is the filter that
@@ -160,13 +171,18 @@ export default function VoiceCard({
       spellCheck={false}
       aria-label="Voice"
       placeholder={placeholder}
-      className={
-        isSection
-          // The card IS the box: a bordered, tinted field inside a bordered,
-          // tinted card is two outlines around the same three lines.
-          ? 'w-full resize-none border-0 bg-transparent p-0 text-[13px] font-light leading-[1.5] tracking-tight text-ink-200 placeholder-ink-600 outline-none'
-          : 'mt-2 w-full resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-[13px] font-light leading-[1.5] tracking-tight text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.05]'
-      }
+      // The card IS the box, in BOTH shells: a bordered, tinted field inside a
+      // bordered, tinted card is two outlines around the same three lines.
+      // Playground's had its own bordered rectangle inside the card until
+      // September 2026 (Massimo's call) — the difference between the variants is
+      // the card's chrome, never a second frame around the text. The caret's
+      // feedback is the CARD brightening (`focus-within` on the wrapper), which
+      // is what the removed border was doing on focus anyway. All that differs
+      // now is the inset: `section` is flush, because `SectionCard` has already
+      // padded it, and `plain` keeps a hair of its own inside the tighter `p-2`.
+      className={`w-full resize-none border-0 bg-transparent text-[12.5px] font-light leading-[1.5] tracking-tight text-ink-200 placeholder-ink-600 outline-none ${
+        isSection ? 'p-0' : 'mt-1.5 px-1 pb-0.5'
+      }`}
     />
   ) : (
     filled && (
@@ -236,7 +252,7 @@ export default function VoiceCard({
     // column would fix it and break something worse: bottom padding on a scroll
     // container is scrolled content, so the gap above the band would change as
     // you scroll.
-    <div className="shrink-0 rounded-2xl border border-ink/5 bg-ink/[0.02] p-2">
+    <div className="shrink-0 rounded-2xl border border-ink/5 bg-ink/[0.02] p-2 transition-colors focus-within:border-ink/15">
       {/* The card's own header, not `SectionCard`'s: with the row collapsed
           there is no hairline to draw under it. Same three-column grid, so the
           heading stays optically centred whatever the edges weigh. */}
