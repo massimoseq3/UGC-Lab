@@ -132,7 +132,7 @@ export default function RightPanel({
         // Shut, the rail leaves a button's worth of room in its place rather
         // than nothing: the toggle is a laid-out element in both states, so it
         // can never land on the bar this column runs across its own top.
-        <HistoryRailClosed onExpand={onToggleHistory} />
+        <HistoryRailClosed onExpand={onToggleHistory} count={history.length + pendingRuns.length} />
       )}
     </div>
   )

@@ -243,7 +243,14 @@ export default function RightPanel(props: RightPanelProps) {
         // Shut, the rail leaves a button's worth of room in its place rather
         // than nothing: the toggle is a laid-out element in both states, so it
         // can never land on the bar this column runs across its own top.
-        <HistoryRailClosed onExpand={() => setHistoryOpen(true)} />
+        <HistoryRailClosed
+          onExpand={() => setHistoryOpen(true)}
+          count={brollHistory.length}
+          // The one caller that draws the hairline, because it is the one
+          // with a bar to continue: `!showCanvas` is exactly when a
+          // storyboard — and so its `border-b` strip — is on screen.
+          divider={!showCanvas}
+        />
       )}
     </div>
   )
