@@ -2,7 +2,7 @@ import type { ScriptHistoryItem } from '../../../stores/types'
 import type { PendingScriptRun, RemixAngle, ScriptMode, WriteFormat } from '../types'
 import OutputPanel from './OutputPanel'
 import HistoryRail from './HistoryRail'
-import HistoryRailHandle from '../../../components/HistoryRailHandle'
+import { HistoryRailClosed } from '../../../components/HistoryRailToggle'
 
 interface RightPanelProps {
   variations: string[]
@@ -89,17 +89,10 @@ export default function RightPanel({
           The number is explained beside `railIsColumn` in ScriptArchitect, which
           has to agree with it. */}
       <div
-        className={`relative min-h-0 min-w-0 flex-1 overflow-hidden ${
+        className={`min-h-0 min-w-0 flex-1 overflow-hidden ${
           historyOpen ? 'hidden min-[980px]:block' : 'block'
         }`}
       >
-        {/* The rail's one open/shut control, on the seam this column's right
-            edge makes with it. Inside this column so it is exactly as far right
-            as the rail's own edge in both states — and so it goes away with the
-            column below 980px, where the rail covers it and carries its own
-            Close. */}
-        <HistoryRailHandle open={historyOpen} onToggle={onToggleHistory} />
-
         <OutputPanel
           variations={cleared ? [] : variations}
           outputAngles={outputAngles}
@@ -122,7 +115,7 @@ export default function RightPanel({
         />
       </div>
 
-      {historyOpen && (
+      {historyOpen ? (
         <div className="flex min-h-0 w-full flex-col border-l border-ink/5 min-[980px]:w-[280px] min-[980px]:shrink-0">
           <HistoryRail
             items={history}
@@ -135,6 +128,11 @@ export default function RightPanel({
             onCollapse={onToggleHistory}
           />
         </div>
+      ) : (
+        // Shut, the rail leaves a button's worth of room in its place rather
+        // than nothing: the toggle is a laid-out element in both states, so it
+        // can never land on the bar this column runs across its own top.
+        <HistoryRailClosed onExpand={onToggleHistory} />
       )}
     </div>
   )

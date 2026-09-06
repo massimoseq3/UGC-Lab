@@ -9,7 +9,7 @@ import { useMinWidth } from '../../../hooks/useBreakpoint'
 import ScenesView from './ScenesView'
 import ContinuousView from './ContinuousView'
 import HistoryRail from './HistoryRail'
-import HistoryRailHandle from '../../../components/HistoryRailHandle'
+import { HistoryRailClosed } from '../../../components/HistoryRailToggle'
 import { brollHistoryMode, isRetiredOneShotRow } from './brollHistoryRows'
 import GridCanvas, { AwaitingBody } from '../../../components/GridCanvas'
 
@@ -157,11 +157,10 @@ export default function RightPanel(props: RightPanelProps) {
           below that it stands in FRONT of it — the shape the tab had, and
           picking a session hands the pane back. */}
       <div
-        className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
+        className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
           historyOpen ? 'hidden min-[980px]:flex' : 'flex'
         }`}
       >
-        <HistoryRailHandle open={historyOpen} onToggle={() => setHistoryOpen((v) => !v)} />
         {/* The storyboard works on the same graph-paper canvas as the other
             apps' output panels. History keeps the plain surface — it's the
             reel, not the stage. */}
@@ -224,7 +223,7 @@ export default function RightPanel(props: RightPanelProps) {
         </CanvasFrame>
       </div>
 
-      {historyOpen && (
+      {historyOpen ? (
         <div className="flex min-h-0 w-full flex-col border-l border-ink/5 min-[980px]:w-[280px] min-[980px]:shrink-0">
           <HistoryRail
             items={brollHistory}
@@ -240,6 +239,11 @@ export default function RightPanel(props: RightPanelProps) {
             onCollapse={() => setHistoryOpen(false)}
           />
         </div>
+      ) : (
+        // Shut, the rail leaves a button's worth of room in its place rather
+        // than nothing: the toggle is a laid-out element in both states, so it
+        // can never land on the bar this column runs across its own top.
+        <HistoryRailClosed onExpand={() => setHistoryOpen(true)} />
       )}
     </div>
   )

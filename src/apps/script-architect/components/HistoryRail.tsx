@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Search, FileText, X } from 'lucide-react'
+import { Search, FileText } from 'lucide-react'
 import type { ScriptHistoryItem } from '../../../stores/types'
 import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history'
 import { WRITE_STYLE_META, HOOK_CATEGORY_META, isHookCategoryChoice, parseHooks, hooksPlainText, type PendingScriptRun } from '../types'
 import { TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
 import RailNewButton from '../../../components/RailNewButton'
+import HistoryRailToggle from '../../../components/HistoryRailToggle'
 import { GeneratingChip } from '../../../components/GeneratingChip'
 
 const isHooksItem = (item: ScriptHistoryItem) => item.mode === 'write' && item.writeFormat === 'hooks'
@@ -135,15 +136,13 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onSele
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
-      {/* New leads the rail, above the search — the Ad Analyzer's shape, and
-          its band takes the app-wide h-[57px] so the hairline lines up with
-          the input column's header across the app. Nothing shares the row on a
-          desktop: the rail's open/shut control is the pull tab on the seam
-          (`HistoryRailHandle`), which is reachable in BOTH states where a
-          button parked in here can only ever be reached in one. Below 980px the
-          rail covers the takes and that tab goes with them, so a Close does sit
-          here — it is the only way back. */}
-      <div className="flex h-[57px] shrink-0 items-center gap-2 border-b border-ink/5 px-3">
+      {/* New leads the rail; the open/shut toggle sits to its LEFT, at the
+          band's own edge (September 2026, Massimo's call — the pull tab it
+          replaced was clipping the bar across the top of the column beside
+          it). The band takes the app-wide h-[57px] so the hairline lines up
+          with the input column's header. */}
+      <div className="flex h-[57px] shrink-0 items-center gap-1.5 border-b border-ink/5 px-3">
+        <HistoryRailToggle open onToggle={onCollapse} />
         <RailNewButton
           label="New Script"
           accentClass="bg-scripts-500"
@@ -151,15 +150,6 @@ export default function HistoryRail({ items, pending, activeId, onSelect, onSele
           onClick={onNew}
           className="flex-1"
         />
-        <button
-          type="button"
-          onClick={onCollapse}
-          title="Close history"
-          aria-label="Close history"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-100 min-[980px]:hidden"
-        >
-          <X className="h-4 w-4" />
-        </button>
       </div>
 
       <div className="relative flex shrink-0 items-center border-b border-ink/5 px-3 py-2.5">

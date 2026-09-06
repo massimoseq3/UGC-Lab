@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Film, AlertCircle, X } from 'lucide-react'
+import { Search, Film, AlertCircle } from 'lucide-react'
 import { GeneratingChip, GeneratingPulseRing } from '../../../components/GeneratingChip'
 import type { BrollHistoryItem } from '../../../stores/types'
 import {
@@ -19,6 +19,7 @@ import { formatRelative, sectionLabel, groupByDay } from '../../../utils/history
 import { TileActionStack, TileDeleteButton } from '../../../components/tileActions'
 import DayPill from '../../../components/DayPill'
 import Dropdown from '../../../components/Dropdown'
+import HistoryRailToggle from '../../../components/HistoryRailToggle'
 import RailNewButton from '../../../components/RailNewButton'
 import { brollHistoryMode } from './brollHistoryRows'
 
@@ -305,13 +306,13 @@ export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {/* New leads the rail, above the filters — the Ad Analyzer's shape, and
-          its band takes the app-wide h-[57px] so the hairline lines up with the
-          input column's header. The rail's open/shut control is the pull tab on
-          the seam (`HistoryRailHandle`), reachable in both states; the Close
-          here renders only below 980px, where the rail covers the storyboard
-          and takes that tab with it. */}
-      <div className="flex h-[57px] shrink-0 items-center gap-2 border-b border-ink/5 px-3">
+      {/* New leads the rail; the open/shut toggle sits to its LEFT, at the
+          band's own edge (September 2026, Massimo's call — the pull tab it
+          replaced was clipping this app's batch strip, which runs across the
+          top of the column beside it). The band takes the app-wide h-[57px] so
+          the hairline lines up with the input column's header. */}
+      <div className="flex h-[57px] shrink-0 items-center gap-1.5 border-b border-ink/5 px-3">
+        <HistoryRailToggle open onToggle={onCollapse} />
         <RailNewButton
           label="New Storyboard"
           accentClass="bg-broll-500"
@@ -319,91 +320,74 @@ export default function HistoryRail({ items, activeId, onSelect, onDelete, onNew
           onClick={onNew}
           className="flex-1"
         />
-        <button
-          type="button"
-          onClick={onCollapse}
-          title="Close history"
-          aria-label="Close history"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/[0.06] hover:text-ink-100 min-[980px]:hidden"
-        >
-          <X className="h-4 w-4" />
-        </button>
       </div>
 
-      {/* Search + filters + sort. It stays put on a phone: this bar wore a
-          CollapsingBar for a week and lost it (August 2026) — a filter row
-          that rolls away on a scroll and unrolls on the way back up moves the
-          list under the thumb reading it. */}
-      <div className="shrink-0 border-b border-ink/5 px-3 py-2.5">
-        {/* ONE row: search, then the mode pills, then sort (August 2026,
-            Massimo's call). The field had the first line to itself and the pills
-            and sort the next, which spent ~40px of a panel that is otherwise all
-            list — and neither line was close to full. The field takes what's
-            left of the row (`flex-1` off a 200px floor) and the row wraps on its
-            own when there isn't room, which is what a phone gets. */}
-        <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[200px] flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
+      {/* Search on its own row, then the mode pills and the sort centred under
+          it. They shared ONE wrapping row until September 2026, which is right
+          in a wide panel and wrong in a 280px rail: the field sat at its
+          `min-w-[200px]` floor with dead space beside it, and the sort wrapped
+          underneath left-aligned against the field's edge. Two stacked rows
+          cost ~40px of a column that is otherwise all list, and buy a field
+          that fills its own width and a control that is centred rather than
+          hanging off one side.
+
+          It stays put on a phone: this bar wore a CollapsingBar for a week and
+          lost it (August 2026) — a filter row that rolls away on a scroll and
+          unrolls on the way back up moves the list under the thumb reading it. */}
+      <div className="flex shrink-0 flex-col gap-2 border-b border-ink/5 px-3 py-2.5">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-500" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search history..."
-            className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-sm text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-broll-500/40"
+            className="w-full rounded-full border border-ink/10 bg-transparent py-2 pl-10 pr-3 text-[12.5px] text-ink-100 placeholder-ink-500 outline-none transition-colors focus:border-broll-500/40"
           />
         </div>
 
-        {/* Mode filter pills, then the sort dropdown. Sort is always shown; the
-            mode pills only when more than one mode is present. A live "N
-            sessions rendering" chip leads them whenever anything is in flight,
-            so the queue is visible without scanning every row.
-
-            CENTRED, and one group with the sort (September 2026): in the rail
-            the search takes the whole first line and this is the whole second
-            one, where left-aligned it sat under the search field's left edge
-            with the rest of the row empty. `flex-1` means it still fills the
-            space beside the field at the widths where everything fits on one
-            line. */}
-          <div className="flex flex-1 flex-wrap items-center justify-center gap-1.5">
-            {generatingRows > 0 && (
-              <span className="flex items-center rounded-full border border-broll-500/30 bg-broll-500/10 px-2.5 py-1 text-[11px]">
-                <GeneratingChip
-                  label={`${generatingRows} session${generatingRows === 1 ? '' : 's'} rendering`}
-                />
-              </span>
-            )}
-            {showModeFilters &&
-              MODE_FILTERS.map((f) => {
-                const active = activeModeFilter === f.id
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setModeFilter(f.id)}
-                    className={`rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
-                      active
-                        ? 'border-broll-500/40 bg-broll-500/15 text-broll-200'
-                        : 'border-ink/10 bg-ink/[0.03] text-ink-400 hover:bg-ink/[0.06] hover:text-ink-200'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                )
-              })}
-          </div>
-
-            {/* A PORTALED dropdown (`Dropdown` → `AnchoredPopover`), not a
-                locally-positioned menu. This rail is a 280px `overflow-y-auto`
-                column, so an `absolute` menu is clipped by it — reported with
-                the options cut off down their left edge. `Dropdown` is the
-                app's only select for exactly this reason. */}
-            <Dropdown
-              value={sort}
-              options={SORTS.map((o) => ({ value: o.id, label: o.label }))}
-              onChange={(v) => setSort(v as SortId)}
-              accent="broll"
-              fitContent
-              dense
-            />
+        {/* Mode filter pills, then the sort. Sort is always shown; the mode
+            pills only when more than one mode is present. A live "N sessions
+            rendering" chip leads them whenever anything is in flight, so the
+            queue is visible without scanning every row. */}
+        <div className="flex flex-wrap items-center justify-center gap-1.5">
+          {generatingRows > 0 && (
+            <span className="flex items-center rounded-full border border-broll-500/30 bg-broll-500/10 px-2.5 py-1 text-[11px]">
+              <GeneratingChip
+                label={`${generatingRows} session${generatingRows === 1 ? '' : 's'} rendering`}
+              />
+            </span>
+          )}
+          {showModeFilters &&
+            MODE_FILTERS.map((f) => {
+              const active = activeModeFilter === f.id
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setModeFilter(f.id)}
+                  className={`rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
+                    active
+                      ? 'border-broll-500/40 bg-broll-500/15 text-broll-200'
+                      : 'border-ink/10 bg-ink/[0.03] text-ink-400 hover:bg-ink/[0.06] hover:text-ink-200'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              )
+            })}
+          {/* A PORTALED dropdown (`Dropdown` → `AnchoredPopover`), not a
+              locally-positioned menu. This rail is a 280px `overflow-y-auto`
+              column, so an `absolute` menu is clipped by it — reported with the
+              options cut off down their left edge. `Dropdown` is the app's only
+              select for exactly this reason. */}
+          <Dropdown
+            value={sort}
+            options={SORTS.map((o) => ({ value: o.id, label: o.label }))}
+            onChange={(v) => setSort(v as SortId)}
+            accent="broll"
+            fitContent
+            dense
+          />
         </div>
       </div>
 

@@ -15,7 +15,7 @@ import { humanizeError } from '../../utils/friendlyError'
 import EditorArea from './components/EditorArea'
 import { VOICE_BATCH_MAX } from './components/GenerateBar'
 import HistoryRail from './components/HistoryRail'
-import HistoryRailHandle from '../../components/HistoryRailHandle'
+import { HistoryRailClosed } from '../../components/HistoryRailToggle'
 import HistoryDetailsView from './components/HistoryDetailsView'
 import { clampBatchCount } from '../../utils/batchCount'
 import SidePanel from './components/SidePanel'
@@ -383,10 +383,6 @@ export default function VoiceStudio() {
                   historyOpen ? 'hidden min-[980px]:block' : 'block'
                 }`}
               >
-                {/* The rail's one open/shut control, on the seam this column
-                    makes with it — see HistoryRailHandle. */}
-                <HistoryRailHandle open={historyOpen} onToggle={() => setHistoryOpen((v) => !v)} />
-
                 <EditorArea
                   scriptText={scriptText}
                   onScriptChange={(v) => { setScriptText(v); setSelectedScript(null) }}
@@ -411,7 +407,7 @@ export default function VoiceStudio() {
                 )}
               </div>
 
-              {historyOpen && (
+              {historyOpen ? (
                 <div className="flex min-h-0 w-full flex-col border-l border-ink/5 min-[980px]:w-[280px] min-[980px]:shrink-0">
                   <HistoryRail
                     items={history}
@@ -424,6 +420,11 @@ export default function VoiceStudio() {
                     onCollapse={() => setHistoryOpen(false)}
                   />
                 </div>
+              ) : (
+        // Shut, the rail leaves a button's worth of room in its place rather
+        // than nothing: the toggle is a laid-out element in both states, so it
+        // can never land on the bar this column runs across its own top.
+                <HistoryRailClosed onExpand={() => setHistoryOpen(true)} />
               )}
             </div>
 
