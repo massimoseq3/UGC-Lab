@@ -802,10 +802,25 @@ export default function ScenesView({
           of the scrolling box, exactly like the panel header above it, and
           nothing about a scroll moves it. It never scrolled away anyway (it was
           pinned at `top-0` from the first pixel), so the only thing given up is
-          cards passing under it blurred; the fill is opaque now, because glass
-          over a panel background that never moves is a backdrop root's cost for
-          no picture. `relative z-20` so a card's own positioned hover chrome
-          can't paint over it. */}
+          cards passing under it blurred. `relative z-20` so a card's own
+          positioned hover chrome can't paint over it. */}
+      {/* It is GLASS, and the glass is the app's own (September 2026, Massimo's
+          call): a faint `bg-ink/[0.04]` wash under `.glass-fill
+          .glass-fill-soft`, the broad-surface tuning of the same two layers the
+          dock tiles and every Generate CTA wear. The strip painted NO fill at
+          all before this — the band you saw was the page gradient showing
+          through the panel — so a bar carrying the panel's whole batch row was
+          the one piece of chrome here with no surface of its own.
+
+          The `backdrop-blur-xl backdrop-saturate-150` is honest about what it
+          samples: nothing scrolls under this row (it is a sibling ABOVE the
+          scroll port, which is the whole point of the note above), so today it
+          only re-blurs a static gradient and the look comes from the wash and
+          the two glass layers. It is kept because this is exactly the case the
+          backdrop-filter rule allows — small, static chrome — and because a
+          backdrop that never changes is a backdrop root that never re-runs.
+          Don't promote it to a bigger surface, and don't put it back on a
+          `sticky` bar. See docs/performance.md. */}
       {/* ONE line, at EVERY width: what the storyboard IS on the left, what you
           can do to it on the right (August 2026, Massimo's call).
 
@@ -836,7 +851,7 @@ export default function ScenesView({
           than a width — see the note below, which the flex parent doesn't
           change: with both margins negative the row still resolves to exactly
           the strip's padding box. */}
-      <div className="relative z-20 flex h-[57px] shrink-0 items-center border-b border-ink/5 px-5">
+      <div className="glass-fill glass-fill-soft relative z-20 flex h-[57px] shrink-0 items-center border-b border-ink/5 bg-ink/[0.04] px-5 backdrop-blur-xl backdrop-saturate-150">
         {/* NOT `w-full` alongside `-mx-5`: `width: 100%` resolves against the
             strip's CONTENT box, so the port came out 40px narrower than the
             strip and the negative margin then spent all of it on the left —
@@ -963,7 +978,18 @@ export default function ScenesView({
                   worst just above the phone breakpoint; with the three generate
                   passes behind one menu, the bar is a style pill and two
                   buttons and the full label fits. */}
-              <span>{`Download Clips (${allClipEntries.length})`}</span>
+              <span>Download Clips</span>
+              {/* The count is a PILL, not `(8)` in the label (September 2026,
+                  Massimo's call). Parenthesised it read as part of the button's
+                  name and the one number on the row that changes was the least
+                  visible thing on it; as its own chip it is a count beside a
+                  verb, the way every other tally in the app is written. Same
+                  `rounded-full` as the button around it — `tabular-nums` so the
+                  pill holds its width as clips land rather than twitching the
+                  row's right edge on every completion. */}
+              <span className="rounded-full bg-ink/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-ink-200">
+                {allClipEntries.length}
+              </span>
             </button>
           )}
         </div>
