@@ -1215,7 +1215,7 @@ function ScriptBankCard({
 function EditableField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-widest text-ink-500">{label}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-500">{label}</span>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}

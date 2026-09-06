@@ -695,7 +695,7 @@ export default function ProductForm({ item, onSave, onAutosave, onCancel, onDeta
               className="group flex aspect-[3/2] w-full shrink-0 flex-col items-center justify-center gap-2 rounded-3xl border border-dashed border-ink/10 bg-ink/[0.02] px-3 text-center transition-colors hover:border-ink/20 md:aspect-square"
             >
               <ImagePlus className="h-6 w-6 text-ink-600 transition-colors group-hover:text-ink-400" />
-              <span className="text-[10px] font-medium uppercase tracking-widest text-ink-600 transition-colors group-hover:text-ink-500">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-ink-600 transition-colors group-hover:text-ink-500">
                 Drop to auto-fill
               </span>
             </button>

@@ -332,7 +332,7 @@ export default function ModelForm({ item, onSave, onCancel }: ModelFormProps) {
             <div>
               <div className="mb-3 flex items-center gap-2.5">
                 <span className="block h-3 w-[3px] rounded-full bg-influencers-400/40" />
-                <h4 className="text-[11px] font-medium uppercase tracking-widest text-ink-400">Character Sheet</h4>
+                <h4 className="text-[11px] font-medium uppercase tracking-wider text-ink-400">Character Sheet</h4>
                 <span className="ml-1 h-px flex-1 bg-ink/5" />
               </div>
               <div className="relative group/sheet overflow-hidden rounded-3xl border border-ink/5 bg-ink/[0.02]">
@@ -373,7 +373,7 @@ export default function ModelForm({ item, onSave, onCancel }: ModelFormProps) {
                   {/* Tab header — uppercase + accent bar, matching the Character Sheet header */}
                   <div className="flex items-center gap-2.5">
                     <span className="block h-3 w-[3px] rounded-full bg-influencers-400/40" />
-                    <h3 className="text-[11px] font-medium uppercase tracking-widest text-ink-400">{tab.label}</h3>
+                    <h3 className="text-[11px] font-medium uppercase tracking-wider text-ink-400">{tab.label}</h3>
                     <span className="ml-1 h-px flex-1 bg-ink/5" />
                   </div>
                   {/* One card per DNA group. The heading was already the right

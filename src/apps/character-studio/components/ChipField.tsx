@@ -163,7 +163,7 @@ export default function ChipField({ label, value, onChange, suggestions, placeho
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5">
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isFilled ? 'bg-emerald-500' : 'bg-red-500'}`} />
-        <span className="text-[11px] font-medium uppercase tracking-widest text-ink-300">{label}</span>
+        <span className="text-[11px] font-medium uppercase tracking-wider text-ink-300">{label}</span>
         {defaultLocked && (
           <button
             type="button"
@@ -250,7 +250,7 @@ export default function ChipField({ label, value, onChange, suggestions, placeho
                 className="w-full resize-none rounded-xl bg-transparent px-3 py-2 text-sm leading-relaxed text-ink-100 placeholder-ink-500 outline-none max-md:text-[13px]"
               />
               <div className="flex items-center justify-between gap-2 px-1 pb-0.5 pt-1">
-                <span className="text-[10px] font-medium uppercase tracking-widest text-ink-500">{label}</span>
+                <span className="text-[10px] font-medium uppercase tracking-wider text-ink-500">{label}</span>
                 <button
                   type="button"
                   onClick={() => setEditing(false)}
