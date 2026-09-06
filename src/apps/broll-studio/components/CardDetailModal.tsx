@@ -1,26 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import {
-  X,
-  ImageIcon,
-  Video as VideoIcon,
-  Film,
-  AlertCircle,
-  Volume2,
-  VolumeX,
-  User,
-  Package,
-  Coins,
-  ChevronRight,
-  Star,
-  Link2,
-  Layers,
-} from 'lucide-react'
+import { X, ImageIcon, Video as VideoIcon, Film, AlertCircle, Volume2, VolumeX, User, Package, Coins, ChevronRight, Link2, Layers } from 'lucide-react'
 import SectionCard, { SectionLabel } from '../../../components/SectionCard'
 import ModelPicker from '../../../components/ModelPicker'
 import ModelPickerModal from '../../../components/ModelPickerModal'
 import ProviderLogo from '../../../components/ProviderLogo'
-import SavingsPill from '../../../components/SavingsPill'
+import ModelTriggerLabel from '../../../components/ModelTriggerLabel'
 import AspectIcon from '../../../components/AspectIcon'
 import ConstraintChip from '../../../components/ConstraintChip'
 import BatchCountStepper from '../../../components/BatchCountStepper'
@@ -806,13 +791,11 @@ export default function CardDetailModal(props: CardDetailModalProps) {
                       {videoModelId ? (
                         <>
                           <ProviderLogo provider={getModel(videoModelId)?.provider ?? ''} />
-                          <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                            <span className="truncate text-[13px] font-medium text-ink-100">{videoModelName}</span>
-                            {getModel(videoModelId)?.tags.includes('recommended') && (
-                              <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
-                            )}
-                            {videoModelSavings != null && <SavingsPill pct={videoModelSavings} />}
-                          </div>
+                          <ModelTriggerLabel
+                            name={videoModelName}
+                            recommended={!!getModel(videoModelId)?.tags.includes('recommended')}
+                            savings={videoModelSavings}
+                          />
                         </>
                       ) : (
                         <span className="flex-1 truncate text-sm text-ink-400">Select model</span>

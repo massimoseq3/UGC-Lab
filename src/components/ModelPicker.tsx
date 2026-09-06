@@ -15,6 +15,7 @@ import { useSettingsStore } from '../stores/settingsStore'
 import { APP_REGISTRY } from '../utils/constants'
 import ProviderLogo from './ProviderLogo'
 import SavingsPill from './SavingsPill'
+import ModelTriggerLabel from './ModelTriggerLabel'
 import { MenuSurface } from './Menu'
 
 // Append 8-digit alpha to a 6-digit hex accent for the selected-row tint.
@@ -168,26 +169,23 @@ export default function ModelPicker({ appId, task, mode, value, onChange, requir
           compact ? (
             <>
               <ProviderLogo provider={selected.provider} size="sm" />
-              <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                <span className="truncate text-[12px] font-medium text-ink-100">{selected.displayName}</span>
-                {selected.tags.includes('recommended') && (
-                  <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
-                )}
-                {selectedSavings != null && <SavingsPill pct={selectedSavings} />}
-              </div>
+              <ModelTriggerLabel
+                size="sm"
+                name={selected.displayName}
+                recommended={selected.tags.includes('recommended')}
+                savings={selectedSavings}
+              />
             </>
           ) : (
             <>
               <ProviderLogo provider={selected.provider} />
-              <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                {/* One trigger text size across every surface — `large` only
-                    widens the padding/gap, it never bumps the type. */}
-                <span className="truncate text-[13px] font-medium text-ink-100">{selected.displayName}</span>
-                {selected.tags.includes('recommended') && (
-                  <Star className="h-3 w-3 shrink-0 fill-yellow-400 text-yellow-400 light:fill-yellow-600 light:text-yellow-600" strokeWidth={1.5} />
-                )}
-                {selectedSavings != null && <SavingsPill pct={selectedSavings} />}
-              </div>
+              {/* One trigger text size across every surface — `large` only
+                  widens the padding/gap, it never bumps the type. */}
+              <ModelTriggerLabel
+                name={selected.displayName}
+                recommended={selected.tags.includes('recommended')}
+                savings={selectedSavings}
+              />
             </>
           )
         ) : (
