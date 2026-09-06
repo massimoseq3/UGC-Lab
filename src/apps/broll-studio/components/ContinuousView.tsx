@@ -1221,7 +1221,14 @@ export default function ContinuousView({
           This strip was left as it was because its actions are a different set;
           bringing it across is the obvious follow-up, and until then the two
           tabs of one panel do dress the same job two ways. */}
-      <div className="glass-fill glass-fill-soft relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 bg-ink/[0.04] px-5 py-3.5 backdrop-blur-xl backdrop-saturate-150">
+      {/* `md:h-[57px]`, the app-wide panel-header height, from the width at
+          which the row below stops wrapping — the same stated height its
+          Line-by-Line twin takes, and for the same reason: the History rail's
+          band next door is 57px, and `py-3.5` made this strip 59.5px, so the
+          two hairlines missed each other by 2.5px across the seam. Below `md`
+          the pills wrap to two rows and the padding has to keep setting the
+          height. */}
+      <div className="glass-fill glass-fill-soft relative z-20 flex shrink-0 flex-col items-center gap-2.5 border-b border-ink/5 bg-ink/[0.04] px-5 py-3.5 backdrop-blur-xl backdrop-saturate-150 md:h-[57px] md:py-0">
         {/* One CENTRED line that scrolls when the pills outrun the panel. The
             `w-max min-w-full` shape is what allows both: at `min-w-full` the row
             is exactly the port when it fits (so centring does the work) and
