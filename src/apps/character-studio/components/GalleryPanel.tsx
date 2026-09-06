@@ -1072,14 +1072,14 @@ function SingleCard({
             onClick={a.toggleSave}
           />
           <ActionPill icon={Download} label="Download" onClick={a.handleDownload} />
-          <ActionPill icon={Copy} label="Copy prompt" onClick={onCopyPrompt} />
+          <ActionPill icon={Copy} label="Copy Prompt" onClick={onCopyPrompt} />
           {/* Straight after Copy prompt, because it's the same object headed
               somewhere else: copy puts this character's parameters on the
               clipboard, reuse puts them back in the form on the left. The arrow
               points at where they land. */}
           <ActionPill
             icon={CornerDownLeft}
-            label="Reuse prompt"
+            label="Reuse Prompt"
             title="Load this character's parameters back into the form"
             onClick={onReuse}
           />

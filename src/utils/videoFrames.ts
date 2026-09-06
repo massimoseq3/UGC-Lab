@@ -70,6 +70,24 @@ export function extractVideoFrame(src: string, position: FramePosition): Promise
   })
 }
 
+// Whether the element currently holds a painted frame a canvas read can copy.
+// Below this the canvas comes back blank rather than throwing, which is worse
+// than refusing.
+//
+// `readyState >= 2` (HAVE_CURRENT_DATA) is the obvious test and the usual
+// answer, but it is not the whole one: a short clip that has played out — or
+// one whose buffer ran dry — drops back to HAVE_METADATA while its last frame
+// stays on screen, so the readyState test alone refuses a grab of a frame the
+// member is looking at. The decoded-frame counters settle that case; the
+// `webkit`-prefixed one is the fallback for older Safari.
+export function hasDecodedFrame(video: HTMLVideoElement): boolean {
+  if (video.readyState >= 2) return true
+  const quality = video.getVideoPlaybackQuality?.()
+  if (quality && quality.totalVideoFrames > 0) return true
+  const decoded = (video as HTMLVideoElement & { webkitDecodedFrameCount?: number }).webkitDecodedFrameCount
+  return typeof decoded === 'number' && decoded > 0
+}
+
 // Grabs the frame a <video> is showing RIGHT NOW, straight off the live
 // element on screen. `extractVideoFrame` above loads its own hidden video and
 // seeks to a fixed position; this one needs no second decode and returns
@@ -82,9 +100,7 @@ export function captureFrameFromElement(video: HTMLVideoElement): Promise<Blob> 
   const w = video.videoWidth
   const h = video.videoHeight
   if (!w || !h) return Promise.reject(new Error('Video had no dimensions'))
-  // HAVE_CURRENT_DATA. Below this the element has no painted frame yet and the
-  // canvas comes back blank rather than throwing.
-  if (video.readyState < 2) return Promise.reject(new Error('No frame decoded yet'))
+  if (!hasDecodedFrame(video)) return Promise.reject(new Error('No frame decoded yet'))
 
   const canvas = document.createElement('canvas')
   canvas.width = w

@@ -1,16 +1,21 @@
 import { useState } from 'react'
 import { AudioLines, Check, ChevronDown, ChevronRight } from 'lucide-react'
-import { SectionPresetPill } from '../../../components/SectionCard'
-import Modal from '../../../components/Modal'
-import SegmentedToggle from '../../../components/SegmentedToggle'
-import SectionRail, { GallerySectionHeading } from '../../../components/SectionRail'
-import { useSectionSpy } from '../../../components/sectionSpy'
-import AutoGrowTextarea from '../../../components/AutoGrowTextarea'
-import CountSlot from '../../../components/CountSlot'
-import { VOICE_GROUPS, VOICE_PRESETS, type VoicePreset } from '../voicePresets'
+import SectionCard, { SectionPresetPill } from './SectionCard'
+import Modal from './Modal'
+import SegmentedToggle from './SegmentedToggle'
+import SectionRail, { GallerySectionHeading } from './SectionRail'
+import { useSectionSpy } from './sectionSpy'
+import AutoGrowTextarea from './AutoGrowTextarea'
+import CountSlot from './CountSlot'
+import { VOICE_GROUPS, VOICE_PRESETS, type VoicePreset } from '../utils/voicePresets'
 
-// The voice profile, in its own box under the prompt, appended to the end of
-// the prompt at generate time (`composePrompt.ts`).
+// The voice profile box — WHO is speaking, as opposed to what is on screen.
+// **One component, two hosts**: Playground's video tab, where it is appended to
+// the end of the prompt at generate time (`composePrompt.ts`), and B-Roll's card
+// detail modal, where it is the ad's one shared dialogue voice. It was two
+// separate boxes until September 2026 (Massimo's call) — the same control, a
+// dock tile apart, with different chrome, different padding and the preset
+// picker on only one of them.
 //
 // It is exactly what a member was doing by hand: the profile is the one part of
 // a UGC video prompt that must NOT change between generations — the same person
@@ -23,9 +28,9 @@ import { VOICE_GROUPS, VOICE_PRESETS, type VoicePreset } from '../voicePresets'
 // this text verbatim — "as if you'd typed it on the end" is the contract, and a
 // label we invented here would be a word in the prompt the member never wrote.
 //
-// **Video only** (and not Motion Control, which has no audio at all): a voice
-// has nothing to say about a still or a music track, and a box that renders in
-// every mode is a box that's wrong in two of them.
+// **In Playground it is video only** (and not Motion Control, which has no audio
+// at all): a voice has nothing to say about a still or a music track. In B-Roll
+// it renders on a DIALOGUE card's Video / Animate tabs, for the same reason.
 //
 // **The header row folds it.** This is a set-once field sitting in the panel's
 // tightest column, directly under the prompt box it steals height from — so once
@@ -34,13 +39,18 @@ import { VOICE_GROUPS, VOICE_PRESETS, type VoicePreset } from '../voicePresets'
 // fold that hid the text entirely would read as the voice having been cleared.
 //
 // It starts OPEN. The box is the reason the card exists, and folded-by-default
-// meant a member who had never opened it had never seen what goes in it — a
-// dashed pill next to the word Optional is easy to read as one more thing to
-// ignore. It costs 78px in the one column that has none spare (this sits
-// directly under a prompt field whose own floor was cut to 150px to keep it and
-// its toolbar on screen at all), which is exactly what the fold is for: one
-// click puts it away, and the state is persisted, so the member pays that price
-// once rather than every session.
+// meant a member who had never opened it had never seen what goes in it. It
+// costs 78px in the one column that has none spare (this sits directly under a
+// prompt field whose own floor was cut to 150px to keep it and its toolbar on
+// screen at all), which is exactly what the fold is for: one click puts it away,
+// and where the host persists the flag the member pays that price once rather
+// than every session.
+//
+// **The header carries no status pills.** B-Roll's copy wore an `optional` and
+// an `every clip` pill either side of the title; both came off with the merge
+// (Massimo's call) — everything in these columns that isn't marked otherwise is
+// optional, and what "every clip" was saying is said properly by the host's own
+// placeholder, in a sentence, inside the box it describes.
 //
 // There is deliberately **no Clear button**: this is a plain textarea, emptying
 // it is select-all-delete, and a destructive control on a set-once field is one
@@ -66,69 +76,73 @@ export default function VoiceCard({
   open,
   onChange,
   onToggleOpen,
+  onCommit,
+  placeholder = 'Describe your voice. Added to the end of every prompt',
+  shadow = true,
+  className = '',
 }: {
   value: string
-  // Folded state, persisted with the draft — the whole point is setting this
-  // once and leaving it, so the fold has to survive a reload too.
+  // Folded state, persisted with the draft where the host has one — the whole
+  // point is setting this once and leaving it, so the fold has to survive a
+  // reload too.
   open: boolean
   onChange: (next: string) => void
   onToggleOpen: () => void
+  // Fired on blur, for a host whose value is shared by more than the one field
+  // it is typed into — B-Roll writes this profile onto every dialogue clip of
+  // the ad, which is not work to do per keystroke.
+  onCommit?: (next: string) => void
+  // The one thing that differs between the two hosts: in Playground the profile
+  // rides on the end of THIS prompt, in B-Roll it applies to every talking clip
+  // of the ad. That sentence used to be an `every clip` pill in the header.
+  placeholder?: string
+  shadow?: boolean
+  className?: string
 }) {
   const [presetsOpen, setPresetsOpen] = useState(false)
   const filled = value.trim().length > 0
 
   return (
-    // `shrink-0`: the prompt box above owns the leftover height and this is a
-    // fixed sibling under it, not another claimant on the same space.
+    // A real `SectionCard` — the B-Roll card modal's shape, which is what this
+    // settled on (Massimo's call, September 2026) once the two apps' voice boxes
+    // were compared side by side: the centred heading over a hairline, and the
+    // card's own rectangle as the field. Playground's copy was a hand-rolled
+    // look-alike with no rule and its own padding, so the same control read as
+    // two different things one dock tile apart.
     //
-    // No `card-soft-shadow`, unlike the References card above it. This is the
-    // LAST child of the input column, and that column is `min-h-full` with the
-    // prompt box taking every spare pixel through `grow` — so this card's bottom
-    // edge sits exactly on the scroller's clip edge at every window size, and a
-    // scroller clips its descendants' shadows. The 8px gap under it belongs to
-    // the generate band below (see the gap rule in CLAUDE.md), which is outside
-    // the scroll port and can't lend the shadow any room. So the shadow could
-    // never render downward here: what it actually drew was a soft halo down the
-    // sides that stopped dead at the bottom corners, which reads as the card
-    // being sliced off — reported in light mode (September 2026), because that
-    // is the only theme where the shadow is visible at all. Adding `pb` to the
-    // column would fix it and break something worse: bottom padding on a scroll
-    // container is scrolled content, so the gap above the band would change as
-    // you scroll.
-    <div className="shrink-0 rounded-2xl border border-ink/5 bg-ink/[0.02] p-2">
-      {/* The card's own header, not `SectionCard`'s: the fold chevron has to be
-          a button of its own on the left, and with the row collapsed there is no
-          hairline to draw under it. Same three-column grid, so the heading stays
-          optically centred whatever the edges weigh.
-
-          The WHOLE ROW folds it, not just the chevron (Massimo's call, September
-          2026): a 24px target on a 48px bar that is otherwise dead space made
-          the fold something you had to aim at. The chevron stays a real button
-          so the control keeps its `aria-expanded` and its keyboard focus — it
-          just stops the click from folding twice on the way up. The heading is
-          the one live thing in here that isn't the fold, so it swallows its own
-          click. */}
-      <div
-        onClick={onToggleOpen}
-        className="group grid min-h-[24px] cursor-pointer grid-cols-[1fr_auto_1fr] items-center gap-1.5"
-      >
-        <div className="flex min-w-0 items-center justify-start">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); onToggleOpen() }}
-            title={open ? 'Hide the voice' : 'Show the voice'}
-            aria-label={open ? 'Hide the voice' : 'Show the voice'}
-            aria-expanded={open}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-600 transition-colors group-hover:text-ink-300 hover:bg-ink/5 hover:text-ink-300"
-          >
-            {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-          </button>
-        </div>
-        {/* The heading IS the preset opener — Influencers' section-title shape
-            (dashed ring + chevron in plain ink), which is where every other list
-            of hand-written presets in this app is reached from. `size='sm'` is
-            the References card's own 13px title: these two headings stack in one
-            column and a 14px pill under a 13px heading read as two title sizes. */}
+    // `focus-within`, not `focus` on the field: the card IS the box you type in,
+    // so the whole rectangle is what brightens when the caret is in it.
+    <SectionCard
+      title="Voice"
+      icon={AudioLines}
+      onHeaderClick={onToggleOpen}
+      // Folded and empty there is no body, so no rule: a hairline over nothing
+      // reads as a card whose content has been clipped off rather than put away.
+      divider={open || filled}
+      shadow={shadow}
+      contentClassName="flex flex-col"
+      className={`shrink-0 transition-colors focus-within:border-ink/15 ${className}`}
+      left={(
+        // The WHOLE header row folds the card; this stays a real button so the
+        // control keeps its `aria-expanded` and its keyboard focus, and stops
+        // its own click from folding twice on the way up.
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onToggleOpen() }}
+          title={open ? 'Hide the voice' : 'Show the voice'}
+          aria-label={open ? 'Hide the voice' : 'Show the voice'}
+          aria-expanded={open}
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-ink-600 transition-colors group-hover:text-ink-300 hover:bg-ink/5 hover:text-ink-300"
+        >
+          {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        </button>
+      )}
+      // The heading IS the preset opener — Influencers' section-title shape
+      // (dashed ring + chevron in plain ink), which is where every other list of
+      // hand-written presets in this app is reached from. `size='sm'` is
+      // `SectionCard`'s own 13px title, so it doesn't stand a size above the
+      // headings it shares a column with.
+      titleNode={(
         <SectionPresetPill
           tone="neutral"
           size="sm"
@@ -137,24 +151,22 @@ export default function VoiceCard({
           title="Browse voice presets"
           onClick={(e) => { e.stopPropagation(); setPresetsOpen(true) }}
         />
-        {/* The right cell is empty and stays: it is the gutter that keeps the
-            heading centred against the chevron opposite it. The `Optional` pill
-            that used to sit here came off with the References card's own
-            (September 2026) — everything in this column that isn't marked
-            otherwise is optional, and the word only ever said so twice. */}
-        <div className="flex min-w-0 items-center justify-end" />
-      </div>
-
+      )}
+    >
       {open ? (
         <AutoGrowTextarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={() => onCommit?.(value)}
           maxHeight={MAX_FIELD_HEIGHT}
           rows={2}
           spellCheck={false}
           aria-label="Voice"
-          placeholder="Describe your voice. Added to the end of every prompt"
-          className="mt-2 w-full resize-none rounded-xl border border-ink/10 bg-ink/[0.03] px-3 py-2 text-[13px] font-light leading-[1.5] tracking-tight text-ink-200 placeholder-ink-600 outline-none transition-colors focus:border-ink/20 focus:bg-ink/[0.05]"
+          placeholder={placeholder}
+          // No border, no fill: the card's own rectangle is the box. A bordered,
+          // tinted field inside a bordered, tinted card is two outlines around
+          // the same three lines, in the column with the least height to spare.
+          className="w-full resize-none border-0 bg-transparent p-0 text-[13px] font-light leading-[1.5] tracking-tight text-ink-200 placeholder-ink-600 outline-none"
         />
       ) : (
         filled && (
@@ -165,7 +177,7 @@ export default function VoiceCard({
             type="button"
             onClick={onToggleOpen}
             title="Show the voice"
-            className="mt-1 block w-full truncate px-1 text-left text-[11.5px] font-light tracking-tight text-ink-600 transition-colors hover:text-ink-400"
+            className="block w-full truncate text-left text-[11.5px] font-light tracking-tight text-ink-600 transition-colors hover:text-ink-400"
           >
             {value.trim()}
           </button>
@@ -176,9 +188,9 @@ export default function VoiceCard({
         open={presetsOpen}
         onClose={() => setPresetsOpen(false)}
         value={value}
-        onPick={(text) => { onChange(text); setPresetsOpen(false) }}
+        onPick={(text) => { onChange(text); onCommit?.(text); setPresetsOpen(false) }}
       />
-    </div>
+    </SectionCard>
   )
 }
 

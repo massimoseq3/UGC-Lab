@@ -48,7 +48,7 @@ import { GALLERY_GRID, useSectionSpy } from '../../../components/sectionSpy'
 import ExpandTextModal, { BracketHighlightArea } from '../../../components/ExpandableText'
 import SectionCard from '../../../components/SectionCard'
 import PromptToolbar from '../../../components/PromptToolbar'
-import VoiceCard from './VoiceCard'
+import VoiceCard from '../../../components/VoiceCard'
 import MentionPopover from './MentionPopover'
 import type { PlaygroundMode, BankReference } from '../types'
 import { VIDEO_PRESETS, IMAGE_PRESETS, type Preset } from '../presets'
@@ -1046,6 +1046,16 @@ export default function PromptPanel({ state, onChange, onModeChange, onSubmit, i
                   open={state.voiceOpen ?? true}
                   onChange={(voiceProfile) => onChange({ ...state, voiceProfile })}
                   onToggleOpen={() => onChange({ ...state, voiceOpen: !(state.voiceOpen ?? true) })}
+                  // No shadow: this is the LAST child of the input column, whose
+                  // bottom edge sits exactly on the scroller's clip edge, and a
+                  // scroller clips its descendants' shadows — what rendered was a
+                  // halo down the sides stopping dead at the bottom corners, which
+                  // reads as the card being sliced off (reported in light mode,
+                  // the only theme where the shadow is visible at all). Padding
+                  // on the column would fix it and break something worse: bottom
+                  // padding on a scroll container is scrolled content, so the gap
+                  // above the generate band would change as you scroll.
+                  shadow={false}
                 />
               )}
 

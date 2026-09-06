@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Bookmark, Check, Copy, Download, Film, Maximize2, X } from 'lucide-react'
+import { Bookmark, Camera, Check, Copy, Download, Film, Maximize2, X } from 'lucide-react'
 import Spinner from './Spinner'
 import { useExclusiveVideo } from '../hooks/useInlineVideo'
 import useCloseOnEscape from '../hooks/useCloseOnEscape'
@@ -11,7 +11,7 @@ import { useAppStore } from '../stores/appStore'
 import { saveAsset } from '../utils/assetStore'
 import { downloadImage } from '../utils/downloadImage'
 import { copyToClipboard } from '../utils/clipboard'
-import { extractVideoFrame } from '../utils/videoFrames'
+import { captureFrameFromElement, extractVideoFrame, frameTimeStamp, hasDecodedFrame } from '../utils/videoFrames'
 import { TileActionButton } from './tileActions'
 import { useBackdropClose } from '../hooks/useBackdropClose'
 
@@ -87,7 +87,7 @@ export default function VideoLightbox({
       </div>
 
       <div className="mx-auto flex h-full w-full max-w-6xl flex-row items-center justify-center gap-8 overflow-hidden px-6 py-16">
-        <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+        <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-3">
           {/* Autoplays with sound, so it claims the app-wide playback slot —
               expanding a clip stops whatever tile was playing. */}
           <video
@@ -97,8 +97,9 @@ export default function VideoLightbox({
             autoPlay
             loop
             onClick={(e) => e.stopPropagation()}
-            className="max-h-[72vh] max-w-full rounded-xl border border-white/10 object-contain"
+            className="max-h-[68vh] max-w-full rounded-xl border border-white/10 object-contain"
           />
+          <CurrentFrameButton videoRef={player.ref} fileStem={fileStem} />
         </div>
 
         <div
@@ -124,7 +125,7 @@ export default function VideoLightbox({
                 toneClass={copied ? SAVED_TONE : accentClass}
               >
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                <span>{copied ? 'Copied' : 'Copy prompt'}</span>
+                <span>{copied ? 'Copied' : 'Copy Prompt'}</span>
               </LightboxBarButton>
             )}
             <LightboxBarButton onClick={() => void downloadImage(videoUrl, fileStem, 'mp4')}>
@@ -169,6 +170,116 @@ export function ExpandVideoButton({
       )}
       {open && <VideoLightbox {...lightbox} onClose={() => setOpen(false)} />}
     </>
+  )
+}
+
+// ── Current frame ───────────────────────────────────────────────
+// The first/last cards on the right are fixed positions; this one hands over
+// whatever the player is showing RIGHT NOW, at the clip's own full resolution.
+// The native controls ARE the scrubber — park the playhead on the moment and
+// press — so there's no second timeline to build. Same idiom as the Ad
+// Analyzer's frame grab, and it shares its `captureFrameFromElement`.
+//
+// Module scope on purpose: a try/finally inside a component makes the React
+// Compiler skip that component entirely (see the root CLAUDE.md).
+async function grabCurrentFrame(video: HTMLVideoElement, fileStem: string): Promise<boolean> {
+  let url: string | null = null
+  try {
+    const blob = await captureFrameFromElement(video)
+    url = URL.createObjectURL(blob)
+    await downloadImage(url, `${fileStem}-frame-${frameTimeStamp(video.currentTime)}`, 'png')
+    return true
+  } catch {
+    return false
+  } finally {
+    if (url) URL.revokeObjectURL(url)
+  }
+}
+
+// Every point at which a frame may have landed. `loadeddata` alone misses the
+// element that had already decoded one before this effect attached.
+const READY_EVENTS = ['loadeddata', 'canplay', 'playing', 'timeupdate', 'seeked'] as const
+
+/**
+ * Downloads the frame the player is showing RIGHT NOW. Sits under the clip in
+ * both full-screen clip views — this one and Playground's preview modal, which
+ * already shares `VideoFrameActions` above it. Hand it the same ref the
+ * `<video>` is wearing.
+ */
+export function CurrentFrameButton({
+  videoRef,
+  fileStem,
+}: {
+  videoRef: React.RefObject<HTMLVideoElement | null>
+  fileStem: string
+}) {
+  const addToast = useAppStore((s) => s.addToast)
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(false)
+  const [ready, setReady] = useState(false)
+  const resetTimer = useRef<number | null>(null)
+
+  useEffect(() => () => { if (resetTimer.current) window.clearTimeout(resetTimer.current) }, [])
+
+  // A canvas read of a clip that hasn't decoded a frame yet comes back blank,
+  // so the button stays inert until the element actually holds one. The clip is
+  // a blob resolved out of IndexedDB, so on a cold load that is a second or two
+  // after the view opens — long enough to press. Same test the capture itself
+  // makes, so the button is never armed for a grab that would refuse.
+  //
+  // Latched: once a frame has been decoded the element keeps showing it, and a
+  // clip that plays out drops back to HAVE_METADATA without losing the picture.
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+    let armed = false
+    const check = () => {
+      if (armed || !video.videoWidth || !hasDecodedFrame(video)) return
+      armed = true
+      setReady(true)
+    }
+    check()
+    for (const evt of READY_EVENTS) video.addEventListener(evt, check)
+    return () => { for (const evt of READY_EVENTS) video.removeEventListener(evt, check) }
+  }, [videoRef])
+
+  async function handleGrab(e: React.MouseEvent) {
+    e.stopPropagation()
+    const video = videoRef.current
+    if (!video || busy || !ready) return
+    // The clip loops on autoplay, so mid-playback the grab would race the click
+    // for whichever frame happened to be up. Pausing makes the file match what
+    // is on screen at the moment of the press.
+    video.pause()
+    setBusy(true)
+    const ok = await grabCurrentFrame(video, fileStem)
+    setBusy(false)
+    if (!ok) {
+      addToast('Could not grab that frame. Let the clip finish loading, then try again.', 'error')
+      return
+    }
+    setDone(true)
+    resetTimer.current = window.setTimeout(() => setDone(false), 2000)
+  }
+
+  return (
+    <button
+      type="button"
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={handleGrab}
+      disabled={busy || !ready}
+      title="Download the frame showing now · scrub the player to pick your moment"
+      className="flex shrink-0 items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-5 py-2.5 text-[12.5px] font-medium tracking-tight text-zinc-100 transition-colors hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {busy ? (
+        <Spinner className="h-4 w-4" />
+      ) : done ? (
+        <Check className="h-4 w-4" strokeWidth={1.75} />
+      ) : (
+        <Camera className="h-4 w-4" strokeWidth={1.75} />
+      )}
+      <span>{done ? 'Frame Downloaded' : 'Download this Frame'}</span>
+    </button>
   )
 }
 

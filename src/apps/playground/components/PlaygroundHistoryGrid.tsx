@@ -8,7 +8,7 @@ import { useAssetUrlState, useAssetUrl, useAssetThumb, useAssetPoster } from '..
 import { useInlineVideo, useExclusiveVideo } from '../../../hooks/useInlineVideo'
 import { useAppStore } from '../../../stores/appStore'
 import { getUrl } from '../../../utils/assetStore'
-import { VideoFrameActions } from '../../../components/VideoLightbox'
+import { CurrentFrameButton, VideoFrameActions } from '../../../components/VideoLightbox'
 import { getModel } from '../../../utils/models'
 import { usePersistedState } from '../../../hooks/usePersistedState'
 import { sectionLabel, groupByDay } from '../../../utils/history'
@@ -1124,7 +1124,7 @@ function PreviewModal({
           </div>
         )}
         {entry.kind === 'video' && videoUrl && (
-          <div className="flex min-h-0 w-full flex-1 items-center justify-center max-md:flex-none">
+          <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-3 max-md:flex-none">
             {/* Autoplays with sound, so it claims the app-wide playback slot
                 — opening the lightbox stops whatever tile was playing. */}
             <video
@@ -1134,7 +1134,13 @@ function PreviewModal({
               autoPlay
               loop
               onClick={(e) => e.stopPropagation()}
-              className="max-h-[52vh] max-w-full rounded-xl border border-white/10 object-contain md:max-h-[72vh]"
+              className="max-h-[52vh] max-w-full rounded-xl border border-white/10 object-contain md:max-h-[68vh]"
+            />
+            {/* The first/last cards on the right are fixed positions; this
+                takes whatever moment the member scrubbed to. */}
+            <CurrentFrameButton
+              videoRef={lightboxVideo.ref}
+              fileStem={`playground-${entry.data.id}`}
             />
           </div>
         )}
@@ -1174,7 +1180,7 @@ function PreviewModal({
             {prompt && (
               <ModalBarButton onClick={handleCopyPrompt} tone={copied ? 'saved' : 'accent'}>
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                <span>{copied ? 'Copied' : 'Copy prompt'}</span>
+                <span>{copied ? 'Copied' : 'Copy Prompt'}</span>
               </ModalBarButton>
             )}
             {/* Beside Copy prompt, because this is the surface where an output
@@ -1184,7 +1190,7 @@ function PreviewModal({
             {onReuse && (
               <ModalBarButton onClick={() => { onReuse(); onClose() }}>
                 <CornerDownLeft className="h-4 w-4" />
-                <span>Reuse prompt</span>
+                <span>Reuse Prompt</span>
               </ModalBarButton>
             )}
             {/* Save-to-bank is stills-only — videos are download-only. */}
