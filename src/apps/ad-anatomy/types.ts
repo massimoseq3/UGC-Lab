@@ -27,7 +27,7 @@ export interface Scene {
 // the look is the thing that must not drift between them, so it also rides
 // outside them as a master block: the same contract as B-Roll's storyboard-wide
 // <STYLE>, and the same shape as a `styles` bank row, so it can be saved and
-// re-used to render a member's own ad in the analysed ad's look.
+// re-used to render a member's own ad in the analyzed ad's look.
 export interface MasterVisualStyle {
   // A live `CONTINUOUS_STYLES` id when the ad matches one of the app's own
   // families, otherwise 'other' — never a retired id, since this is what the

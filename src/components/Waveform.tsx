@@ -16,7 +16,7 @@ interface WaveformProps {
 // The whole clip, drawn once, filling left to right as it plays — the shape you
 // can read before you press play, and a position you can see and click.
 //
-// It used to be a live spectrum analyser: 44 bars driven by an AnalyserNode off
+// It used to be a live spectrum analyzer: 44 bars driven by an AnalyserNode off
 // the playing element. Two problems, one of them fatal. The gain staging pinned
 // every bar at full height on a normally-loud voiceover, so it read as noise
 // rather than as speech; and routing the element through the Web Audio graph

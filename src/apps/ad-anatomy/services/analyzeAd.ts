@@ -23,13 +23,13 @@ import {
 } from '../../../utils/visualStyle'
 import { VOICE_PROFILE_SPEC } from '../../../utils/voiceProfile'
 
-// The one surface on the STRONG tier (August 2026). Everything the analyser
+// The one surface on the STRONG tier (August 2026). Everything the analyzer
 // returns is read by a person and acted on — a misread style family or a
 // hedged scene prompt costs a re-shoot, not a retry, which is exactly the
 // "wrong answer costs real rework" case CHAT_MODEL_STRONG is kept for.
 const CHAT_MODEL_ID = CHAT_MODEL_STRONG
 // Both transports read this. kieChatCompletions defaults to 'low', so the
-// streaming fallback would quietly analyse at a different effort from the task
+// streaming fallback would quietly analyze at a different effort from the task
 // path if it didn't pass one — and the fallback's whole point is that a member
 // can't tell which of the two ran.
 const REASONING_EFFORT = 'medium' as const
@@ -37,7 +37,7 @@ const REASONING_EFFORT = 'medium' as const
 // have intermediate progress signals like the task-based flow.
 const STREAM_TIMEOUT_MS = 300_000
 
-// How many bytes of video the analyser will send to kie in one go.
+// How many bytes of video the analyzer will send to kie in one go.
 //
 // This used to be the INLINE budget — what fit in a chat request as a base64
 // data URI — and it was never the real ceiling: the gateway rejects an inline
@@ -93,7 +93,7 @@ function isPayloadTooLarge(err: unknown): boolean {
 // or the JSON contract, so a regression here is a prompt-quality question and
 // not the payload-budget one that killed the split.
 
-// The style families the analyser classifies an ad into — read off the app's own
+// The style families the analyzer classifies an ad into — read off the app's own
 // picker list so the two can never drift, plus 'other' for a look none of them
 // covers (a polished cinematic spot, mixed media, a screen recording).
 const STYLE_ID_ENUM = [...CONTINUOUS_STYLES.map((s) => s.id), 'other'].join(' | ')
@@ -472,7 +472,7 @@ export async function streamAnalysisFallback(videoFile: File): Promise<AnalysisR
   }).catch((err) => {
     // A detected ceiling. humanizeError's own rule for this is written for
     // Scripts and B-Roll and advises "a shorter script or fewer scenes" —
-    // neither of which is a thing a member analysing an ad has.
+    // neither of which is a thing a member analyzing an ad has.
     if (err instanceof TruncatedResponseError) throw INCOMPLETE_ANALYSIS
     throw err
   })

@@ -49,18 +49,18 @@ async function fitForUpload(historyId: string, file: File): Promise<File> {
   if (file.size <= VIDEO_UPLOAD_BUDGET_BYTES) return file
   if (!file.type.startsWith('video/')) {
     throw new FriendlyError(
-      `This image is ${mb(file.size)}, over the ${mb(VIDEO_UPLOAD_BUDGET_BYTES)} the analyser can send. Export it smaller and try again.`,
+      `This image is ${mb(file.size)}, over the ${mb(VIDEO_UPLOAD_BUDGET_BYTES)} the analyzer can send. Export it smaller and try again.`,
     )
   }
 
   const { updateAdAnatomyHistory } = useBankStore.getState()
-  // The analysing screen reads this: a realtime re-encode is a wait BEFORE the
+  // The analyzing screen reads this: a realtime re-encode is a wait BEFORE the
   // analysis starts, and an unexplained one on top of an already-long call is
   // what reads as a hung page.
   await updateAdAnatomyHistory(historyId, { compressing: true })
   console.log(`[ad-anatomy] ${file.name} is ${mb(file.size)} — compressing to fit ${mb(VIDEO_UPLOAD_BUDGET_BYTES)}`)
   // Each pass is another realtime encode, so a second one doubles a wait the
-  // analysing screen has already told the member to expect. It says which pass
+  // analyzing screen has already told the member to expect. It says which pass
   // it is on rather than letting the promised runtime quietly come and go.
   const result = await compressVideoForAnalysis(file, VIDEO_UPLOAD_BUDGET_BYTES, (pass) => {
     if (pass > 1 && rowExists(historyId)) void updateAdAnatomyHistory(historyId, { compressPass: pass })
@@ -76,7 +76,7 @@ async function fitForUpload(historyId: string, file: File): Promise<File> {
   // letting kie say it in its own words after another upload.
   if (result.compressedBytes > VIDEO_UPLOAD_BUDGET_BYTES) {
     throw new FriendlyError(
-      `This ad is still ${mb(result.compressedBytes)} after compressing, over the ${mb(VIDEO_UPLOAD_BUDGET_BYTES)} the analyser can send. Trim it shorter or export it at a lower resolution and try again.`,
+      `This ad is still ${mb(result.compressedBytes)} after compressing, over the ${mb(VIDEO_UPLOAD_BUDGET_BYTES)} the analyzer can send. Trim it shorter or export it at a lower resolution and try again.`,
     )
   }
   return result.file

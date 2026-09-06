@@ -1,4 +1,4 @@
-// A scene prompt comes back as ONE long paragraph — the analyser's contract
+// A scene prompt comes back as ONE long paragraph — the analyzer's contract
 // (services/analyzeAd.ts) asks for a `[0:00–0:03]` marker per camera cut, the
 // shot's direction in prose, and every spoken line quoted verbatim inside it.
 // That is the right shape to paste into a video model and the wrong shape to
@@ -10,7 +10,7 @@
 //
 // It deliberately does NOT share Scripts' `splitSpokenLines`: that parser is
 // written against Scripts' own contract (`[CHARACTER] says: "…"`, always double
-// quotes, always a colon), while the analyser transcribes what it heard — single
+// quotes, always a colon), while the analyzer transcribes what it heard — single
 // or double quotes, `says,` as often as `says:`, plus quoted ON-SCREEN text
 // that is not dialogue at all. One parser bent to serve both would loosen the
 // Scripts one, which is the parser holding the tighter contract.
@@ -18,7 +18,7 @@
 export type SceneSegment =
   | { kind: 'direction'; text: string }
   // A verbatim quote lifted out of the direction. 'speech' is someone talking;
-  // 'screen' is burned-in text the analyser transcribed ("Spanish text at top:
+  // 'screen' is burned-in text the analyzer transcribed ("Spanish text at top:
   // '…'"). Both are quoted verbatim, but only one gets read aloud, so they
   // don't render alike.
   | { kind: 'quote'; variant: 'speech' | 'screen'; speaker: string | null; text: string }
@@ -58,7 +58,7 @@ const SCREEN_CUE = /\b(?:text|caption|overlay|subtitle|title\s*card|sticker|head
 const TRAILING_CONNECTIVE = /[\s,;:]*\b(?:and|then|as|while|before|after)\s*$/i
 
 // The closing mark for the quote opening at `open`. Single quotes need the
-// guard: the analyser's prose is full of possessives and contractions ("the
+// guard: the analyzer's prose is full of possessives and contractions ("the
 // woman's knee", "don't"), so an apostrophe followed by a letter is never the
 // end of a line. Returns null for an unterminated quote — that text is left in
 // the direction rather than swallowed whole.

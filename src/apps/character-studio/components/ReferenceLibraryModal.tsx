@@ -213,7 +213,7 @@ function ReferenceRow({
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-influencers-400 opacity-75" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-influencers-400" />
               </span>
-              Analysing…
+              Analyzing…
             </span>
           ) : failure ? (
             <span className="flex min-w-0 items-center gap-1 text-red-400 light:text-red-600">
@@ -230,8 +230,8 @@ function ReferenceRow({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onRetry() }}
-          title="Analyse again"
-          aria-label="Analyse again"
+          title="Analyze again"
+          aria-label="Analyze again"
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-400 transition-colors hover:bg-ink/10 hover:text-ink-100"
         >
           <RotateCw className="h-3.5 w-3.5" />

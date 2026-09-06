@@ -166,7 +166,7 @@ export default function ControlsPanel({
   const [groupPreset, setGroupPreset] = useState<FieldGroup | null>(null)
   // The whole-form prompt as one editable JSON box — copy the character out, or
   // paste one in. It sits in the band with the other two ways of filling this
-  // form (a saved preset, an analysed photo) rather than on a tab divider,
+  // form (a saved preset, an analyzed photo) rather than on a tab divider,
   // because it is the only one of the three that carries every field at once.
 
   const applyScopedPreset = (incoming: Record<string, string>, keys: string[]) => {

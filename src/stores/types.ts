@@ -512,22 +512,22 @@ export interface AdAnatomyHistoryItem {
   uploadedRef?: string
   // True while the clip is being re-encoded to fit the model's inline request
   // limit (see services/analysisQueue.ts). That pass runs in realtime, so it is
-  // a wait BEFORE the analysis even starts and the analysing screen has to say
+  // a wait BEFORE the analysis even starts and the analyzing screen has to say
   // what it is doing. Ephemeral — a refresh mid-compress leaves an 'analyzing'
   // row with no taskId, which the mount-time reconciler already flips to error.
   compressing?: boolean
   // Which realtime pass that re-encode is on, set only from the second one.
   // The encoder treats the bitrate it is given as a suggestion, so an overshoot
   // is measured and run again (see utils/compressVideo.ts) — which doubles a
-  // wait the analysing screen has already quoted, so it has to say so.
+  // wait the analyzing screen has already quoted, so it has to say so.
   // Ephemeral, on the same rule as `compressing`.
   compressPass?: number
   // kie.ai job id of the analysis in flight. Set after createTask returns.
   // Persisted so a refresh-mid-analysis can resume polling instead of dropping
-  // the result. Missing when the analyser falls back to the streaming
+  // the result. Missing when the analyzer falls back to the streaming
   // transport.
   taskId?: string
-  // Legacy: pass-1 output from the retired two-pass analyser (reverted July
+  // Legacy: pass-1 output from the retired two-pass analyzer (reverted July
   // 2026). Nothing writes it any more; kept so a row still carrying one stays
   // valid, and it's cleared on the next success/error.
   perception?: unknown
@@ -624,14 +624,14 @@ export interface DiscoverVideoPayload {
 }
 
 // Payload for the Ad Analyzer → B-Roll handoff (targetField 'adBlueprint').
-// Deliberately carries STAGING, not the analysed prompts: `script` is the ad's
+// Deliberately carries STAGING, not the analyzed prompts: `script` is the ad's
 // own transcript and `staging` is its beat map + shot craft, which rides the
 // same `BrollInput.sceneStaging` seam a Script Style format uses. B-Roll then
 // writes fresh prompts against the member's OWN product and character refs,
-// shot the way the analysed ad was shot. See services/adBlueprint.ts for why
+// shot the way the analyzed ad was shot. See services/adBlueprint.ts for why
 // the original identity must not travel with it.
 export interface AdBlueprintPayload {
-  // The analysed ad's title — labels the B-Roll input row and the toast.
+  // The analyzed ad's title — labels the B-Roll input row and the toast.
   title: string
   script: string
   staging: string

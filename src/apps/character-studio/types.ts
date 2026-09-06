@@ -567,7 +567,7 @@ export function profileFromFlat(flat: Record<string, unknown>): CharacterProfile
   return profile
 }
 
-// One analysed reference photo in the Characters reference library.
+// One analyzed reference photo in the Characters reference library.
 //
 // Deliberately localStorage-only, and deliberately thumbnail-only. The payload
 // that matters is `profile` — the extracted DNA; the picture is just how you
@@ -588,10 +588,10 @@ export interface CharacterRefItem {
 
 // A row with neither a profile nor an error, and no live analysis running, was
 // interrupted mid-analysis (a refresh, a closed tab). It can't be left reading
-// "Analysing…" forever, so it reads as a failure the member can retry or clear.
+// "Analyzing…" forever, so it reads as a failure the member can retry or clear.
 export const INTERRUPTED_REF_ERROR = 'Analysis was interrupted.'
 
-// One-line descriptor for a reference row — enough to tell two analysed faces
+// One-line descriptor for a reference row — enough to tell two analyzed faces
 // apart in the list without opening either.
 export function describeRefProfile(profile: CharacterProfile): string {
   return [profile.gender, profile.age, profile.ethnicity, profile.hairColor && `${profile.hairColor} hair`]
