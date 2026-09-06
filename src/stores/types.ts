@@ -516,6 +516,12 @@ export interface AdAnatomyHistoryItem {
   // what it is doing. Ephemeral — a refresh mid-compress leaves an 'analyzing'
   // row with no taskId, which the mount-time reconciler already flips to error.
   compressing?: boolean
+  // Which realtime pass that re-encode is on, set only from the second one.
+  // The encoder treats the bitrate it is given as a suggestion, so an overshoot
+  // is measured and run again (see utils/compressVideo.ts) — which doubles a
+  // wait the analysing screen has already quoted, so it has to say so.
+  // Ephemeral, on the same rule as `compressing`.
+  compressPass?: number
   // kie.ai job id of the analysis in flight. Set after createTask returns.
   // Persisted so a refresh-mid-analysis can resume polling instead of dropping
   // the result. Missing when the analyser falls back to the streaming
